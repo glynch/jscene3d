@@ -21,6 +21,23 @@ final class Preconditions {
         return value;
     }
 
+    static float requireInRange(float value, float minimum, float maximum, String parameterName) {
+        float finiteValue = requireFinite(value, parameterName);
+        if (finiteValue < minimum || finiteValue > maximum) {
+            throw new IllegalArgumentException(
+                    parameterName + " must be between " + minimum + " and " + maximum + ": " + finiteValue);
+        }
+        return finiteValue;
+    }
+
+    static int requireInRange(int value, int minimum, int maximum, String parameterName) {
+        if (value < minimum || value > maximum) {
+            throw new IllegalArgumentException(
+                    parameterName + " must be between " + minimum + " and " + maximum + ": " + value);
+        }
+        return value;
+    }
+
     static Vector3fc requireFinite(Vector3fc value, String parameterName) {
         Vector3fc validValue = Objects.requireNonNull(value, parameterName);
         requireFinite(validValue.x(), parameterName + ".x");

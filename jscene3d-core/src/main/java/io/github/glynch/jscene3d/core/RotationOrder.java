@@ -26,6 +26,7 @@ public enum RotationOrder {
     /** Z, then Y, then X. */
     ZYX;
 
+    /** Replaces a quaternion with the rotation represented by ordered Euler angles. */
     final void setQuaternion(Quaternionf destination, float x, float y, float z) {
         switch (this) {
             case XYZ -> destination.rotationXYZ(x, y, z);

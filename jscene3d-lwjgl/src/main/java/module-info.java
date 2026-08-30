@@ -2,6 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
+/** LWJGL-backed windowing, controls, and rendering APIs. */
 module io.github.glynch.jscene3d.lwjgl {
     requires transitive io.github.glynch.jscene3d.core;
     requires org.lwjgl;

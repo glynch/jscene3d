@@ -17,6 +17,7 @@ import java.util.Objects;
 
 /** Demonstrates buffer geometry, scoped edits, built-in factories, and mesh binding. */
 public final class BufferGeometryExample {
+    /** Prevents instantiation of this example entry point. */
     private BufferGeometryExample() {
         throw new AssertionError("BufferGeometryExample cannot be instantiated");
     }
@@ -53,6 +54,7 @@ public final class BufferGeometryExample {
         }
     }
 
+    /** Creates one indexed triangle with per-vertex colors using the low-level builder. */
     private static BufferGeometry createTriangle() {
         BufferGeometry geometry = new BufferGeometry();
         geometry.setAttribute(

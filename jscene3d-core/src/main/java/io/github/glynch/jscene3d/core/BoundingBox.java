@@ -73,6 +73,7 @@ public final class BoundingBox {
         return "BoundingBox[minimum=" + minimum + ", maximum=" + maximum + ']';
     }
 
+    /** Requires ordered bounds for one named axis. */
     private static void requireOrdered(float minimum, float maximum, String axis) {
         if (minimum > maximum) {
             throw new IllegalArgumentException(

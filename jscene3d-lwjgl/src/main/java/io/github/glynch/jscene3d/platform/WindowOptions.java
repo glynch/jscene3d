@@ -27,6 +27,7 @@ public final class WindowOptions {
     private final VerticalSync verticalSync;
     private final int preferredFramebufferSampleCount;
 
+    /** Copies a validated builder snapshot into immutable options. */
     private WindowOptions(Builder builder) {
         width = builder.width;
         height = builder.height;
@@ -101,6 +102,7 @@ public final class WindowOptions {
         return preferredFramebufferSampleCount;
     }
 
+    /** Requires a non-null title containing no native null terminator. */
     static String requireValidTitle(String title) {
         Objects.requireNonNull(title, "title");
         if (title.indexOf('\0') >= 0) {
@@ -152,6 +154,7 @@ public final class WindowOptions {
         private VerticalSync verticalSync = VerticalSync.ENABLED;
         private int preferredFramebufferSampleCount = DEFAULT_FRAMEBUFFER_SAMPLE_COUNT;
 
+        /** Restricts builder creation to {@link WindowOptions#builder()}. */
         private Builder() {}
 
         /**

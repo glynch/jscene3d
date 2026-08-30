@@ -45,6 +45,7 @@ public final class Color {
     @SuppressWarnings("java:S1845")
     private final float blue;
 
+    /** Stores channels already validated as linear sRGB values. */
     private Color(float red, float green, float blue) {
         this.red = red;
         this.green = green;

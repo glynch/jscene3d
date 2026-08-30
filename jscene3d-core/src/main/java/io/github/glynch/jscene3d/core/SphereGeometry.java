@@ -9,6 +9,7 @@ public final class SphereGeometry {
     private static final int DEFAULT_WIDTH_SEGMENTS = 32;
     private static final int DEFAULT_HEIGHT_SEGMENTS = 16;
 
+    /** Prevents instantiation of this geometry factory. */
     private SphereGeometry() {
         throw new AssertionError("SphereGeometry cannot be instantiated");
     }

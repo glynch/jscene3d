@@ -26,6 +26,7 @@ final class RenderList {
     private int activeItemCount;
     private long traversalOrder;
 
+    /** Creates reusable traversal, pooling, and submission collections. */
     RenderList() {
         pendingObjects = new ArrayDeque<>();
         itemPool = new ArrayList<>();
@@ -33,6 +34,7 @@ final class RenderList {
         transparentItems = new ArrayList<>();
     }
 
+    /** Rebuilds opaque and transparent submissions from a scene hierarchy. */
     void build(Scene scene, Frustum frustum, RenderStatistics statistics) {
         clear();
         pendingObjects.push(scene);
@@ -57,22 +59,27 @@ final class RenderList {
         }
     }
 
+    /** Returns the number of active opaque submissions. */
     int opaqueCount() {
         return opaqueItems.size();
     }
 
+    /** Returns an opaque submission by sorted position. */
     RenderItem opaqueItem(int index) {
         return opaqueItems.get(index);
     }
 
+    /** Returns the number of active transparent submissions. */
     int transparentCount() {
         return transparentItems.size();
     }
 
+    /** Returns a transparent submission by traversal position. */
     RenderItem transparentItem(int index) {
         return transparentItems.get(index);
     }
 
+    /** Releases active submissions while retaining allocated pooling capacity. */
     void clear() {
         pendingObjects.clear();
         opaqueItems.clear();
@@ -84,6 +91,7 @@ final class RenderList {
         traversalOrder = 0L;
     }
 
+    /** Validates and classifies one visible mesh, including optional frustum rejection. */
     private void collect(Mesh mesh, Frustum frustum, RenderStatistics statistics) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
@@ -120,6 +128,7 @@ final class RenderList {
         }
     }
 
+    /** Acquires one active item while growing retained pool capacity only when necessary. */
     private RenderItem acquireItem() {
         if (activeItemCount == itemPool.size()) {
             itemPool.add(new RenderItem());

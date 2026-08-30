@@ -19,6 +19,7 @@ import io.github.glynch.jscene3d.render.Renderer;
 
 /** Displays a rotating vertex-colored triangle with the public rendering API. */
 public final class BasicTriangleExample {
+    /** Prevents instantiation of this example entry point. */
     private BasicTriangleExample() {
         throw new AssertionError("BasicTriangleExample cannot be instantiated");
     }
@@ -62,6 +63,7 @@ public final class BasicTriangleExample {
         }
     }
 
+    /** Creates the double-sided vertex-color material used by the rotating triangle. */
     private static BasicMaterial createMaterial() {
         BasicMaterial material = new BasicMaterial(Color.WHITE);
         material.setUsesVertexColors(true);

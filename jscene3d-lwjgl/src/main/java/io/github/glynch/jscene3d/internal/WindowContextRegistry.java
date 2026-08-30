@@ -13,6 +13,7 @@ import java.util.function.IntSupplier;
 public final class WindowContextRegistry {
     private static final IdentityHashMap<Window, Entry> ENTRIES = new IdentityHashMap<>();
 
+    /** Prevents instantiation of this registry utility class. */
     private WindowContextRegistry() {
         throw new AssertionError("WindowContextRegistry cannot be instantiated");
     }
@@ -64,6 +65,7 @@ public final class WindowContextRegistry {
         }
     }
 
+    /** Returns the registered entry for an open window. */
     private static Entry requireEntry(Window window) {
         Entry entry = ENTRIES.get(Objects.requireNonNull(window, "window"));
         if (entry == null) {
@@ -76,6 +78,7 @@ public final class WindowContextRegistry {
     public static final class Access {
         private final Entry entry;
 
+        /** Wraps the exclusively claimed registry entry. */
         private Access(Entry entry) {
             this.entry = entry;
         }
@@ -96,6 +99,7 @@ public final class WindowContextRegistry {
         }
     }
 
+    /** Registered platform operations and exclusive-claim state for one window. */
     private static final class Entry {
         private final Runnable makeCurrent;
         private final IntSupplier framebufferWidth;
@@ -103,6 +107,7 @@ public final class WindowContextRegistry {
 
         private boolean claimed;
 
+        /** Stores context operations supplied by the platform package. */
         private Entry(Runnable makeCurrent, IntSupplier framebufferWidth, IntSupplier framebufferHeight) {
             this.makeCurrent = makeCurrent;
             this.framebufferWidth = framebufferWidth;

@@ -59,6 +59,7 @@ public final class Window implements AutoCloseable {
     private boolean framebufferSizeChanged;
     private boolean closed;
 
+    /** Completes Java-side state and callbacks for an already created native window. */
     private Window(long handle, GLCapabilities capabilities, WindowOptions options) {
         this.handle = handle;
         this.capabilities = capabilities;
@@ -417,6 +418,7 @@ public final class Window implements AutoCloseable {
         GlfwRuntime.release();
     }
 
+    /** Applies the complete OpenGL and default-framebuffer creation contract to GLFW. */
     private static void configureWindowHints(WindowOptions options) {
         GLFW.glfwDefaultWindowHints();
         GLFW.glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -436,10 +438,12 @@ public final class Window implements AutoCloseable {
         GLFW.glfwWindowHint(GLFW_SAMPLES, options.preferredFramebufferSampleCount());
     }
 
+    /** Converts the vertical-sync option to a GLFW swap interval. */
     private static int toSwapInterval(VerticalSync verticalSync) {
         return verticalSync == VerticalSync.ENABLED ? 1 : 0;
     }
 
+    /** Frees callbacks, detaches a current context, and destroys the native window. */
     private static void releaseNativeWindow(long handle) {
         Callbacks.glfwFreeCallbacks(handle);
         if (GLFW.glfwGetCurrentContext() == handle) {
@@ -449,6 +453,7 @@ public final class Window implements AutoCloseable {
         GLFW.glfwDestroyWindow(handle);
     }
 
+    /** Installs callbacks that maintain this window's Java-side state. */
     private void installCallbacks() {
         double[] pointerX = new double[1];
         double[] pointerY = new double[1];
@@ -481,11 +486,13 @@ public final class Window implements AutoCloseable {
         });
     }
 
+    /** Clears per-poll window and input transitions before GLFW dispatch. */
     private void beginPoll() {
         framebufferSizeChanged = false;
         input.beginPoll();
     }
 
+    /** Requires an open window and the process-wide GLFW owner thread. */
     private void requireOpenOwnerThread() {
         if (closed) {
             throw new IllegalStateException("Window is closed");
@@ -493,6 +500,7 @@ public final class Window implements AutoCloseable {
         GlfwRuntime.requireActiveOwnerThread();
     }
 
+    /** Makes this context current and installs its matching LWJGL capabilities. */
     private void makeContextCurrent() {
         if (GLFW.glfwGetCurrentContext() != handle) {
             GLFW.glfwMakeContextCurrent(handle);

@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.core;
 
 /** Creates indexed box geometry with independent face normals and texture coordinates. */
 public final class BoxGeometry {
+    /** Prevents instantiation of this geometry factory. */
     private BoxGeometry() {
         throw new AssertionError("BoxGeometry cannot be instantiated");
     }

@@ -61,6 +61,7 @@ final class BasicProgram implements AutoCloseable {
     private final int baseColorLocation;
     private final int useVertexColorLocation;
 
+    /** Retains a linked program and its required uniform locations. */
     private BasicProgram(
             int id,
             int modelMatrixLocation,
@@ -76,6 +77,7 @@ final class BasicProgram implements AutoCloseable {
         this.useVertexColorLocation = useVertexColorLocation;
     }
 
+    /** Compiles, links, and validates the built-in basic-material program. */
     static BasicProgram create() {
         int program = createLinkedProgram();
         int modelMatrixLocation;
@@ -102,6 +104,7 @@ final class BasicProgram implements AutoCloseable {
                 useVertexColorLocation);
     }
 
+    /** Compiles both stages, links them, and releases all intermediate shader objects. */
     private static int createLinkedProgram() {
         int vertexShader = compileShader(GL_VERTEX_SHADER, "vertex", VERTEX_SOURCE);
         int fragmentShader = 0;
@@ -129,26 +132,32 @@ final class BasicProgram implements AutoCloseable {
         }
     }
 
+    /** Returns the context-local OpenGL program name. */
     int id() {
         return id;
     }
 
+    /** Returns the required model-matrix uniform location. */
     int modelMatrixLocation() {
         return modelMatrixLocation;
     }
 
+    /** Returns the required view-matrix uniform location. */
     int viewMatrixLocation() {
         return viewMatrixLocation;
     }
 
+    /** Returns the required projection-matrix uniform location. */
     int projectionMatrixLocation() {
         return projectionMatrixLocation;
     }
 
+    /** Returns the required base-color uniform location. */
     int baseColorLocation() {
         return baseColorLocation;
     }
 
+    /** Returns the required vertex-color switch uniform location. */
     int useVertexColorLocation() {
         return useVertexColorLocation;
     }
@@ -158,6 +167,7 @@ final class BasicProgram implements AutoCloseable {
         glDeleteProgram(id);
     }
 
+    /** Compiles one built-in shader stage or deletes it before reporting failure. */
     private static int compileShader(int type, String label, String source) {
         int shader = glCreateShader(type);
         glShaderSource(shader, source);
@@ -170,6 +180,7 @@ final class BasicProgram implements AutoCloseable {
         return shader;
     }
 
+    /** Returns an active uniform location or rejects a mismatched built-in program. */
     private static int requiredUniform(int program, String name) {
         int location = glGetUniformLocation(program, name);
         if (location < 0) {

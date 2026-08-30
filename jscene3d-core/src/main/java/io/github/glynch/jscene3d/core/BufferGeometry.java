@@ -517,6 +517,7 @@ public final class BufferGeometry implements AutoCloseable {
         private int drawRangeCount;
         private boolean built;
 
+        /** Restricts builder creation to {@link BufferGeometry#builder()}. */
         private Builder() {}
 
         /**
@@ -674,6 +675,7 @@ public final class BufferGeometry implements AutoCloseable {
             return geometry;
         }
 
+        /** Validates cross-attribute counts, indices, and an explicit draw range. */
         private void validateConfiguration() {
             BufferAttribute positions = attributes.get(POSITION);
             if (positions != null && positions.itemSize() != 3) {
@@ -704,6 +706,7 @@ public final class BufferGeometry implements AutoCloseable {
             }
         }
 
+        /** Rejects reuse after ownership has transferred to a built geometry. */
         private void requireNotBuilt() {
             if (built) {
                 throw new IllegalStateException("BufferGeometry.Builder has already built a geometry");
@@ -711,6 +714,7 @@ public final class BufferGeometry implements AutoCloseable {
         }
     }
 
+    /** Requires one builder attribute to match the configured vertex count. */
     private void requireCompatibleAttributeCount(String name, int attributeCount) {
         for (Map.Entry<String, BufferAttribute> entry : attributes.entrySet()) {
             if (!entry.getKey().equals(name) && entry.getValue().count() != attributeCount) {
@@ -722,6 +726,7 @@ public final class BufferGeometry implements AutoCloseable {
         }
     }
 
+    /** Validates a replacement position attribute against indices and peer attributes. */
     private void validatePositionReplacement(BufferAttribute replacementPosition) {
         IndexBuffer existingIndex = index;
         if (existingIndex != null) {
@@ -730,6 +735,7 @@ public final class BufferGeometry implements AutoCloseable {
         }
     }
 
+    /** Moves the index buffer's registered constraint when the position count changes. */
     private void updateIndexVertexCountAttachment(
             @Nullable BufferAttribute existingPosition, BufferAttribute replacementPosition) {
         IndexBuffer existingIndex = index;
@@ -738,6 +744,7 @@ public final class BufferGeometry implements AutoCloseable {
         }
     }
 
+    /** Returns the first attribute count other than an optional excluded attribute. */
     private int vertexCountExcluding(@Nullable BufferAttribute excluded) {
         for (BufferAttribute attribute : attributes.values()) {
             if (attribute != excluded) {
@@ -747,21 +754,25 @@ public final class BufferGeometry implements AutoCloseable {
         return 0;
     }
 
+    /** Returns the position count, or zero when no position attribute exists. */
     private int vertexCountUnchecked() {
         return attributes.isEmpty() ? 0 : attributes.values().iterator().next().count();
     }
 
+    /** Returns the current indexed or non-indexed element capacity. */
     private int availableElementCount() {
         IndexBuffer currentIndex = index;
         return currentIndex == null ? vertexCountUnchecked() : currentIndex.count();
     }
 
+    /** Revalidates an explicitly configured draw range against current capacity. */
     private void requireValidExplicitDrawRange(int availableCount) {
         if (explicitDrawRange) {
             requireRangeWithin(drawRangeStart, drawRangeCount, availableCount);
         }
     }
 
+    /** Requires a start/count pair to remain within an available element count. */
     private static void requireRangeWithin(int start, int count, int availableCount) {
         if (start > availableCount || count > availableCount - start) {
             throw new IllegalArgumentException("draw range must fit available data: start="
@@ -773,6 +784,7 @@ public final class BufferGeometry implements AutoCloseable {
         }
     }
 
+    /** Returns the position attribute or rejects geometry that has none. */
     private BufferAttribute requirePositionAttribute() {
         BufferAttribute positions = attributes.get(POSITION);
         if (positions == null) {
@@ -781,6 +793,7 @@ public final class BufferGeometry implements AutoCloseable {
         return positions;
     }
 
+    /** Returns a non-empty position attribute or rejects unavailable bounds input. */
     private BufferAttribute requireNonEmptyPositionAttribute() {
         BufferAttribute positions = attributes.get(POSITION);
         if (positions == null || positions.count() == 0) {
@@ -789,6 +802,7 @@ public final class BufferGeometry implements AutoCloseable {
         return positions;
     }
 
+    /** Invalidates only bounds still owned by automatic computation. */
     private void invalidateComputedBounds() {
         if (computedBoundingBox) {
             boundingBox = null;
@@ -802,6 +816,7 @@ public final class BufferGeometry implements AutoCloseable {
         }
     }
 
+    /** Recomputes stale automatically managed bounds before access. */
     private void refreshComputedBounds() {
         BufferAttribute positions = attributes.get(POSITION);
         if (computedBoundingBox
@@ -822,6 +837,7 @@ public final class BufferGeometry implements AutoCloseable {
         }
     }
 
+    /** Calculates axis-aligned bounds from three-component positions. */
     private static BoundingBox calculateBoundingBox(BufferAttribute positions) {
         float minimumX = Float.POSITIVE_INFINITY;
         float minimumY = Float.POSITIVE_INFINITY;
@@ -843,6 +859,7 @@ public final class BufferGeometry implements AutoCloseable {
         return new BoundingBox(minimumX, minimumY, minimumZ, maximumX, maximumY, maximumZ);
     }
 
+    /** Rejects access after this geometry has been closed. */
     private void requireOpen() {
         if (closed) {
             throw new IllegalStateException("BufferGeometry is closed");

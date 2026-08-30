@@ -182,6 +182,7 @@ public final class OrthographicCamera extends Camera {
                 centerX - halfWidth, centerX + halfWidth, centerY - halfHeight, centerY + halfHeight, near, far);
     }
 
+    /** Requires ordered horizontal and vertical projection bounds. */
     private static void validateBounds(float left, float right, float top, float bottom) {
         Preconditions.requireLessThan(left, "left", right, "right");
         Preconditions.requireLessThan(bottom, "bottom", top, "top");

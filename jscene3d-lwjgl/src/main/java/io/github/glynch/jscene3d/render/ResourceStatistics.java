@@ -9,24 +9,35 @@ public final class ResourceStatistics {
     private int activeGeometryResources;
     private int programCount;
 
+    /** Creates zero-valued resource statistics for one renderer. */
     ResourceStatistics() {
         // Resource counts intentionally begin at Java's zero-valued field defaults.
     }
 
-    /** Returns currently realized geometry resources. */
+    /**
+     * Returns currently realized geometry resources.
+     *
+     * @return active geometry-resource count
+     */
     public int activeGeometryResources() {
         return activeGeometryResources;
     }
 
-    /** Returns currently compiled shader programs. */
+    /**
+     * Returns currently compiled shader programs.
+     *
+     * @return compiled-program count
+     */
     public int programCount() {
         return programCount;
     }
 
+    /** Replaces the current context-local geometry-resource count. */
     void setActiveGeometryResources(int activeGeometryResources) {
         this.activeGeometryResources = activeGeometryResources;
     }
 
+    /** Replaces the current context-local shader-program count. */
     void setProgramCount(int programCount) {
         this.programCount = programCount;
     }

@@ -38,10 +38,12 @@ final class GeometryResource implements AutoCloseable {
     private @Nullable AttributeResource colors;
     private @Nullable IndexResource indices;
 
+    /** Allocates the vertex-array object that owns geometry bindings. */
     GeometryResource() {
         vertexArray = glGenVertexArrays();
     }
 
+    /** Synchronizes changed CPU attributes and indices into context-local GPU buffers. */
     void synchronize(BufferGeometry geometry, boolean requiresVertexColors, RenderStatistics statistics) {
         @Nullable BufferAttribute positionAttribute = geometry.attribute(BufferGeometry.POSITION);
         @Nullable BufferAttribute colorAttribute = geometry.attribute(BufferGeometry.COLOR);
@@ -65,6 +67,7 @@ final class GeometryResource implements AutoCloseable {
         glBindVertexArray(0);
     }
 
+    /** Binds this geometry's vertex-array object for drawing. */
     void bind() {
         glBindVertexArray(vertexArray);
     }
@@ -79,6 +82,7 @@ final class GeometryResource implements AutoCloseable {
         glDeleteVertexArrays(vertexArray);
     }
 
+    /** Reuses or replaces one attribute buffer and uploads it only when its version changed. */
     private static @Nullable AttributeResource synchronizeAttribute(
             @Nullable AttributeResource existing,
             @Nullable BufferAttribute attribute,
@@ -112,6 +116,7 @@ final class GeometryResource implements AutoCloseable {
         return resource;
     }
 
+    /** Reuses or replaces the index buffer and uploads it only when its version changed. */
     private static @Nullable IndexResource synchronizeIndex(
             @Nullable IndexResource existing, @Nullable IndexBuffer index, RenderStatistics statistics) {
         if (index == null) {
@@ -139,6 +144,7 @@ final class GeometryResource implements AutoCloseable {
         return resource;
     }
 
+    /** Converts renderer-independent buffer usage to an OpenGL usage hint. */
     private static int toOpenGlUsage(BufferUsage usage) {
         return switch (usage) {
             case STATIC -> GL_STATIC_DRAW;
@@ -147,12 +153,14 @@ final class GeometryResource implements AutoCloseable {
         };
     }
 
+    /** Deletes an attribute buffer when one is present. */
     private static void closeAttribute(@Nullable AttributeResource resource) {
         if (resource != null) {
             glDeleteBuffers(resource.buffer);
         }
     }
 
+    /** Context-local attribute buffer with reusable CPU upload staging. */
     private static final class AttributeResource {
         private final BufferAttribute attribute;
         private final int buffer;
@@ -160,6 +168,7 @@ final class GeometryResource implements AutoCloseable {
 
         private long uploadedVersion = -1L;
 
+        /** Associates one attribute description with a newly allocated buffer name. */
         private AttributeResource(BufferAttribute attribute, int buffer) {
             this.attribute = attribute;
             this.buffer = buffer;
@@ -167,6 +176,7 @@ final class GeometryResource implements AutoCloseable {
         }
     }
 
+    /** Context-local index buffer with reusable CPU upload staging. */
     private static final class IndexResource {
         private final IndexBuffer index;
         private final int buffer;
@@ -174,6 +184,7 @@ final class GeometryResource implements AutoCloseable {
 
         private long uploadedVersion = -1L;
 
+        /** Associates one index description with a newly allocated buffer name. */
         private IndexResource(IndexBuffer index, int buffer) {
             this.index = index;
             this.buffer = buffer;

@@ -30,22 +30,27 @@ public enum MouseButton {
 
     private final int platformCode;
 
+    /** Associates a supported mouse button with its GLFW code. */
     MouseButton(int platformCode) {
         this.platformCode = platformCode;
     }
 
+    /** Returns the exclusive array bound needed to index every GLFW mouse-button code. */
     static int platformCodeLimit() {
         return GLFW.GLFW_MOUSE_BUTTON_LAST + 1;
     }
 
+    /** Returns the corresponding GLFW mouse-button code. */
     int platformCode() {
         return platformCode;
     }
 
+    /** Returns the supported button for a GLFW code, or {@code null} when unsupported. */
     static @Nullable MouseButton fromPlatformCode(int platformCode) {
         return platformCode >= 0 && platformCode < BY_PLATFORM_CODE.length ? BY_PLATFORM_CODE[platformCode] : null;
     }
 
+    /** Builds constant-time GLFW-code lookup storage. */
     private static MouseButton[] createLookup() {
         MouseButton[] lookup = new MouseButton[GLFW.GLFW_MOUSE_BUTTON_LAST + 1];
         for (MouseButton button : values()) {

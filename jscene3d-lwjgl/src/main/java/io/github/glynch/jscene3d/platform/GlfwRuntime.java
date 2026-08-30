@@ -16,8 +16,10 @@ final class GlfwRuntime {
     private static @Nullable GLFWErrorCallback previousErrorCallback;
     private static @Nullable String lastError;
 
+    /** Prevents instantiation of this process-wide runtime manager. */
     private GlfwRuntime() {}
 
+    /** Acquires one window reference and initializes GLFW for the first reference. */
     static synchronized void acquire() {
         Thread currentThread = Thread.currentThread();
         if (referenceCount > 0) {
@@ -44,6 +46,7 @@ final class GlfwRuntime {
         referenceCount = 1;
     }
 
+    /** Releases one window reference and terminates GLFW after the final reference. */
     static synchronized void release() {
         requireActiveOwnerThread();
         referenceCount--;
@@ -57,6 +60,7 @@ final class GlfwRuntime {
         lastError = null;
     }
 
+    /** Requires an active GLFW runtime owned by the calling thread. */
     static synchronized void requireActiveOwnerThread() {
         if (referenceCount == 0) {
             throw new IllegalStateException("No open JScene3D windows");
@@ -64,21 +68,25 @@ final class GlfwRuntime {
         requireOwnerThread(Thread.currentThread());
     }
 
+    /** Clears the most recently captured GLFW error after validating thread ownership. */
     static synchronized void clearLastError() {
         requireActiveOwnerThread();
         lastError = null;
     }
 
+    /** Combines an operation description with the most recently captured GLFW error. */
     static synchronized String failureMessage(String operation) {
         return lastError == null ? operation : operation + ": " + lastError;
     }
 
+    /** Requires the supplied thread to own the active process-wide runtime. */
     private static void requireOwnerThread(Thread currentThread) {
         if (!currentThread.equals(ownerThread)) {
             throw new IllegalStateException("Window operations must run on the creating thread");
         }
     }
 
+    /** Restores the previous GLFW error callback and frees the runtime callback. */
     private static void restoreErrorCallback() {
         GLFW.glfwSetErrorCallback(previousErrorCallback);
         previousErrorCallback = null;

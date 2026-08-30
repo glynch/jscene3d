@@ -26,6 +26,7 @@ public final class IndexBuffer {
     private long version;
     private boolean editing;
 
+    /** Retains validated, exclusively owned index data and its cached maximum. */
     private IndexBuffer(int[] data, BufferUsage usage, int maximumIndex) {
         this.data = data;
         this.usage = usage;
@@ -181,11 +182,13 @@ public final class IndexBuffer {
         System.arraycopy(data, 0, validDestination, 0, data.length);
     }
 
+    /** Registers one geometry whose vertex count constrains index mutations. */
     void attachVertexCount(int vertexCount) {
         requireCompatibleVertexCount(vertexCount);
         attachedVertexCounts.merge(vertexCount, 1, Integer::sum);
     }
 
+    /** Removes one previously registered geometry vertex-count constraint. */
     void detachVertexCount(int vertexCount) {
         Integer attachmentCount = attachedVertexCounts.get(vertexCount);
         if (attachmentCount == null) {
@@ -198,12 +201,14 @@ public final class IndexBuffer {
         }
     }
 
+    /** Atomically replaces one registered geometry vertex-count constraint. */
     void replaceVertexCount(int oldVertexCount, int newVertexCount) {
         requireCompatibleVertexCount(newVertexCount);
         detachVertexCount(oldVertexCount);
         attachedVertexCounts.merge(newVertexCount, 1, Integer::sum);
     }
 
+    /** Requires a non-negative index compatible with every attached geometry. */
     private int requireValidValue(int value) {
         int validValue = Preconditions.requireNonNegative(value, "value");
         if (!attachedVertexCounts.isEmpty() && validValue >= attachedVertexCounts.firstKey()) {
@@ -213,6 +218,7 @@ public final class IndexBuffer {
         return validValue;
     }
 
+    /** Requires every index to address the supplied vertex count. */
     void requireCompatibleVertexCount(int vertexCount) {
         int validVertexCount = Preconditions.requireNonNegative(vertexCount, "vertexCount");
         if (maximumIndex >= validVertexCount) {
@@ -221,6 +227,7 @@ public final class IndexBuffer {
         }
     }
 
+    /** Maintains the cached maximum after one index mutation. */
     private void updateMaximumAfterChange(int oldValue, int newValue) {
         if (newValue > maximumIndex) {
             maximumIndex = newValue;
@@ -229,6 +236,7 @@ public final class IndexBuffer {
         }
     }
 
+    /** Recomputes the maximum after the previous maximum may have decreased. */
     private void recomputeMaximumIndex() {
         maximumIndex = -1;
         for (int value : data) {
@@ -236,6 +244,7 @@ public final class IndexBuffer {
         }
     }
 
+    /** Rejects direct mutation while the scoped editor owns changes. */
     private void requireNotEditing() {
         if (editing) {
             throw new IllegalStateException("Use the scoped editor while an IndexBuffer edit is active");
@@ -257,6 +266,7 @@ public final class IndexBuffer {
         void set(int index, int value);
     }
 
+    /** Reusable scoped editor whose access is guarded by the active edit operation. */
     private final class EditorImpl implements Editor {
         private boolean active;
         private boolean changed;
@@ -272,16 +282,19 @@ public final class IndexBuffer {
             }
         }
 
+        /** Starts an edit operation and clears its change marker. */
         void activate() {
             active = true;
             changed = false;
         }
 
+        /** Ends an edit operation and reports whether it changed any index. */
         boolean deactivate() {
             active = false;
             return changed;
         }
 
+        /** Rejects use of this editor outside its scoped operation. */
         private void requireActive() {
             if (!active) {
                 throw new IllegalStateException("IndexBuffer editor is no longer active");

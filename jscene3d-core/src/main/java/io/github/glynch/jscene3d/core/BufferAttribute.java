@@ -26,6 +26,7 @@ public final class BufferAttribute {
     private long version;
     private boolean editing;
 
+    /** Retains validated, exclusively owned attribute data. */
     private BufferAttribute(float[] data, int itemSize, BufferUsage usage) {
         this.data = data;
         this.itemSize = itemSize;
@@ -251,6 +252,7 @@ public final class BufferAttribute {
         System.arraycopy(data, 0, validDestination, 0, data.length);
     }
 
+    /** Replaces one validated component and reports whether its value changed. */
     private boolean setValue(int itemIndex, int componentIndex, float value) {
         int index = dataIndex(itemIndex, componentIndex);
         float validValue = Preconditions.requireFinite(value, "value");
@@ -261,6 +263,7 @@ public final class BufferAttribute {
         return true;
     }
 
+    /** Replaces a validated item prefix as one versioned mutation. */
     private void setComponents(int itemIndex, float x, float y, float z, float w, int componentCount) {
         requireNotEditing();
         Objects.checkIndex(itemIndex, count);
@@ -293,12 +296,14 @@ public final class BufferAttribute {
         }
     }
 
+    /** Returns the checked flat-array index for an item component. */
     private int dataIndex(int itemIndex, int componentIndex) {
         Objects.checkIndex(itemIndex, count);
         Objects.checkIndex(componentIndex, itemSize);
         return itemIndex * itemSize + componentIndex;
     }
 
+    /** Rejects direct mutation while the scoped editor owns changes. */
     private void requireNotEditing() {
         if (editing) {
             throw new IllegalStateException("Use the scoped editor while a BufferAttribute edit is active");
@@ -370,6 +375,7 @@ public final class BufferAttribute {
         void setXYZW(int itemIndex, float x, float y, float z, float w);
     }
 
+    /** Reusable scoped editor whose access is guarded by the active edit operation. */
     private final class EditorImpl implements Editor {
         private boolean active;
         private boolean changed;
@@ -406,16 +412,19 @@ public final class BufferAttribute {
             set(itemIndex, 3, w);
         }
 
+        /** Starts an edit operation and clears its change marker. */
         void activate() {
             active = true;
             changed = false;
         }
 
+        /** Ends an edit operation and reports whether it changed any component. */
         boolean deactivate() {
             active = false;
             return changed;
         }
 
+        /** Rejects use of this editor outside its scoped operation. */
         private void requireActive() {
             if (!active) {
                 throw new IllegalStateException("BufferAttribute editor is no longer active");

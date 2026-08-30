@@ -74,6 +74,7 @@ public final class Renderer implements AutoCloseable {
     private int viewportHeight;
     private boolean closed;
 
+    /** Initializes context-local renderer state after the window context is exclusively claimed. */
     private Renderer(Window window, WindowContextRegistry.Access context, RendererOptions options) {
         this.window = window;
         this.context = context;
@@ -89,12 +90,27 @@ public final class Renderer implements AutoCloseable {
         matrixValues = new float[16];
     }
 
-    /** Creates a renderer with default options and exclusively claims the window context. */
+    /**
+     * Creates a renderer with default options and exclusively claims the window context.
+     *
+     * @param window open window whose context the renderer will own
+     * @return renderer owning the window's OpenGL context
+     * @throws NullPointerException if {@code window} is {@code null}
+     * @throws IllegalStateException if the window is closed or its context is already claimed
+     */
     public static Renderer create(Window window) {
         return create(window, RendererOptions.defaults());
     }
 
-    /** Creates a renderer and exclusively claims the window context. */
+    /**
+     * Creates a renderer and exclusively claims the window context.
+     *
+     * @param window open window whose context the renderer will own
+     * @param options immutable renderer configuration
+     * @return renderer owning the window's OpenGL context
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalStateException if the window is closed or its context is already claimed
+     */
     public static Renderer create(Window window, RendererOptions options) {
         Window validWindow = Objects.requireNonNull(window, "window");
         RendererOptions validOptions = Objects.requireNonNull(options, "options");
@@ -109,7 +125,14 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
-    /** Renders the visible meshes in a scene with the supplied camera. */
+    /**
+     * Renders the visible meshes in a scene with the supplied camera.
+     *
+     * @param scene scene graph to render
+     * @param camera camera defining the view and projection
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalStateException if this renderer is closed
+     */
     public void render(Scene scene, Camera camera) {
         requireOpen();
         Scene validScene = Objects.requireNonNull(scene, "scene");
@@ -153,7 +176,16 @@ public final class Renderer implements AutoCloseable {
         clearBuffers(clearColor);
     }
 
-    /** Sets an explicit framebuffer-pixel viewport for subsequent frames. */
+    /**
+     * Sets an explicit framebuffer-pixel viewport for subsequent frames.
+     *
+     * @param x non-negative horizontal origin
+     * @param y non-negative vertical origin
+     * @param width positive viewport width
+     * @param height positive viewport height
+     * @throws IllegalArgumentException if an origin is negative or a dimension is not positive
+     * @throws IllegalStateException if this renderer is closed
+     */
     public void setViewport(int x, int y, int width, int height) {
         requireOpen();
         context.makeCurrent();
@@ -175,7 +207,15 @@ public final class Renderer implements AutoCloseable {
         customViewport = false;
     }
 
-    /** Sets the renderer's default linear-sRGB clear color and alpha. */
+    /**
+     * Sets the renderer's default linear-sRGB clear color and alpha.
+     *
+     * @param color clear color in JScene3D's linear-sRGB working space
+     * @param alpha clear alpha in the inclusive range {@code [0, 1]}
+     * @throws NullPointerException if {@code color} is {@code null}
+     * @throws IllegalArgumentException if {@code alpha} is non-finite or outside {@code [0, 1]}
+     * @throws IllegalStateException if this renderer is closed
+     */
     public void setClearColor(Color color, float alpha) {
         requireOpen();
         context.makeCurrent();
@@ -185,14 +225,23 @@ public final class Renderer implements AutoCloseable {
         clearAlpha = validAlpha;
     }
 
-    /** Returns this renderer's stable diagnostic container. */
+    /**
+     * Returns this renderer's stable diagnostic container.
+     *
+     * @return renderer-owned diagnostics updated in place
+     * @throws IllegalStateException if this renderer is closed
+     */
     public RendererInfo info() {
         requireOpen();
         context.makeCurrent();
         return info;
     }
 
-    /** Returns whether terminal closure has completed. */
+    /**
+     * Returns whether terminal closure has completed.
+     *
+     * @return {@code true} after this renderer has been closed
+     */
     public boolean isClosed() {
         return closed;
     }
@@ -224,6 +273,7 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
+    /** Synchronizes and submits one prepared mesh draw. */
     private void renderMesh(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
         BufferGeometry geometry = item.geometry();
         BasicMaterial material = item.material();
@@ -254,6 +304,7 @@ public final class Renderer implements AutoCloseable {
         statistics.recordDraw(elementCount);
     }
 
+    /** Lazily creates and returns the context-local built-in program. */
     private BasicProgram basicProgram() {
         if (basicProgram == null) {
             basicProgram = BasicProgram.create();
@@ -262,6 +313,7 @@ public final class Renderer implements AutoCloseable {
         return basicProgram;
     }
 
+    /** Applies depth, blending, and face-culling state for one material. */
     private void applyMaterialState(Material material) {
         if (material.depthTestEnabled()) {
             glEnable(GL_DEPTH_TEST);
@@ -287,6 +339,7 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
+    /** Applies either the custom viewport or the complete current framebuffer. */
     private void applyViewport(int framebufferWidth, int framebufferHeight) {
         if (customViewport) {
             glViewport(viewportX, viewportY, viewportWidth, viewportHeight);
@@ -295,17 +348,20 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
+    /** Clears color and depth using renderer and scene clear state. */
     private void clearBuffers(Color color) {
         glClearColor(color.red(), color.green(), color.blue(), clearAlpha);
         glDepthMask(true);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
+    /** Copies a matrix into reusable staging and uploads one uniform. */
     private void uploadMatrix(int location, Matrix4fc matrix) {
         matrix.get(matrixValues);
         glUniformMatrix4fv(location, false, matrixValues);
     }
 
+    /** Releases realized GPU resources whose geometry descriptions were closed. */
     private void releaseClosedGeometryResources() {
         Iterator<Map.Entry<BufferGeometry, GeometryResource>> iterator =
                 geometryResources.entrySet().iterator();
@@ -319,6 +375,7 @@ public final class Renderer implements AutoCloseable {
         resources.setActiveGeometryResources(geometryResources.size());
     }
 
+    /** Rejects renderer use after close. */
     private void requireOpen() {
         if (closed) {
             throw new IllegalStateException("Renderer is closed");

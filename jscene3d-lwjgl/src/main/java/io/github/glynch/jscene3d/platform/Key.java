@@ -158,22 +158,27 @@ public enum Key {
 
     private final int platformCode;
 
+    /** Associates a supported key with its GLFW code. */
     Key(int platformCode) {
         this.platformCode = platformCode;
     }
 
+    /** Returns the exclusive array bound needed to index every GLFW key code. */
     static int platformCodeLimit() {
         return GLFW.GLFW_KEY_LAST + 1;
     }
 
+    /** Returns the corresponding GLFW key code. */
     int platformCode() {
         return platformCode;
     }
 
+    /** Returns the supported key for a GLFW code, or {@code null} when unsupported. */
     static @Nullable Key fromPlatformCode(int platformCode) {
         return platformCode >= 0 && platformCode < BY_PLATFORM_CODE.length ? BY_PLATFORM_CODE[platformCode] : null;
     }
 
+    /** Builds constant-time GLFW-code lookup storage. */
     private static Key[] createLookup() {
         Key[] lookup = new Key[GLFW.GLFW_KEY_LAST + 1];
         for (Key key : values()) {

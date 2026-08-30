@@ -13,6 +13,7 @@ import org.joml.Vector3f;
 public final class TransformsExample {
     private static final float EPSILON = 1.0e-5f;
 
+    /** Prevents instantiation of this example entry point. */
     private TransformsExample() {
         throw new AssertionError("TransformsExample cannot be instantiated");
     }

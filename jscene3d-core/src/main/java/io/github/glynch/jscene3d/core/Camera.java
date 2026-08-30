@@ -37,6 +37,7 @@ public abstract sealed class Camera extends Object3D permits OrthographicCamera,
     private long resolvedProjectionVersion;
     private long resolvedViewWorldMatrixVersion;
 
+    /** Initializes identity projection and view state for a concrete camera. */
     Camera() {
         projectionMatrix = new Matrix4f();
         inverseProjectionMatrix = new Matrix4f();
@@ -175,12 +176,15 @@ public abstract sealed class Camera extends Object3D permits OrthographicCamera,
         lookAt(validTarget.x(), validTarget.y(), validTarget.z());
     }
 
+    /** Marks controlled projection state as changed without eagerly rebuilding matrices. */
     final void markProjectionChanged() {
         projectionVersion++;
     }
 
+    /** Replaces {@code destination} with the concrete camera's current projection matrix. */
     abstract void calculateProjectionMatrix(Matrix4f destination);
 
+    /** Lazily refreshes the projection matrix and its inverse for the current version. */
     private void updateProjectionMatrices() {
         if (resolvedProjectionVersion != projectionVersion) {
             calculateProjectionMatrix(projectionMatrix);

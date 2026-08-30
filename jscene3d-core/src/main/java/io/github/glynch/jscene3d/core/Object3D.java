@@ -513,6 +513,7 @@ public class Object3D {
         }
     }
 
+    /** Validates ownership, mutability, and acyclic-tree rules for a prospective child. */
     private void validateNewChild(Object3D child) {
         if (child == this) {
             throw new IllegalArgumentException("An Object3D cannot be its own child");
@@ -524,6 +525,7 @@ public class Object3D {
         }
     }
 
+    /** Returns the root of the hierarchy containing this node. */
     private Object3D treeRoot() {
         Object3D root = this;
         while (root.parent != null) {
@@ -532,12 +534,14 @@ public class Object3D {
         return root;
     }
 
+    /** Rejects hierarchy mutation while its root is being traversed. */
     private static void requireStructureMutable(Object3D root) {
         if (root.activeTraversalCount > 0) {
             throw new ConcurrentModificationException(TRAVERSAL_MUTATION_MESSAGE);
         }
     }
 
+    /** Removes a known direct child and clears its parent link. */
     private void removeKnownChild(Object3D child) {
         int childIndex = -1;
         for (int index = 0; index < children.size(); index++) {
@@ -553,6 +557,7 @@ public class Object3D {
         child.parent = null;
     }
 
+    /** Visits this subtree in pre-order without recursion. */
     private void traverseDepthFirst(Consumer<Object3D> visitor) {
         ArrayDeque<Object3D> pending = new ArrayDeque<>();
         pending.push(this);
@@ -565,6 +570,7 @@ public class Object3D {
         }
     }
 
+    /** Visits visible branches in pre-order without recursion. */
     private void traverseVisibleDepthFirst(Consumer<Object3D> visitor) {
         ArrayDeque<Object3D> pending = new ArrayDeque<>();
         pending.push(this);
@@ -580,10 +586,12 @@ public class Object3D {
         }
     }
 
+    /** Advances local transform state so dependent matrices become stale. */
     private void markLocalTransformChanged() {
         localTransformVersion++;
     }
 
+    /** Lazily composes the local matrix from controlled transform values. */
     private void updateLocalMatrix() {
         if (localMatrixVersion != localTransformVersion) {
             matrix.translationRotateScale(position, quaternion, scale);
@@ -591,6 +599,7 @@ public class Object3D {
         }
     }
 
+    /** Resolves ancestor and local matrices without recursive hierarchy descent. */
     private void updateWorldMatrix() {
         ArrayDeque<Object3D> ancestorPath = new ArrayDeque<>();
         for (Object3D ancestor = this; ancestor != null; ancestor = ancestor.parent) {
@@ -606,10 +615,12 @@ public class Object3D {
         }
     }
 
+    /** Returns the internal version of the currently resolved world matrix. */
     final long matrixWorldVersion() {
         return worldMatrixVersion;
     }
 
+    /** Rebuilds this node's world matrix when local or resolved-parent state changed. */
     private void resolveWorldMatrix(@Nullable Object3D resolvedParent) {
         long parentWorldVersion = resolvedParent == null ? 0L : resolvedParent.worldMatrixVersion;
         if (resolvedWorldLocalMatrixVersion == localMatrixVersion

@@ -230,6 +230,7 @@ final class OrbitState {
         return polarAngle;
     }
 
+    /** Retains the damped remainder and removes insignificant residual motion. */
     private void retainUnappliedMotion(float retainedFraction) {
         pendingAzimuth *= retainedFraction;
         pendingPolar *= retainedFraction;
@@ -245,6 +246,7 @@ final class OrbitState {
         }
     }
 
+    /** Clamps an azimuth while supporting configured intervals that cross the pi seam. */
     private static float clampAzimuth(float angle, OrbitLimits limits) {
         float minimum = limits.minimumAzimuthAngle();
         float maximum = limits.maximumAzimuthAngle();
@@ -267,6 +269,7 @@ final class OrbitState {
         return angle > (minimum + maximum) * 0.5f ? Math.max(angle, minimum) : Math.min(angle, maximum);
     }
 
+    /** Writes the Cartesian camera position represented by current spherical state. */
     private Vector3f calculatePosition(Vector3f destination) {
         float sinPolar = (float) Math.sin(polarAngle);
         return destination.set(

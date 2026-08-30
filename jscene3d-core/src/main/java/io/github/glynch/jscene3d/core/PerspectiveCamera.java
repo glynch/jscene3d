@@ -129,6 +129,7 @@ public final class PerspectiveCamera extends Camera {
         destination.setPerspective(fieldOfView, aspectRatio, near, far);
     }
 
+    /** Requires a finite field of view strictly between zero and pi radians. */
     private static float requireFieldOfView(float fieldOfView) {
         float validFieldOfView = Preconditions.requirePositive(fieldOfView, "fieldOfView");
         if (validFieldOfView >= Math.PI) {

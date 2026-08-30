@@ -15,6 +15,7 @@ import org.joml.Vector3f;
 public final class CamerasExample {
     private static final float EPSILON = 1.0e-5f;
 
+    /** Prevents instantiation of this example entry point. */
     private CamerasExample() {
         throw new AssertionError("CamerasExample cannot be instantiated");
     }

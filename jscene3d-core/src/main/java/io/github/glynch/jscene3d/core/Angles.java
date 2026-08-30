@@ -24,6 +24,7 @@ public final class Angles {
     /** Three hundred sixty degrees in radians. */
     public static final float TWO_PI = (float) (Math.PI * 2.0);
 
+    /** Prevents instantiation of this constants class. */
     private Angles() {
         throw new AssertionError("Angles cannot be instantiated");
     }

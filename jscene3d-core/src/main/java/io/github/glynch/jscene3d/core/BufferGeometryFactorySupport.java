@@ -6,10 +6,12 @@ package io.github.glynch.jscene3d.core;
 
 /** Shared assembly for built-in indexed triangle geometry factories. */
 final class BufferGeometryFactorySupport {
+    /** Prevents instantiation of this shared factory support class. */
     private BufferGeometryFactorySupport() {
         throw new AssertionError("BufferGeometryFactorySupport cannot be instantiated");
     }
 
+    /** Assembles owned attributes, indices, and computed bounds into a geometry. */
     static BufferGeometry create(float[] positions, float[] normals, float[] textureCoordinates, int[] indices) {
         BufferGeometry geometry = new BufferGeometry();
         geometry.setAttribute(BufferGeometry.POSITION, BufferAttribute.of(positions, 3));

@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.core;
 
 /** Creates indexed rectangular geometry in the XY plane facing positive Z. */
 public final class PlaneGeometry {
+    /** Prevents instantiation of this geometry factory. */
     private PlaneGeometry() {
         throw new AssertionError("PlaneGeometry cannot be instantiated");
     }

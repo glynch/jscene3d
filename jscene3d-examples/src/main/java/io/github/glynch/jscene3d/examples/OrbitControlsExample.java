@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.render.Renderer;
 
 /** Displays a small scene that can be inspected with orbit, pan, and dolly controls. */
 public final class OrbitControlsExample {
+    /** Prevents instantiation of this example entry point. */
     private OrbitControlsExample() {
         throw new AssertionError("OrbitControlsExample cannot be instantiated");
     }
@@ -68,6 +69,7 @@ public final class OrbitControlsExample {
         }
     }
 
+    /** Creates three differently transformed boxes that make camera movement easy to see. */
     private static Scene createScene(
             BufferGeometry geometry,
             BasicMaterial centerMaterial,

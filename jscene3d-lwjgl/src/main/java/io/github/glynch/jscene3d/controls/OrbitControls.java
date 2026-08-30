@@ -78,12 +78,23 @@ public final class OrbitControls {
         camera.lookAt(orbitState.target());
     }
 
-    /** Returns the stable live read-only world-space orbit target. */
+    /**
+     * Returns the stable live read-only world-space orbit target.
+     *
+     * @return target view retained for the lifetime of these controls
+     */
     public Vector3fc target() {
         return orbitState.target();
     }
 
-    /** Sets the world-space orbit target for the next update. */
+    /**
+     * Sets the world-space orbit target for the next update.
+     *
+     * @param x target X coordinate
+     * @param y target Y coordinate
+     * @param z target Z coordinate
+     * @throws IllegalArgumentException if any coordinate is not finite
+     */
     public void setTarget(float x, float y, float z) {
         orbitState.setTarget(
                 Preconditions.requireFinite(x, "x"),
@@ -91,63 +102,118 @@ public final class OrbitControls {
                 Preconditions.requireFinite(z, "z"));
     }
 
-    /** Copies the world-space orbit target for the next update. */
+    /**
+     * Copies the world-space orbit target for the next update.
+     *
+     * @param target target to copy
+     * @throws NullPointerException if {@code target} is {@code null}
+     * @throws IllegalArgumentException if any target coordinate is not finite
+     */
     public void setTarget(Vector3fc target) {
         Vector3fc validTarget = Objects.requireNonNull(target, "target");
         setTarget(validTarget.x(), validTarget.y(), validTarget.z());
     }
 
-    /** Returns whether controls process input and pending motion. */
+    /**
+     * Returns whether controls process input and pending motion.
+     *
+     * @return {@code true} by default
+     */
     public boolean isEnabled() {
         return enabled;
     }
 
-    /** Enables or disables input and pending-motion processing. */
+    /**
+     * Enables or disables input and pending-motion processing.
+     *
+     * @param enabled whether calls to {@link #update()} may move the camera
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
 
-    /** Returns whether orbit rotation is enabled. */
+    /**
+     * Returns whether orbit rotation is enabled.
+     *
+     * @return {@code true} by default
+     */
     public boolean isRotationEnabled() {
         return rotationEnabled;
     }
 
-    /** Enables or disables mouse, keyboard, programmatic, and automatic rotation. */
+    /**
+     * Enables or disables mouse, keyboard, programmatic, and automatic rotation.
+     *
+     * @param rotationEnabled whether rotation operations are enabled
+     */
     public void setRotationEnabled(boolean rotationEnabled) {
         this.rotationEnabled = rotationEnabled;
     }
 
-    /** Returns whether panning is enabled. */
+    /**
+     * Returns whether panning is enabled.
+     *
+     * @return {@code true} by default
+     */
     public boolean isPanningEnabled() {
         return panningEnabled;
     }
 
-    /** Enables or disables mouse, keyboard, and programmatic panning. */
+    /**
+     * Enables or disables mouse, keyboard, and programmatic panning.
+     *
+     * @param panningEnabled whether panning operations are enabled
+     */
     public void setPanningEnabled(boolean panningEnabled) {
         this.panningEnabled = panningEnabled;
     }
 
-    /** Returns whether perspective dolly or orthographic zoom is enabled. */
+    /**
+     * Returns whether perspective dolly or orthographic zoom is enabled.
+     *
+     * @return {@code true} by default
+     */
     public boolean isZoomEnabled() {
         return zoomEnabled;
     }
 
-    /** Enables or disables mouse and programmatic dolly or zoom. */
+    /**
+     * Enables or disables mouse and programmatic dolly or zoom.
+     *
+     * @param zoomEnabled whether dolly and zoom operations are enabled
+     */
     public void setZoomEnabled(boolean zoomEnabled) {
         this.zoomEnabled = zoomEnabled;
     }
 
-    /** Returns the minimum perspective-camera target distance. */
+    /**
+     * Returns the minimum perspective-camera target distance.
+     *
+     * @return the positive lower distance limit, {@code 0.01} by default
+     */
     public float minimumDistance() {
         return limits.minimumDistance();
     }
 
-    /** Returns the maximum perspective-camera target distance. */
+    /**
+     * Returns the maximum perspective-camera target distance.
+     *
+     * @return the positive upper distance limit, effectively unbounded by default
+     */
     public float maximumDistance() {
         return limits.maximumDistance();
     }
 
-    /** Atomically sets the perspective-camera target-distance interval. */
+    /**
+     * Atomically sets the perspective-camera target-distance interval.
+     *
+     * <p>The interval is enforced by the next movement or update. It does not affect orthographic
+     * zoom.
+     *
+     * @param minimumDistance finite positive lower limit
+     * @param maximumDistance finite positive upper limit not less than the lower limit
+     * @throws IllegalArgumentException if either value or their ordering is invalid
+     */
     public void setDistanceLimits(float minimumDistance, float maximumDistance) {
         float validMinimum = Preconditions.requirePositive(minimumDistance, "minimumDistance");
         float validMaximum = Preconditions.requirePositive(maximumDistance, "maximumDistance");
@@ -155,17 +221,34 @@ public final class OrbitControls {
         limits.setDistance(validMinimum, validMaximum);
     }
 
-    /** Returns the minimum orthographic-camera zoom. */
+    /**
+     * Returns the minimum orthographic-camera zoom.
+     *
+     * @return the positive lower zoom limit, {@code 0.01} by default
+     */
     public float minimumZoom() {
         return limits.minimumZoom();
     }
 
-    /** Returns the maximum orthographic-camera zoom. */
+    /**
+     * Returns the maximum orthographic-camera zoom.
+     *
+     * @return the positive upper zoom limit, effectively unbounded by default
+     */
     public float maximumZoom() {
         return limits.maximumZoom();
     }
 
-    /** Atomically sets the orthographic-camera zoom interval. */
+    /**
+     * Atomically sets the orthographic-camera zoom interval.
+     *
+     * <p>The interval is enforced by the next movement or update. It does not affect perspective
+     * distance.
+     *
+     * @param minimumZoom finite positive lower limit
+     * @param maximumZoom finite positive upper limit not less than the lower limit
+     * @throws IllegalArgumentException if either value or their ordering is invalid
+     */
     public void setZoomLimits(float minimumZoom, float maximumZoom) {
         float validMinimum = Preconditions.requirePositive(minimumZoom, "minimumZoom");
         float validMaximum = Preconditions.requirePositive(maximumZoom, "maximumZoom");
@@ -173,17 +256,33 @@ public final class OrbitControls {
         limits.setZoom(validMinimum, validMaximum);
     }
 
-    /** Returns the minimum polar angle in radians. */
+    /**
+     * Returns the minimum polar angle measured down from world positive Y.
+     *
+     * @return the lower limit in radians, zero by default
+     */
     public float minimumPolarAngle() {
         return limits.minimumPolarAngle();
     }
 
-    /** Returns the maximum polar angle in radians. */
+    /**
+     * Returns the maximum polar angle measured down from world positive Y.
+     *
+     * @return the upper limit in radians, pi by default
+     */
     public float maximumPolarAngle() {
         return limits.maximumPolarAngle();
     }
 
-    /** Atomically sets the polar-angle interval between zero and pi radians. */
+    /**
+     * Atomically sets the polar-angle interval between zero and pi radians.
+     *
+     * <p>A small internal epsilon prevents the camera from occupying a singular pole exactly.
+     *
+     * @param minimumPolarAngle finite lower limit in the inclusive range {@code [0, pi]}
+     * @param maximumPolarAngle finite upper limit in the inclusive range {@code [0, pi]}
+     * @throws IllegalArgumentException if either value or their ordering is invalid
+     */
     public void setPolarAngleLimits(float minimumPolarAngle, float maximumPolarAngle) {
         float validMinimum = Preconditions.requireInRange(minimumPolarAngle, "minimumPolarAngle", 0.0f, PI);
         float validMaximum = Preconditions.requireInRange(maximumPolarAngle, "maximumPolarAngle", 0.0f, PI);
@@ -191,12 +290,20 @@ public final class OrbitControls {
         limits.setPolarAngle(validMinimum, validMaximum);
     }
 
-    /** Returns the minimum azimuth angle in radians. */
+    /**
+     * Returns the minimum azimuth angle around world Y.
+     *
+     * @return the lower limit in radians, negative infinity when unbounded
+     */
     public float minimumAzimuthAngle() {
         return limits.minimumAzimuthAngle();
     }
 
-    /** Returns the maximum azimuth angle in radians. */
+    /**
+     * Returns the maximum azimuth angle around world Y.
+     *
+     * @return the upper limit in radians, positive infinity when unbounded
+     */
     public float maximumAzimuthAngle() {
         return limits.maximumAzimuthAngle();
     }
@@ -206,6 +313,10 @@ public final class OrbitControls {
      *
      * <p>Each endpoint must be between negative and positive two pi, and the interval must span
      * less than one complete turn. Intervals crossing the negative/positive pi seam are supported.
+     *
+     * @param minimumAzimuthAngle finite lower endpoint in radians
+     * @param maximumAzimuthAngle finite upper endpoint in radians
+     * @throws IllegalArgumentException if either endpoint, their ordering, or their span is invalid
      */
     public void setAzimuthAngleLimits(float minimumAzimuthAngle, float maximumAzimuthAngle) {
         float validMinimum = Preconditions.requireInRange(minimumAzimuthAngle, "minimumAzimuthAngle", -TWO_PI, TWO_PI);
@@ -216,126 +327,238 @@ public final class OrbitControls {
         limits.setAzimuthAngle(validMinimum, validMaximum);
     }
 
-    /** Returns the mouse rotation multiplier. */
+    /**
+     * Returns the mouse rotation multiplier.
+     *
+     * @return the non-negative multiplier, {@code 1} by default
+     */
     public float rotationSpeed() {
         return rotationSpeed;
     }
 
-    /** Sets the finite non-negative mouse rotation multiplier. */
+    /**
+     * Sets the mouse rotation multiplier.
+     *
+     * @param rotationSpeed finite non-negative multiplier
+     * @throws IllegalArgumentException if {@code rotationSpeed} is invalid
+     */
     public void setRotationSpeed(float rotationSpeed) {
         this.rotationSpeed = Preconditions.requireNonNegative(rotationSpeed, "rotationSpeed");
     }
 
-    /** Returns the mouse and keyboard panning multiplier. */
+    /**
+     * Returns the mouse and keyboard panning multiplier.
+     *
+     * @return the non-negative multiplier, {@code 1} by default
+     */
     public float panSpeed() {
         return panSpeed;
     }
 
-    /** Sets the finite non-negative panning multiplier. */
+    /**
+     * Sets the mouse and keyboard panning multiplier.
+     *
+     * @param panSpeed finite non-negative multiplier
+     * @throws IllegalArgumentException if {@code panSpeed} is invalid
+     */
     public void setPanSpeed(float panSpeed) {
         this.panSpeed = Preconditions.requireNonNegative(panSpeed, "panSpeed");
     }
 
-    /** Returns the dolly and zoom multiplier. */
+    /**
+     * Returns the mouse dolly and zoom multiplier.
+     *
+     * @return the non-negative multiplier, {@code 1} by default
+     */
     public float zoomSpeed() {
         return zoomSpeed;
     }
 
-    /** Sets the finite non-negative dolly and zoom multiplier. */
+    /**
+     * Sets the mouse dolly and zoom multiplier.
+     *
+     * @param zoomSpeed finite non-negative multiplier
+     * @throws IllegalArgumentException if {@code zoomSpeed} is invalid
+     */
     public void setZoomSpeed(float zoomSpeed) {
         this.zoomSpeed = Preconditions.requireNonNegative(zoomSpeed, "zoomSpeed");
     }
 
-    /** Returns the arrow-key panning distance in logical pixels. */
+    /**
+     * Returns the arrow-key panning distance.
+     *
+     * @return logical pixels per update, {@code 7} by default
+     */
     public float keyPanSpeed() {
         return keyPanSpeed;
     }
 
-    /** Sets the finite non-negative arrow-key panning distance in logical pixels. */
+    /**
+     * Sets the arrow-key panning distance.
+     *
+     * @param keyPanSpeed finite non-negative logical pixels per update
+     * @throws IllegalArgumentException if {@code keyPanSpeed} is invalid
+     */
     public void setKeyPanSpeed(float keyPanSpeed) {
         this.keyPanSpeed = Preconditions.requireNonNegative(keyPanSpeed, "keyPanSpeed");
     }
 
-    /** Returns the modified-arrow-key rotation multiplier. */
+    /**
+     * Returns the modified-arrow-key rotation multiplier.
+     *
+     * @return the non-negative multiplier, {@code 1} by default
+     */
     public float keyRotationSpeed() {
         return keyRotationSpeed;
     }
 
-    /** Sets the finite non-negative modified-arrow-key rotation multiplier. */
+    /**
+     * Sets the modified-arrow-key rotation multiplier.
+     *
+     * @param keyRotationSpeed finite non-negative multiplier
+     * @throws IllegalArgumentException if {@code keyRotationSpeed} is invalid
+     */
     public void setKeyRotationSpeed(float keyRotationSpeed) {
         this.keyRotationSpeed = Preconditions.requireNonNegative(keyRotationSpeed, "keyRotationSpeed");
     }
 
-    /** Returns whether rotation and panning use damping. */
+    /**
+     * Returns whether rotation and panning use damping.
+     *
+     * @return {@code false} by default
+     */
     public boolean isDampingEnabled() {
         return dampingEnabled;
     }
 
-    /** Enables or disables rotation and panning damping. */
+    /**
+     * Enables or disables rotation and panning damping.
+     *
+     * @param dampingEnabled whether motion should be applied gradually
+     */
     public void setDampingEnabled(boolean dampingEnabled) {
         this.dampingEnabled = dampingEnabled;
     }
 
-    /** Returns the per-60-Hz-update damping fraction. */
+    /**
+     * Returns the damping fraction normalized to a 60-Hz update.
+     *
+     * @return the fraction in {@code (0, 1]}, {@code 0.05} by default
+     */
     public float dampingFactor() {
         return dampingFactor;
     }
 
-    /** Sets the damping fraction greater than zero and no greater than one. */
+    /**
+     * Sets the damping fraction normalized to a 60-Hz update.
+     *
+     * @param dampingFactor finite factor in {@code (0, 1]}
+     * @throws IllegalArgumentException if {@code dampingFactor} is invalid
+     */
     public void setDampingFactor(float dampingFactor) {
         float validFactor = Preconditions.requirePositive(dampingFactor, "dampingFactor");
         this.dampingFactor = Preconditions.requireInRange(validFactor, "dampingFactor", 0.0f, 1.0f);
     }
 
-    /** Returns whether the camera automatically orbits while idle. */
+    /**
+     * Returns whether the camera automatically orbits while idle.
+     *
+     * @return {@code false} by default
+     */
     public boolean isAutoRotationEnabled() {
         return autoRotationEnabled;
     }
 
-    /** Enables or disables automatic idle rotation. */
+    /**
+     * Enables or disables automatic idle rotation.
+     *
+     * @param autoRotationEnabled whether idle updates should orbit automatically
+     */
     public void setAutoRotationEnabled(boolean autoRotationEnabled) {
         this.autoRotationEnabled = autoRotationEnabled;
     }
 
-    /** Returns the automatic-rotation multiplier; {@code 2} completes one orbit in 30 seconds. */
+    /**
+     * Returns the automatic-rotation multiplier.
+     *
+     * @return multiplier for which {@code 2} completes one orbit in 30 seconds
+     */
     public float autoRotationSpeed() {
         return autoRotationSpeed;
     }
 
-    /** Sets the finite automatic-rotation multiplier; negative values reverse direction. */
+    /**
+     * Sets the automatic-rotation multiplier; negative values reverse direction.
+     *
+     * @param autoRotationSpeed finite multiplier
+     * @throws IllegalArgumentException if {@code autoRotationSpeed} is not finite
+     */
     public void setAutoRotationSpeed(float autoRotationSpeed) {
         this.autoRotationSpeed = Preconditions.requireFinite(autoRotationSpeed, "autoRotationSpeed");
     }
 
-    /** Returns whether panning follows the camera's screen plane. */
+    /**
+     * Returns whether panning follows the camera's screen plane.
+     *
+     * @return {@code true} by default
+     */
     public boolean isScreenSpacePanning() {
         return screenSpacePanning;
     }
 
-    /** Selects screen-plane panning or panning perpendicular to world up. */
+    /**
+     * Selects screen-plane panning or panning perpendicular to world up.
+     *
+     * @param screenSpacePanning {@code true} for the camera screen plane; {@code false} for the
+     *     world-up plane
+     */
     public void setScreenSpacePanning(boolean screenSpacePanning) {
         this.screenSpacePanning = screenSpacePanning;
     }
 
-    /** Returns the current azimuth angle in radians. */
+    /**
+     * Returns the current azimuth angle around world Y.
+     *
+     * @return synchronized angle in radians
+     * @throws IllegalStateException if the camera coincides with the target
+     */
     public float azimuthAngle() {
         synchronize();
         return orbitState.azimuthAngle();
     }
 
-    /** Returns the current polar angle in radians. */
+    /**
+     * Returns the current polar angle measured down from world positive Y.
+     *
+     * @return synchronized angle in radians
+     * @throws IllegalStateException if the camera coincides with the target
+     */
     public float polarAngle() {
         synchronize();
         return orbitState.polarAngle();
     }
 
-    /** Returns the current distance between the camera and target. */
+    /**
+     * Returns the current distance between the camera and target.
+     *
+     * @return synchronized positive distance
+     * @throws IllegalStateException if the camera coincides with the target
+     */
     public float distance() {
         synchronize();
         return orbitState.distance();
     }
 
-    /** Immediately rotates left by the supplied non-negative radians. */
+    /**
+     * Applies or begins a leftward rotation by the supplied angle.
+     *
+     * <p>When damping is enabled, subsequent updates apply the retained remainder. The operation
+     * does nothing when rotation is disabled.
+     *
+     * @param radians finite non-negative angle
+     * @throws IllegalArgumentException if {@code radians} is invalid
+     * @throws IllegalStateException if the camera state cannot be controlled
+     */
     public void rotateLeft(float radians) {
         if (!rotationEnabled) {
             return;
@@ -344,7 +567,16 @@ public final class OrbitControls {
         applyQueuedMotion(DEFAULT_SECONDS_PER_UPDATE);
     }
 
-    /** Immediately rotates upward by the supplied non-negative radians. */
+    /**
+     * Applies or begins an upward rotation by the supplied angle.
+     *
+     * <p>When damping is enabled, subsequent updates apply the retained remainder. The operation
+     * does nothing when rotation is disabled.
+     *
+     * @param radians finite non-negative angle
+     * @throws IllegalArgumentException if {@code radians} is invalid
+     * @throws IllegalStateException if the camera state cannot be controlled
+     */
     public void rotateUp(float radians) {
         if (!rotationEnabled) {
             return;
@@ -353,7 +585,17 @@ public final class OrbitControls {
         applyQueuedMotion(DEFAULT_SECONDS_PER_UPDATE);
     }
 
-    /** Immediately pans by a logical-pixel offset using the configured pan mode. */
+    /**
+     * Applies or begins a pan using logical-window-pixel offsets and the configured pan mode.
+     *
+     * <p>Positive horizontal input moves the camera left; positive vertical input moves it up.
+     * The operation does nothing when panning is disabled.
+     *
+     * @param horizontalPixels finite horizontal input
+     * @param verticalPixels finite vertical input
+     * @throws IllegalArgumentException if either input is not finite
+     * @throws IllegalStateException if the camera or window state cannot be controlled
+     */
     public void pan(float horizontalPixels, float verticalPixels) {
         float validHorizontal = Preconditions.requireFinite(horizontalPixels, "horizontalPixels");
         float validVertical = Preconditions.requireFinite(verticalPixels, "verticalPixels");
@@ -372,7 +614,15 @@ public final class OrbitControls {
         applyQueuedMotion(DEFAULT_SECONDS_PER_UPDATE);
     }
 
-    /** Immediately moves toward the target or increases orthographic zoom by a factor. */
+    /**
+     * Moves a perspective camera toward the target or increases orthographic zoom.
+     *
+     * <p>The operation does nothing when zoom is disabled.
+     *
+     * @param factor finite factor greater than one
+     * @throws IllegalArgumentException if {@code factor} is invalid
+     * @throws IllegalStateException if the camera state cannot be controlled
+     */
     public void dollyIn(float factor) {
         if (!zoomEnabled) {
             return;
@@ -381,7 +631,15 @@ public final class OrbitControls {
         applyQueuedMotion(DEFAULT_SECONDS_PER_UPDATE);
     }
 
-    /** Immediately moves away from the target or decreases orthographic zoom by a factor. */
+    /**
+     * Moves a perspective camera away from the target or decreases orthographic zoom.
+     *
+     * <p>The operation does nothing when zoom is disabled.
+     *
+     * @param factor finite factor greater than one
+     * @throws IllegalArgumentException if {@code factor} is invalid
+     * @throws IllegalStateException if the camera state cannot be controlled
+     */
     public void dollyOut(float factor) {
         if (!zoomEnabled) {
             return;
@@ -390,7 +648,15 @@ public final class OrbitControls {
         applyQueuedMotion(DEFAULT_SECONDS_PER_UPDATE);
     }
 
-    /** Saves the current target, camera position, and orthographic zoom for {@link #reset()}. */
+    /**
+     * Saves the current target, camera position, and orthographic zoom for {@link #reset()}.
+     *
+     * <p>Perspective projection properties and camera orientation are not saved; reset derives
+     * orientation by aiming the restored position at the restored target.
+     *
+     * @throws IllegalStateException if the camera is parented, coincides with the target, or has
+     *     invalid position state
+     */
     public void saveState() {
         requireUnparentedCamera(true);
         synchronize();
@@ -401,7 +667,14 @@ public final class OrbitControls {
         }
     }
 
-    /** Restores the most recently saved target, camera position, and orthographic zoom. */
+    /**
+     * Restores the most recently saved target, camera position, and orthographic zoom.
+     *
+     * <p>The constructor saves the initial state, and {@link #saveState()} can replace it. Reset
+     * also discards pending damped motion.
+     *
+     * @throws IllegalStateException if the camera is parented or the saved state cannot be applied
+     */
     public void reset() {
         requireUnparentedCamera(true);
         orbitState.clearPendingMotion();
@@ -414,7 +687,13 @@ public final class OrbitControls {
         camera.lookAt(orbitState.target());
     }
 
-    /** Applies input and pending motion using a nominal 60-Hz elapsed time. */
+    /**
+     * Applies input and pending motion using a nominal 60-Hz elapsed time.
+     *
+     * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
+     */
     public boolean update() {
         return update(DEFAULT_SECONDS_PER_UPDATE);
     }
@@ -424,6 +703,9 @@ public final class OrbitControls {
      *
      * @param elapsedSeconds finite non-negative time since the previous update
      * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalArgumentException if {@code elapsedSeconds} is invalid
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
      */
     public boolean update(float elapsedSeconds) {
         float validElapsedSeconds = Preconditions.requireNonNegative(elapsedSeconds, "elapsedSeconds");
@@ -447,6 +729,7 @@ public final class OrbitControls {
         return applyQueuedMotion(validElapsedSeconds);
     }
 
+    /** Routes current pointer state to the highest-precedence enabled pointer operation. */
     private boolean processPointerInput(InputState input, boolean modifierDown) {
         double deltaX = input.pointerDeltaX();
         double deltaY = input.pointerDeltaY();
@@ -505,6 +788,7 @@ public final class OrbitControls {
         }
     }
 
+    /** Applies held arrow keys as panning or modified rotation input. */
     private boolean processKeyboardInput(InputState input, boolean modifierDown) {
         float horizontal = axis(input, Key.LEFT, Key.RIGHT);
         float vertical = axis(input, Key.UP, Key.DOWN);
@@ -533,6 +817,7 @@ public final class OrbitControls {
         return false;
     }
 
+    /** Applies queued state with limits and damping, then reports observable camera changes. */
     private boolean applyQueuedMotion(float elapsedSeconds) {
         requireUnparentedCamera(true);
         float oldPositionX = camera.position().x();
@@ -559,10 +844,12 @@ public final class OrbitControls {
                 || (camera instanceof OrthographicCamera orthographicCamera && orthographicCamera.zoom() != oldZoom);
     }
 
+    /** Synchronizes spherical state from the caller-owned camera's current position. */
     private void synchronize() {
         orbitState.synchronize(camera.position());
     }
 
+    /** Requires the supported unparented-camera state with the appropriate failure category. */
     private void requireUnparentedCamera(boolean stateFailure) {
         if (camera.parent() != null) {
             String message = "OrbitControls requires an unparented camera";
@@ -573,6 +860,7 @@ public final class OrbitControls {
         }
     }
 
+    /** Returns whether a Shift, Control, or Super modifier is held. */
     private static boolean isModifierDown(InputState input) {
         return input.isKeyDown(Key.LEFT_SHIFT)
                 || input.isKeyDown(Key.RIGHT_SHIFT)
@@ -582,6 +870,7 @@ public final class OrbitControls {
                 || input.isKeyDown(Key.RIGHT_SUPER);
     }
 
+    /** Converts a pair of opposing held keys to a signed unit axis. */
     private static float axis(InputState input, Key positive, Key negative) {
         return (input.isKeyDown(positive) ? 1.0f : 0.0f) - (input.isKeyDown(negative) ? 1.0f : 0.0f);
     }

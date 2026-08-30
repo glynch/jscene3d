@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.controls;
 
 /** Reusable precondition checks for control arguments. */
 final class Preconditions {
+    /** Prevents instantiation of this validation utility class. */
     private Preconditions() {
         throw new AssertionError("Preconditions cannot be instantiated");
     }

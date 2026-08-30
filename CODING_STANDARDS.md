@@ -148,6 +148,9 @@ threads.
 - Every exported type and public method has Javadoc covering the applicable
   invariants, lifecycle, thread rules, ownership, failures, and performance
   behavior.
+- Every package-private production type, constructor, and method has concise
+  Javadoc describing its internal contract. Private helpers have Javadoc when
+  their name and signature do not fully explain their role.
 - Configuration types such as `WindowOptions` and `RendererOptions` are final,
   immutable classes with builders and value equality.
 - Mutable scene nodes and Resource Descriptions remain intentionally mutable

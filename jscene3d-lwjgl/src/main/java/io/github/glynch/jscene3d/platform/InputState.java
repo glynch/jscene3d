@@ -31,6 +31,7 @@ public final class InputState {
     private double scrollDeltaX;
     private double scrollDeltaY;
 
+    /** Creates empty input state for one window. */
     InputState() {}
 
     /**
@@ -153,6 +154,7 @@ public final class InputState {
         return scrollDeltaY;
     }
 
+    /** Clears transitions and deltas before the next process-wide event poll. */
     void beginPoll() {
         Arrays.fill(keysPressed, false);
         Arrays.fill(keysReleased, false);
@@ -164,11 +166,13 @@ public final class InputState {
         scrollDeltaY = 0.0;
     }
 
+    /** Establishes an initial pointer position without producing movement. */
     void initializePointer(double x, double y) {
         pointerX = x;
         pointerY = y;
     }
 
+    /** Applies one GLFW key action, ignoring unsupported keys and repeat events. */
     void updateKey(@Nullable Key key, int action) {
         if (key == null || action == GLFW.GLFW_REPEAT) {
             return;
@@ -183,6 +187,7 @@ public final class InputState {
         }
     }
 
+    /** Applies one GLFW mouse-button action, ignoring unsupported buttons. */
     void updateMouseButton(@Nullable MouseButton button, int action) {
         if (button == null) {
             return;
@@ -197,6 +202,7 @@ public final class InputState {
         }
     }
 
+    /** Accumulates pointer movement and replaces the current position. */
     void updatePointer(double x, double y) {
         pointerDeltaX += x - pointerX;
         pointerDeltaY += y - pointerY;
@@ -204,16 +210,19 @@ public final class InputState {
         pointerY = y;
     }
 
+    /** Accumulates horizontal and vertical scrolling for the current poll. */
     void updateScroll(double xOffset, double yOffset) {
         scrollDeltaX += xOffset;
         scrollDeltaY += yOffset;
     }
 
+    /** Releases all held keys and mouse buttons when the window loses focus. */
     void releaseHeldButtons() {
         releaseHeld(keysDown, keysReleased);
         releaseHeld(mouseButtonsDown, mouseButtonsReleased);
     }
 
+    /** Converts every held entry in one input category into a release transition. */
     private static void releaseHeld(boolean[] held, boolean[] released) {
         for (int index = 0; index < held.length; index++) {
             if (held[index]) {

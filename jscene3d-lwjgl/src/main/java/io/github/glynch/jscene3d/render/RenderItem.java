@@ -22,10 +22,12 @@ final class RenderItem {
     private int geometrySortKey;
     private long traversalOrder;
 
+    /** Creates an inactive item ready for pooled assignment. */
     RenderItem() {
         // References are assigned when this pooled item participates in a frame.
     }
 
+    /** Orders opaque items by material, geometry, and stable traversal order. */
     static int compareOpaque(RenderItem first, RenderItem second) {
         int comparison = Integer.compare(first.materialSortKey, second.materialSortKey);
         if (comparison == 0) {
@@ -37,6 +39,7 @@ final class RenderItem {
         return comparison;
     }
 
+    /** Assigns one active mesh submission to this pooled item. */
     void assign(
             Mesh mesh,
             BufferGeometry geometry,
@@ -54,26 +57,32 @@ final class RenderItem {
         this.traversalOrder = traversalOrder;
     }
 
+    /** Returns the active mesh. */
     Mesh mesh() {
         return Objects.requireNonNull(mesh, "Inactive render item has no mesh");
     }
 
+    /** Returns the active geometry. */
     BufferGeometry geometry() {
         return Objects.requireNonNull(geometry, "Inactive render item has no geometry");
     }
 
+    /** Returns the active basic material. */
     BasicMaterial material() {
         return Objects.requireNonNull(material, "Inactive render item has no material");
     }
 
+    /** Returns the stable world-matrix view captured for the active submission. */
     Matrix4fc worldMatrix() {
         return Objects.requireNonNull(worldMatrix, "Inactive render item has no world matrix");
     }
 
+    /** Returns the number of indexed or non-indexed elements to draw. */
     int elementCount() {
         return elementCount;
     }
 
+    /** Clears references and scalar state before returning this item to the pool. */
     void release() {
         mesh = null;
         geometry = null;

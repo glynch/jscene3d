@@ -14,6 +14,7 @@ import java.util.Objects;
 
 /** Demonstrates ordered scene hierarchy construction, traversal, and reparenting. */
 public final class HierarchyExample {
+    /** Prevents instantiation of this example entry point. */
     private HierarchyExample() {}
 
     /**
@@ -45,6 +46,7 @@ public final class HierarchyExample {
         }
     }
 
+    /** Verifies the example's observed traversal order and fails visibly if it changes. */
     private static void requireOrder(List<Object3D> actual, Object3D... expected) {
         if (!actual.equals(List.of(expected))) {
             throw new IllegalStateException("Unexpected traversal order");

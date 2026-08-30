@@ -17,6 +17,7 @@ final class Frustum {
     private final Vector3f worldCenter;
     private final Vector3f worldScale;
 
+    /** Creates reusable matrices and intersection state. */
     Frustum() {
         viewProjectionMatrix = new Matrix4f();
         intersection = new FrustumIntersection();
@@ -24,11 +25,13 @@ final class Frustum {
         worldScale = new Vector3f();
     }
 
+    /** Replaces the frustum from current view and projection matrices. */
     void update(Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
         viewProjectionMatrix.set(projectionMatrix).mul(viewMatrix);
         intersection.set(viewProjectionMatrix);
     }
 
+    /** Tests a local bounding sphere after applying its object's world transform. */
     boolean intersects(BoundingSphere sphere, Matrix4fc worldMatrix) {
         worldMatrix.transformPosition(sphere.center(), worldCenter);
         worldMatrix.getScale(worldScale);

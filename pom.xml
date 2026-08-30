@@ -35,6 +35,7 @@
     <modules>
         <module>jscene3d-core</module>
         <module>jscene3d-lwjgl</module>
+        <module>jscene3d-gui</module>
         <module>jscene3d-examples</module>
     </modules>
 
@@ -114,6 +115,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-lwjgl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-gui</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

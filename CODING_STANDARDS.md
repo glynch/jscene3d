@@ -127,6 +127,8 @@ threads.
   `io.github.glynch.jscene3d.core`.
 - `jscene3d-lwjgl` uses JPMS module name
   `io.github.glynch.jscene3d.lwjgl`.
+- `jscene3d-gui` uses JPMS module name
+  `io.github.glynch.jscene3d.gui`.
 - Export only intentional caller packages.
 - Keep implementation in unexported `.internal` packages and prefer
   package-private implementation types.
@@ -215,6 +217,8 @@ prior deprecation where practical.
   module requires JOML transitively.
 - `jscene3d-lwjgl` depends on core and only the required LWJGL components: LWJGL
   core, GLFW, OpenGL, and STB.
+- `jscene3d-gui` depends on LWJGL and uses STB only for bundled TrueType font
+  rasterization. It does not receive or expose OpenGL state.
 - Exported packages never expose LWJGL types.
 - Test, benchmark, and optional integration dependencies do not leak
   transitively.

@@ -63,10 +63,12 @@ public final class Renderer implements AutoCloseable {
     private final RenderList renderList;
     private final Frustum frustum;
     private final float[] matrixValues;
+    private final OverlayCanvas overlayCanvas;
 
     private Color clearColor;
     private float clearAlpha;
     private @Nullable BasicProgram basicProgram;
+    private @Nullable OverlayRenderer overlayRenderer;
     private boolean customViewport;
     private int viewportX;
     private int viewportY;
@@ -88,6 +90,7 @@ public final class Renderer implements AutoCloseable {
         renderList = new RenderList();
         frustum = new Frustum();
         matrixValues = new float[16];
+        overlayCanvas = new OverlayCanvas();
     }
 
     /**
@@ -166,6 +169,38 @@ public final class Renderer implements AutoCloseable {
             renderList.clear();
             glBindVertexArray(0);
         }
+    }
+
+    /**
+     * Draws a safe logical-coordinate overlay over the complete current framebuffer.
+     *
+     * <p>Call this after {@link #render(Scene, Camera)} and before swapping buffers. Overlay draws
+     * do not alter the most-recent-scene values in {@link RenderStatistics}. The supplied overlay
+     * receives no OpenGL state or handles. An overlay that paints nothing does not realize GPU
+     * resources.
+     *
+     * @param overlay overlay to paint in current logical window coordinates
+     * @throws NullPointerException if {@code overlay} is {@code null}
+     * @throws IllegalStateException if this renderer is closed
+     */
+    public void render(Overlay overlay) {
+        requireOpen();
+        Overlay validOverlay = Objects.requireNonNull(overlay, "overlay");
+        int logicalWidth = window.width();
+        int logicalHeight = window.height();
+        overlayCanvas.clear();
+        validOverlay.paint(overlayCanvas, logicalWidth, logicalHeight);
+        if (overlayCanvas.vertexCount() == 0) {
+            return;
+        }
+        context.makeCurrent();
+        overlayRenderer()
+                .render(
+                        overlayCanvas,
+                        logicalWidth,
+                        logicalHeight,
+                        context.framebufferWidth(),
+                        context.framebufferHeight());
     }
 
     /** Clears the current color and depth buffers using the renderer clear color. */
@@ -262,6 +297,10 @@ public final class Renderer implements AutoCloseable {
                 basicProgram.close();
                 basicProgram = null;
             }
+            if (overlayRenderer != null) {
+                overlayRenderer.close();
+                overlayRenderer = null;
+            }
             glBindVertexArray(0);
             glUseProgram(0);
             renderList.clear();
@@ -308,9 +347,23 @@ public final class Renderer implements AutoCloseable {
     private BasicProgram basicProgram() {
         if (basicProgram == null) {
             basicProgram = BasicProgram.create();
-            resources.setProgramCount(1);
+            updateProgramCount();
         }
         return basicProgram;
+    }
+
+    /** Lazily creates and returns context-local overlay drawing resources. */
+    private OverlayRenderer overlayRenderer() {
+        if (overlayRenderer == null) {
+            overlayRenderer = OverlayRenderer.create();
+            updateProgramCount();
+        }
+        return overlayRenderer;
+    }
+
+    /** Synchronizes the diagnostic program count with realized built-in programs. */
+    private void updateProgramCount() {
+        resources.setProgramCount((basicProgram == null ? 0 : 1) + (overlayRenderer == null ? 0 : 1));
     }
 
     /** Applies depth, blending, and face-culling state for one material. */

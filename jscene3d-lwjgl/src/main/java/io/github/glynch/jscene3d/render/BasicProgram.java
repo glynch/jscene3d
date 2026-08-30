@@ -4,23 +4,7 @@
  */
 package io.github.glynch.jscene3d.render;
 
-import static org.lwjgl.opengl.GL20.GL_COMPILE_STATUS;
-import static org.lwjgl.opengl.GL20.GL_FRAGMENT_SHADER;
-import static org.lwjgl.opengl.GL20.GL_LINK_STATUS;
-import static org.lwjgl.opengl.GL20.GL_VERTEX_SHADER;
-import static org.lwjgl.opengl.GL20.glAttachShader;
-import static org.lwjgl.opengl.GL20.glCompileShader;
-import static org.lwjgl.opengl.GL20.glCreateProgram;
-import static org.lwjgl.opengl.GL20.glCreateShader;
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
-import static org.lwjgl.opengl.GL20.glDeleteShader;
-import static org.lwjgl.opengl.GL20.glGetProgramInfoLog;
-import static org.lwjgl.opengl.GL20.glGetProgrami;
-import static org.lwjgl.opengl.GL20.glGetShaderInfoLog;
-import static org.lwjgl.opengl.GL20.glGetShaderi;
-import static org.lwjgl.opengl.GL20.glGetUniformLocation;
-import static org.lwjgl.opengl.GL20.glLinkProgram;
-import static org.lwjgl.opengl.GL20.glShaderSource;
 
 /** Compiled built-in unlit mesh program. */
 final class BasicProgram implements AutoCloseable {
@@ -79,18 +63,18 @@ final class BasicProgram implements AutoCloseable {
 
     /** Compiles, links, and validates the built-in basic-material program. */
     static BasicProgram create() {
-        int program = createLinkedProgram();
+        int program = ProgramSupport.createLinkedProgram("Built-in basic", VERTEX_SOURCE, FRAGMENT_SOURCE);
         int modelMatrixLocation;
         int viewMatrixLocation;
         int projectionMatrixLocation;
         int baseColorLocation;
         int useVertexColorLocation;
         try {
-            modelMatrixLocation = requiredUniform(program, "modelMatrix");
-            viewMatrixLocation = requiredUniform(program, "viewMatrix");
-            projectionMatrixLocation = requiredUniform(program, "projectionMatrix");
-            baseColorLocation = requiredUniform(program, "baseColor");
-            useVertexColorLocation = requiredUniform(program, "useVertexColor");
+            modelMatrixLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "modelMatrix");
+            viewMatrixLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "viewMatrix");
+            projectionMatrixLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "projectionMatrix");
+            baseColorLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "baseColor");
+            useVertexColorLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "useVertexColor");
         } catch (RuntimeException exception) {
             glDeleteProgram(program);
             throw exception;
@@ -102,34 +86,6 @@ final class BasicProgram implements AutoCloseable {
                 projectionMatrixLocation,
                 baseColorLocation,
                 useVertexColorLocation);
-    }
-
-    /** Compiles both stages, links them, and releases all intermediate shader objects. */
-    private static int createLinkedProgram() {
-        int vertexShader = compileShader(GL_VERTEX_SHADER, "vertex", VERTEX_SOURCE);
-        int fragmentShader = 0;
-        int program = 0;
-        try {
-            fragmentShader = compileShader(GL_FRAGMENT_SHADER, "fragment", FRAGMENT_SOURCE);
-            program = glCreateProgram();
-            glAttachShader(program, vertexShader);
-            glAttachShader(program, fragmentShader);
-            glLinkProgram(program);
-            if (glGetProgrami(program, GL_LINK_STATUS) == 0) {
-                throw new IllegalStateException("Built-in basic program link failed:\n" + glGetProgramInfoLog(program));
-            }
-            return program;
-        } catch (RuntimeException exception) {
-            if (program != 0) {
-                glDeleteProgram(program);
-            }
-            throw exception;
-        } finally {
-            glDeleteShader(vertexShader);
-            if (fragmentShader != 0) {
-                glDeleteShader(fragmentShader);
-            }
-        }
     }
 
     /** Returns the context-local OpenGL program name. */
@@ -165,27 +121,5 @@ final class BasicProgram implements AutoCloseable {
     @Override
     public void close() {
         glDeleteProgram(id);
-    }
-
-    /** Compiles one built-in shader stage or deletes it before reporting failure. */
-    private static int compileShader(int type, String label, String source) {
-        int shader = glCreateShader(type);
-        glShaderSource(shader, source);
-        glCompileShader(shader);
-        if (glGetShaderi(shader, GL_COMPILE_STATUS) == 0) {
-            String infoLog = glGetShaderInfoLog(shader);
-            glDeleteShader(shader);
-            throw new IllegalStateException("Built-in basic " + label + " shader compilation failed:\n" + infoLog);
-        }
-        return shader;
-    }
-
-    /** Returns an active uniform location or rejects a mismatched built-in program. */
-    private static int requiredUniform(int program, String name) {
-        int location = glGetUniformLocation(program, name);
-        if (location < 0) {
-            throw new IllegalStateException("Built-in basic program has no active " + name + " uniform");
-        }
-        return location;
     }
 }

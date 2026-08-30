@@ -191,6 +191,39 @@ final class RendererIT {
         }
     }
 
+    @Test
+    void rendersSolidAndAlphaMaskOverlaysThroughOwnedRendererState() {
+        WindowOptions windowOptions = WindowOptions.builder()
+                .size(320, 240)
+                .title("Renderer overlay integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+
+        try (Window window = Window.create(windowOptions);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+            OverlayImage alphaMask = OverlayImage.alphaMask(1, 1, new byte[] {(byte) 0xff});
+            Overlay overlay = (canvas, width, height) -> {
+                canvas.rectangle(width - 30.0f, 10.0f, 20.0f, 20.0f, Color.WHITE, 1.0f);
+                canvas.alphaMask(alphaMask.fullRegion(), 10.0f, 10.0f, 20.0f, 20.0f, Color.WHITE, 1.0f);
+            };
+
+            renderer.render(scene, camera);
+            renderer.render(overlay);
+
+            assertThat(renderer.info().resources().programCount()).isEqualTo(2);
+            int panelX = window.framebufferWidth() - 20;
+            int panelY = window.framebufferHeight() - 20;
+            assertPixelIsNotBlack(panelX, panelY);
+        }
+    }
+
     private static BufferGeometry createTriangle() {
         BufferGeometry geometry = new BufferGeometry();
         geometry.setAttribute(
@@ -223,6 +256,14 @@ final class RendererIT {
         assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+
+    private static void assertPixelIsNotBlack(int x, int y) {
+        ByteBuffer pixel = readPixel(x, y);
+
+        int brightness =
+                Byte.toUnsignedInt(pixel.get(0)) + Byte.toUnsignedInt(pixel.get(1)) + Byte.toUnsignedInt(pixel.get(2));
+        assertThat(brightness).isPositive();
     }
 
     private static ByteBuffer readPixel(int x, int y) {

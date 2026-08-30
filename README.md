@@ -50,6 +50,8 @@ Build and run the visible basic-triangle example with:
 the same command. In `OrbitControlsExample`, drag with the left mouse button to
 orbit; drag with the right mouse button or Shift-left to pan; and use the middle
 mouse button or scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates.
+The example also demonstrates the optional themed control panel and FPS monitor
+from `jscene3d-gui`; interacting with the panel does not move the camera.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same command without that JVM
@@ -59,9 +61,11 @@ option. The examples artifact is never deployed.
 
 - `jscene3d-core`: renderer-independent scene, camera, geometry, material, and
   texture descriptions.
-- `jscene3d-lwjgl`: the OpenGL renderer, GLFW platform integration, and STB
-  texture loading.
-- `jscene3d-examples`: unpublished runnable examples depending on both public
+- `jscene3d-lwjgl`: the OpenGL renderer, GLFW platform integration, controls,
+  and the renderer-owned safe overlay canvas.
+- `jscene3d-gui`: optional themed controls and monitors with bundled TrueType
+  text rendering.
+- `jscene3d-examples`: unpublished runnable examples depending on the public
   artifacts.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and

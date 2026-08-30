@@ -8,7 +8,6 @@ module io.github.glynch.jscene3d.lwjgl {
     requires org.lwjgl;
     requires org.lwjgl.glfw;
     requires org.lwjgl.opengl;
-    requires org.lwjgl.stb;
     requires static transitive org.jspecify;
 
     exports io.github.glynch.jscene3d.controls;

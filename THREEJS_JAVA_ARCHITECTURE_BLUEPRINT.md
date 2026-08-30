@@ -455,18 +455,21 @@ The core scene model must not depend on the renderer implementation.
 Initial published artifact boundary:
 
 ```text
-io.github.glynch:jscene3d-core  io.github.glynch:jscene3d-lwjgl
-----------------------------    ----------------------------------
-scene graph                     OpenGL renderer
-cameras                         GLFW window and input integration
-geometry and materials          perspective OrbitControls
-textures and JOML-facing APIs
+io.github.glynch:jscene3d-core  io.github.glynch:jscene3d-lwjgl  io.github.glynch:jscene3d-gui
+----------------------------    --------------------------------  -------------------------------
+scene graph                     OpenGL renderer                   optional control panels
+cameras                         GLFW window and input integration FPS and diagnostic monitors
+geometry and materials          perspective OrbitControls        themes and TrueType text
+textures and JOML-facing APIs   safe logical overlay canvas
 ```
 
-The `jscene3d-lwjgl` artifact depends on `jscene3d-core`.
+The `jscene3d-lwjgl` artifact depends on `jscene3d-core`. The optional
+`jscene3d-gui` artifact depends on `jscene3d-lwjgl`. Renderer owns the OpenGL
+implementation behind a generic logical overlay interface; GUI code never
+receives OpenGL handles or state.
 
 The Maven group is `io.github.glynch`. Examples use the reactor artifact name
-`jscene3d-examples`, depend on both published artifacts, and are not published.
+`jscene3d-examples`, depend on the three published artifacts, and are not published.
 GLFW remains in `jscene3d-lwjgl` until a real alternative host requires a
 separate integration.
 
@@ -478,6 +481,7 @@ Maven artifact    JPMS module
 ----------------  ----------------------------------
 jscene3d-core     io.github.glynch.jscene3d.core
 jscene3d-lwjgl    io.github.glynch.jscene3d.lwjgl
+jscene3d-gui      io.github.glynch.jscene3d.gui
 ```
 
 Each module exports only intentional caller packages. Packages do not split
@@ -2139,9 +2143,9 @@ recorded baseline.
 ### 27.5 Publication and versioning
 
 The first public artifact release is `0.1.0` and publishes
-`io.github.glynch:jscene3d-core` and `io.github.glynch:jscene3d-lwjgl` to Maven
-Central through the Central Publisher Portal. All published JScene3D artifacts
-use one lockstep version.
+`io.github.glynch:jscene3d-core`, `io.github.glynch:jscene3d-lwjgl`, and the
+optional `io.github.glynch:jscene3d-gui` to Maven Central through the Central
+Publisher Portal. All published JScene3D artifacts use one lockstep version.
 
 JScene3D follows Semantic Versioning with a stricter pre-1.0 policy:
 
@@ -2845,9 +2849,11 @@ context, choice, consequences, and alternatives.
 35. Include optional default-framebuffer MSAA in version 0.1, disabled by
     default; let the Solar System Viewer request four samples and expose the
     actual sample count supplied by the platform.
-36. Publish `jscene3d-core` and `jscene3d-lwjgl` as the JPMS modules
-    `io.github.glynch.jscene3d.core` and `io.github.glynch.jscene3d.lwjgl`, with
-    intentional exports and both module-path and classpath consumer tests.
+36. Publish `jscene3d-core`, `jscene3d-lwjgl`, and optional `jscene3d-gui` as
+    the JPMS modules `io.github.glynch.jscene3d.core`,
+    `io.github.glynch.jscene3d.lwjgl`, and `io.github.glynch.jscene3d.gui`, with
+    intentional exports and both module-path and classpath consumer tests. Keep
+    renderer-owned OpenGL resources behind a generic safe overlay interface.
 37. Make every public `close()` idempotent while keeping closure terminal;
     expose `isClosed()`, perform cleanup at most once, and reject other
     operations after closure.
@@ -3007,8 +3013,8 @@ Version 0.1 is complete when all of the following are true:
 The version 0.1 foundation review established that JScene3D is a public,
 general-purpose Java library inspired by Three.js but governed by Java idioms
 and deterministic lifecycle safety. It targets Java 21 and OpenGL 3.3 Core,
-publishes separate core and LWJGL JPMS artifacts through Maven Central, and uses
-Apache-2.0.
+publishes separate core, LWJGL, and optional GUI JPMS artifacts through Maven
+Central, and uses Apache-2.0.
 
 Version 0.1 includes custom GLSL through `ShaderMaterial`, PNG and JPEG texture
 loading, genuine module-path and classpath use, multiple independent

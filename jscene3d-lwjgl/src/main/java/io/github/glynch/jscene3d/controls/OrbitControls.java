@@ -708,6 +708,40 @@ public final class OrbitControls {
      *     state
      */
     public boolean update(float elapsedSeconds) {
+        return update(elapsedSeconds, true);
+    }
+
+    /**
+     * Applies keyboard input and pending motion without reading pointer buttons, movement, or
+     * scrolling.
+     *
+     * <p>This is intended for frames in which an overlaid control panel has claimed pointer
+     * input. Automatic rotation and damping continue normally.
+     *
+     * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
+     */
+    public boolean updateWithoutPointerInput() {
+        return updateWithoutPointerInput(DEFAULT_SECONDS_PER_UPDATE);
+    }
+
+    /**
+     * Applies keyboard input and pending motion without reading pointer input, using an elapsed
+     * duration in seconds.
+     *
+     * @param elapsedSeconds finite non-negative time since the previous update
+     * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalArgumentException if {@code elapsedSeconds} is invalid
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
+     */
+    public boolean updateWithoutPointerInput(float elapsedSeconds) {
+        return update(elapsedSeconds, false);
+    }
+
+    /** Applies input categories selected by the caller and all pending motion. */
+    private boolean update(float elapsedSeconds, boolean pointerInputEnabled) {
         float validElapsedSeconds = Preconditions.requireNonNegative(elapsedSeconds, "elapsedSeconds");
         if (!enabled) {
             return false;
@@ -717,9 +751,9 @@ public final class OrbitControls {
 
         InputState input = window.input();
         boolean modifierDown = isModifierDown(input);
-        boolean userInteracting = processPointerInput(input, modifierDown);
+        boolean userInteracting = pointerInputEnabled && processPointerInput(input, modifierDown);
         userInteracting |= processKeyboardInput(input, modifierDown);
-        if (zoomEnabled && input.scrollDeltaY() != 0.0) {
+        if (pointerInputEnabled && zoomEnabled && input.scrollDeltaY() != 0.0) {
             orbitState.dolly(input.scrollDeltaY(), zoomSpeed);
             userInteracting = true;
         }

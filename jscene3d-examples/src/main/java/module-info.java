@@ -6,5 +6,6 @@
 module io.github.glynch.jscene3d.examples {
     requires io.github.glynch.jscene3d.core;
     requires io.github.glynch.jscene3d.lwjgl;
+    requires io.github.glynch.jscene3d.gui;
     requires static org.jspecify;
 }

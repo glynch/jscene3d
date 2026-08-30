@@ -14,6 +14,8 @@ import io.github.glynch.jscene3d.core.Color;
 import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.PerspectiveCamera;
 import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.gui.ControlPanel;
+import io.github.glynch.jscene3d.gui.FpsMonitor;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.Renderer;
@@ -50,6 +52,9 @@ public final class OrbitControlsExample {
             controls.setDistanceLimits(2.0f, 20.0f);
             controls.setDampingEnabled(true);
             controls.update();
+
+            ControlPanel panel = createControlPanel(window, controls);
+            FpsMonitor fpsMonitor = new FpsMonitor();
             window.show();
 
             while (!window.shouldClose()) {
@@ -62,11 +67,44 @@ public final class OrbitControlsExample {
                         && window.framebufferHeight() > 0) {
                     camera.setAspectRatio(window.framebufferAspectRatio());
                 }
-                controls.update();
+                panel.update();
+                if (panel.capturesPointer()) {
+                    controls.updateWithoutPointerInput();
+                } else {
+                    controls.update();
+                }
                 renderer.render(scene, camera);
+                renderer.render(panel);
+                renderer.render(fpsMonitor);
                 window.swapBuffers();
+                fpsMonitor.update();
             }
         }
+    }
+
+    /** Creates explicit Java bindings for the interactive camera settings. */
+    private static ControlPanel createControlPanel(Window window, OrbitControls controls) {
+        ControlPanel panel = new ControlPanel(window, "Orbit Controls");
+
+        ControlPanel.Section interaction = panel.addSection("Interaction");
+        interaction.addBoolean("enabled", controls::isEnabled, controls::setEnabled);
+        interaction.addBoolean("rotation", controls::isRotationEnabled, controls::setRotationEnabled);
+        interaction.addBoolean("panning", controls::isPanningEnabled, controls::setPanningEnabled);
+        interaction.addBoolean("zoom", controls::isZoomEnabled, controls::setZoomEnabled);
+        interaction.addBoolean("screen-space pan", controls::isScreenSpacePanning, controls::setScreenSpacePanning);
+
+        ControlPanel.Section motion = panel.addSection("Motion");
+        motion.addFloat("rotation speed", controls::rotationSpeed, controls::setRotationSpeed, 0.0f, 3.0f);
+        motion.addFloat("pan speed", controls::panSpeed, controls::setPanSpeed, 0.0f, 3.0f);
+        motion.addFloat("zoom speed", controls::zoomSpeed, controls::setZoomSpeed, 0.0f, 3.0f);
+        motion.addBoolean("damping", controls::isDampingEnabled, controls::setDampingEnabled);
+        motion.addFloat("damping factor", controls::dampingFactor, controls::setDampingFactor, 0.01f, 1.0f);
+        motion.addBoolean("auto rotate", controls::isAutoRotationEnabled, controls::setAutoRotationEnabled);
+        motion.addFloat("auto speed", controls::autoRotationSpeed, controls::setAutoRotationSpeed, -5.0f, 5.0f);
+
+        ControlPanel.Section state = panel.addSection("State");
+        state.addButton("reset camera", controls::reset);
+        return panel;
     }
 
     /** Creates three differently transformed boxes that make camera movement easy to see. */

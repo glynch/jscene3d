@@ -93,6 +93,10 @@ the build-authoritative NullAway configuration.
 - Do not create generic `Util`, `Common`, `Manager`, `Service`, or `Core`
   container classes. This rule does not prohibit the accepted
   `jscene3d-core` artifact name.
+- Do not bury a generally reusable operation in a private helper merely because
+  it currently has one caller. Put generic argument checks in a focused internal
+  `Preconditions` component; keep class-specific invariant validation and
+  implementation behavior in the owning class.
 
 ## Static verification
 

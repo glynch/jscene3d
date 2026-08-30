@@ -101,6 +101,14 @@ public final class WindowOptions {
         return preferredFramebufferSampleCount;
     }
 
+    static String requireValidTitle(String title) {
+        Objects.requireNonNull(title, "title");
+        if (title.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException("title must not contain a null character");
+        }
+        return title;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -155,10 +163,10 @@ public final class WindowOptions {
          * @throws IllegalArgumentException if either dimension is not positive
          */
         public Builder size(int width, int height) {
-            requirePositive(width, "width");
-            requirePositive(height, "height");
-            this.width = width;
-            this.height = height;
+            int validWidth = Preconditions.requirePositive(width, "width");
+            int validHeight = Preconditions.requirePositive(height, "height");
+            this.width = validWidth;
+            this.height = validHeight;
             return this;
         }
 
@@ -171,11 +179,7 @@ public final class WindowOptions {
          * @throws IllegalArgumentException if {@code title} contains a null character
          */
         public Builder title(String title) {
-            Objects.requireNonNull(title, "title");
-            if (title.indexOf('\0') >= 0) {
-                throw new IllegalArgumentException("title must not contain a null character");
-            }
-            this.title = title;
+            this.title = requireValidTitle(title);
             return this;
         }
 
@@ -202,11 +206,8 @@ public final class WindowOptions {
          * @throws IllegalArgumentException if the sample count is negative
          */
         public Builder preferredFramebufferSampleCount(int preferredFramebufferSampleCount) {
-            if (preferredFramebufferSampleCount < 0) {
-                throw new IllegalArgumentException(
-                        "preferredFramebufferSampleCount must not be negative: " + preferredFramebufferSampleCount);
-            }
-            this.preferredFramebufferSampleCount = preferredFramebufferSampleCount;
+            this.preferredFramebufferSampleCount = Preconditions.requireNonNegative(
+                    preferredFramebufferSampleCount, "preferredFramebufferSampleCount");
             return this;
         }
 
@@ -217,12 +218,6 @@ public final class WindowOptions {
          */
         public WindowOptions build() {
             return new WindowOptions(this);
-        }
-
-        private static void requirePositive(int value, String name) {
-            if (value <= 0) {
-                throw new IllegalArgumentException(name + " must be positive: " + value);
-            }
         }
     }
 }

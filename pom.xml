@@ -496,6 +496,9 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <argLine>@{argLine} ${jscene3d.example.firstThreadArgument}</argLine>
+                        </configuration>
                         <executions>
                             <execution>
                                 <goals>

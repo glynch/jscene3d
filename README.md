@@ -1,12 +1,11 @@
 # JScene3D
 
 JScene3D is a Java 21 scene-graph and rendering library inspired by Three.js.
-It is currently in private version 0.1 development.
 
 ## Requirements
 
 - A Java 21 or newer JDK.
-- macOS ARM64 is the sole Verified Platform during private foundation work.
+- macOS ARM64 is currently the sole Verified Platform.
 
 The checked-in Maven Wrapper downloads the required Maven version. No system
 Maven installation is required.
@@ -25,12 +24,21 @@ OpenGL integration tests are isolated behind a separate profile:
 ./mvnw clean verify -Prender-integration
 ```
 
-The integration profile does not contain graphical tests until the Window and
-OpenGL context milestone begins.
+That profile creates hidden native windows and OpenGL contexts. On macOS it
+must run in a session with access to the WindowServer.
+
+To manually verify a visible, resizable blue window, run:
+
+```shell
+./mvnw clean verify -pl jscene3d-lwjgl -am -Prun-window-smoke
+```
+
+Close the window normally or press Escape to finish the build. This is an
+internal development smoke test; applications do not receive raw OpenGL access.
 
 ## Run an example
 
-Once an example main class exists, build its dependencies and run it with:
+Once a public feature example exists, build its dependencies and run it with:
 
 ```shell
 ./mvnw -pl jscene3d-examples -am verify -Prun-example \

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<analysisConfiguration>
+    <revapi.filter>
+        <elements>
+            <exclude>
+                <item>
+                    <matcher>java-package</matcher>
+                    <match>/io\.github\.glynch\.jscene3d(?:\..*)?\.internal(?:\..*)?/</match>
+                </item>
+            </exclude>
+        </elements>
+    </revapi.filter>
+</analysisConfiguration>

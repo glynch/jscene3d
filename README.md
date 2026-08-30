@@ -38,15 +38,15 @@ internal development smoke test; applications do not receive raw OpenGL access.
 
 ## Run examples
 
-Build and run the automatic-transforms example with:
+Build and run the visible basic-triangle example with:
 
 ```shell
 ./mvnw clean verify -pl jscene3d-examples -am -Prun-example \
-    -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.TransformsExample
+    -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.BasicTriangleExample
 ```
 
-`HierarchyExample`, `CamerasExample`, and `BufferGeometryExample` are also
-available using the same command.
+`TransformsExample`, `HierarchyExample`, `CamerasExample`, and
+`BufferGeometryExample` are also available using the same command.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same command without that JVM

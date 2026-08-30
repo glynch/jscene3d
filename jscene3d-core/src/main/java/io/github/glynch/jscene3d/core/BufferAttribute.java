@@ -235,6 +235,22 @@ public final class BufferAttribute {
         return Arrays.copyOf(data, data.length);
     }
 
+    /**
+     * Copies all scalar data into an existing array.
+     *
+     * @param destination array whose length must equal the scalar-data length
+     * @throws NullPointerException if {@code destination} is {@code null}
+     * @throws IllegalArgumentException if the destination length differs from the data length
+     */
+    public void copyTo(float[] destination) {
+        float[] validDestination = Objects.requireNonNull(destination, "destination");
+        if (validDestination.length != data.length) {
+            throw new IllegalArgumentException(
+                    "destination length must equal data length: " + validDestination.length + " != " + data.length);
+        }
+        System.arraycopy(data, 0, validDestination, 0, data.length);
+    }
+
     private boolean setValue(int itemIndex, int componentIndex, float value) {
         int index = dataIndex(itemIndex, componentIndex);
         float validValue = Preconditions.requireFinite(value, "value");

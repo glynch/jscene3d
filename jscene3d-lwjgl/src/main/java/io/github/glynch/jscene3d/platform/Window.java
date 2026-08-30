@@ -23,6 +23,7 @@ import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
 import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
+import io.github.glynch.jscene3d.internal.WindowContextRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -108,6 +109,8 @@ public final class Window implements AutoCloseable {
 
             Window window = new Window(handle, capabilities, options);
             window.installCallbacks();
+            WindowContextRegistry.register(
+                    window, window::makeContextCurrent, window::framebufferWidth, window::framebufferHeight);
             OPEN_WINDOWS.add(window);
             return window;
         } catch (RuntimeException exception) {
@@ -117,6 +120,20 @@ public final class Window implements AutoCloseable {
             GlfwRuntime.release();
             throw exception;
         }
+    }
+
+    /**
+     * Creates an initially hidden window with the default size, vertical synchronization, and
+     * multisampling options.
+     *
+     * @param title the title, which may be empty
+     * @return the created window
+     * @throws NullPointerException if {@code title} is {@code null}
+     * @throws IllegalArgumentException if the title contains a null character
+     * @throws IllegalStateException if GLFW or the requested OpenGL context cannot be initialized
+     */
+    public static Window create(String title) {
+        return create(WindowOptions.builder().title(title).build());
     }
 
     /**
@@ -392,8 +409,10 @@ public final class Window implements AutoCloseable {
             return;
         }
         GlfwRuntime.requireActiveOwnerThread();
+        WindowContextRegistry.requireUnclaimed(this);
         OPEN_WINDOWS.remove(this);
         releaseNativeWindow(handle);
+        WindowContextRegistry.unregister(this);
         closed = true;
         GlfwRuntime.release();
     }

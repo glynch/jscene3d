@@ -41,6 +41,15 @@ final class WindowIT {
     }
 
     @Test
+    void createsWithDefaultOptionsAndACustomTitle() {
+        try (Window window = Window.create("Convenient title")) {
+            assertThat(window.title()).isEqualTo("Convenient title");
+            assertThat(window.width()).isPositive();
+            assertThat(window.height()).isPositive();
+        }
+    }
+
+    @Test
     void changesItsTitle() {
         try (Window window = Window.create(320, 240, "Initial title")) {
             window.setTitle("Updated title");

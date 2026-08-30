@@ -1,0 +1,141 @@
+/*
+ * Copyright 2026 Graham Lynch
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.glynch.jscene3d.render;
+
+import static io.github.glynch.jscene3d.core.Angles.PI;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.joml.Math.toRadians;
+import static org.lwjgl.opengl.GL11.GL_RGBA;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11.glReadPixels;
+
+import io.github.glynch.jscene3d.core.BasicMaterial;
+import io.github.glynch.jscene3d.core.BufferAttribute;
+import io.github.glynch.jscene3d.core.BufferGeometry;
+import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.core.IndexBuffer;
+import io.github.glynch.jscene3d.core.MaterialSide;
+import io.github.glynch.jscene3d.core.Mesh;
+import io.github.glynch.jscene3d.core.PerspectiveCamera;
+import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.platform.VerticalSync;
+import io.github.glynch.jscene3d.platform.Window;
+import io.github.glynch.jscene3d.platform.WindowOptions;
+import java.nio.ByteBuffer;
+import java.util.Objects;
+import org.junit.jupiter.api.Test;
+import org.lwjgl.BufferUtils;
+
+final class RendererIT {
+    @Test
+    void rendersGeometryAndUploadsOnlyChangedData() {
+        WindowOptions windowOptions = WindowOptions.builder()
+                .size(320, 240)
+                .title("Renderer integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+
+        try (Window window = Window.create(windowOptions);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            RendererInfo info = renderer.info();
+
+            assertThat(info.frame()).isEqualTo(1L);
+            assertThat(info.drawCalls()).isEqualTo(1);
+            assertThat(info.triangles()).isEqualTo(1L);
+            assertThat(info.visibleMeshes()).isEqualTo(1);
+            assertThat(info.activeGeometryResources()).isEqualTo(1);
+            assertThat(info.programCount()).isEqualTo(1);
+            assertThat(info.bufferUploads()).isEqualTo(1);
+            assertCenterPixelIsRed(window);
+
+            renderer.render(scene, camera);
+
+            assertThat(renderer.info()).isSameAs(info);
+            assertThat(info.frame()).isEqualTo(2L);
+            assertThat(info.bufferUploads()).isZero();
+
+            BufferAttribute positions = Objects.requireNonNull(geometry.attribute(BufferGeometry.POSITION));
+            positions.setX(0, -0.9f);
+            renderer.render(scene, camera);
+
+            assertThat(info.frame()).isEqualTo(3L);
+            assertThat(info.bufferUploads()).isEqualTo(1);
+
+            geometry.setIndex(IndexBuffer.of(new int[] {0, 1, 2}));
+            renderer.render(scene, camera);
+
+            assertThat(info.frame()).isEqualTo(4L);
+            assertThat(info.drawCalls()).isEqualTo(1);
+            assertThat(info.bufferUploads()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void enforcesOneRendererAndRendererBeforeWindowClosure() {
+        Window window = Window.create(320, 240, "Renderer ownership test");
+        Renderer renderer = Renderer.create(window);
+        try {
+            assertThatIllegalStateException().isThrownBy(() -> Renderer.create(window));
+            assertThatIllegalStateException()
+                    .isThrownBy(window::close)
+                    .withMessage("Window cannot close while its renderer is open");
+        } finally {
+            renderer.close();
+            window.close();
+        }
+
+        assertThat(renderer.isClosed()).isTrue();
+        assertThat(window.isClosed()).isTrue();
+    }
+
+    @Test
+    void rendersTheBackFaceOfADoubleSidedMaterial() {
+        try (Window window = Window.create("Double-sided material test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            material.setSide(MaterialSide.DOUBLE);
+            Mesh triangle = new Mesh(geometry, material);
+            triangle.rotateY(PI);
+            Scene scene = new Scene();
+            scene.add(triangle);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsRed(window);
+        }
+    }
+
+    private static BufferGeometry createTriangle() {
+        BufferGeometry geometry = new BufferGeometry();
+        geometry.setAttribute(
+                BufferGeometry.POSITION,
+                BufferAttribute.of(new float[] {-0.8f, -0.8f, 0.0f, 0.8f, -0.8f, 0.0f, 0.0f, 0.8f, 0.0f}, 3));
+        return geometry;
+    }
+
+    private static void assertCenterPixelIsRed(Window window) {
+        ByteBuffer pixel = BufferUtils.createByteBuffer(4);
+        glReadPixels(
+                window.framebufferWidth() / 2, window.framebufferHeight() / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isGreaterThan(240);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+}

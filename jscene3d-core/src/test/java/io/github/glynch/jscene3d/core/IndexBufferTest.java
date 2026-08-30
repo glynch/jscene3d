@@ -30,6 +30,17 @@ final class IndexBufferTest {
     }
 
     @Test
+    void copiesIntoReusableCallerStorage() {
+        IndexBuffer index = IndexBuffer.of(new int[] {0, 1, 2});
+        int[] destination = new int[3];
+
+        index.copyTo(destination);
+
+        assertThat(destination).containsExactly(0, 1, 2);
+        assertThatIllegalArgumentException().isThrownBy(() -> index.copyTo(new int[2]));
+    }
+
+    @Test
     void versionsSingleAndScopedChangesAndExpiresEditor() {
         IndexBuffer index = IndexBuffer.of(new int[] {0, 1, 2});
         AtomicReference<IndexBuffer.Editor> retainedEditor = new AtomicReference<>();
@@ -77,5 +88,6 @@ final class IndexBufferTest {
         assertThatNullPointerException().isThrownBy(() -> IndexBuffer.of(new int[0], null));
         IndexBuffer index = IndexBuffer.of(new int[0]);
         assertThatNullPointerException().isThrownBy(() -> index.edit(null));
+        assertThatNullPointerException().isThrownBy(() -> index.copyTo(null));
     }
 }

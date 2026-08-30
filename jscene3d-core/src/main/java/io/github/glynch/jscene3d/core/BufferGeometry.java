@@ -59,6 +59,15 @@ public final class BufferGeometry implements AutoCloseable {
     }
 
     /**
+     * Creates a builder for atomic initial geometry configuration.
+     *
+     * @return a new one-use builder
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
      * Returns the geometry-level structural version.
      *
      * <p>Attribute and index scalar data have their own versions. This version changes when an
@@ -496,6 +505,210 @@ public final class BufferGeometry implements AutoCloseable {
         boundingBoxPositionAttribute = null;
         boundingSpherePositionAttribute = null;
         closed = true;
+    }
+
+    /** Builds one initially configured {@link BufferGeometry}. */
+    public static final class Builder {
+        private final Map<String, BufferAttribute> attributes = new LinkedHashMap<>();
+
+        private @Nullable IndexBuffer index;
+        private boolean explicitDrawRange;
+        private int drawRangeStart;
+        private int drawRangeCount;
+        private boolean built;
+
+        private Builder() {}
+
+        /**
+         * Sets a named attribute.
+         *
+         * <p>This is the general construction path for custom attributes, explicit usage policies,
+         * and standard attributes that need direct {@link BufferAttribute} control.
+         *
+         * @param name non-empty attribute name
+         * @param attribute attribute to retain
+         * @return this builder
+         * @throws NullPointerException if an argument is {@code null}
+         * @throws IllegalArgumentException if the name is empty
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder attribute(String name, BufferAttribute attribute) {
+            requireNotBuilt();
+            attributes.put(Preconditions.requireNonEmpty(name, "name"), Objects.requireNonNull(attribute, "attribute"));
+            return this;
+        }
+
+        /**
+         * Sets static three-component vertex positions.
+         *
+         * @param values flat XYZ values whose length is divisible by three
+         * @return this builder
+         * @throws NullPointerException if {@code values} is {@code null}
+         * @throws IllegalArgumentException if the values do not form complete finite positions
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder positions(float... values) {
+            requireNotBuilt();
+            return attribute(POSITION, BufferAttribute.of(values, 3));
+        }
+
+        /**
+         * Sets static three-component vertex normals.
+         *
+         * @param values flat XYZ values whose length is divisible by three
+         * @return this builder
+         * @throws NullPointerException if {@code values} is {@code null}
+         * @throws IllegalArgumentException if the values do not form complete finite normals
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder normals(float... values) {
+            requireNotBuilt();
+            return attribute(NORMAL, BufferAttribute.of(values, 3));
+        }
+
+        /**
+         * Sets static two-component texture coordinates.
+         *
+         * @param values flat UV values whose length is divisible by two
+         * @return this builder
+         * @throws NullPointerException if {@code values} is {@code null}
+         * @throws IllegalArgumentException if the values do not form complete finite coordinates
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder uvs(float... values) {
+            requireNotBuilt();
+            return attribute(UV, BufferAttribute.of(values, 2));
+        }
+
+        /**
+         * Sets static RGB vertex colors from linear-sRGB color values.
+         *
+         * @param colors one color per vertex
+         * @return this builder
+         * @throws NullPointerException if the array or a color is {@code null}
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder vertexColors(Color... colors) {
+            requireNotBuilt();
+            Color[] validColors = Objects.requireNonNull(colors, "colors");
+            float[] values = new float[Preconditions.requireArrayLength(validColors.length, 3, "colors")];
+            for (int colorIndex = 0; colorIndex < validColors.length; colorIndex++) {
+                Color color = Objects.requireNonNull(validColors[colorIndex], "colors[" + colorIndex + "]");
+                int offset = colorIndex * 3;
+                values[offset] = color.red();
+                values[offset + 1] = color.green();
+                values[offset + 2] = color.blue();
+            }
+            return attribute(COLOR, BufferAttribute.of(values, 3));
+        }
+
+        /**
+         * Sets a shared index buffer.
+         *
+         * @param index index buffer to retain
+         * @return this builder
+         * @throws NullPointerException if {@code index} is {@code null}
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder index(IndexBuffer index) {
+            requireNotBuilt();
+            this.index = Objects.requireNonNull(index, "index");
+            return this;
+        }
+
+        /**
+         * Sets static vertex indices.
+         *
+         * @param values non-negative indices
+         * @return this builder
+         * @throws NullPointerException if {@code values} is {@code null}
+         * @throws IllegalArgumentException if an index is negative
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder indices(int... values) {
+            requireNotBuilt();
+            return index(IndexBuffer.of(values));
+        }
+
+        /**
+         * Sets an explicit initial index or vertex draw range.
+         *
+         * @param start non-negative first element
+         * @param count non-negative number of elements
+         * @return this builder
+         * @throws IllegalArgumentException if either value is negative
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public Builder drawRange(int start, int count) {
+            requireNotBuilt();
+            drawRangeStart = Preconditions.requireNonNegative(start, "start");
+            drawRangeCount = Preconditions.requireNonNegative(count, "count");
+            explicitDrawRange = true;
+            return this;
+        }
+
+        /**
+         * Builds the configured geometry.
+         *
+         * @return a new open geometry
+         * @throws IllegalArgumentException if attribute counts, positions, indices, or the draw
+         *     range are incompatible
+         * @throws IllegalStateException if this builder has already built a geometry
+         */
+        public BufferGeometry build() {
+            requireNotBuilt();
+            validateConfiguration();
+
+            BufferGeometry geometry = new BufferGeometry();
+            for (Map.Entry<String, BufferAttribute> entry : attributes.entrySet()) {
+                geometry.setAttribute(entry.getKey(), entry.getValue());
+            }
+            IndexBuffer configuredIndex = index;
+            if (configuredIndex != null) {
+                geometry.setIndex(configuredIndex);
+            }
+            if (explicitDrawRange) {
+                geometry.setDrawRange(drawRangeStart, drawRangeCount);
+            }
+            built = true;
+            return geometry;
+        }
+
+        private void validateConfiguration() {
+            BufferAttribute positions = attributes.get(POSITION);
+            if (positions != null && positions.itemSize() != 3) {
+                throw new IllegalArgumentException("position attribute itemSize must be 3: " + positions.itemSize());
+            }
+
+            int vertexCount = -1;
+            for (BufferAttribute attribute : attributes.values()) {
+                if (vertexCount < 0) {
+                    vertexCount = attribute.count();
+                } else if (attribute.count() != vertexCount) {
+                    throw new IllegalArgumentException(
+                            "all attribute counts must match: " + attribute.count() + " != " + vertexCount);
+                }
+            }
+
+            IndexBuffer configuredIndex = index;
+            if (configuredIndex != null) {
+                if (positions == null) {
+                    throw new IllegalArgumentException("position attribute must be set before an index");
+                }
+                configuredIndex.requireCompatibleVertexCount(positions.count());
+            }
+
+            if (explicitDrawRange) {
+                int availableCount = configuredIndex == null ? Math.max(vertexCount, 0) : configuredIndex.count();
+                requireRangeWithin(drawRangeStart, drawRangeCount, availableCount);
+            }
+        }
+
+        private void requireNotBuilt() {
+            if (built) {
+                throw new IllegalStateException("BufferGeometry.Builder has already built a geometry");
+            }
+        }
     }
 
     private void requireCompatibleAttributeCount(String name, int attributeCount) {

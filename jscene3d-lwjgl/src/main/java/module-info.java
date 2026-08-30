@@ -11,4 +11,5 @@ module io.github.glynch.jscene3d.lwjgl {
     requires static transitive org.jspecify;
 
     exports io.github.glynch.jscene3d.platform;
+    exports io.github.glynch.jscene3d.render;
 }

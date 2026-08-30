@@ -165,6 +165,22 @@ public final class IndexBuffer {
         return Arrays.copyOf(data, data.length);
     }
 
+    /**
+     * Copies all indices into an existing array.
+     *
+     * @param destination array whose length must equal the index count
+     * @throws NullPointerException if {@code destination} is {@code null}
+     * @throws IllegalArgumentException if the destination length differs from the index count
+     */
+    public void copyTo(int[] destination) {
+        int[] validDestination = Objects.requireNonNull(destination, "destination");
+        if (validDestination.length != data.length) {
+            throw new IllegalArgumentException(
+                    "destination length must equal index count: " + validDestination.length + " != " + data.length);
+        }
+        System.arraycopy(data, 0, validDestination, 0, data.length);
+    }
+
     void attachVertexCount(int vertexCount) {
         requireCompatibleVertexCount(vertexCount);
         attachedVertexCounts.merge(vertexCount, 1, Integer::sum);
@@ -197,7 +213,7 @@ public final class IndexBuffer {
         return validValue;
     }
 
-    private void requireCompatibleVertexCount(int vertexCount) {
+    void requireCompatibleVertexCount(int vertexCount) {
         int validVertexCount = Preconditions.requireNonNegative(vertexCount, "vertexCount");
         if (maximumIndex >= validVertexCount) {
             throw new IllegalArgumentException(

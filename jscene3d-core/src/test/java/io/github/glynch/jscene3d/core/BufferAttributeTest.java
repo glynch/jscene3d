@@ -32,6 +32,17 @@ final class BufferAttributeTest {
     }
 
     @Test
+    void copiesIntoReusableCallerStorage() {
+        BufferAttribute attribute = BufferAttribute.of(new float[] {1.0f, 2.0f, 3.0f}, 3);
+        float[] destination = new float[3];
+
+        attribute.copyTo(destination);
+
+        assertThat(destination).containsExactly(1.0f, 2.0f, 3.0f);
+        assertThatIllegalArgumentException().isThrownBy(() -> attribute.copyTo(new float[2]));
+    }
+
+    @Test
     void versionsActualScalarAndConvenienceChanges() {
         BufferAttribute attribute = BufferAttribute.of(new float[8], 4);
 
@@ -96,5 +107,6 @@ final class BufferAttributeTest {
         assertThatNullPointerException().isThrownBy(() -> BufferAttribute.of(new float[3], 3, null));
         BufferAttribute attribute = BufferAttribute.of(new float[3], 3);
         assertThatNullPointerException().isThrownBy(() -> attribute.edit(null));
+        assertThatNullPointerException().isThrownBy(() -> attribute.copyTo(null));
     }
 }

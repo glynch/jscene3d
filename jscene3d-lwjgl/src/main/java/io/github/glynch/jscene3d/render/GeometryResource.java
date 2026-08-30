@@ -42,7 +42,7 @@ final class GeometryResource implements AutoCloseable {
         vertexArray = glGenVertexArrays();
     }
 
-    void synchronize(BufferGeometry geometry, boolean requiresVertexColors, RendererInfo info) {
+    void synchronize(BufferGeometry geometry, boolean requiresVertexColors, RenderStatistics statistics) {
         @Nullable BufferAttribute positionAttribute = geometry.attribute(BufferGeometry.POSITION);
         @Nullable BufferAttribute colorAttribute = geometry.attribute(BufferGeometry.COLOR);
         if (requiresVertexColors && colorAttribute == null) {
@@ -53,15 +53,15 @@ final class GeometryResource implements AutoCloseable {
         }
 
         glBindVertexArray(vertexArray);
-        positions = synchronizeAttribute(positions, positionAttribute, POSITION_LOCATION, 3, true, info);
+        positions = synchronizeAttribute(positions, positionAttribute, POSITION_LOCATION, 3, true, statistics);
         colors = synchronizeAttribute(
                 colors,
                 colorAttribute,
                 COLOR_LOCATION,
                 colorAttribute == null ? 4 : colorAttribute.itemSize(),
                 false,
-                info);
-        indices = synchronizeIndex(indices, geometry.index(), info);
+                statistics);
+        indices = synchronizeIndex(indices, geometry.index(), statistics);
         glBindVertexArray(0);
     }
 
@@ -85,7 +85,7 @@ final class GeometryResource implements AutoCloseable {
             int location,
             int itemSize,
             boolean required,
-            RendererInfo info) {
+            RenderStatistics statistics) {
         if (attribute == null) {
             if (required) {
                 throw new IllegalStateException("Drawable geometry has no position attribute");
@@ -105,7 +105,7 @@ final class GeometryResource implements AutoCloseable {
             attribute.copyTo(resource.staging);
             glBufferData(GL_ARRAY_BUFFER, resource.staging, toOpenGlUsage(attribute.usage()));
             resource.uploadedVersion = attribute.version();
-            info.recordUpload((long) resource.staging.length * Float.BYTES);
+            statistics.recordUpload((long) resource.staging.length * Float.BYTES);
         }
         glEnableVertexAttribArray(location);
         glVertexAttribPointer(location, itemSize, GL_FLOAT, false, 0, 0L);
@@ -113,7 +113,7 @@ final class GeometryResource implements AutoCloseable {
     }
 
     private static @Nullable IndexResource synchronizeIndex(
-            @Nullable IndexResource existing, @Nullable IndexBuffer index, RendererInfo info) {
+            @Nullable IndexResource existing, @Nullable IndexBuffer index, RenderStatistics statistics) {
         if (index == null) {
             if (existing != null) {
                 glDeleteBuffers(existing.buffer);
@@ -134,7 +134,7 @@ final class GeometryResource implements AutoCloseable {
             index.copyTo(resource.staging);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, resource.staging, toOpenGlUsage(index.usage()));
             resource.uploadedVersion = index.version();
-            info.recordUpload((long) resource.staging.length * Integer.BYTES);
+            statistics.recordUpload((long) resource.staging.length * Integer.BYTES);
         }
         return resource;
     }

@@ -412,6 +412,8 @@ io.github.glynch.jscene3d
 │   ├── Renderer
 │   ├── RendererOptions
 │   ├── RendererInfo
+│   ├── RenderStatistics
+│   ├── ResourceStatistics
 │   └── internal
 │       ├── RenderList
 │       ├── RenderItem
@@ -1271,20 +1273,35 @@ Avoid an oversized options object with unimplemented flags.
 
 ### 16.4 Renderer information
 
-`RendererInfo` should expose read-only diagnostics such as:
+`RendererInfo` is a stable container that separates per-frame rendering
+measurements from persistent renderer-owned resource counts:
+
+```java
+RendererInfo info = renderer.info();
+RenderStatistics statistics = info.statistics();
+ResourceStatistics resources = info.resources();
+```
+
+`RenderStatistics` exposes:
 
 - Frame number.
 - Draw calls.
 - Rendered triangles.
 - Visible mesh count.
 - Culled mesh count.
-- Active geometry resources.
-- Active texture resources.
-- Compiled program count.
 - Buffer upload count and bytes uploaded for the frame.
 - Texture upload count and bytes uploaded for the frame.
 
-This is important for both users and automated performance tests.
+`ResourceStatistics` exposes:
+
+- Active geometry resources.
+- Active texture resources.
+- Compiled program count.
+
+All three objects are stable read-only live views. This separation prevents
+resource lifetime information from being confused with counters reset at the
+start of each rendered frame. The diagnostics are important for both users and
+automated performance tests.
 
 ---
 

@@ -50,35 +50,40 @@ final class RendererIT {
 
             renderer.render(scene, camera);
             RendererInfo info = renderer.info();
+            RenderStatistics statistics = info.statistics();
+            ResourceStatistics resources = info.resources();
 
-            assertThat(info.frame()).isEqualTo(1L);
-            assertThat(info.drawCalls()).isEqualTo(1);
-            assertThat(info.triangles()).isEqualTo(1L);
-            assertThat(info.visibleMeshes()).isEqualTo(1);
-            assertThat(info.activeGeometryResources()).isEqualTo(1);
-            assertThat(info.programCount()).isEqualTo(1);
-            assertThat(info.bufferUploads()).isEqualTo(1);
+            assertThat(statistics.frame()).isEqualTo(1L);
+            assertThat(statistics.drawCalls()).isEqualTo(1);
+            assertThat(statistics.triangles()).isEqualTo(1L);
+            assertThat(statistics.visibleMeshes()).isEqualTo(1);
+            assertThat(statistics.culledMeshes()).isZero();
+            assertThat(statistics.bufferUploads()).isEqualTo(1);
+            assertThat(resources.activeGeometryResources()).isEqualTo(1);
+            assertThat(resources.programCount()).isEqualTo(1);
             assertCenterPixelIsRed(window);
 
             renderer.render(scene, camera);
 
             assertThat(renderer.info()).isSameAs(info);
-            assertThat(info.frame()).isEqualTo(2L);
-            assertThat(info.bufferUploads()).isZero();
+            assertThat(info.statistics()).isSameAs(statistics);
+            assertThat(info.resources()).isSameAs(resources);
+            assertThat(statistics.frame()).isEqualTo(2L);
+            assertThat(statistics.bufferUploads()).isZero();
 
             BufferAttribute positions = Objects.requireNonNull(geometry.attribute(BufferGeometry.POSITION));
             positions.setX(0, -0.9f);
             renderer.render(scene, camera);
 
-            assertThat(info.frame()).isEqualTo(3L);
-            assertThat(info.bufferUploads()).isEqualTo(1);
+            assertThat(statistics.frame()).isEqualTo(3L);
+            assertThat(statistics.bufferUploads()).isEqualTo(1);
 
             geometry.setIndex(IndexBuffer.of(new int[] {0, 1, 2}));
             renderer.render(scene, camera);
 
-            assertThat(info.frame()).isEqualTo(4L);
-            assertThat(info.drawCalls()).isEqualTo(1);
-            assertThat(info.bufferUploads()).isEqualTo(1);
+            assertThat(statistics.frame()).isEqualTo(4L);
+            assertThat(statistics.drawCalls()).isEqualTo(1);
+            assertThat(statistics.bufferUploads()).isEqualTo(1);
         }
     }
 

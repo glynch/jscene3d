@@ -58,6 +58,8 @@ public final class Renderer implements AutoCloseable {
     private final WindowContextRegistry.Access context;
     private final boolean automaticClear;
     private final RendererInfo info;
+    private final RenderStatistics statistics;
+    private final ResourceStatistics resources;
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
     private final float[] matrixValues;
 
@@ -78,6 +80,8 @@ public final class Renderer implements AutoCloseable {
         clearColor = options.clearColor();
         clearAlpha = options.clearAlpha();
         info = new RendererInfo();
+        statistics = info.statistics();
+        resources = info.resources();
         geometryResources = new IdentityHashMap<>();
         matrixValues = new float[16];
     }
@@ -109,7 +113,7 @@ public final class Renderer implements AutoCloseable {
         Camera validCamera = Objects.requireNonNull(camera, "camera");
         context.makeCurrent();
         releaseClosedGeometryResources();
-        info.beginFrame();
+        statistics.beginFrame();
 
         int framebufferWidth = context.framebufferWidth();
         int framebufferHeight = context.framebufferHeight();
@@ -128,7 +132,7 @@ public final class Renderer implements AutoCloseable {
             });
         }
         glBindVertexArray(0);
-        info.completeFrame();
+        statistics.completeFrame();
     }
 
     /** Clears the current color and depth buffers using the renderer clear color. */
@@ -171,7 +175,7 @@ public final class Renderer implements AutoCloseable {
         clearAlpha = validAlpha;
     }
 
-    /** Returns this renderer's stable statistics view. */
+    /** Returns this renderer's stable diagnostic container. */
     public RendererInfo info() {
         requireOpen();
         context.makeCurrent();
@@ -201,8 +205,8 @@ public final class Renderer implements AutoCloseable {
             }
             glBindVertexArray(0);
             glUseProgram(0);
-            info.setActiveGeometryResources(0);
-            info.setProgramCount(0);
+            resources.setActiveGeometryResources(0);
+            resources.setProgramCount(0);
             closed = true;
         } finally {
             WindowContextRegistry.release(window, context);
@@ -226,8 +230,8 @@ public final class Renderer implements AutoCloseable {
 
         BasicProgram program = basicProgram();
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
-        info.setActiveGeometryResources(geometryResources.size());
-        resource.synchronize(geometry, basicMaterial.usesVertexColors(), info);
+        resources.setActiveGeometryResources(geometryResources.size());
+        resource.synchronize(geometry, basicMaterial.usesVertexColors(), statistics);
         applyMaterialState(basicMaterial);
 
         glUseProgram(program.id());
@@ -247,13 +251,13 @@ public final class Renderer implements AutoCloseable {
         } else {
             glDrawElements(GL_TRIANGLES, elementCount, GL_UNSIGNED_INT, (long) start * Integer.BYTES);
         }
-        info.recordDraw(elementCount);
+        statistics.recordDraw(elementCount);
     }
 
     private BasicProgram basicProgram() {
         if (basicProgram == null) {
             basicProgram = BasicProgram.create();
-            info.setProgramCount(1);
+            resources.setProgramCount(1);
         }
         return basicProgram;
     }
@@ -312,7 +316,7 @@ public final class Renderer implements AutoCloseable {
                 iterator.remove();
             }
         }
-        info.setActiveGeometryResources(geometryResources.size());
+        resources.setActiveGeometryResources(geometryResources.size());
     }
 
     private void requireOpen() {

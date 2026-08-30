@@ -19,6 +19,7 @@ public final class OrthographicCamera extends Camera {
     private float bottom;
     private float near;
     private float far;
+    private float zoom = 1.0f;
 
     /**
      * Creates an orthographic camera.
@@ -105,6 +106,15 @@ public final class OrthographicCamera extends Camera {
     }
 
     /**
+     * Returns the projection magnification.
+     *
+     * @return the positive zoom factor, where {@code 1} preserves the configured bounds
+     */
+    public float zoom() {
+        return zoom;
+    }
+
+    /**
      * Atomically sets all projection bounds.
      *
      * @param left left projection bound
@@ -148,9 +158,28 @@ public final class OrthographicCamera extends Camera {
         }
     }
 
+    /**
+     * Sets the projection magnification while preserving the center of the configured bounds.
+     *
+     * @param zoom finite positive zoom factor
+     * @throws IllegalArgumentException if {@code zoom} is not finite and positive
+     */
+    public void setZoom(float zoom) {
+        float validZoom = Preconditions.requirePositive(zoom, "zoom");
+        if (this.zoom != validZoom) {
+            this.zoom = validZoom;
+            markProjectionChanged();
+        }
+    }
+
     @Override
     void calculateProjectionMatrix(Matrix4f destination) {
-        destination.setOrtho(left, right, bottom, top, near, far);
+        float centerX = (left + right) * 0.5f;
+        float centerY = (bottom + top) * 0.5f;
+        float halfWidth = (right - left) * 0.5f / zoom;
+        float halfHeight = (top - bottom) * 0.5f / zoom;
+        destination.setOrtho(
+                centerX - halfWidth, centerX + halfWidth, centerY - halfHeight, centerY + halfHeight, near, far);
     }
 
     private static void validateBounds(float left, float right, float top, float bottom) {

@@ -45,8 +45,11 @@ Build and run the visible basic-triangle example with:
     -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.BasicTriangleExample
 ```
 
-`TransformsExample`, `HierarchyExample`, `CamerasExample`, and
-`BufferGeometryExample` are also available using the same command.
+`TransformsExample`, `HierarchyExample`, `CamerasExample`,
+`BufferGeometryExample`, and `OrbitControlsExample` are also available using
+the same command. In `OrbitControlsExample`, drag with the left mouse button to
+orbit; drag with the right mouse button or Shift-left to pan; and use the middle
+mouse button or scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same command without that JVM

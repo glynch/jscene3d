@@ -252,3 +252,11 @@ A stable, read-only per-window view of held keyboard and mouse state, current
 pointer position, and the press, release, pointer movement, and scroll changes
 accumulated during the latest Event Poll. Reading it does not consume changes.
 _Avoid_: Native callback, allocated event queue
+
+**Orbit Controls**:
+A window-input component that keeps an unparented Perspective or Orthographic
+Camera aimed at a configurable World Transform target. Mouse and keyboard input
+support orbiting, panning, perspective dolly, and orthographic zoom, with
+optional damping and automatic rotation. Version 0.1 excludes touch input,
+remappable bindings, zoom-to-cursor behavior, and parented cameras.
+_Avoid_: Camera ownership, native input callback

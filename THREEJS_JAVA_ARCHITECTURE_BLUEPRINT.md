@@ -431,6 +431,8 @@ io.github.glynch.jscene3d
 │   ├── Key
 │   ├── MouseButton
 │   └── glfw
+├── controls
+│   └── OrbitControls
 └── examples
     ├── TriangleExample
     ├── HierarchyExample
@@ -457,9 +459,11 @@ io.github.glynch:jscene3d-core  io.github.glynch:jscene3d-lwjgl
 ----------------------------    ----------------------------------
 scene graph                     OpenGL renderer
 cameras                         GLFW window and input integration
-geometry and materials    <---- depends on core
+geometry and materials          perspective OrbitControls
 textures and JOML-facing APIs
 ```
+
+The `jscene3d-lwjgl` artifact depends on `jscene3d-core`.
 
 The Maven group is `io.github.glynch`. Examples use the reactor artifact name
 `jscene3d-examples`, depend on both published artifacts, and are not published.
@@ -829,6 +833,7 @@ Required properties:
 - Bottom plane.
 - Near plane.
 - Far plane.
+- Positive zoom factor.
 
 Every value must be finite. Bounds satisfy `left < right` and `bottom < top`;
 clipping planes satisfy `0 <= near < far`. Infinite far planes, reversed depth,
@@ -838,7 +843,8 @@ names the offending values and required relationship.
 
 The constructor validates the complete initial projection. Controlled setters
 include atomic `setBounds(left, right, top, bottom)` and
-`setClippingPlanes(near, far)` operations. Projection matrices follow the same
+`setClippingPlanes(near, far)` operations, plus `setZoom(zoom)`. Zoom preserves
+the center of the configured bounds. Projection matrices follow the same
 automatic lazy-update rule as `PerspectiveCamera`.
 
 Version 0.1 includes only `PerspectiveCamera` and `OrthographicCamera`.
@@ -1835,6 +1841,26 @@ An optional high-level `Application` component may later provide:
 
 It should be built after the lower-level window and renderer lifecycle is
 proven.
+
+### 21.1 Orbit controls
+
+Version 0.1 provides `OrbitControls` in the exported
+`io.github.glynch.jscene3d.controls` package of `jscene3d-lwjgl`. Its dependency
+on `Window` and `InputState` keeps it out of renderer-independent
+`jscene3d-core`.
+
+The control supports unparented perspective and orthographic cameras, a
+configurable world-space target, mouse and keyboard orbit and pan, perspective
+dolly, orthographic zoom, independent enable flags and speeds, distance, zoom,
+polar, and azimuth limits, optional damping, optional automatic rotation,
+screen-space panning, programmatic movement, and save/reset state. `update()`
+reads input already accumulated by `Window.pollEvents()` and returns whether it
+changed the camera. It registers no native callback and owns no closeable
+resource.
+
+Touch input, remappable bindings, zoom-to-cursor behavior, target-radius limits,
+input events, and parented cameras are deferred until Feature Examples make
+their interface and behavior requirements concrete.
 
 ---
 
@@ -2849,6 +2875,11 @@ context, choice, consequences, and alternatives.
     render thread, with one renderer per JScene3D-created unshared context and
     independent GPU realizations; exclude context sharing and concurrent render
     threads from version 0.1.
+46. Provide perspective and orthographic `OrbitControls` in `jscene3d-lwjgl`
+    with desktop mouse and keyboard navigation, optional damping and automatic
+    rotation, explicit targets and limits, and no separate callback or lifecycle
+    ownership; defer touch, remapping, zoom-to-cursor behavior, input events, and
+    parented cameras.
 
 ### Decisions still required
 
@@ -2930,6 +2961,8 @@ Version 0.1 is complete when all of the following are true:
   materials, shader materials, and textures.
 - A user can render with `renderer.render(scene, camera)` without direct OpenGL
   calls.
+- A user can inspect perspective and orthographic scenes interactively with
+  orbit, pan, dolly, and zoom controls driven by a window's polled input state.
 - Lifecycle and thread rules are documented.
 - Public core types do not expose OpenGL identifiers.
 

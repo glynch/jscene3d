@@ -16,9 +16,11 @@ import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BufferAttribute;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.core.Group;
 import io.github.glynch.jscene3d.core.IndexBuffer;
 import io.github.glynch.jscene3d.core.MaterialSide;
 import io.github.glynch.jscene3d.core.Mesh;
+import io.github.glynch.jscene3d.core.OrthographicCamera;
 import io.github.glynch.jscene3d.core.PerspectiveCamera;
 import io.github.glynch.jscene3d.core.Scene;
 import io.github.glynch.jscene3d.platform.VerticalSync;
@@ -126,6 +128,61 @@ final class RendererIT {
         }
     }
 
+    @Test
+    void rendersMultipleObjectsWithHierarchyVisibilityAndSharedResources() {
+        WindowOptions windowOptions = WindowOptions.builder()
+                .size(320, 240)
+                .title("Multiple object integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+
+        try (Window window = Window.create(windowOptions);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createSmallTriangle();
+                BasicMaterial redMaterial = new BasicMaterial(Color.RED);
+                BasicMaterial greenMaterial = new BasicMaterial(Color.GREEN)) {
+            Mesh leftTriangle = new Mesh(geometry, redMaterial);
+            leftTriangle.setPosition(-0.6f, 0.0f, 0.0f);
+
+            Group translatedParent = new Group();
+            translatedParent.setPosition(0.5f, 0.0f, 0.0f);
+            Mesh inheritedTriangle = new Mesh(geometry, redMaterial);
+            inheritedTriangle.setPosition(0.1f, 0.0f, 0.0f);
+            translatedParent.add(inheritedTriangle);
+
+            Group hiddenParent = new Group();
+            hiddenParent.setVisible(false);
+            hiddenParent.add(new Mesh(geometry, greenMaterial));
+
+            Scene scene = new Scene();
+            scene.add(leftTriangle);
+            scene.add(translatedParent);
+            scene.add(hiddenParent);
+            OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            RenderStatistics statistics = renderer.info().statistics();
+            ResourceStatistics resources = renderer.info().resources();
+            assertThat(statistics.drawCalls()).isEqualTo(2);
+            assertThat(statistics.visibleMeshes()).isEqualTo(2);
+            assertThat(statistics.triangles()).isEqualTo(2L);
+            assertThat(statistics.bufferUploads()).isEqualTo(1);
+            assertThat(resources.activeGeometryResources()).isEqualTo(1);
+            int centerY = window.framebufferHeight() / 2;
+            assertPixelIsRed(Math.round(window.framebufferWidth() * 0.2f), centerY);
+            assertPixelIsRed(Math.round(window.framebufferWidth() * 0.8f), centerY);
+            assertPixelIsBlack(window.framebufferWidth() / 2, centerY);
+
+            renderer.render(scene, camera);
+
+            assertThat(statistics.drawCalls()).isEqualTo(2);
+            assertThat(statistics.bufferUploads()).isZero();
+            assertThat(resources.activeGeometryResources()).isEqualTo(1);
+        }
+    }
+
     private static BufferGeometry createTriangle() {
         BufferGeometry geometry = new BufferGeometry();
         geometry.setAttribute(
@@ -134,13 +191,35 @@ final class RendererIT {
         return geometry;
     }
 
+    private static BufferGeometry createSmallTriangle() {
+        return BufferGeometry.builder()
+                .positions(-0.2f, -0.2f, 0.0f, 0.2f, -0.2f, 0.0f, 0.0f, 0.2f, 0.0f)
+                .build();
+    }
+
     private static void assertCenterPixelIsRed(Window window) {
-        ByteBuffer pixel = BufferUtils.createByteBuffer(4);
-        glReadPixels(
-                window.framebufferWidth() / 2, window.framebufferHeight() / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+        assertPixelIsRed(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+    }
+
+    private static void assertPixelIsRed(int x, int y) {
+        ByteBuffer pixel = readPixel(x, y);
 
         assertThat(Byte.toUnsignedInt(pixel.get(0))).isGreaterThan(240);
         assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+
+    private static void assertPixelIsBlack(int x, int y) {
+        ByteBuffer pixel = readPixel(x, y);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+
+    private static ByteBuffer readPixel(int x, int y) {
+        ByteBuffer pixel = BufferUtils.createByteBuffer(4);
+        glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+        return pixel;
     }
 }

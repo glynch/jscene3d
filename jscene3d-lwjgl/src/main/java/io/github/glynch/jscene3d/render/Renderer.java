@@ -61,6 +61,7 @@ public final class Renderer implements AutoCloseable {
     private final RenderStatistics statistics;
     private final ResourceStatistics resources;
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
+    private final RenderList renderList;
     private final float[] matrixValues;
 
     private Color clearColor;
@@ -83,6 +84,7 @@ public final class Renderer implements AutoCloseable {
         statistics = info.statistics();
         resources = info.resources();
         geometryResources = new IdentityHashMap<>();
+        renderList = new RenderList();
         matrixValues = new float[16];
     }
 
@@ -122,17 +124,23 @@ public final class Renderer implements AutoCloseable {
             Color background = validScene.background();
             clearBuffers(background == null ? clearColor : background);
         }
-        if (framebufferWidth > 0 && framebufferHeight > 0) {
-            Matrix4fc viewMatrix = validCamera.viewMatrix();
-            Matrix4fc projectionMatrix = validCamera.projectionMatrix();
-            validScene.traverseVisible(object -> {
-                if (object instanceof Mesh mesh) {
-                    renderMesh(mesh, viewMatrix, projectionMatrix);
+        try {
+            if (framebufferWidth > 0 && framebufferHeight > 0) {
+                Matrix4fc viewMatrix = validCamera.viewMatrix();
+                Matrix4fc projectionMatrix = validCamera.projectionMatrix();
+                renderList.build(validScene);
+                for (int index = 0; index < renderList.opaqueCount(); index++) {
+                    renderMesh(renderList.opaqueItem(index), viewMatrix, projectionMatrix);
                 }
-            });
+                for (int index = 0; index < renderList.transparentCount(); index++) {
+                    renderMesh(renderList.transparentItem(index), viewMatrix, projectionMatrix);
+                }
+            }
+            statistics.completeFrame();
+        } finally {
+            renderList.clear();
+            glBindVertexArray(0);
         }
-        glBindVertexArray(0);
-        statistics.completeFrame();
     }
 
     /** Clears the current color and depth buffers using the renderer clear color. */
@@ -205,6 +213,7 @@ public final class Renderer implements AutoCloseable {
             }
             glBindVertexArray(0);
             glUseProgram(0);
+            renderList.clear();
             resources.setActiveGeometryResources(0);
             resources.setProgramCount(0);
             closed = true;
@@ -213,38 +222,28 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
-    private void renderMesh(Mesh mesh, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
-        BufferGeometry geometry = mesh.geometry();
-        Material material = mesh.material();
-        if (!material.visible()) {
-            return;
-        }
-        int elementCount = geometry.drawRangeCount();
-        if (elementCount == 0) {
-            return;
-        }
-        if (!(material instanceof BasicMaterial basicMaterial)) {
-            throw new IllegalStateException(
-                    "Unsupported material type: " + material.getClass().getName());
-        }
-
+    private void renderMesh(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
+        Mesh mesh = item.mesh();
+        BufferGeometry geometry = item.geometry();
+        BasicMaterial material = item.material();
         BasicProgram program = basicProgram();
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
         resources.setActiveGeometryResources(geometryResources.size());
-        resource.synchronize(geometry, basicMaterial.usesVertexColors(), statistics);
-        applyMaterialState(basicMaterial);
+        resource.synchronize(geometry, material.usesVertexColors(), statistics);
+        applyMaterialState(material);
 
         glUseProgram(program.id());
         uploadMatrix(program.modelMatrixLocation(), mesh.matrixWorld());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
-        Color color = basicMaterial.color();
-        float alpha = basicMaterial.transparent() ? basicMaterial.opacity() : 1.0f;
+        Color color = material.color();
+        float alpha = material.transparent() ? material.opacity() : 1.0f;
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
-        glUniform1i(program.useVertexColorLocation(), basicMaterial.usesVertexColors() ? 1 : 0);
+        glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
         resource.bind();
 
         int start = geometry.drawRangeStart();
+        int elementCount = item.elementCount();
         IndexBuffer index = geometry.index();
         if (index == null) {
             glDrawArrays(GL_TRIANGLES, start, elementCount);

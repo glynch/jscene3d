@@ -21,6 +21,31 @@ final class Preconditions {
         return value;
     }
 
+    static float requirePositive(float value, String parameterName) {
+        float finiteValue = requireFinite(value, parameterName);
+        if (finiteValue <= 0.0f) {
+            throw new IllegalArgumentException(parameterName + " must be positive: " + finiteValue);
+        }
+        return finiteValue;
+    }
+
+    static float requireNonNegative(float value, String parameterName) {
+        float finiteValue = requireFinite(value, parameterName);
+        if (finiteValue < 0.0f) {
+            throw new IllegalArgumentException(parameterName + " must not be negative: " + finiteValue);
+        }
+        return finiteValue;
+    }
+
+    static void requireLessThan(float lowerValue, String lowerName, float upperValue, String upperName) {
+        requireFinite(lowerValue, lowerName);
+        requireFinite(upperValue, upperName);
+        if (lowerValue >= upperValue) {
+            throw new IllegalArgumentException(
+                    lowerName + " must be less than " + upperName + ": " + lowerValue + " >= " + upperValue);
+        }
+    }
+
     static float requireInRange(float value, float minimum, float maximum, String parameterName) {
         float finiteValue = requireFinite(value, parameterName);
         if (finiteValue < minimum || finiteValue > maximum) {

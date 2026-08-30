@@ -135,9 +135,8 @@ public class Object3D {
         float validY = Preconditions.requireFinite(y, "y");
         float validZ = Preconditions.requireFinite(z, "z");
         float validW = Preconditions.requireFinite(w, "w");
-        float largestComponent = java.lang.Math.max(
-                java.lang.Math.max(java.lang.Math.abs(validX), java.lang.Math.abs(validY)),
-                java.lang.Math.max(java.lang.Math.abs(validZ), java.lang.Math.abs(validW)));
+        float largestComponent =
+                Math.max(Math.max(Math.abs(validX), Math.abs(validY)), Math.max(Math.abs(validZ), Math.abs(validW)));
         if (largestComponent == 0.0f) {
             throw new IllegalArgumentException("quaternion must not have zero length");
         }
@@ -145,8 +144,8 @@ public class Object3D {
         float scaledY = validY / largestComponent;
         float scaledZ = validZ / largestComponent;
         float scaledW = validW / largestComponent;
-        float inverseLength = (float) (1.0
-                / java.lang.Math.sqrt(scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ + scaledW * scaledW));
+        float inverseLength = (float)
+                (1.0 / Math.sqrt(scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ + scaledW * scaledW));
         float normalizedX = scaledX * inverseLength;
         float normalizedY = scaledY * inverseLength;
         float normalizedZ = scaledZ * inverseLength;
@@ -579,6 +578,10 @@ public class Object3D {
             current.resolveWorldMatrix(resolvedParent);
             resolvedParent = current;
         }
+    }
+
+    final long matrixWorldVersion() {
+        return worldMatrixVersion;
     }
 
     private void resolveWorldMatrix(@Nullable Object3D resolvedParent) {

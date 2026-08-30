@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.Scene;
 import java.util.ArrayList;
 import java.util.List;
+import org.joml.Matrix4f;
 import org.junit.jupiter.api.Test;
 
 final class RenderListTest {
@@ -32,7 +33,7 @@ final class RenderListTest {
             scene.add(secondTransparent);
             RenderList renderList = new RenderList();
 
-            renderList.build(scene);
+            build(renderList, scene);
 
             assertThat(renderList.opaqueCount()).isEqualTo(1);
             assertThat(renderList.opaqueItem(0).mesh()).isSameAs(opaque);
@@ -58,14 +59,14 @@ final class RenderListTest {
             scene.add(thirdMesh);
             RenderList renderList = new RenderList();
 
-            renderList.build(scene);
+            build(renderList, scene);
             RenderItem firstMeshItem = findOpaqueItem(renderList, firstMesh);
             List<RenderItem> initialOrder = opaqueItems(renderList);
 
             assertThat(initialOrder).isSortedAccordingTo(RenderItem::compareOpaque);
 
             renderList.clear();
-            renderList.build(scene);
+            build(renderList, scene);
 
             assertThat(findOpaqueItem(renderList, firstMesh)).isSameAs(firstMeshItem);
             assertThat(opaqueItems(renderList)).containsExactlyElementsOf(initialOrder);
@@ -88,10 +89,37 @@ final class RenderListTest {
             scene.add(invisibleMaterialMesh);
             RenderList renderList = new RenderList();
 
-            renderList.build(scene);
+            build(renderList, scene);
 
             assertThat(renderList.opaqueCount()).isZero();
             assertThat(renderList.transparentCount()).isZero();
+            renderList.clear();
+        }
+    }
+
+    @Test
+    void cullsOutsideMeshesUnlessCullingIsDisabled() {
+        try (BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            Mesh mesh = new Mesh(geometry, material);
+            mesh.setPosition(3.0f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            RenderList renderList = new RenderList();
+
+            RenderStatistics culledStatistics = build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isZero();
+            assertThat(culledStatistics.culledMeshes()).isEqualTo(1);
+            assertThat(geometry.boundingSphere()).isNotNull();
+
+            geometry.clearBoundingSphere();
+            mesh.setFrustumCullingEnabled(false);
+            RenderStatistics uncullableStatistics = build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isEqualTo(1);
+            assertThat(uncullableStatistics.culledMeshes()).isZero();
+            assertThat(geometry.boundingSphere()).isNull();
             renderList.clear();
         }
     }
@@ -100,6 +128,15 @@ final class RenderListTest {
         return BufferGeometry.builder()
                 .positions(-0.2f, -0.2f, 0.0f, 0.2f, -0.2f, 0.0f, 0.0f, 0.2f, 0.0f)
                 .build();
+    }
+
+    private static RenderStatistics build(RenderList renderList, Scene scene) {
+        Frustum frustum = new Frustum();
+        frustum.update(new Matrix4f(), new Matrix4f());
+        RenderStatistics statistics = new RenderStatistics();
+        statistics.beginFrame();
+        renderList.build(scene, frustum, statistics);
+        return statistics;
     }
 
     private static RenderItem findOpaqueItem(RenderList renderList, Mesh mesh) {

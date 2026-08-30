@@ -23,6 +23,7 @@ final class Object3DTest {
 
         assertThat(object.parent()).isNull();
         assertThat(object.isVisible()).isTrue();
+        assertThat(object.isFrustumCullingEnabled()).isTrue();
         assertThat(children).isSameAs(object.children()).isEmpty();
         Object3D rejectedChild = new Object3D();
         assertThatThrownBy(() -> children.add(rejectedChild)).isInstanceOf(UnsupportedOperationException.class);
@@ -30,6 +31,15 @@ final class Object3DTest {
         Object3D child = new Object3D();
         object.add(child);
         assertThat(children).containsExactly(child);
+    }
+
+    @Test
+    void controlsWhetherTheObjectMayBeFrustumCulled() {
+        Object3D object = new Object3D();
+
+        object.setFrustumCullingEnabled(false);
+
+        assertThat(object.isFrustumCullingEnabled()).isFalse();
     }
 
     @Test

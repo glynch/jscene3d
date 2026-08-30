@@ -41,7 +41,6 @@ import io.github.glynch.jscene3d.core.Color;
 import io.github.glynch.jscene3d.core.IndexBuffer;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.MaterialSide;
-import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.Scene;
 import io.github.glynch.jscene3d.internal.WindowContextRegistry;
 import io.github.glynch.jscene3d.platform.Window;
@@ -62,6 +61,7 @@ public final class Renderer implements AutoCloseable {
     private final ResourceStatistics resources;
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
     private final RenderList renderList;
+    private final Frustum frustum;
     private final float[] matrixValues;
 
     private Color clearColor;
@@ -85,6 +85,7 @@ public final class Renderer implements AutoCloseable {
         resources = info.resources();
         geometryResources = new IdentityHashMap<>();
         renderList = new RenderList();
+        frustum = new Frustum();
         matrixValues = new float[16];
     }
 
@@ -128,7 +129,8 @@ public final class Renderer implements AutoCloseable {
             if (framebufferWidth > 0 && framebufferHeight > 0) {
                 Matrix4fc viewMatrix = validCamera.viewMatrix();
                 Matrix4fc projectionMatrix = validCamera.projectionMatrix();
-                renderList.build(validScene);
+                frustum.update(viewMatrix, projectionMatrix);
+                renderList.build(validScene, frustum, statistics);
                 for (int index = 0; index < renderList.opaqueCount(); index++) {
                     renderMesh(renderList.opaqueItem(index), viewMatrix, projectionMatrix);
                 }
@@ -223,7 +225,6 @@ public final class Renderer implements AutoCloseable {
     }
 
     private void renderMesh(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
-        Mesh mesh = item.mesh();
         BufferGeometry geometry = item.geometry();
         BasicMaterial material = item.material();
         BasicProgram program = basicProgram();
@@ -233,7 +234,7 @@ public final class Renderer implements AutoCloseable {
         applyMaterialState(material);
 
         glUseProgram(program.id());
-        uploadMatrix(program.modelMatrixLocation(), mesh.matrixWorld());
+        uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
         Color color = material.color();

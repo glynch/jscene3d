@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.render;
 
 import io.github.glynch.jscene3d.core.BasicMaterial;
+import io.github.glynch.jscene3d.core.BoundingSphere;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.Mesh;
@@ -13,6 +14,7 @@ import io.github.glynch.jscene3d.core.Scene;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import org.joml.Matrix4fc;
 
 /** Reusable renderer-internal collection of opaque and transparent submissions. */
 final class RenderList {
@@ -31,7 +33,7 @@ final class RenderList {
         transparentItems = new ArrayList<>();
     }
 
-    void build(Scene scene) {
+    void build(Scene scene, Frustum frustum, RenderStatistics statistics) {
         clear();
         pendingObjects.push(scene);
         try {
@@ -41,7 +43,7 @@ final class RenderList {
                     continue;
                 }
                 if (object instanceof Mesh mesh) {
-                    collect(mesh);
+                    collect(mesh, frustum, statistics);
                 }
                 List<Object3D> children = object.children();
                 for (int index = children.size() - 1; index >= 0; index--) {
@@ -82,7 +84,7 @@ final class RenderList {
         traversalOrder = 0L;
     }
 
-    private void collect(Mesh mesh) {
+    private void collect(Mesh mesh, Frustum frustum, RenderStatistics statistics) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
         if (!material.visible()) {
@@ -97,8 +99,20 @@ final class RenderList {
                     "Unsupported material type: " + material.getClass().getName());
         }
 
+        Matrix4fc worldMatrix = mesh.matrixWorld();
+        if (mesh.isFrustumCullingEnabled()) {
+            BoundingSphere boundingSphere = geometry.boundingSphere();
+            if (boundingSphere == null) {
+                boundingSphere = geometry.computeBoundingSphere();
+            }
+            if (!frustum.intersects(boundingSphere, worldMatrix)) {
+                statistics.recordCulledMesh();
+                return;
+            }
+        }
+
         RenderItem item = acquireItem();
-        item.assign(mesh, geometry, basicMaterial, elementCount, traversalOrder++);
+        item.assign(mesh, geometry, basicMaterial, worldMatrix, elementCount, traversalOrder++);
         if (basicMaterial.transparent()) {
             transparentItems.add(item);
         } else {

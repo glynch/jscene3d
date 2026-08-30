@@ -154,10 +154,14 @@ final class RendererIT {
             hiddenParent.setVisible(false);
             hiddenParent.add(new Mesh(geometry, greenMaterial));
 
+            Mesh outsideTriangle = new Mesh(geometry, redMaterial);
+            outsideTriangle.setPosition(3.0f, 0.0f, 0.0f);
+
             Scene scene = new Scene();
             scene.add(leftTriangle);
             scene.add(translatedParent);
             scene.add(hiddenParent);
+            scene.add(outsideTriangle);
             OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
             camera.setPosition(0.0f, 0.0f, 2.0f);
 
@@ -167,6 +171,7 @@ final class RendererIT {
             ResourceStatistics resources = renderer.info().resources();
             assertThat(statistics.drawCalls()).isEqualTo(2);
             assertThat(statistics.visibleMeshes()).isEqualTo(2);
+            assertThat(statistics.culledMeshes()).isEqualTo(1);
             assertThat(statistics.triangles()).isEqualTo(2L);
             assertThat(statistics.bufferUploads()).isEqualTo(1);
             assertThat(resources.activeGeometryResources()).isEqualTo(1);
@@ -175,9 +180,12 @@ final class RendererIT {
             assertPixelIsRed(Math.round(window.framebufferWidth() * 0.8f), centerY);
             assertPixelIsBlack(window.framebufferWidth() / 2, centerY);
 
+            outsideTriangle.setFrustumCullingEnabled(false);
             renderer.render(scene, camera);
 
-            assertThat(statistics.drawCalls()).isEqualTo(2);
+            assertThat(statistics.drawCalls()).isEqualTo(3);
+            assertThat(statistics.visibleMeshes()).isEqualTo(3);
+            assertThat(statistics.culledMeshes()).isZero();
             assertThat(statistics.bufferUploads()).isZero();
             assertThat(resources.activeGeometryResources()).isEqualTo(1);
         }

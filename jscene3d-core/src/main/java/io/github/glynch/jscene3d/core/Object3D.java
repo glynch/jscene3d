@@ -45,6 +45,7 @@ public class Object3D {
     private @Nullable Object3D parent;
     private @Nullable Object3D resolvedWorldParent;
     private boolean visible;
+    private boolean frustumCullingEnabled;
     private int activeTraversalCount;
     private long localTransformVersion;
     private long localMatrixVersion;
@@ -62,6 +63,7 @@ public class Object3D {
         matrix = new Matrix4f();
         matrixWorld = new Matrix4f();
         visible = true;
+        frustumCullingEnabled = true;
     }
 
     /**
@@ -363,6 +365,30 @@ public class Object3D {
      */
     public final void setVisible(boolean visible) {
         this.visible = visible;
+    }
+
+    /**
+     * Returns whether a renderer may reject this object when its bounds lie outside the camera
+     * frustum.
+     *
+     * <p>The setting is consulted only for renderable object types and does not affect descendants.
+     *
+     * @return {@code true} by default
+     */
+    public final boolean isFrustumCullingEnabled() {
+        return frustumCullingEnabled;
+    }
+
+    /**
+     * Changes whether a renderer may reject this object using its bounds.
+     *
+     * <p>Disable culling when an object's geometry bounds do not reliably describe its rendered
+     * extent. This setting does not affect descendants.
+     *
+     * @param enabled whether frustum culling is enabled
+     */
+    public final void setFrustumCullingEnabled(boolean enabled) {
+        frustumCullingEnabled = enabled;
     }
 
     /**

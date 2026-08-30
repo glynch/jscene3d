@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Mesh;
 import java.util.Objects;
+import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 
 /** Reusable renderer-internal description of one mesh submission. */
@@ -15,6 +16,7 @@ final class RenderItem {
     private @Nullable Mesh mesh;
     private @Nullable BufferGeometry geometry;
     private @Nullable BasicMaterial material;
+    private @Nullable Matrix4fc worldMatrix;
     private int elementCount;
     private int materialSortKey;
     private int geometrySortKey;
@@ -35,10 +37,17 @@ final class RenderItem {
         return comparison;
     }
 
-    void assign(Mesh mesh, BufferGeometry geometry, BasicMaterial material, int elementCount, long traversalOrder) {
+    void assign(
+            Mesh mesh,
+            BufferGeometry geometry,
+            BasicMaterial material,
+            Matrix4fc worldMatrix,
+            int elementCount,
+            long traversalOrder) {
         this.mesh = mesh;
         this.geometry = geometry;
         this.material = material;
+        this.worldMatrix = worldMatrix;
         this.elementCount = elementCount;
         materialSortKey = System.identityHashCode(material);
         geometrySortKey = System.identityHashCode(geometry);
@@ -57,6 +66,10 @@ final class RenderItem {
         return Objects.requireNonNull(material, "Inactive render item has no material");
     }
 
+    Matrix4fc worldMatrix() {
+        return Objects.requireNonNull(worldMatrix, "Inactive render item has no world matrix");
+    }
+
     int elementCount() {
         return elementCount;
     }
@@ -65,6 +78,7 @@ final class RenderItem {
         mesh = null;
         geometry = null;
         material = null;
+        worldMatrix = null;
         elementCount = 0;
         materialSortKey = 0;
         geometrySortKey = 0;

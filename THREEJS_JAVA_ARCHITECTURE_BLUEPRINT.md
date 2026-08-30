@@ -592,6 +592,7 @@ Tests must establish the conventions with concrete examples:
 - Local matrix.
 - World matrix.
 - Visibility.
+- Frustum-culling eligibility.
 - Optional layer mask.
 - Local-matrix update behavior.
 - World-matrix update behavior.
@@ -635,6 +636,8 @@ public class Object3D {
 
     public boolean isVisible();
     public void setVisible(boolean visible);
+    public boolean isFrustumCullingEnabled();
+    public void setFrustumCullingEnabled(boolean enabled);
 
     public boolean add(Object3D child);
     public boolean remove(Object3D child);
@@ -2009,6 +2012,13 @@ Initial frustum culling should:
 - Account conservatively for object scale.
 - Be individually disableable on objects that cannot provide reliable bounds.
 - Record culled counts in renderer information.
+
+Renderable objects enable culling by default through the Java-style
+`isFrustumCullingEnabled()` and `setFrustumCullingEnabled(boolean)` operations
+inherited from `Object3D`. The setting applies only to the object itself; it does
+not hide or disable culling for descendants. Non-renderable groups retain the
+setting for interface consistency and future renderable `Object3D` subtypes,
+but the renderer does not test groups against the frustum.
 
 Non-uniform scale can conservatively use the maximum axis scale for the sphere
 radius.

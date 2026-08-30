@@ -23,7 +23,7 @@ The target experience is conceptually similar to:
 ```java
 try (Window window = Window.create(1280, 720, "Example");
      Renderer renderer = Renderer.create(window, RendererOptions.defaults());
-     Geometry geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
+     BufferGeometry geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
      BasicMaterial material = new BasicMaterial(
          Color.srgb(0.2f, 0.6f, 1.0f)
      )) {
@@ -101,7 +101,7 @@ The normal user should need to understand:
 - Scene hierarchy.
 - Local and world transforms.
 - Cameras.
-- Geometry attributes.
+- BufferGeometry attributes.
 - Materials and textures.
 - The per-frame update and render loop.
 - Explicit cleanup at application shutdown.
@@ -243,13 +243,13 @@ submission remain internal.
 
 ### 6.1 Descriptions are separate from GPU realizations
 
-Public objects such as `Geometry`, `Material`, and `Texture` describe renderable
+Public objects such as `BufferGeometry`, `Material`, and `Texture` describe renderable
 data. They do not store context-specific OpenGL handles.
 
 The renderer owns corresponding internal resources:
 
 ```text
-Public Geometry                 Renderer-internal Geometry Resource
+Public BufferGeometry                 Renderer-internal BufferGeometry Resource
 ---------------                 -----------------------------------
 attributes                      VAO identifier
 indices                         VBO identifiers
@@ -337,7 +337,7 @@ Application
 Window / Input                                             Scene Graph
    |                                                     Scene, Object3D
    |                                                     Camera, Mesh
-   |                                                     Geometry
+   |                                                     BufferGeometry
    |                                                     Material, Texture
    |                                                            |
    +-- current context + framebuffer size                       |
@@ -357,7 +357,7 @@ Window / Input                                             Scene Graph
                                   |
                +------------------+------------------+
                |                  |                  |
-          Geometry store      Texture store      Program cache
+          BufferGeometry store      Texture store      Program cache
                |                  |                  |
                +------------------+------------------+
                                   |
@@ -388,7 +388,7 @@ io.github.glynch.jscene3d
 │   ├── PerspectiveCamera
 │   └── OrthographicCamera
 ├── geometries
-│   ├── Geometry
+│   ├── BufferGeometry
 │   ├── BufferAttribute
 │   ├── IndexBuffer
 │   ├── BoundingBox
@@ -855,11 +855,11 @@ inside `Renderer.render` should be avoided because:
 
 ---
 
-## 12. Geometry Design
+## 12. BufferGeometry Design
 
 ### 12.1 Public geometry is CPU-side descriptive data
 
-`Geometry` contains:
+`BufferGeometry` contains:
 
 - Named vertex attributes.
 - An optional index buffer.
@@ -907,7 +907,7 @@ operations may copy data back out when requested. The renderer uses a private
 zero-copy view of library-owned storage and does not copy unchanged attributes
 each frame.
 
-### 12.3 Geometry invariants
+### 12.3 BufferGeometry invariants
 
 - A position attribute is required for mesh drawing.
 - Item size is positive.
@@ -950,7 +950,7 @@ workload demonstrates that this interface is inadequate.
 
 ### 12.5 Bounds
 
-Geometry should support:
+BufferGeometry should support:
 
 - `computeBoundingBox()`.
 - `computeBoundingSphere()`.
@@ -966,9 +966,9 @@ Start with triangles. Add lines and points only when their object and material
 behavior is defined. Avoid exposing every OpenGL topology merely because the
 binding makes it easy.
 
-### 12.7 Geometry generators
+### 12.7 BufferGeometry generators
 
-Generators such as box, plane, and sphere should create ordinary `Geometry`
+Generators such as box, plane, and sphere should create ordinary `BufferGeometry`
 values. They do not need a deep inheritance hierarchy.
 
 Recommended early generators:
@@ -1185,16 +1185,16 @@ never silently substitutes a different filter.
 
 `Mesh` extends `Object3D` and binds:
 
-- One geometry.
+- One buffer geometry.
 - One material initially.
 
 Conceptual interface:
 
 ```java
 public final class Mesh extends Object3D {
-    public Mesh(Geometry geometry, Material material);
-    public Geometry geometry();
-    public void setGeometry(Geometry geometry);
+    public Mesh(BufferGeometry geometry, Material material);
+    public BufferGeometry geometry();
+    public void setGeometry(BufferGeometry geometry);
     public Material material();
     public void setMaterial(Material material);
 }
@@ -1426,7 +1426,7 @@ references that prevent intended cleanup.
 
 ## 18. Renderer-Internal Resource Management
 
-### 18.1 Geometry store
+### 18.1 BufferGeometry store
 
 The geometry store maps public geometry identity to context-specific GPU state.
 
@@ -1487,7 +1487,7 @@ The design must satisfy all of these cases:
   behavior.
 - Garbage collection is not the only cleanup mechanism.
 
-`Geometry`, `Texture`, and `Material` are application-owned Resource
+`BufferGeometry`, `Texture`, and `Material` are application-owned Resource
 Descriptions implementing `AutoCloseable`. Calling `close()` is terminal and
 notifies every renderer that realized the description. Each renderer queues its
 own context-bound GPU Realization for deletion on the context-owning thread.
@@ -1841,7 +1841,7 @@ Background threads may later perform CPU-only work such as:
 
 - File reading.
 - Image decoding.
-- Geometry generation.
+- BufferGeometry generation.
 - Asset parsing.
 
 Transfer to render-visible state must occur through a documented handoff. OpenGL
@@ -1919,7 +1919,7 @@ Allowed and expected during:
 
 - Scene construction.
 - Asset loading.
-- Geometry generation.
+- BufferGeometry generation.
 - First use of a shader variant.
 - First GPU realization of a resource.
 
@@ -1960,7 +1960,7 @@ The initial opaque sort key may include:
 1. Explicit render order.
 2. Program key or program identity.
 3. Material identity.
-4. Geometry identity.
+4. BufferGeometry identity.
 5. Stable object identity.
 
 The exact order should be profiled and must remain deterministic.
@@ -2133,7 +2133,7 @@ No GLFW or OpenGL context required:
 - Camera projection validation.
 - Bounds calculation.
 - Frustum tests.
-- Geometry attribute validation.
+- BufferGeometry attribute validation.
 - Program-key generation.
 - Render-list ordering.
 - Disposal state transitions.
@@ -2220,7 +2220,7 @@ renderer statistics first.
 - Opaque sorting.
 - Transparent sorting.
 - Program-key calculation.
-- Geometry upload of static and dynamic buffers.
+- BufferGeometry upload of static and dynamic buffers.
 - Repeated rendering with no resource changes.
 
 ### 29.3 Steady-state checks
@@ -2268,7 +2268,7 @@ public final class RotatingCube {
                 window,
                 RendererOptions.defaults()
             );
-            Geometry geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
+            BufferGeometry geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
             BasicMaterial material = new BasicMaterial(
                 Color.srgb(0.2f, 0.7f, 1.0f)
             )
@@ -2417,21 +2417,21 @@ and observable completion criteria.
 - Invalid projection parameters fail clearly.
 - Camera parent transforms work.
 
-### Milestone 4: Geometry and material descriptions
+### Milestone 4: BufferGeometry and material descriptions
 
-#### Geometry and material deliverables
+#### BufferGeometry and material deliverables
 
 - Float buffer attributes.
 - Optional unsigned index data.
-- Geometry validation.
-- Geometry versions.
+- BufferGeometry validation.
+- BufferGeometry versions.
 - Bounds.
 - Basic material.
 - Mesh.
 
-#### Geometry and material acceptance criteria
+#### BufferGeometry and material acceptance criteria
 
-- Geometry can be created and validated without a context.
+- BufferGeometry can be created and validated without a context.
 - Shared geometry and material references are supported.
 - Attribute mutation and update-version behavior are tested.
 - No public object contains an OpenGL identifier.
@@ -2443,7 +2443,7 @@ and observable completion criteria.
 - Renderer construction and close.
 - Built-in vertex and fragment shaders.
 - Program compilation and linking.
-- Geometry GPU realization.
+- BufferGeometry GPU realization.
 - VAO/VBO/EBO creation.
 - Model, view, and projection uniform binding.
 - Indexed and non-indexed draw paths.
@@ -2452,7 +2452,7 @@ and observable completion criteria.
 
 #### Static renderer visible proof
 
-- Render a colored triangle through `Scene`, `Mesh`, `Geometry`,
+- Render a colored triangle through `Scene`, `Mesh`, `BufferGeometry`,
   `BasicMaterial`, `Camera`, and `Renderer.render`.
 
 #### Static renderer acceptance criteria
@@ -2471,7 +2471,7 @@ and observable completion criteria.
 - Multiple meshes.
 - Opaque sorting.
 - Visibility inheritance.
-- Geometry and material sharing.
+- BufferGeometry and material sharing.
 - Frustum culling.
 
 #### Scene rendering visible proof
@@ -2966,7 +2966,7 @@ The foundation review approved:
 
 1. Coordinate and matrix conventions.
 2. Public transform mutation style.
-3. Geometry attribute representation.
+3. BufferGeometry attribute representation.
 4. GPU resource ownership and disposal.
 5. Window/renderer lifecycle ordering.
 6. Initial material features.
@@ -3003,7 +3003,7 @@ Window
   -> Scene graph
   -> Camera
   -> Mesh
-  -> Geometry + BasicMaterial
+  -> BufferGeometry + BasicMaterial
   -> Renderer.render
   -> deterministic GPU cleanup
 ```
@@ -3014,7 +3014,7 @@ under real usage.
 
 The most consequential early rule is worth repeating:
 
-> Geometry, materials, and textures describe rendering. The renderer owns their
+> BufferGeometry, materials, and textures describe rendering. The renderer owns their
 > context-specific GPU realization.
 
 That rule provides the strongest foundation for a high-level Java graphics

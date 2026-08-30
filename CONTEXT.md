@@ -35,7 +35,7 @@ _Avoid_: Feature Example, test
 The first Integration Example, used to validate the initial scene hierarchy and rendering experience as an integrated whole.
 
 **Resource Description**:
-A renderer-independent `Geometry`, `Texture`, or `Material` value that may be shared by meshes and realized by more than one renderer.
+A renderer-independent `BufferGeometry`, `Texture`, or `Material` value that may be shared by meshes and realized by more than one renderer.
 _Avoid_: GPU resource, OpenGL object
 
 **GPU Realization**:
@@ -103,6 +103,22 @@ _Avoid_: Implicit degrees
 The optional solid color belonging to a `Scene` and rendered behind its contents. When absent, the renderer's configured default clear color applies.
 _Avoid_: Environment
 
+**Material**:
+A renderer-independent, shareable description of surface appearance and render
+state. Closing a Material ends its application-owned lifetime without closing
+any Mesh that refers to it.
+_Avoid_: Shader program, OpenGL state object
+
+**Basic Material**:
+An unlit Material whose base color may optionally be multiplied by per-vertex
+colors.
+_Avoid_: Default material
+
+**Mesh**:
+An `Object3D` that binds one shared BufferGeometry to one shared Material for
+triangle rendering. A Mesh does not own either Resource Description's lifetime.
+_Avoid_: BufferGeometry, model
+
 **Shader Material**:
 A material whose application supplies vertex and fragment shader source plus
 explicit custom uniform values. JScene3D supplies its Automatic Transform
@@ -125,6 +141,18 @@ A bounded callback that directly changes a Buffer Attribute and automatically
 records one version change for the batch. Its editor cannot be used after the
 callback returns.
 _Avoid_: Manual needs-update flag, buffer mapping
+
+**Index Buffer**:
+Library-owned non-negative vertex indices used for indexed triangle drawing.
+Construction arrays are copied, and controlled edits remain valid for every
+BufferGeometry sharing the Index Buffer.
+_Avoid_: Element buffer object, public index array
+
+**Draw Range**:
+The validated contiguous portion of a BufferGeometry's indices or vertices selected
+for drawing. In the absence of an explicit Draw Range, all available elements
+are selected.
+_Avoid_: Unchecked offset and count
 
 **Asset Import**:
 Loading an external interchange asset and mapping its supported content into

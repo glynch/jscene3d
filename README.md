@@ -45,8 +45,8 @@ Build and run the automatic-transforms example with:
     -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.TransformsExample
 ```
 
-`HierarchyExample` and `CamerasExample` are also available using the same
-command.
+`HierarchyExample`, `CamerasExample`, and `BufferGeometryExample` are also
+available using the same command.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same command without that JVM

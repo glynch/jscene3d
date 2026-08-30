@@ -63,6 +63,35 @@ final class Preconditions {
         return value;
     }
 
+    static int requirePositive(int value, String parameterName) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(parameterName + " must be positive: " + value);
+        }
+        return value;
+    }
+
+    static int requireNonNegative(int value, String parameterName) {
+        if (value < 0) {
+            throw new IllegalArgumentException(parameterName + " must not be negative: " + value);
+        }
+        return value;
+    }
+
+    static String requireNonEmpty(String value, String parameterName) {
+        String validValue = Objects.requireNonNull(value, parameterName);
+        if (validValue.isEmpty()) {
+            throw new IllegalArgumentException(parameterName + " must not be empty");
+        }
+        return validValue;
+    }
+
+    static int requireArrayLength(long itemCount, int itemSize, String parameterName) {
+        if (itemCount < 0L || itemSize <= 0 || itemCount > Integer.MAX_VALUE / itemSize) {
+            throw new IllegalArgumentException(parameterName + " data exceeds Java array limits");
+        }
+        return (int) itemCount * itemSize;
+    }
+
     static Vector3fc requireFinite(Vector3fc value, String parameterName) {
         Vector3fc validValue = Objects.requireNonNull(value, parameterName);
         requireFinite(validValue.x(), parameterName + ".x");

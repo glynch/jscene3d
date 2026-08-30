@@ -36,14 +36,16 @@ To manually verify a visible, resizable blue window, run:
 Close the window normally or press Escape to finish the build. This is an
 internal development smoke test; applications do not receive raw OpenGL access.
 
-## Run an example
+## Run examples
 
-Build the hierarchy example and run it with:
+Build and run the automatic-transforms example with:
 
 ```shell
 ./mvnw clean verify -pl jscene3d-examples -am -Prun-example \
-    -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.HierarchyExample
+    -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.TransformsExample
 ```
+
+`HierarchyExample` is also available using the same command.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same command without that JVM

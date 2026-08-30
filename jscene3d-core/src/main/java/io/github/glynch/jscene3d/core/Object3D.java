@@ -11,6 +11,12 @@ import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.joml.Quaternionf;
+import org.joml.Quaternionfc;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -30,16 +36,295 @@ public class Object3D {
 
     private final List<Object3D> children;
     private final List<Object3D> childrenView;
+    private final Vector3f position;
+    private final Quaternionf quaternion;
+    private final Vector3f scale;
+    private final Matrix4f matrix;
+    private final Matrix4f matrixWorld;
 
     private @Nullable Object3D parent;
+    private @Nullable Object3D resolvedWorldParent;
     private boolean visible;
     private int activeTraversalCount;
+    private long localTransformVersion;
+    private long localMatrixVersion;
+    private long resolvedWorldLocalMatrixVersion;
+    private long resolvedParentWorldMatrixVersion;
+    private long worldMatrixVersion;
 
     /** Creates a visible, unparented object with no children. */
     public Object3D() {
         children = new ArrayList<>();
         childrenView = Collections.unmodifiableList(children);
+        position = new Vector3f();
+        quaternion = new Quaternionf();
+        scale = new Vector3f(1.0f);
+        matrix = new Matrix4f();
+        matrixWorld = new Matrix4f();
         visible = true;
+    }
+
+    /**
+     * Returns the live read-only view of this object's local position.
+     *
+     * @return the stable local-position view
+     */
+    public final Vector3fc position() {
+        return position;
+    }
+
+    /**
+     * Returns the live read-only view of this object's normalized local orientation.
+     *
+     * @return the stable local-quaternion view
+     */
+    public final Quaternionfc quaternion() {
+        return quaternion;
+    }
+
+    /**
+     * Returns the live read-only view of this object's local scale.
+     *
+     * @return the stable local-scale view
+     */
+    public final Vector3fc scale() {
+        return scale;
+    }
+
+    /**
+     * Sets this object's local position.
+     *
+     * @param x local X coordinate
+     * @param y local Y coordinate
+     * @param z local Z coordinate
+     * @throws IllegalArgumentException if any coordinate is not finite
+     */
+    public final void setPosition(float x, float y, float z) {
+        float validX = Preconditions.requireFinite(x, "x");
+        float validY = Preconditions.requireFinite(y, "y");
+        float validZ = Preconditions.requireFinite(z, "z");
+        if (!position.equals(validX, validY, validZ)) {
+            position.set(validX, validY, validZ);
+            markLocalTransformChanged();
+        }
+    }
+
+    /**
+     * Copies an existing value into this object's local position.
+     *
+     * @param position position to copy
+     * @throws NullPointerException if {@code position} is {@code null}
+     * @throws IllegalArgumentException if any coordinate is not finite
+     */
+    public final void setPosition(Vector3fc position) {
+        Vector3fc validPosition = Preconditions.requireFinite(position, "position");
+        setPosition(validPosition.x(), validPosition.y(), validPosition.z());
+    }
+
+    /**
+     * Sets and normalizes this object's local orientation.
+     *
+     * @param x quaternion X component
+     * @param y quaternion Y component
+     * @param z quaternion Z component
+     * @param w quaternion W component
+     * @throws IllegalArgumentException if any component is not finite or all components are zero
+     */
+    public final void setQuaternion(float x, float y, float z, float w) {
+        float validX = Preconditions.requireFinite(x, "x");
+        float validY = Preconditions.requireFinite(y, "y");
+        float validZ = Preconditions.requireFinite(z, "z");
+        float validW = Preconditions.requireFinite(w, "w");
+        float largestComponent = java.lang.Math.max(
+                java.lang.Math.max(java.lang.Math.abs(validX), java.lang.Math.abs(validY)),
+                java.lang.Math.max(java.lang.Math.abs(validZ), java.lang.Math.abs(validW)));
+        if (largestComponent == 0.0f) {
+            throw new IllegalArgumentException("quaternion must not have zero length");
+        }
+        float scaledX = validX / largestComponent;
+        float scaledY = validY / largestComponent;
+        float scaledZ = validZ / largestComponent;
+        float scaledW = validW / largestComponent;
+        float inverseLength = (float) (1.0
+                / java.lang.Math.sqrt(scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ + scaledW * scaledW));
+        float normalizedX = scaledX * inverseLength;
+        float normalizedY = scaledY * inverseLength;
+        float normalizedZ = scaledZ * inverseLength;
+        float normalizedW = scaledW * inverseLength;
+        if (!quaternion.equals(normalizedX, normalizedY, normalizedZ, normalizedW)) {
+            quaternion.set(normalizedX, normalizedY, normalizedZ, normalizedW);
+            markLocalTransformChanged();
+        }
+    }
+
+    /**
+     * Copies and normalizes an existing value into this object's local orientation.
+     *
+     * @param quaternion quaternion to copy
+     * @throws NullPointerException if {@code quaternion} is {@code null}
+     * @throws IllegalArgumentException if any component is not finite or all components are zero
+     */
+    public final void setQuaternion(Quaternionfc quaternion) {
+        Quaternionfc validQuaternion = Preconditions.requireFinite(quaternion, "quaternion");
+        setQuaternion(validQuaternion.x(), validQuaternion.y(), validQuaternion.z(), validQuaternion.w());
+    }
+
+    /**
+     * Sets this object's local scale.
+     *
+     * @param x local X scale
+     * @param y local Y scale
+     * @param z local Z scale
+     * @throws IllegalArgumentException if any component is not finite
+     */
+    public final void setScale(float x, float y, float z) {
+        float validX = Preconditions.requireFinite(x, "x");
+        float validY = Preconditions.requireFinite(y, "y");
+        float validZ = Preconditions.requireFinite(z, "z");
+        if (!scale.equals(validX, validY, validZ)) {
+            scale.set(validX, validY, validZ);
+            markLocalTransformChanged();
+        }
+    }
+
+    /**
+     * Copies an existing value into this object's local scale.
+     *
+     * @param scale scale to copy
+     * @throws NullPointerException if {@code scale} is {@code null}
+     * @throws IllegalArgumentException if any component is not finite
+     */
+    public final void setScale(Vector3fc scale) {
+        Vector3fc validScale = Preconditions.requireFinite(scale, "scale");
+        setScale(validScale.x(), validScale.y(), validScale.z());
+    }
+
+    /**
+     * Applies a local X-axis rotation in radians.
+     *
+     * @param angle angle in radians
+     * @throws IllegalArgumentException if {@code angle} is not finite
+     */
+    public final void rotateX(float angle) {
+        float validAngle = Preconditions.requireFinite(angle, "angle");
+        if (validAngle != 0.0f) {
+            quaternion.rotateX(validAngle).normalize();
+            markLocalTransformChanged();
+        }
+    }
+
+    /**
+     * Applies a local Y-axis rotation in radians.
+     *
+     * @param angle angle in radians
+     * @throws IllegalArgumentException if {@code angle} is not finite
+     */
+    public final void rotateY(float angle) {
+        float validAngle = Preconditions.requireFinite(angle, "angle");
+        if (validAngle != 0.0f) {
+            quaternion.rotateY(validAngle).normalize();
+            markLocalTransformChanged();
+        }
+    }
+
+    /**
+     * Applies a local Z-axis rotation in radians.
+     *
+     * @param angle angle in radians
+     * @throws IllegalArgumentException if {@code angle} is not finite
+     */
+    public final void rotateZ(float angle) {
+        float validAngle = Preconditions.requireFinite(angle, "angle");
+        if (validAngle != 0.0f) {
+            quaternion.rotateZ(validAngle).normalize();
+            markLocalTransformChanged();
+        }
+    }
+
+    /**
+     * Replaces this object's local orientation from Euler angles in radians.
+     *
+     * @param x rotation about the X axis in radians
+     * @param y rotation about the Y axis in radians
+     * @param z rotation about the Z axis in radians
+     * @param order rotation order
+     * @throws NullPointerException if {@code order} is {@code null}
+     * @throws IllegalArgumentException if any angle is not finite
+     */
+    public final void setRotationFromEuler(float x, float y, float z, RotationOrder order) {
+        float validX = Preconditions.requireFinite(x, "x");
+        float validY = Preconditions.requireFinite(y, "y");
+        float validZ = Preconditions.requireFinite(z, "z");
+        RotationOrder validOrder = Objects.requireNonNull(order, "order");
+        validOrder.setQuaternion(quaternion, validX, validY, validZ);
+        quaternion.normalize();
+        markLocalTransformChanged();
+    }
+
+    /**
+     * Returns the current local transform matrix, composing it lazily when required.
+     *
+     * @return the stable live read-only local-matrix view
+     */
+    public final Matrix4fc matrix() {
+        updateLocalMatrix();
+        return matrix;
+    }
+
+    /**
+     * Returns the current world transform matrix, updating the ancestor path iteratively.
+     *
+     * @return the stable live read-only world-matrix view
+     */
+    public final Matrix4fc matrixWorld() {
+        updateWorldMatrix();
+        return matrixWorld;
+    }
+
+    /**
+     * Copies this object's current world position into caller-owned storage.
+     *
+     * @param destination vector receiving the world position
+     * @return {@code destination}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     */
+    public final Vector3f worldPosition(Vector3f destination) {
+        Vector3f validDestination = Objects.requireNonNull(destination, "destination");
+        updateWorldMatrix();
+        return matrixWorld.getTranslation(validDestination);
+    }
+
+    /**
+     * Copies this object's current world orientation into caller-owned storage.
+     *
+     * @param destination quaternion receiving the normalized world orientation
+     * @return {@code destination}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     */
+    public final Quaternionf worldQuaternion(Quaternionf destination) {
+        Quaternionf validDestination = Objects.requireNonNull(destination, "destination");
+        updateWorldMatrix();
+        return matrixWorld.getUnnormalizedRotation(validDestination).normalize();
+    }
+
+    /**
+     * Copies this object's current world scale into caller-owned storage.
+     *
+     * <p>When the world transform contains a reflection, its sign is reported on the X component,
+     * matching conventional affine decomposition.
+     *
+     * @param destination vector receiving the world scale
+     * @return {@code destination}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     */
+    public final Vector3f worldScale(Vector3f destination) {
+        Vector3f validDestination = Objects.requireNonNull(destination, "destination");
+        updateWorldMatrix();
+        matrixWorld.getScale(validDestination);
+        if (matrixWorld.determinant3x3() < 0.0f) {
+            validDestination.set(-validDestination.x(), validDestination.y(), validDestination.z());
+        }
+        return validDestination;
     }
 
     /**
@@ -268,5 +553,50 @@ public class Object3D {
                 pending.push(current.children.get(index));
             }
         }
+    }
+
+    private void markLocalTransformChanged() {
+        localTransformVersion++;
+    }
+
+    private void updateLocalMatrix() {
+        if (localMatrixVersion != localTransformVersion) {
+            matrix.translationRotateScale(position, quaternion, scale);
+            localMatrixVersion = localTransformVersion;
+        }
+    }
+
+    private void updateWorldMatrix() {
+        ArrayDeque<Object3D> ancestorPath = new ArrayDeque<>();
+        for (Object3D ancestor = this; ancestor != null; ancestor = ancestor.parent) {
+            ancestorPath.push(ancestor);
+        }
+
+        Object3D resolvedParent = null;
+        while (!ancestorPath.isEmpty()) {
+            Object3D current = ancestorPath.pop();
+            current.updateLocalMatrix();
+            current.resolveWorldMatrix(resolvedParent);
+            resolvedParent = current;
+        }
+    }
+
+    private void resolveWorldMatrix(@Nullable Object3D resolvedParent) {
+        long parentWorldVersion = resolvedParent == null ? 0L : resolvedParent.worldMatrixVersion;
+        if (resolvedWorldLocalMatrixVersion == localMatrixVersion
+                && resolvedWorldParent == resolvedParent
+                && resolvedParentWorldMatrixVersion == parentWorldVersion) {
+            return;
+        }
+
+        if (resolvedParent == null) {
+            matrixWorld.set(matrix);
+        } else {
+            resolvedParent.matrixWorld.mul(matrix, matrixWorld);
+        }
+        resolvedWorldLocalMatrixVersion = localMatrixVersion;
+        resolvedWorldParent = resolvedParent;
+        resolvedParentWorldMatrixVersion = parentWorldVersion;
+        worldMatrixVersion++;
     }
 }

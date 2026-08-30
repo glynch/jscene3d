@@ -38,11 +38,11 @@ internal development smoke test; applications do not receive raw OpenGL access.
 
 ## Run an example
 
-Once a public feature example exists, build its dependencies and run it with:
+Build the hierarchy example and run it with:
 
 ```shell
-./mvnw -pl jscene3d-examples -am verify -Prun-example \
-    -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.ExampleName
+./mvnw clean verify -pl jscene3d-examples -am -Prun-example \
+    -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.HierarchyExample
 ```
 
 On macOS, the OS-activated Maven profile launches the new JVM with

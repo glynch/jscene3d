@@ -45,6 +45,9 @@ automatically.
   whitespace, import-order, or line-length behavior.
 - `./mvnw clean verify` checks formatting and never rewrites source.
 - Run `./mvnw spotless:apply` explicitly to format source.
+- Do not leave public constructors or methods empty. Perform their required
+  initialization, omit them, or document why an intentionally empty body is
+  part of the public contract.
 - Original source files use this short license header with the appropriate
   comment syntax:
 
@@ -181,6 +184,8 @@ prior deprecation where practical.
   headlessly through their public interfaces.
 - Never use arbitrary sleeps. Use deterministic coordination when concurrency
   eventually requires it.
+- Keep an exception assertion's executable lambda to one invocation that may
+  throw. Construct inputs and callbacks before the assertion.
 - Compile every Feature Example during ordinary verification.
 - Run context-dependent OpenGL tests with:
 

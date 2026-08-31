@@ -18,7 +18,11 @@ import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.CircleGeometry;
+import io.github.glynch.jscene3d.geometries.ConeGeometry;
+import io.github.glynch.jscene3d.geometries.CylinderGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
+import io.github.glynch.jscene3d.geometries.TorusGeometry;
 import io.github.glynch.jscene3d.helpers.AxesHelper;
 import io.github.glynch.jscene3d.helpers.BoxHelper;
 import io.github.glynch.jscene3d.helpers.GridHelper;
@@ -131,6 +135,40 @@ final class RendererIT {
             assertThat(statistics.frame()).isEqualTo(4L);
             assertThat(statistics.drawCalls()).isEqualTo(1);
             assertThat(statistics.bufferUploads()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void rendersGeneratedCircleCylinderConeAndTorusGeometry() {
+        try (Window window = Window.create("Generated geometry integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry circleGeometry = CircleGeometry.create(0.75f);
+                BufferGeometry cylinderGeometry = CylinderGeometry.create(0.6f, 1.5f);
+                BufferGeometry coneGeometry = ConeGeometry.create(0.75f, 1.5f);
+                BufferGeometry torusGeometry = TorusGeometry.create(0.6f, 0.2f);
+                BasicMaterial material = new BasicMaterial(Color.WHITE)) {
+            Mesh circle = new Mesh(circleGeometry, material);
+            circle.setPosition(-4.5f, 0.0f, 0.0f);
+            Mesh cylinder = new Mesh(cylinderGeometry, material);
+            cylinder.setPosition(-1.5f, 0.0f, 0.0f);
+            Mesh cone = new Mesh(coneGeometry, material);
+            cone.setPosition(1.5f, 0.0f, 0.0f);
+            Mesh torus = new Mesh(torusGeometry, material);
+            torus.setPosition(4.5f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(circle);
+            scene.add(cylinder);
+            scene.add(cone);
+            scene.add(torus);
+            OrthographicCamera camera = new OrthographicCamera(-6.0f, 6.0f, 2.5f, -2.5f, 0.1f, 20.0f);
+            camera.setPosition(0.0f, 0.0f, 10.0f);
+
+            renderer.render(scene, camera);
+
+            assertThat(renderer.info().statistics().drawCalls()).isEqualTo(4);
+            assertThat(renderer.info().statistics().triangles()).isEqualTo(1_376L);
+            assertThat(renderer.info().statistics().bufferUploads()).isEqualTo(16);
+            assertThat(renderer.info().resources().activeGeometryResources()).isEqualTo(4);
         }
     }
 

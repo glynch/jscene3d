@@ -60,8 +60,8 @@ example without running tests or the full verification lifecycle.
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
 `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
-`LineRenderingExample`, `HelpersExample`, `BoxHelperExample`, and
-`OrbitControlsExample` are also
+`LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
+`GeneratedGeometriesExample`, and `OrbitControlsExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
 connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
 controls. In
@@ -141,6 +141,13 @@ replaced.
 `HelpersExample` gives the axes a higher render order than the grid so their
 coplanar X and Z segments remain distinct without altering either helper's
 position or disabling depth testing.
+
+`CircleGeometry`, `CylinderGeometry`, `ConeGeometry`, and `TorusGeometry`
+create indexed positions, normals, texture coordinates, and bounds. Their
+common overloads supply practical segment defaults, while configurable
+overloads support tessellation, angular extents, and open-ended cylinders and
+cones. `GeneratedGeometriesExample` displays all four with Lambert lighting and
+orbit controls.
 
 ## Project structure
 

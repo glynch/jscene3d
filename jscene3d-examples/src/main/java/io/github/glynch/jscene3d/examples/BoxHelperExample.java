@@ -8,6 +8,10 @@ import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.helpers.BoxHelper;
@@ -15,9 +19,6 @@ import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
-import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays dynamic world-axis-aligned bounds around a rotating object hierarchy. */
@@ -36,43 +37,34 @@ public final class BoxHelperExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Box Helper");
-                BufferGeometry geometry = BoxGeometry.create(1.5f, 1.0f, 1.0f);
-                BasicMaterial cyanMaterial = new BasicMaterial(Color.CYAN);
-                BasicMaterial magentaMaterial = new BasicMaterial(Color.MAGENTA)) {
-            Group target = createTarget(geometry, cyanMaterial, magentaMaterial);
-            try (BoxHelper helper = new BoxHelper(target, Color.YELLOW);
-                    Renderer renderer = Renderer.create(window)) {
-                Scene scene = new Scene();
-                scene.setBackground(Color.srgb(0x080b12));
-                scene.add(target);
-                scene.add(helper);
+        ExampleLauncher.launch("JScene3D - Box Helper", BoxHelperExample::create);
+    }
 
-                PerspectiveCamera camera =
-                        new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-                camera.setPosition(6.0f, 4.0f, 8.0f);
-                camera.lookAt(0.0f, 0.0f, 0.0f);
-                OrbitControls controls = new OrbitControls(camera, window);
-                window.show();
-
-                while (!window.shouldClose()) {
-                    Window.pollEvents();
-                    if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                        window.requestClose();
-                    }
-                    if (window.framebufferSizeChanged()
-                            && window.framebufferWidth() > 0
-                            && window.framebufferHeight() > 0) {
-                        camera.setAspectRatio(window.framebufferAspectRatio());
-                    }
-                    target.rotateY(0.01f);
-                    helper.update();
-                    controls.update();
-                    renderer.render(scene, camera);
-                    window.swapBuffers();
-                }
-            }
-        }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry geometry = BoxGeometry.create(1.5f, 1.0f, 1.0f);
+        BasicMaterial cyanMaterial = new BasicMaterial(Color.CYAN);
+        BasicMaterial magentaMaterial = new BasicMaterial(Color.MAGENTA);
+        Group target = createTarget(geometry, cyanMaterial, magentaMaterial);
+        BoxHelper helper = new BoxHelper(target, Color.YELLOW);
+        Scene scene = new Scene();
+        scene.setBackground(Color.srgb(0x080b12));
+        scene.add(target);
+        scene.add(helper);
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(6.0f, 4.0f, 8.0f);
+        camera.lookAt(0.0f, 0.0f, 0.0f);
+        OrbitControls controls = new OrbitControls(camera, context.window());
+        SceneExample example = new SceneExample(context, scene, camera, controls);
+        example.own(geometry);
+        example.own(cyanMaterial);
+        example.own(magentaMaterial);
+        example.own(helper);
+        example.setFrameAction((ignored, frame) -> {
+            target.rotateY(frame.elapsedSeconds() * 0.6f);
+            helper.update();
+        });
+        return example;
     }
 
     /** Creates two offset boxes beneath one animated target group. */

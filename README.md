@@ -38,7 +38,19 @@ internal development smoke test; applications do not receive raw OpenGL access.
 
 ## Run examples
 
-Run the interactive Solar System Viewer with:
+Open the searchable native example browser with:
+
+```shell
+./tools/scripts/run-example.sh ExampleBrowser
+```
+
+The browser keeps one native window and renderer alive while examples are
+selected. Its left sidebar provides captured thumbnails, category and tag
+search, scrolling, and persistent selection; the right content area hosts the
+fully interactive example. Switching cards closes the previous example's GPU
+resources before creating the replacement. The examples continue to run as
+independent applications through the same lifecycle. For example, launch the
+Solar System Viewer directly with:
 
 ```shell
 ./tools/scripts/run-example.sh SolarSystemViewer
@@ -56,6 +68,11 @@ an astronomical simulation. The bundled textures are distributed under CC BY
 List the available examples with `./tools/scripts/run-example.sh --list`. The
 runner incrementally compiles the required artifacts and launches the selected
 example without running tests or the full verification lifecycle.
+
+Maintainers can regenerate every browser thumbnail from the examples' own
+OpenGL framebuffers with `./tools/scripts/capture-example-thumbnails.sh`. The
+capture process creates one hidden shared window, renders every catalogued
+scene without its large control overlays, and replaces the checked-in PNGs.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,

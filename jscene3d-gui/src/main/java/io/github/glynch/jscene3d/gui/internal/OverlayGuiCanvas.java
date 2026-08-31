@@ -61,6 +61,13 @@ public final class OverlayGuiCanvas implements GuiCanvas {
         requireDelegate().alphaMask(region, x, y, width, height, color, alpha);
     }
 
+    /** Delegates a full-color image command to the bound renderer canvas. */
+    @Override
+    public void image(
+            OverlayImage.Region region, float x, float y, float width, float height, Color tint, float alpha) {
+        requireDelegate().image(region, x, y, width, height, tint, alpha);
+    }
+
     /** Returns the currently bound renderer canvas. */
     private OverlayCanvas requireDelegate() {
         if (delegate == null) {

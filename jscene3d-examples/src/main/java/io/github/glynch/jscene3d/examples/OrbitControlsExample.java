@@ -8,6 +8,10 @@ import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.gui.ControlPanel;
@@ -15,9 +19,7 @@ import io.github.glynch.jscene3d.gui.FpsMonitor;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays a small scene that can be inspected with orbit, pan, and dolly controls. */
@@ -37,49 +39,36 @@ public final class OrbitControlsExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Orbit Controls");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
-                BasicMaterial centerMaterial = new BasicMaterial(Color.YELLOW);
-                BasicMaterial leftMaterial = new BasicMaterial(Color.CYAN);
-                BasicMaterial rightMaterial = new BasicMaterial(Color.MAGENTA)) {
-            Scene scene = createScene(geometry, centerMaterial, leftMaterial, rightMaterial);
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(4.0f, 3.0f, 6.0f);
+        ExampleLauncher.launch("JScene3D - Orbit Controls", OrbitControlsExample::create);
+    }
 
-            OrbitControls controls = new OrbitControls(camera, window);
-            controls.setDistanceLimits(2.0f, 20.0f);
-            controls.setDampingEnabled(true);
-            controls.update();
-
-            ControlPanel panel = createControlPanel(window, controls);
-            FpsMonitor fpsMonitor = new FpsMonitor();
-            window.show();
-
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                    window.requestClose();
-                }
-                if (window.framebufferSizeChanged()
-                        && window.framebufferWidth() > 0
-                        && window.framebufferHeight() > 0) {
-                    camera.setAspectRatio(window.framebufferAspectRatio());
-                }
-                panel.update();
-                if (panel.capturesPointer()) {
-                    controls.updateWithoutPointerInput();
-                } else {
-                    controls.update();
-                }
-                renderer.render(scene, camera);
-                renderer.render(panel);
-                renderer.render(fpsMonitor);
-                window.swapBuffers();
-                fpsMonitor.update();
-            }
-        }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
+        BasicMaterial centerMaterial = new BasicMaterial(Color.YELLOW);
+        BasicMaterial leftMaterial = new BasicMaterial(Color.CYAN);
+        BasicMaterial rightMaterial = new BasicMaterial(Color.MAGENTA);
+        Scene scene = createScene(geometry, centerMaterial, leftMaterial, rightMaterial);
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(4.0f, 3.0f, 6.0f);
+        OrbitControls controls = new OrbitControls(camera, context.window());
+        controls.setDistanceLimits(2.0f, 20.0f);
+        controls.setDampingEnabled(true);
+        controls.update();
+        SceneExample example = new SceneExample(context, scene, camera, controls);
+        example.own(geometry);
+        example.own(centerMaterial);
+        example.own(leftMaterial);
+        example.own(rightMaterial);
+        ControlPanel panel = example.addOverlay(createControlPanel(context.window(), controls));
+        FpsMonitor fpsMonitor = example.addOverlay(new FpsMonitor());
+        fpsMonitor.setPosition(context.logicalLeft() + 16.0f, 16.0f);
+        example.setPointerCapture(panel::capturesPointer);
+        example.setFrameAction((ignored, frame) -> {
+            panel.update();
+            fpsMonitor.update();
+        });
+        return example;
     }
 
     /** Creates explicit Java bindings for the interactive camera settings. */

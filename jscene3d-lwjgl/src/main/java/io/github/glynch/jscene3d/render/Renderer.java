@@ -21,7 +21,9 @@ import static org.lwjgl.opengl.GL11.GL_LESS;
 import static org.lwjgl.opengl.GL11.GL_NEVER;
 import static org.lwjgl.opengl.GL11.GL_NOTEQUAL;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_RGBA;
 import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
 import static org.lwjgl.opengl.GL11.glBlendFunc;
 import static org.lwjgl.opengl.GL11.glClear;
@@ -35,6 +37,7 @@ import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glFrontFace;
 import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL11.glReadPixels;
 import static org.lwjgl.opengl.GL11.glViewport;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
@@ -84,6 +87,7 @@ import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
 import io.github.glynch.jscene3d.render.internal.resources.TextureResource;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.Texture;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -313,6 +317,38 @@ public final class Renderer implements AutoCloseable {
         requireOpen();
         context.makeCurrent();
         customViewport = false;
+    }
+
+    /**
+     * Captures the current custom viewport, or the complete framebuffer, as an overlay image.
+     *
+     * <p>The image is read from the current back buffer and returned in conventional top-to-bottom
+     * row order. Call this after rendering and before swapping buffers.
+     *
+     * @return immutable sRGB RGBA image of the current renderer viewport
+     * @throws IllegalStateException if this renderer is closed
+     */
+    public OverlayImage captureViewport() {
+        requireOpen();
+        context.makeCurrent();
+        int x = customViewport ? viewportX : 0;
+        int y = customViewport ? viewportY : 0;
+        int width = customViewport ? viewportWidth : context.framebufferWidth();
+        int height = customViewport ? viewportHeight : context.framebufferHeight();
+        long byteCount = (long) width * height * 4L;
+        if (byteCount > Integer.MAX_VALUE) {
+            throw new IllegalStateException(
+                    "Framebuffer viewport exceeds Java array limits: " + width + " x " + height);
+        }
+        ByteBuffer source = ByteBuffer.allocateDirect((int) byteCount);
+        glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, source);
+        byte[] pixels = new byte[(int) byteCount];
+        int rowBytes = width * 4;
+        for (int destinationRow = 0; destinationRow < height; destinationRow++) {
+            int sourceOffset = (height - destinationRow - 1) * rowBytes;
+            source.get(sourceOffset, pixels, destinationRow * rowBytes, rowBytes);
+        }
+        return OverlayImage.srgbRgba(width, height, pixels);
     }
 
     /**

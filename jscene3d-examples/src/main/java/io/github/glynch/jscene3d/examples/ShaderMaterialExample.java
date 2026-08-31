@@ -8,14 +8,15 @@ import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 import static io.github.glynch.jscene3d.math.Angles.TWO_PI;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
-import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays a rotating cube using automatic transforms and typed custom uniforms. */
@@ -61,39 +62,30 @@ public final class ShaderMaterialExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Shader Material");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry geometry = BoxGeometry.create(1.4f, 1.4f, 1.4f);
-                ShaderMaterial material = createMaterial()) {
-            Mesh cube = new Mesh(geometry, material);
-            Scene scene = new Scene();
-            scene.setBackground(Color.BLACK);
-            scene.add(cube);
+        ExampleLauncher.launch("JScene3D - Shader Material", ShaderMaterialExample::create);
+    }
 
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(0.0f, 0.0f, 3.0f);
-            window.show();
-
-            float time = 0.0f;
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                    window.requestClose();
-                }
-                if (window.framebufferSizeChanged()
-                        && window.framebufferWidth() > 0
-                        && window.framebufferHeight() > 0) {
-                    camera.setAspectRatio(window.framebufferAspectRatio());
-                }
-                time = (time + 0.02f) % TWO_PI;
-                material.setUniform("time", time);
-                cube.rotateX(0.006f);
-                cube.rotateY(0.01f);
-                renderer.render(scene, camera);
-                window.swapBuffers();
-            }
-        }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry geometry = BoxGeometry.create(1.4f, 1.4f, 1.4f);
+        ShaderMaterial material = createMaterial();
+        Mesh cube = new Mesh(geometry, material);
+        Scene scene = new Scene();
+        scene.setBackground(Color.BLACK);
+        scene.add(cube);
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(0.0f, 0.0f, 3.0f);
+        SceneExample example = new SceneExample(context, scene, camera);
+        example.own(geometry);
+        example.own(material);
+        float[] time = {0.0f};
+        example.setFrameAction((ignored, frame) -> {
+            time[0] = (time[0] + frame.elapsedSeconds()) % TWO_PI;
+            material.setUniform("time", time[0]);
+            cube.rotateX(frame.elapsedSeconds() * 0.36f);
+            cube.rotateY(frame.elapsedSeconds() * 0.6f);
+        });
+        return example;
     }
 
     /** Creates immutable shader structure and initial application-controlled uniforms. */

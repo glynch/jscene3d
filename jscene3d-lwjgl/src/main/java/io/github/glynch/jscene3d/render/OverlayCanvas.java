@@ -147,12 +147,42 @@ public final class OverlayCanvas {
     public void alphaMask(
             OverlayImage.Region region, float x, float y, float width, float height, Color color, float alpha) {
         OverlayImage.Region validRegion = Objects.requireNonNull(region, "region");
+        if (validRegion.image().format() != OverlayImageFormat.ALPHA_MASK) {
+            throw new IllegalArgumentException("alphaMask requires a single-channel overlay image");
+        }
         validateRectangle(x, y, width, height, color, alpha);
         if (width == 0.0f || height == 0.0f) {
             return;
         }
         beginCommand(validRegion.image());
         rectangleVertices(x, y, width, height, color, alpha, validRegion);
+    }
+
+    /**
+     * Appends a full-color sRGB image region with an optional linear-sRGB tint.
+     *
+     * @param region immutable normalized source-image region
+     * @param x finite horizontal destination origin
+     * @param y finite vertical destination origin
+     * @param width non-negative destination width
+     * @param height non-negative destination height
+     * @param tint linear-sRGB color multiplied with the decoded image
+     * @param alpha opacity in the inclusive range {@code [0, 1]}
+     * @throws NullPointerException if {@code region} or {@code tint} is {@code null}
+     * @throws IllegalArgumentException if the image is not full-color or another argument is invalid
+     */
+    public void image(
+            OverlayImage.Region region, float x, float y, float width, float height, Color tint, float alpha) {
+        OverlayImage.Region validRegion = Objects.requireNonNull(region, "region");
+        if (validRegion.image().format() != OverlayImageFormat.SRGB_RGBA) {
+            throw new IllegalArgumentException("image requires an sRGB RGBA overlay image");
+        }
+        validateRectangle(x, y, width, height, tint, alpha);
+        if (width == 0.0f || height == 0.0f) {
+            return;
+        }
+        beginCommand(validRegion.image());
+        rectangleVertices(x, y, width, height, tint, alpha, validRegion);
     }
 
     /** Clears all accumulated vertices and commands while retaining storage. */

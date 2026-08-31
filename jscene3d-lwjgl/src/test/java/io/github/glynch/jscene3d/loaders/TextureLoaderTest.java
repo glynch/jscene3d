@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.loaders;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import io.github.glynch.jscene3d.render.OverlayImage;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureColorSpace;
 import java.io.IOException;
@@ -37,6 +38,17 @@ final class TextureLoaderTest {
             assertThat(texture.colorSpace()).isEqualTo(TextureColorSpace.SRGB);
             assertThat(pixels.position()).isEqualTo(4);
         }
+    }
+
+    @Test
+    void loadsPngIntoImmutableOverlayImage(@TempDir Path temporaryDirectory) throws IOException {
+        Path source = temporaryDirectory.resolve("overlay.png");
+        Files.write(source, Base64.getDecoder().decode(ONE_PIXEL_PNG));
+
+        OverlayImage image = OverlayImageLoader.load(source);
+
+        assertThat(image.width()).isEqualTo(1);
+        assertThat(image.height()).isEqualTo(1);
     }
 
     @Test

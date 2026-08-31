@@ -59,4 +59,17 @@ public interface GuiCanvas {
      * @param alpha image opacity
      */
     void alphaMask(OverlayImage.Region region, float x, float y, float width, float height, Color color, float alpha);
+
+    /**
+     * Appends a tinted full-color image region.
+     *
+     * @param region image region to draw
+     * @param x left coordinate
+     * @param y top coordinate
+     * @param width image width
+     * @param height image height
+     * @param tint multiplicative tint color
+     * @param alpha image opacity
+     */
+    void image(OverlayImage.Region region, float x, float y, float width, float height, Color tint, float alpha);
 }

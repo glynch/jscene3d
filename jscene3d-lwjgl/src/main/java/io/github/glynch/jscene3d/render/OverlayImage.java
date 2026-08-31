@@ -5,20 +5,23 @@
 package io.github.glynch.jscene3d.render;
 
 import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Immutable single-channel image that a renderer can use as an overlay alpha mask. */
+/** Immutable image that a renderer can draw as an overlay alpha mask or full-color image. */
 public final class OverlayImage {
     private final int width;
     private final int height;
+    private final OverlayImageFormat format;
     private final byte[] pixels;
     private final Region fullRegion;
 
     /** Retains validated dimensions and an owned pixel copy. */
-    private OverlayImage(int width, int height, byte[] pixels) {
+    private OverlayImage(int width, int height, OverlayImageFormat format, byte[] pixels) {
         this.width = width;
         this.height = height;
+        this.format = format;
         this.pixels = pixels;
         fullRegion = new Region(this, 0.0f, 0.0f, 1.0f, 1.0f);
     }
@@ -40,12 +43,60 @@ public final class OverlayImage {
         int validWidth = Preconditions.requirePositive(width, "width");
         int validHeight = Preconditions.requirePositive(height, "height");
         byte[] validPixels = Objects.requireNonNull(pixels, "pixels");
-        long expectedLength = (long) validWidth * validHeight;
-        if (validPixels.length != expectedLength) {
-            throw new IllegalArgumentException(
-                    "pixels length must equal width * height: " + validPixels.length + " != " + expectedLength);
+        requirePixelLength(validWidth, validHeight, OverlayImageFormat.ALPHA_MASK, validPixels);
+        return new OverlayImage(
+                validWidth, validHeight, OverlayImageFormat.ALPHA_MASK, Arrays.copyOf(validPixels, validPixels.length));
+    }
+
+    /**
+     * Creates an immutable full-color image from row-major sRGB RGBA8 bytes.
+     *
+     * <p>The input is defensively copied. Color components use the sRGB transfer function while
+     * alpha is linear. Rows are ordered from top to bottom.
+     *
+     * @param width positive image width
+     * @param height positive image height
+     * @param pixels exactly {@code width * height * 4} row-major RGBA bytes
+     * @return immutable overlay image
+     * @throws NullPointerException if {@code pixels} is {@code null}
+     * @throws IllegalArgumentException if a dimension or the array length is invalid
+     */
+    public static OverlayImage srgbRgba(int width, int height, byte[] pixels) {
+        int validWidth = Preconditions.requirePositive(width, "width");
+        int validHeight = Preconditions.requirePositive(height, "height");
+        byte[] validPixels = Objects.requireNonNull(pixels, "pixels");
+        requirePixelLength(validWidth, validHeight, OverlayImageFormat.SRGB_RGBA, validPixels);
+        return new OverlayImage(
+                validWidth, validHeight, OverlayImageFormat.SRGB_RGBA, Arrays.copyOf(validPixels, validPixels.length));
+    }
+
+    /**
+     * Creates an immutable full-color image from the remaining bytes of an sRGB RGBA8 buffer.
+     *
+     * <p>The buffer position is not changed. Color components use the sRGB transfer function while
+     * alpha is linear. Rows are ordered from top to bottom.
+     *
+     * @param width positive image width
+     * @param height positive image height
+     * @param pixels exactly {@code width * height * 4} remaining RGBA bytes
+     * @return immutable overlay image
+     * @throws NullPointerException if {@code pixels} is {@code null}
+     * @throws IllegalArgumentException if a dimension or the remaining byte count is invalid
+     */
+    public static OverlayImage srgbRgba(int width, int height, ByteBuffer pixels) {
+        int validWidth = Preconditions.requirePositive(width, "width");
+        int validHeight = Preconditions.requirePositive(height, "height");
+        ByteBuffer validPixels = Objects.requireNonNull(pixels, "pixels").duplicate();
+        long expectedLength = (long) validWidth * validHeight * OverlayImageFormat.SRGB_RGBA.componentCount();
+        if (validPixels.remaining() != expectedLength) {
+            throw new IllegalArgumentException("remaining pixels must equal width * height * component count: "
+                    + validPixels.remaining()
+                    + " != "
+                    + expectedLength);
         }
-        return new OverlayImage(validWidth, validHeight, Arrays.copyOf(validPixels, validPixels.length));
+        byte[] copy = new byte[validPixels.remaining()];
+        validPixels.get(copy);
+        return new OverlayImage(validWidth, validHeight, OverlayImageFormat.SRGB_RGBA, copy);
     }
 
     /**
@@ -99,6 +150,22 @@ public final class OverlayImage {
     /** Returns renderer-internal immutable pixel storage. */
     byte[] pixels() {
         return pixels;
+    }
+
+    /** Returns the renderer-internal pixel layout and color interpretation. */
+    OverlayImageFormat format() {
+        return format;
+    }
+
+    /** Validates tightly packed pixel storage without overflowing Java array arithmetic. */
+    private static void requirePixelLength(int width, int height, OverlayImageFormat format, byte[] pixels) {
+        long expectedLength = (long) width * height * format.componentCount();
+        if (pixels.length != expectedLength) {
+            throw new IllegalArgumentException("pixels length must equal width * height * component count: "
+                    + pixels.length
+                    + " != "
+                    + expectedLength);
+        }
     }
 
     /** Immutable normalized rectangular region of an {@link OverlayImage}. */

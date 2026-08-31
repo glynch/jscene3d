@@ -473,6 +473,7 @@ public final class Window implements AutoCloseable {
                 handle,
                 (ignored, keyCode, scanCode, action, modifiers) ->
                         input.updateKey(Key.fromPlatformCode(keyCode), action));
+        GLFW.glfwSetCharCallback(handle, (ignored, codePoint) -> input.updateTypedCodePoint(codePoint));
         GLFW.glfwSetMouseButtonCallback(
                 handle,
                 (ignored, buttonCode, action, modifiers) ->

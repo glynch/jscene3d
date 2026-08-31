@@ -7,14 +7,16 @@ package io.github.glynch.jscene3d.examples;
 import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.loaders.TextureLoader;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
-import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.Texture;
 import java.nio.file.Path;
@@ -34,36 +36,35 @@ public final class TexturedCubeExample {
      * @param arguments optional first PNG or JPEG path; a checkerboard is generated when omitted
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Textured Cube");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry geometry = BoxGeometry.create(1.4f, 1.4f, 1.4f);
-                Texture texture = createTexture(arguments);
-                BasicMaterial material = createMaterial(texture)) {
-            Scene scene = new Scene();
-            Mesh cube = new Mesh(geometry, material);
-            scene.add(cube);
+        String[] copiedArguments = arguments.clone();
+        ExampleLauncher.launch("JScene3D - Textured Cube", context -> create(context, copiedArguments));
+    }
 
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(0.0f, 0.0f, 3.0f);
-            window.show();
+    /** Creates the built-in checkerboard variant for the example browser. */
+    static HostedExample create(ExampleContext context) {
+        return create(context, new String[0]);
+    }
 
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                    window.requestClose();
-                }
-                if (window.framebufferSizeChanged()
-                        && window.framebufferWidth() > 0
-                        && window.framebufferHeight() > 0) {
-                    camera.setAspectRatio(window.framebufferAspectRatio());
-                }
-                cube.rotateX(0.006f);
-                cube.rotateY(0.01f);
-                renderer.render(scene, camera);
-                window.swapBuffers();
-            }
-        }
+    /** Creates the shared hosted implementation with optional texture-path arguments. */
+    private static HostedExample create(ExampleContext context, String[] arguments) {
+        BufferGeometry geometry = BoxGeometry.create(1.4f, 1.4f, 1.4f);
+        Texture texture = createTexture(arguments);
+        BasicMaterial material = createMaterial(texture);
+        Scene scene = new Scene();
+        scene.setBackground(Color.srgb(0x050810));
+        Mesh cube = new Mesh(geometry, material);
+        scene.add(cube);
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(0.0f, 0.0f, 3.0f);
+        SceneExample example = new SceneExample(context, scene, camera);
+        example.own(geometry);
+        example.own(texture);
+        example.own(material);
+        example.setFrameAction((ignored, frame) -> {
+            cube.rotateX(frame.elapsedSeconds() * 0.36f);
+            cube.rotateY(frame.elapsedSeconds() * 0.6f);
+        });
+        return example;
     }
 
     /** Loads the optional image or creates the built-in checkerboard. */

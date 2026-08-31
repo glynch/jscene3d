@@ -8,6 +8,10 @@ import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.SphereGeometry;
 import io.github.glynch.jscene3d.gui.ControlPanel;
@@ -21,9 +25,6 @@ import io.github.glynch.jscene3d.materials.NormalMaterial;
 import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
-import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Compares built-in mesh materials and exposes live Phong controls. */
@@ -34,56 +35,49 @@ public final class MaterialsExample {
     }
 
     /**
-     * Opens the example window and renders until it is closed or Escape is pressed.
-     *
-     * <p>From left to right, the spheres use Basic, Lambert, Normal, and Phong materials. Drag with
-     * the left mouse button to orbit, drag with the right mouse button to pan, and use the scroll
-     * wheel to dolly. The panel changes the Phong sphere without moving the camera.
+     * Runs this example as an independent native application.
      *
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Materials");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry geometry = SphereGeometry.create(1.0f, 48, 24);
-                BasicMaterial basicMaterial = new BasicMaterial(Color.CYAN);
-                LambertMaterial lambertMaterial = new LambertMaterial(Color.CYAN);
-                NormalMaterial normalMaterial = new NormalMaterial();
-                PhongMaterial phongMaterial = new PhongMaterial(Color.CYAN)) {
-            phongMaterial.setEmissive(Color.srgb(0x080018));
-            phongMaterial.setSpecular(Color.WHITE);
-            phongMaterial.setShininess(80.0f);
+        ExampleLauncher.launch("JScene3D - Materials", MaterialsExample::create);
+    }
 
-            Scene scene = createScene(geometry, basicMaterial, lambertMaterial, normalMaterial, phongMaterial);
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(7.0f, 3.5f, 11.0f);
-            OrbitControls controls = new OrbitControls(camera, window);
-            controls.setTarget(0.0f, 0.0f, 0.0f);
-            controls.setDistanceLimits(6.0f, 30.0f);
-            controls.setDampingEnabled(true);
-            controls.update();
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry geometry = SphereGeometry.create(1.0f, 48, 24);
+        BasicMaterial basicMaterial = new BasicMaterial(Color.CYAN);
+        LambertMaterial lambertMaterial = new LambertMaterial(Color.CYAN);
+        NormalMaterial normalMaterial = new NormalMaterial();
+        PhongMaterial phongMaterial = new PhongMaterial(Color.CYAN);
+        phongMaterial.setEmissive(Color.srgb(0x080018));
+        phongMaterial.setSpecular(Color.WHITE);
+        phongMaterial.setShininess(80.0f);
 
-            ControlPanel panel = createPanel(window, phongMaterial);
-            FpsMonitor fpsMonitor = new FpsMonitor();
-            window.show();
+        Scene scene = createScene(geometry, basicMaterial, lambertMaterial, normalMaterial, phongMaterial);
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(7.0f, 3.5f, 11.0f);
+        OrbitControls controls = new OrbitControls(camera, context.window());
+        controls.setTarget(0.0f, 0.0f, 0.0f);
+        controls.setDistanceLimits(6.0f, 30.0f);
+        controls.setDampingEnabled(true);
+        controls.update();
 
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                handleWindowState(window, camera);
-                panel.update();
-                if (panel.capturesPointer()) {
-                    controls.updateWithoutPointerInput();
-                } else {
-                    controls.update();
-                }
-                renderer.render(scene, camera);
-                renderer.render(panel);
-                renderer.render(fpsMonitor);
-                window.swapBuffers();
-                fpsMonitor.update();
-            }
-        }
+        SceneExample example = new SceneExample(context, scene, camera, controls);
+        example.own(geometry);
+        example.own(basicMaterial);
+        example.own(lambertMaterial);
+        example.own(normalMaterial);
+        example.own(phongMaterial);
+        ControlPanel panel = example.addOverlay(createPanel(context, phongMaterial));
+        FpsMonitor fpsMonitor = example.addOverlay(new FpsMonitor());
+        fpsMonitor.setPosition(context.logicalLeft() + 16.0f, 16.0f);
+        example.setPointerCapture(panel::capturesPointer);
+        example.setFrameAction((ignored, frame) -> {
+            panel.update();
+            fpsMonitor.update();
+        });
+        return example;
     }
 
     /** Creates the four-sphere comparison scene and shared lighting. */
@@ -114,8 +108,8 @@ public final class MaterialsExample {
     }
 
     /** Creates the material legend and live Phong property controls. */
-    private static ControlPanel createPanel(Window window, PhongMaterial material) {
-        ControlPanel panel = new ControlPanel(window, "Materials");
+    private static ControlPanel createPanel(ExampleContext context, PhongMaterial material) {
+        ControlPanel panel = new ControlPanel(context.window(), "Materials");
         ControlPanel.Section legend = panel.addSection("Left to right");
         legend.addText("1", () -> "Basic");
         legend.addText("2", () -> "Lambert");
@@ -125,15 +119,5 @@ public final class MaterialsExample {
         phong.addFloat("shininess", material::shininess, material::setShininess, 0.0f, 200.0f);
         phong.addFloat("emissive intensity", material::emissiveIntensity, material::setEmissiveIntensity, 0.0f, 4.0f);
         return panel;
-    }
-
-    /** Applies close and aspect-ratio changes from the latest event poll. */
-    private static void handleWindowState(Window window, PerspectiveCamera camera) {
-        if (window.input().wasKeyPressed(Key.ESCAPE)) {
-            window.requestClose();
-        }
-        if (window.framebufferSizeChanged() && window.framebufferWidth() > 0 && window.framebufferHeight() > 0) {
-            camera.setAspectRatio(window.framebufferAspectRatio());
-        }
     }
 }

@@ -8,6 +8,10 @@ import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.gui.ControlPanel;
@@ -15,12 +19,10 @@ import io.github.glynch.jscene3d.gui.FpsMonitor;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.MouseButton;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.raycasting.RaycastHit;
 import io.github.glynch.jscene3d.raycasting.Raycaster;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -42,54 +44,52 @@ public final class ObjectSelectionExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Object Selection");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry geometry = BoxGeometry.create(1.4f, 1.4f, 1.4f);
-                BasicMaterial cyanMaterial = new BasicMaterial(Color.CYAN);
-                BasicMaterial yellowMaterial = new BasicMaterial(Color.YELLOW);
-                BasicMaterial magentaMaterial = new BasicMaterial(Color.MAGENTA)) {
-            SelectionTarget[] targets = {
-                target("cyan box", geometry, cyanMaterial, Color.CYAN, -2.0f),
-                target("yellow box", geometry, yellowMaterial, Color.YELLOW, 0.0f),
-                target("magenta box", geometry, magentaMaterial, Color.MAGENTA, 2.0f)
-            };
-            Scene scene = new Scene();
-            scene.setBackground(Color.srgb(0x050810));
-            for (SelectionTarget target : targets) {
-                scene.add(target.mesh());
-            }
+        ExampleLauncher.launch("JScene3D - Object Selection", ObjectSelectionExample::create);
+    }
 
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(4.0f, 3.0f, 7.0f);
-            OrbitControls controls = new OrbitControls(camera, window);
-            controls.setDampingEnabled(true);
-            controls.setDistanceLimits(3.0f, 20.0f);
-            controls.update();
-
-            SelectionState selection = new SelectionState(targets);
-            ControlPanel panel = createPanel(window, selection);
-            FpsMonitor fpsMonitor = new FpsMonitor();
-            Raycaster raycaster = new Raycaster();
-            window.show();
-
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                handleWindowState(window, camera);
-                panel.update();
-                if (panel.capturesPointer()) {
-                    controls.updateWithoutPointerInput();
-                } else {
-                    selectOnPointerPress(window, camera, scene, raycaster, selection);
-                    controls.update();
-                }
-                renderer.render(scene, camera);
-                renderer.render(panel);
-                renderer.render(fpsMonitor);
-                window.swapBuffers();
-                fpsMonitor.update();
-            }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry geometry = BoxGeometry.create(1.4f, 1.4f, 1.4f);
+        BasicMaterial cyanMaterial = new BasicMaterial(Color.CYAN);
+        BasicMaterial yellowMaterial = new BasicMaterial(Color.YELLOW);
+        BasicMaterial magentaMaterial = new BasicMaterial(Color.MAGENTA);
+        SelectionTarget[] targets = {
+            target("cyan box", geometry, cyanMaterial, Color.CYAN, -2.0f),
+            target("yellow box", geometry, yellowMaterial, Color.YELLOW, 0.0f),
+            target("magenta box", geometry, magentaMaterial, Color.MAGENTA, 2.0f)
+        };
+        Scene scene = new Scene();
+        scene.setBackground(Color.srgb(0x050810));
+        for (SelectionTarget target : targets) {
+            scene.add(target.mesh());
         }
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(4.0f, 3.0f, 7.0f);
+        OrbitControls controls = new OrbitControls(camera, context.window());
+        controls.setDampingEnabled(true);
+        controls.setDistanceLimits(3.0f, 20.0f);
+        controls.update();
+        SelectionState selection = new SelectionState(targets);
+        ControlPanel panel = createPanel(context.window(), selection);
+        FpsMonitor fpsMonitor = new FpsMonitor();
+        fpsMonitor.setPosition(context.logicalLeft() + 16.0f, 16.0f);
+        Raycaster raycaster = new Raycaster();
+        SceneExample example = new SceneExample(context, scene, camera, controls);
+        example.own(geometry);
+        example.own(cyanMaterial);
+        example.own(yellowMaterial);
+        example.own(magentaMaterial);
+        example.addOverlay(panel);
+        example.addOverlay(fpsMonitor);
+        example.setPointerCapture(panel::capturesPointer);
+        example.setFrameAction((ignored, frame) -> {
+            panel.update();
+            if (!frame.pointerCaptured() && !panel.capturesPointer()) {
+                selectOnPointerPress(context, camera, scene, raycaster, selection);
+            }
+            fpsMonitor.update();
+        });
+        return example;
     }
 
     /** Creates one named selectable box at a horizontal position. */
@@ -110,25 +110,17 @@ public final class ObjectSelectionExample {
         return panel;
     }
 
-    /** Applies close and aspect-ratio changes from the latest event poll. */
-    private static void handleWindowState(Window window, PerspectiveCamera camera) {
-        if (window.input().wasKeyPressed(Key.ESCAPE)) {
-            window.requestClose();
-        }
-        if (window.framebufferSizeChanged() && window.framebufferWidth() > 0 && window.framebufferHeight() > 0) {
-            camera.setAspectRatio(window.framebufferAspectRatio());
-        }
-    }
-
     /** Selects the nearest mesh under a primary-button press or clears an empty click. */
     private static void selectOnPointerPress(
-            Window window, PerspectiveCamera camera, Scene scene, Raycaster raycaster, SelectionState selection) {
-        if (!window.input().wasMouseButtonPressed(MouseButton.LEFT)) {
+            ExampleContext context,
+            PerspectiveCamera camera,
+            Scene scene,
+            Raycaster raycaster,
+            SelectionState selection) {
+        if (!context.window().input().wasMouseButtonPressed(MouseButton.LEFT)) {
             return;
         }
-        float x = (float) (window.input().pointerX() * 2.0 / window.width() - 1.0);
-        float y = (float) (1.0 - window.input().pointerY() * 2.0 / window.height());
-        raycaster.setFromCamera(x, y, camera);
+        raycaster.setFromCamera(context.normalizedPointerX(), context.normalizedPointerY(), camera);
         List<RaycastHit> hits = raycaster.intersect(scene);
         if (hits.isEmpty()) {
             selection.clear();

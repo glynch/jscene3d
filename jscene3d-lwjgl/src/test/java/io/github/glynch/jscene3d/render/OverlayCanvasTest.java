@@ -30,6 +30,18 @@ final class OverlayCanvasTest {
     }
 
     @Test
+    void accumulatesFullColorImageCommands() {
+        OverlayCanvas canvas = new OverlayCanvas();
+        OverlayImage image = OverlayImage.srgbRgba(1, 1, new byte[] {(byte) 0xff, 0, 0, (byte) 0xff});
+
+        canvas.image(image.fullRegion(), 2.0f, 3.0f, 20.0f, 10.0f, Color.WHITE, 0.75f);
+
+        assertThat(canvas.vertexCount()).isEqualTo(6);
+        assertThat(canvas.commandCount()).isEqualTo(1);
+        assertThat(canvas.commandImage(0)).isSameAs(image);
+    }
+
+    @Test
     void tessellatesRoundedRectanglesAndLines() {
         OverlayCanvas canvas = new OverlayCanvas();
 

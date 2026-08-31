@@ -8,6 +8,10 @@ import static io.github.glynch.jscene3d.math.Angles.PI;
 import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.PlaneGeometry;
 import io.github.glynch.jscene3d.gui.ControlPanel;
@@ -15,9 +19,7 @@ import io.github.glynch.jscene3d.gui.FpsMonitor;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureFilter;
@@ -42,33 +44,32 @@ public final class TextureTransformsExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Texture Transforms");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry geometry = PlaneGeometry.create(4.8f, 3.2f);
-                Texture texture = createPatternTexture();
-                BasicMaterial material = createMaterial(texture)) {
-            Scene scene = new Scene();
-            scene.setBackground(Color.srgb(0x080b12));
-            scene.add(new Mesh(geometry, material));
+        ExampleLauncher.launch("JScene3D - Texture Transforms", TextureTransformsExample::create);
+    }
 
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(0.0f, 0.0f, 4.2f);
-            ControlPanel panel = createPanel(window, texture);
-            FpsMonitor fpsMonitor = new FpsMonitor();
-            window.show();
-
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                handleWindowState(window, camera);
-                panel.update();
-                renderer.render(scene, camera);
-                renderer.render(panel);
-                renderer.render(fpsMonitor);
-                window.swapBuffers();
-                fpsMonitor.update();
-            }
-        }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry geometry = PlaneGeometry.create(4.8f, 3.2f);
+        Texture texture = createPatternTexture();
+        BasicMaterial material = createMaterial(texture);
+        Scene scene = new Scene();
+        scene.setBackground(Color.srgb(0x080b12));
+        scene.add(new Mesh(geometry, material));
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(0.0f, 0.0f, 4.2f);
+        SceneExample example = new SceneExample(context, scene, camera);
+        example.own(geometry);
+        example.own(texture);
+        example.own(material);
+        ControlPanel panel = example.addOverlay(createPanel(context.window(), texture));
+        FpsMonitor fpsMonitor = example.addOverlay(new FpsMonitor());
+        fpsMonitor.setPosition(context.logicalLeft() + 16.0f, 16.0f);
+        example.setPointerCapture(panel::capturesPointer);
+        example.setFrameAction((ignored, frame) -> {
+            panel.update();
+            fpsMonitor.update();
+        });
+        return example;
     }
 
     /** Creates the transformed color map and enables repeat wrapping in both directions. */
@@ -115,16 +116,6 @@ public final class TextureTransformsExample {
         wrapping.addText("vertical", () -> texture.verticalWrap().name());
         wrapping.addButton("cycle vertical", () -> texture.setVerticalWrap(next(texture.verticalWrap())));
         return panel;
-    }
-
-    /** Applies close and aspect-ratio changes from the latest event poll. */
-    private static void handleWindowState(Window window, PerspectiveCamera camera) {
-        if (window.input().wasKeyPressed(Key.ESCAPE)) {
-            window.requestClose();
-        }
-        if (window.framebufferSizeChanged() && window.framebufferWidth() > 0 && window.framebufferHeight() > 0) {
-            camera.setAspectRatio(window.framebufferAspectRatio());
-        }
     }
 
     /** Restores the example's initial transform while retaining the selected wrapping modes. */

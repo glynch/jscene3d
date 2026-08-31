@@ -59,6 +59,8 @@ public final class OrbitControls {
     private float dampingFactor = DEFAULT_DAMPING_FACTOR;
     private float autoRotationSpeed = DEFAULT_AUTO_ROTATION_SPEED;
     private float savedZoom = 1.0f;
+    private int viewportWidth;
+    private int viewportHeight;
 
     /**
      * Creates controls centered on the world origin and saves the initial camera state.
@@ -517,6 +519,30 @@ public final class OrbitControls {
     }
 
     /**
+     * Sets the logical viewport size used to scale pointer and keyboard movement.
+     *
+     * <p>Controls use the complete logical window by default. Hosts that reserve part of a window
+     * for other content should set the remaining example viewport whenever it changes.
+     *
+     * @param width positive logical viewport width
+     * @param height positive logical viewport height
+     * @throws IllegalArgumentException if either dimension is not positive
+     */
+    public void setViewportSize(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("viewport dimensions must be positive: " + width + " x " + height);
+        }
+        viewportWidth = width;
+        viewportHeight = height;
+    }
+
+    /** Restores movement scaling against the complete current logical window. */
+    public void resetViewportSize() {
+        viewportWidth = 0;
+        viewportHeight = 0;
+    }
+
+    /**
      * Returns the current azimuth angle around world Y.
      *
      * @return synchronized angle in radians
@@ -606,8 +632,8 @@ public final class OrbitControls {
         orbitState.pan(
                 validHorizontal,
                 validVertical,
-                Math.max(window.width(), 1),
-                Math.max(window.height(), 1),
+                effectiveViewportWidth(),
+                effectiveViewportHeight(),
                 camera,
                 panSpeed,
                 screenSpacePanning);
@@ -767,8 +793,8 @@ public final class OrbitControls {
     private boolean processPointerInput(InputState input, boolean modifierDown) {
         double deltaX = input.pointerDeltaX();
         double deltaY = input.pointerDeltaY();
-        int width = Math.max(window.width(), 1);
-        int height = Math.max(window.height(), 1);
+        int width = effectiveViewportWidth();
+        int height = effectiveViewportHeight();
         if (isPointerDollyInput(input)) {
             applyPointerDolly(deltaY);
             return true;
@@ -829,8 +855,8 @@ public final class OrbitControls {
         if (horizontal == 0.0f && vertical == 0.0f) {
             return false;
         }
-        int width = Math.max(window.width(), 1);
-        int height = Math.max(window.height(), 1);
+        int width = effectiveViewportWidth();
+        int height = effectiveViewportHeight();
         if (modifierDown && rotationEnabled) {
             float radiansPerHeight = TWO_PI / height * keyRotationSpeed;
             orbitState.rotateLeft(horizontal * radiansPerHeight);
@@ -892,6 +918,16 @@ public final class OrbitControls {
             }
             throw new IllegalArgumentException(message);
         }
+    }
+
+    /** Returns the explicit logical viewport width or the current complete window width. */
+    private int effectiveViewportWidth() {
+        return viewportWidth == 0 ? Math.max(window.width(), 1) : viewportWidth;
+    }
+
+    /** Returns the explicit logical viewport height or the current complete window height. */
+    private int effectiveViewportHeight() {
+        return viewportHeight == 0 ? Math.max(window.height(), 1) : viewportHeight;
     }
 
     /** Returns whether a Shift, Control, or Super modifier is held. */

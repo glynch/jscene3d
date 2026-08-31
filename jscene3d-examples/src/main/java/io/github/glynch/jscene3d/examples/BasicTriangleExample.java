@@ -7,14 +7,15 @@ package io.github.glynch.jscene3d.examples;
 import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
-import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays a rotating vertex-colored triangle with the public rendering API. */
@@ -25,42 +26,32 @@ public final class BasicTriangleExample {
     }
 
     /**
-     * Opens the example window and renders until it is closed or Escape is pressed.
+     * Runs this example as an independent native application.
      *
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Basic Triangle");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry geometry = BufferGeometry.builder()
-                        .positions(-0.8f, -0.7f, 0.0f, 0.8f, -0.7f, 0.0f, 0.0f, 0.8f, 0.0f)
-                        .vertexColors(Color.RED, Color.GREEN, Color.BLUE)
-                        .build();
-                BasicMaterial material = createMaterial()) {
-            Scene scene = new Scene();
-            Mesh triangle = new Mesh(geometry, material);
-            scene.add(triangle);
+        ExampleLauncher.launch("JScene3D - Basic Triangle", BasicTriangleExample::create);
+    }
 
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(0.0f, 0.0f, 2.0f);
-            window.show();
-
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                    window.requestClose();
-                }
-                if (window.framebufferSizeChanged()
-                        && window.framebufferWidth() > 0
-                        && window.framebufferHeight() > 0) {
-                    camera.setAspectRatio(window.framebufferAspectRatio());
-                }
-                triangle.rotateY(0.01f);
-                renderer.render(scene, camera);
-                window.swapBuffers();
-            }
-        }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry geometry = BufferGeometry.builder()
+                .positions(-0.8f, -0.7f, 0.0f, 0.8f, -0.7f, 0.0f, 0.0f, 0.8f, 0.0f)
+                .vertexColors(Color.RED, Color.GREEN, Color.BLUE)
+                .build();
+        BasicMaterial material = createMaterial();
+        Scene scene = new Scene();
+        scene.setBackground(Color.srgb(0x050810));
+        Mesh triangle = new Mesh(geometry, material);
+        scene.add(triangle);
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(0.0f, 0.0f, 2.0f);
+        SceneExample example = new SceneExample(context, scene, camera);
+        example.own(geometry);
+        example.own(material);
+        example.setFrameAction((ignored, frame) -> triangle.rotateY(frame.elapsedSeconds() * 0.6f));
+        return example;
     }
 
     /** Creates the double-sided vertex-color material used by the rotating triangle. */

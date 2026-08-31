@@ -35,30 +35,32 @@ public final class OverlayProgram implements AutoCloseable {
             in vec4 vertexColor;
             in vec2 vertexTextureCoordinate;
 
-            uniform sampler2D alphaMask;
-            uniform bool usesAlphaMask;
+            uniform sampler2D overlayImage;
+            uniform int imageKind;
 
             out vec4 fragmentColor;
 
             void main() {
                 fragmentColor = vertexColor;
-                if (usesAlphaMask) {
-                    fragmentColor.a *= texture(alphaMask, vertexTextureCoordinate).r;
+                if (imageKind == 1) {
+                    fragmentColor.a *= texture(overlayImage, vertexTextureCoordinate).r;
+                } else if (imageKind == 2) {
+                    fragmentColor *= texture(overlayImage, vertexTextureCoordinate);
                 }
             }
             """;
 
     private final int id;
     private final int logicalSizeLocation;
-    private final int alphaMaskLocation;
-    private final int usesAlphaMaskLocation;
+    private final int overlayImageLocation;
+    private final int imageKindLocation;
 
     /** Retains a linked program and its required logical-size uniform. */
-    private OverlayProgram(int id, int logicalSizeLocation, int alphaMaskLocation, int usesAlphaMaskLocation) {
+    private OverlayProgram(int id, int logicalSizeLocation, int overlayImageLocation, int imageKindLocation) {
         this.id = id;
         this.logicalSizeLocation = logicalSizeLocation;
-        this.alphaMaskLocation = alphaMaskLocation;
-        this.usesAlphaMaskLocation = usesAlphaMaskLocation;
+        this.overlayImageLocation = overlayImageLocation;
+        this.imageKindLocation = imageKindLocation;
     }
 
     /**
@@ -72,8 +74,8 @@ public final class OverlayProgram implements AutoCloseable {
             return new OverlayProgram(
                     program,
                     ProgramSupport.requiredUniform(program, LABEL, "logicalSize"),
-                    ProgramSupport.requiredUniform(program, LABEL, "alphaMask"),
-                    ProgramSupport.requiredUniform(program, LABEL, "usesAlphaMask"));
+                    ProgramSupport.requiredUniform(program, LABEL, "overlayImage"),
+                    ProgramSupport.requiredUniform(program, LABEL, "imageKind"));
         } catch (RuntimeException exception) {
             glDeleteProgram(program);
             throw exception;
@@ -103,8 +105,8 @@ public final class OverlayProgram implements AutoCloseable {
      *
      * @return uniform location
      */
-    public int alphaMaskLocation() {
-        return alphaMaskLocation;
+    public int overlayImageLocation() {
+        return overlayImageLocation;
     }
 
     /**
@@ -112,8 +114,8 @@ public final class OverlayProgram implements AutoCloseable {
      *
      * @return uniform location
      */
-    public int usesAlphaMaskLocation() {
-        return usesAlphaMaskLocation;
+    public int imageKindLocation() {
+        return imageKindLocation;
     }
 
     @Override

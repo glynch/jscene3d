@@ -19,6 +19,7 @@ final class RecordingGuiCanvas implements GuiCanvas {
     private int roundedRectangleCount;
     private int lineCount;
     private int alphaMaskCount;
+    private int imageCount;
 
     /** Records one rectangle command. */
     @Override
@@ -45,6 +46,13 @@ final class RecordingGuiCanvas implements GuiCanvas {
     public void alphaMask(
             OverlayImage.Region region, float x, float y, float width, float height, Color color, float alpha) {
         alphaMaskCount++;
+    }
+
+    /** Records one full-color image command. */
+    @Override
+    public void image(
+            OverlayImage.Region region, float x, float y, float width, float height, Color tint, float alpha) {
+        imageCount++;
     }
 
     /** Returns the number of rectangle commands. */
@@ -77,8 +85,13 @@ final class RecordingGuiCanvas implements GuiCanvas {
         return alphaMaskCount;
     }
 
+    /** Returns the number of full-color image commands. */
+    int imageCount() {
+        return imageCount;
+    }
+
     /** Returns the total number of recorded commands. */
     int commandCount() {
-        return rectangleCount + roundedRectangleCount + lineCount + alphaMaskCount;
+        return rectangleCount + roundedRectangleCount + lineCount + alphaMaskCount + imageCount;
     }
 }

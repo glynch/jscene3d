@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIndexOutOfBoundsException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
 import static org.lwjgl.glfw.GLFW.GLFW_RELEASE;
@@ -99,6 +100,25 @@ final class InputStateTest {
         assertThat(input.isMouseButtonDown(MouseButton.RIGHT)).isFalse();
         assertThat(input.wasMouseButtonReleased(MouseButton.LEFT)).isTrue();
         assertThat(input.wasMouseButtonReleased(MouseButton.RIGHT)).isTrue();
+    }
+
+    @Test
+    void accumulatesUnicodeTextInputForOnePollingCycle() {
+        InputState input = new InputState();
+
+        input.updateTypedCodePoint('A');
+        input.updateTypedCodePoint(0x1f680);
+        input.updateTypedCodePoint(-1);
+        input.updateTypedCodePoint(Character.MIN_SURROGATE);
+
+        assertThat(input.typedCodePointCount()).isEqualTo(2);
+        assertThat(input.typedCodePoint(0)).isEqualTo('A');
+        assertThat(input.typedCodePoint(1)).isEqualTo(0x1f680);
+
+        input.beginPoll();
+
+        assertThat(input.typedCodePointCount()).isZero();
+        assertThatIndexOutOfBoundsException().isThrownBy(() -> input.typedCodePoint(0));
     }
 
     @Test

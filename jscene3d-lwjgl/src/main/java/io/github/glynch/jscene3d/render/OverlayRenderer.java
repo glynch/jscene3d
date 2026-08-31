@@ -11,6 +11,7 @@ import static org.lwjgl.opengl.GL11.GL_FLOAT;
 import static org.lwjgl.opengl.GL11.GL_LINEAR;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_RED;
+import static org.lwjgl.opengl.GL11.GL_RGBA;
 import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
 import static org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER;
@@ -46,6 +47,7 @@ import static org.lwjgl.opengl.GL20.glUniform1i;
 import static org.lwjgl.opengl.GL20.glUniform2f;
 import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
+import static org.lwjgl.opengl.GL21.GL_SRGB8_ALPHA8;
 import static org.lwjgl.opengl.GL30.GL_R8;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
@@ -147,7 +149,7 @@ final class OverlayRenderer implements AutoCloseable {
 
         glUseProgram(program.id());
         glUniform2f(program.logicalSizeLocation(), logicalWidth, logicalHeight);
-        glUniform1i(program.alphaMaskLocation(), 0);
+        glUniform1i(program.overlayImageLocation(), 0);
         glActiveTexture(GL_TEXTURE0);
         glBindVertexArray(vertexArray);
     }
@@ -155,11 +157,11 @@ final class OverlayRenderer implements AutoCloseable {
     /** Binds one lazily uploaded alpha mask, or selects solid-color drawing. */
     private void bindImage(@Nullable OverlayImage image) {
         if (image == null) {
-            glUniform1i(program.usesAlphaMaskLocation(), 0);
+            glUniform1i(program.imageKindLocation(), 0);
             defaultTexture.bind();
             return;
         }
-        glUniform1i(program.usesAlphaMaskLocation(), 1);
+        glUniform1i(program.imageKindLocation(), image.format() == OverlayImageFormat.ALPHA_MASK ? 1 : 2);
         glBindTexture(GL_TEXTURE_2D, textures.computeIfAbsent(image, OverlayRenderer::createTexture));
     }
 
@@ -174,7 +176,18 @@ final class OverlayRenderer implements AutoCloseable {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, image.width(), image.height(), 0, GL_RED, GL_UNSIGNED_BYTE, pixels);
+        int internalFormat = image.format() == OverlayImageFormat.ALPHA_MASK ? GL_R8 : GL_SRGB8_ALPHA8;
+        int sourceFormat = image.format() == OverlayImageFormat.ALPHA_MASK ? GL_RED : GL_RGBA;
+        glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                internalFormat,
+                image.width(),
+                image.height(),
+                0,
+                sourceFormat,
+                GL_UNSIGNED_BYTE,
+                pixels);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         return texture;
     }

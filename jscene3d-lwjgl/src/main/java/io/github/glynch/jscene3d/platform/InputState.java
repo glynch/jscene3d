@@ -17,12 +17,15 @@ import org.lwjgl.glfw.GLFW;
  * does not consume it, and no query allocates.
  */
 public final class InputState {
+    private static final int INITIAL_TYPED_CODE_POINT_CAPACITY = 16;
+
     private final boolean[] keysDown = new boolean[Key.platformCodeLimit()];
     private final boolean[] keysPressed = new boolean[Key.platformCodeLimit()];
     private final boolean[] keysReleased = new boolean[Key.platformCodeLimit()];
     private final boolean[] mouseButtonsDown = new boolean[MouseButton.platformCodeLimit()];
     private final boolean[] mouseButtonsPressed = new boolean[MouseButton.platformCodeLimit()];
     private final boolean[] mouseButtonsReleased = new boolean[MouseButton.platformCodeLimit()];
+    private int[] typedCodePoints = new int[INITIAL_TYPED_CODE_POINT_CAPACITY];
 
     private double pointerX;
     private double pointerY;
@@ -30,6 +33,7 @@ public final class InputState {
     private double pointerDeltaY;
     private double scrollDeltaX;
     private double scrollDeltaY;
+    private int typedCodePointCount;
 
     /** Creates empty input state for one window. */
     InputState() {}
@@ -154,6 +158,32 @@ public final class InputState {
         return scrollDeltaY;
     }
 
+    /**
+     * Returns the number of Unicode code points entered during the latest event poll.
+     *
+     * <p>This reports text input after the platform has applied the active keyboard layout. It is
+     * distinct from physical key transitions and includes repeated characters.
+     *
+     * @return the non-negative number of entered code points
+     */
+    public int typedCodePointCount() {
+        return typedCodePointCount;
+    }
+
+    /**
+     * Returns one Unicode code point entered during the latest event poll.
+     *
+     * @param index zero-based index below {@link #typedCodePointCount()}
+     * @return a Unicode scalar value
+     * @throws IndexOutOfBoundsException if {@code index} is outside the current input
+     */
+    public int typedCodePoint(int index) {
+        if (index < 0 || index >= typedCodePointCount) {
+            throw new IndexOutOfBoundsException("typed code point index: " + index);
+        }
+        return typedCodePoints[index];
+    }
+
     /** Clears transitions and deltas before the next process-wide event poll. */
     void beginPoll() {
         Arrays.fill(keysPressed, false);
@@ -164,6 +194,7 @@ public final class InputState {
         pointerDeltaY = 0.0;
         scrollDeltaX = 0.0;
         scrollDeltaY = 0.0;
+        typedCodePointCount = 0;
     }
 
     /** Establishes an initial pointer position without producing movement. */
@@ -216,6 +247,18 @@ public final class InputState {
         scrollDeltaY += yOffset;
     }
 
+    /** Appends one Unicode scalar value produced by GLFW's character callback. */
+    void updateTypedCodePoint(int codePoint) {
+        if (!isUnicodeScalar(codePoint)) {
+            return;
+        }
+        if (typedCodePointCount == typedCodePoints.length) {
+            typedCodePoints = Arrays.copyOf(typedCodePoints, typedCodePoints.length * 2);
+        }
+        typedCodePoints[typedCodePointCount] = codePoint;
+        typedCodePointCount++;
+    }
+
     /** Releases all held keys and mouse buttons when the window loses focus. */
     void releaseHeldButtons() {
         releaseHeld(keysDown, keysReleased);
@@ -230,5 +273,11 @@ public final class InputState {
                 released[index] = true;
             }
         }
+    }
+
+    /** Returns whether a value is a Unicode code point excluding surrogate code points. */
+    private static boolean isUnicodeScalar(int codePoint) {
+        return Character.isValidCodePoint(codePoint)
+                && (codePoint < Character.MIN_SURROGATE || codePoint > Character.MAX_SURROGATE);
     }
 }

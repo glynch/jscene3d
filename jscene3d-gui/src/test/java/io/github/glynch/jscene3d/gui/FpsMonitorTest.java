@@ -103,6 +103,19 @@ final class FpsMonitorTest {
     }
 
     @Test
+    void acceptsFiniteCustomPosition() {
+        FpsMonitor monitor = new FpsMonitor(() -> 0L, GuiTheme.dark());
+        monitor.setPosition(348.0f, 16.0f);
+        RecordingGuiCanvas canvas = new RecordingGuiCanvas();
+
+        monitor.paint(canvas, 1000, 720);
+
+        assertThat(canvas.commandCount()).isPositive();
+        assertThatIllegalArgumentException().isThrownBy(() -> monitor.setPosition(Float.NaN, 0.0f));
+        assertThatIllegalArgumentException().isThrownBy(() -> monitor.setPosition(0.0f, Float.POSITIVE_INFINITY));
+    }
+
+    @Test
     @SuppressWarnings("NullAway") // Deliberately exercises runtime null validation.
     void validatesConstructionAndPaintDimensions() {
         RecordingGuiCanvas canvas = new RecordingGuiCanvas();

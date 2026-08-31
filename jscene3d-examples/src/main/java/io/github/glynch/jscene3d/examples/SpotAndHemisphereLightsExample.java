@@ -9,6 +9,10 @@ import static io.github.glynch.jscene3d.math.Angles.PI_OVER_TWO;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.PlaneGeometry;
 import io.github.glynch.jscene3d.geometries.SphereGeometry;
@@ -20,9 +24,7 @@ import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Demonstrates editable spotlight cones and sky-to-ground hemisphere illumination. */
@@ -42,55 +44,50 @@ public final class SpotAndHemisphereLightsExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Spot and Hemisphere Lights");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry sphereGeometry = SphereGeometry.create(0.9f, 48, 24);
-                BufferGeometry groundGeometry = PlaneGeometry.create(14.0f, 10.0f);
-                PhongMaterial cyanMaterial = shiny(Color.CYAN);
-                PhongMaterial yellowMaterial = shiny(Color.YELLOW);
-                PhongMaterial magentaMaterial = shiny(Color.MAGENTA);
-                PhongMaterial groundMaterial = new PhongMaterial(Color.srgb(0x30343c))) {
-            HemisphereLight hemisphereLight = new HemisphereLight(Color.srgb(0xb1e1ff), Color.srgb(0x5b3215), 0.65f);
-            hemisphereLight.setPosition(0.0f, 5.0f, 0.0f);
-            SpotLight spotLight = new SpotLight(Color.WHITE, 55.0f);
-            spotLight.setPosition(0.0f, 6.0f, 4.0f);
-            spotLight.setTarget(0.0f, 0.0f, 0.0f);
-            spotLight.setDistance(25.0f);
-            spotLight.setAngle(0.45f);
-            spotLight.setPenumbra(0.45f);
+        ExampleLauncher.launch("JScene3D - Spot and Hemisphere Lights", SpotAndHemisphereLightsExample::create);
+    }
 
-            GalleryResources gallery = new GalleryResources(
-                    sphereGeometry, groundGeometry, cyanMaterial, yellowMaterial, magentaMaterial, groundMaterial);
-            Scene scene = createScene(gallery, hemisphereLight, spotLight);
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(7.0f, 5.0f, 10.0f);
-            OrbitControls controls = new OrbitControls(camera, window);
-            controls.setTarget(0.0f, 0.0f, 0.0f);
-            controls.setDistanceLimits(5.0f, 30.0f);
-            controls.setDampingEnabled(true);
-            controls.update();
-
-            ControlPanel panel = createPanel(window, hemisphereLight, spotLight);
-            FpsMonitor fpsMonitor = new FpsMonitor();
-            window.show();
-
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                handleWindowState(window, camera);
-                panel.update();
-                if (panel.capturesPointer()) {
-                    controls.updateWithoutPointerInput();
-                } else {
-                    controls.update();
-                }
-                renderer.render(scene, camera);
-                renderer.render(panel);
-                renderer.render(fpsMonitor);
-                window.swapBuffers();
-                fpsMonitor.update();
-            }
-        }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry sphereGeometry = SphereGeometry.create(0.9f, 48, 24);
+        BufferGeometry groundGeometry = PlaneGeometry.create(14.0f, 10.0f);
+        PhongMaterial cyanMaterial = shiny(Color.CYAN);
+        PhongMaterial yellowMaterial = shiny(Color.YELLOW);
+        PhongMaterial magentaMaterial = shiny(Color.MAGENTA);
+        PhongMaterial groundMaterial = new PhongMaterial(Color.srgb(0x30343c));
+        HemisphereLight hemisphereLight = new HemisphereLight(Color.srgb(0xb1e1ff), Color.srgb(0x5b3215), 0.65f);
+        hemisphereLight.setPosition(0.0f, 5.0f, 0.0f);
+        SpotLight spotLight = new SpotLight(Color.WHITE, 55.0f);
+        spotLight.setPosition(0.0f, 6.0f, 4.0f);
+        spotLight.setTarget(0.0f, 0.0f, 0.0f);
+        spotLight.setDistance(25.0f);
+        spotLight.setAngle(0.45f);
+        spotLight.setPenumbra(0.45f);
+        GalleryResources gallery = new GalleryResources(
+                sphereGeometry, groundGeometry, cyanMaterial, yellowMaterial, magentaMaterial, groundMaterial);
+        Scene scene = createScene(gallery, hemisphereLight, spotLight);
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(7.0f, 5.0f, 10.0f);
+        OrbitControls controls = new OrbitControls(camera, context.window());
+        controls.setDistanceLimits(5.0f, 30.0f);
+        controls.setDampingEnabled(true);
+        controls.update();
+        SceneExample example = new SceneExample(context, scene, camera, controls);
+        example.own(sphereGeometry);
+        example.own(groundGeometry);
+        example.own(cyanMaterial);
+        example.own(yellowMaterial);
+        example.own(magentaMaterial);
+        example.own(groundMaterial);
+        ControlPanel panel = example.addOverlay(createPanel(context.window(), hemisphereLight, spotLight));
+        FpsMonitor fpsMonitor = example.addOverlay(new FpsMonitor());
+        fpsMonitor.setPosition(context.logicalLeft() + 16.0f, 16.0f);
+        example.setPointerCapture(panel::capturesPointer);
+        example.setFrameAction((ignored, frame) -> {
+            panel.update();
+            fpsMonitor.update();
+        });
+        return example;
     }
 
     /** Creates a moderately shiny Phong material for one gallery sphere. */
@@ -137,16 +134,6 @@ public final class SpotAndHemisphereLightsExample {
         spot.addFloat("penumbra", spotLight::penumbra, spotLight::setPenumbra, 0.0f, 1.0f);
         spot.addFloat("decay", spotLight::decay, spotLight::setDecay, 0.0f, 3.0f);
         return panel;
-    }
-
-    /** Applies close and aspect-ratio changes from the latest event poll. */
-    private static void handleWindowState(Window window, PerspectiveCamera camera) {
-        if (window.input().wasKeyPressed(Key.ESCAPE)) {
-            window.requestClose();
-        }
-        if (window.framebufferSizeChanged() && window.framebufferWidth() > 0 && window.framebufferHeight() > 0) {
-            camera.setAspectRatio(window.framebufferAspectRatio());
-        }
     }
 
     /** Resources shared by the objects in the example scene. */

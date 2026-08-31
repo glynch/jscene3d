@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.loaders;
 
 import java.nio.file.Path;
 
-/** Reports an operational failure while reading or decoding a texture image. */
+/** Reports an operational failure while reading or decoding an image used by a texture or overlay. */
 public final class TextureLoadException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 

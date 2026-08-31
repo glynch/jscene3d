@@ -9,14 +9,15 @@ import static io.github.glynch.jscene3d.math.Angles.TWO_PI;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
+import io.github.glynch.jscene3d.examples.framework.ExampleContext;
+import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
+import io.github.glynch.jscene3d.examples.framework.HostedExample;
+import io.github.glynch.jscene3d.examples.framework.SceneExample;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
-import io.github.glynch.jscene3d.platform.Key;
-import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays a connected orbit and independent vertex-colored coordinate axes. */
@@ -34,38 +35,29 @@ public final class LineRenderingExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        try (Window window = Window.create("JScene3D - Line Rendering");
-                Renderer renderer = Renderer.create(window);
-                BufferGeometry orbitGeometry = createOrbitGeometry();
-                BufferGeometry axesGeometry = createAxesGeometry();
-                LineBasicMaterial orbitMaterial = new LineBasicMaterial(Color.CYAN);
-                LineBasicMaterial axesMaterial = createAxesMaterial()) {
-            Scene scene = new Scene();
-            scene.add(new Line(orbitGeometry, orbitMaterial));
-            scene.add(new LineSegments(axesGeometry, axesMaterial));
+        ExampleLauncher.launch("JScene3D - Line Rendering", LineRenderingExample::create);
+    }
 
-            PerspectiveCamera camera =
-                    new PerspectiveCamera(PI_OVER_THREE, window.framebufferAspectRatio(), 0.1f, 100.0f);
-            camera.setPosition(3.0f, 2.5f, 4.0f);
-            camera.lookAt(0.0f, 0.0f, 0.0f);
-            OrbitControls controls = new OrbitControls(camera, window);
-            window.show();
-
-            while (!window.shouldClose()) {
-                Window.pollEvents();
-                if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                    window.requestClose();
-                }
-                if (window.framebufferSizeChanged()
-                        && window.framebufferWidth() > 0
-                        && window.framebufferHeight() > 0) {
-                    camera.setAspectRatio(window.framebufferAspectRatio());
-                }
-                controls.update();
-                renderer.render(scene, camera);
-                window.swapBuffers();
-            }
-        }
+    /** Creates the shared hosted implementation used by both launch modes. */
+    static HostedExample create(ExampleContext context) {
+        BufferGeometry orbitGeometry = createOrbitGeometry();
+        BufferGeometry axesGeometry = createAxesGeometry();
+        LineBasicMaterial orbitMaterial = new LineBasicMaterial(Color.CYAN);
+        LineBasicMaterial axesMaterial = createAxesMaterial();
+        Scene scene = new Scene();
+        scene.setBackground(Color.srgb(0x050810));
+        scene.add(new Line(orbitGeometry, orbitMaterial));
+        scene.add(new LineSegments(axesGeometry, axesMaterial));
+        PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(3.0f, 2.5f, 4.0f);
+        camera.lookAt(0.0f, 0.0f, 0.0f);
+        OrbitControls controls = new OrbitControls(camera, context.window());
+        SceneExample example = new SceneExample(context, scene, camera, controls);
+        example.own(orbitGeometry);
+        example.own(axesGeometry);
+        example.own(orbitMaterial);
+        example.own(axesMaterial);
+        return example;
     }
 
     /** Creates a closed connected line strip in the XZ plane. */

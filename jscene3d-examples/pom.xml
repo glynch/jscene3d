@@ -70,7 +70,7 @@
                         <executions>
                             <execution>
                                 <id>run-selected-example</id>
-                                <phase>verify</phase>
+                                <phase>compile</phase>
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>

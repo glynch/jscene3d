@@ -38,26 +38,30 @@ internal development smoke test; applications do not receive raw OpenGL access.
 
 ## Run examples
 
-Build and run the visible basic-triangle example with:
+Run the visible basic-triangle example with:
 
 ```shell
-./mvnw clean verify -pl jscene3d-examples -am -Prun-example \
-    -Djscene3d.exampleMainClass=io.github.glynch.jscene3d.examples.BasicTriangleExample
+./tools/scripts/run-example.sh BasicTriangleExample
 ```
+
+List the available examples with `./tools/scripts/run-example.sh --list`. The
+runner incrementally compiles the required artifacts and launches the selected
+example without running tests or the full verification lifecycle.
 
 `TransformsExample`, `HierarchyExample`, `CamerasExample`,
 `BufferGeometryExample`, `TexturedCubeExample`, `TransparencyExample`,
 `ShaderMaterialExample`, `LightingExample`, and `OrbitControlsExample` are also
 available using the same command. In `OrbitControlsExample`, drag with the left
 mouse button to orbit; drag with the right mouse button or Shift-left to pan;
-and use the middle
-mouse button or scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates.
-The example also demonstrates the optional themed control panel and FPS monitor
-from `jscene3d-gui`; interacting with the panel does not move the camera.
+and use the middle mouse button or scroll wheel to dolly. Arrow keys pan, while
+Shift-arrow rotates. The example also demonstrates the optional themed control
+panel and FPS monitor from `jscene3d-gui`; interacting with the panel does not
+move the camera.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
-`-XstartOnFirstThread`. Other platforms use the same command without that JVM
-option. The examples artifact is never deployed.
+`-XstartOnFirstThread`. Other platforms use the same runner without that JVM
+option. The examples artifact is never deployed. Run `./mvnw clean verify`
+separately when the project needs complete verification.
 
 ## Transparency
 

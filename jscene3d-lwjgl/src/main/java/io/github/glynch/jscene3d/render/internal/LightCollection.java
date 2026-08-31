@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.render.internal;
 
 import io.github.glynch.jscene3d.lights.AmbientLight;
+import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.lights.Light;
 import io.github.glynch.jscene3d.lights.PointLight;
 import io.github.glynch.jscene3d.math.Color;
@@ -13,20 +14,25 @@ import java.util.ArrayList;
 /** Reusable renderer-internal collection of visible lights for one frame. */
 public final class LightCollection {
     private final int maximumPointLights;
+    private final int maximumDirectionalLights;
     private final ArrayList<PointLight> pointLights;
+    private final ArrayList<DirectionalLight> directionalLights;
 
     private float ambientRed;
     private float ambientGreen;
     private float ambientBlue;
 
     /**
-     * Creates a retained collection with a deterministic point-light capacity.
+     * Creates a retained collection with deterministic light capacities.
      *
      * @param maximumPointLights maximum accepted visible point lights
+     * @param maximumDirectionalLights maximum accepted visible directional lights
      */
-    public LightCollection(int maximumPointLights) {
+    public LightCollection(int maximumPointLights, int maximumDirectionalLights) {
         this.maximumPointLights = maximumPointLights;
+        this.maximumDirectionalLights = maximumDirectionalLights;
         pointLights = new ArrayList<>(maximumPointLights);
+        directionalLights = new ArrayList<>(maximumDirectionalLights);
     }
 
     /**
@@ -37,10 +43,8 @@ public final class LightCollection {
     public void add(Light light) {
         switch (light) {
             case AmbientLight ambientLight -> addAmbient(ambientLight);
+            case DirectionalLight directionalLight -> addDirectional(directionalLight);
             case PointLight pointLight -> addPoint(pointLight);
-            default ->
-                throw new IllegalStateException(
-                        "Unsupported light type: " + light.getClass().getName());
         }
     }
 
@@ -90,9 +94,29 @@ public final class LightCollection {
         return pointLights.get(index);
     }
 
+    /**
+     * Returns the number of visible directional lights.
+     *
+     * @return visible directional-light count
+     */
+    public int directionalLightCount() {
+        return directionalLights.size();
+    }
+
+    /**
+     * Returns a visible directional light by deterministic scene order.
+     *
+     * @param index zero-based light position
+     * @return visible directional light
+     */
+    public DirectionalLight directionalLight(int index) {
+        return directionalLights.get(index);
+    }
+
     /** Releases active references and values while retaining collection capacity. */
     public void clear() {
         pointLights.clear();
+        directionalLights.clear();
         ambientRed = 0.0f;
         ambientGreen = 0.0f;
         ambientBlue = 0.0f;
@@ -116,6 +140,17 @@ public final class LightCollection {
                     + maximumPointLights);
         }
         pointLights.add(light);
+    }
+
+    /** Adds one directional light while enforcing the deterministic renderer limit. */
+    private void addDirectional(DirectionalLight light) {
+        if (directionalLights.size() == maximumDirectionalLights) {
+            throw new IllegalStateException("Scene has more visible directional lights than Renderer supports: "
+                    + (directionalLights.size() + 1)
+                    + " > "
+                    + maximumDirectionalLights);
+        }
+        directionalLights.add(light);
     }
 
     /** Requires one accumulated ambient channel to remain finite. */

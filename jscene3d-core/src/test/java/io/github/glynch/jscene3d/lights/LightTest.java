@@ -20,10 +20,17 @@ final class LightTest {
     @Test
     void providesDocumentedDefaults() {
         AmbientLight ambientLight = new AmbientLight();
+        DirectionalLight directionalLight = new DirectionalLight();
         PointLight pointLight = new PointLight();
+        Vector3f target = new Vector3f();
+        Vector3f position = new Vector3f();
 
         assertThat(ambientLight.color()).isEqualTo(Color.WHITE);
         assertThat(ambientLight.intensity()).isEqualTo(1.0f);
+        assertThat(directionalLight.color()).isEqualTo(Color.WHITE);
+        assertThat(directionalLight.intensity()).isEqualTo(1.0f);
+        assertVector(directionalLight.worldPosition(position), 0.0f, 1.0f, 0.0f);
+        assertVector(directionalLight.target(target), 0.0f, 0.0f, 0.0f);
         assertThat(pointLight.color()).isEqualTo(Color.WHITE);
         assertThat(pointLight.intensity()).isEqualTo(1.0f);
         assertThat(pointLight.distance()).isZero();
@@ -33,10 +40,13 @@ final class LightTest {
     @Test
     void supportsColorAndIntensityConvenienceConstructors() {
         AmbientLight ambientLight = new AmbientLight(Color.BLUE);
+        DirectionalLight directionalLight = new DirectionalLight(Color.GREEN, 0.5f);
         PointLight pointLight = new PointLight(Color.RED, 12.0f);
 
         assertThat(ambientLight.color()).isEqualTo(Color.BLUE);
         assertThat(ambientLight.intensity()).isEqualTo(1.0f);
+        assertThat(directionalLight.color()).isEqualTo(Color.GREEN);
+        assertThat(directionalLight.intensity()).isEqualTo(0.5f);
         assertThat(pointLight.color()).isEqualTo(Color.RED);
         assertThat(pointLight.intensity()).isEqualTo(12.0f);
     }
@@ -57,13 +67,34 @@ final class LightTest {
     }
 
     @Test
+    void copiesDirectionalTargetValuesInAndOut() {
+        DirectionalLight light = new DirectionalLight();
+        Vector3f suppliedTarget = new Vector3f(1.0f, 2.0f, 3.0f);
+        Vector3f copiedTarget = new Vector3f();
+
+        light.setTarget(suppliedTarget);
+        suppliedTarget.set(9.0f, 9.0f, 9.0f);
+
+        assertThat(light.target(copiedTarget)).isSameAs(copiedTarget);
+        assertVector(copiedTarget, 1.0f, 2.0f, 3.0f);
+
+        light.setTarget(-1.0f, -2.0f, -3.0f);
+        light.target(copiedTarget);
+        assertVector(copiedTarget, -1.0f, -2.0f, -3.0f);
+    }
+
+    @Test
     @SuppressWarnings("NullAway")
     void rejectsInvalidLightProperties() {
         PointLight light = new PointLight();
+        DirectionalLight directionalLight = new DirectionalLight();
 
         assertThatNullPointerException().isThrownBy(() -> new AmbientLight(null));
         assertThatNullPointerException().isThrownBy(() -> new PointLight(null, 1.0f));
+        assertThatNullPointerException().isThrownBy(() -> new DirectionalLight(null));
         assertThatNullPointerException().isThrownBy(() -> light.setColor(null));
+        assertThatNullPointerException().isThrownBy(() -> directionalLight.setTarget(null));
+        assertThatNullPointerException().isThrownBy(() -> directionalLight.target(null));
         assertThatIllegalArgumentException().isThrownBy(() -> new AmbientLight(Color.WHITE, -1.0f));
         assertThatIllegalArgumentException().isThrownBy(() -> light.setIntensity(Float.NaN));
         assertThatIllegalArgumentException().isThrownBy(() -> light.setIntensity(-1.0f));
@@ -71,6 +102,7 @@ final class LightTest {
         assertThatIllegalArgumentException().isThrownBy(() -> light.setDistance(-1.0f));
         assertThatIllegalArgumentException().isThrownBy(() -> light.setDecay(Float.NaN));
         assertThatIllegalArgumentException().isThrownBy(() -> light.setDecay(-1.0f));
+        assertThatIllegalArgumentException().isThrownBy(() -> directionalLight.setTarget(Float.NaN, 0.0f, 0.0f));
     }
 
     @Test
@@ -106,17 +138,19 @@ final class LightTest {
     void participatesInHierarchyAndVisibleTraversal() {
         Object3D root = new Object3D();
         AmbientLight ambientLight = new AmbientLight();
+        DirectionalLight directionalLight = new DirectionalLight();
         PointLight pointLight = new PointLight();
         root.add(ambientLight);
+        root.add(directionalLight);
         root.add(pointLight);
         List<Object3D> visited = new ArrayList<>();
 
         root.traverseVisible(visited::add);
-        assertThat(visited).containsExactly(root, ambientLight, pointLight);
+        assertThat(visited).containsExactly(root, ambientLight, directionalLight, pointLight);
 
         ambientLight.setVisible(false);
         visited.clear();
         root.traverseVisible(visited::add);
-        assertThat(visited).containsExactly(root, pointLight);
+        assertThat(visited).containsExactly(root, directionalLight, pointLight);
     }
 }

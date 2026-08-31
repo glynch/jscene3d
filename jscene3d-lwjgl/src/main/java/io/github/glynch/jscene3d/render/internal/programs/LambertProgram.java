@@ -12,6 +12,7 @@ import static org.lwjgl.opengl.GL20.glUniform3fv;
 import static org.lwjgl.opengl.GL20.glUniformMatrix3fv;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 
+import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.lights.PointLight;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
@@ -49,10 +50,10 @@ public final class LambertProgram implements AutoCloseable {
                 gl_Position = projectionMatrix * viewPosition;
             }
             """;
-    private static final String FRAGMENT_SOURCE =
-            """
+    private static final String FRAGMENT_SOURCE = """
             #version 330 core
             const int MAX_POINT_LIGHTS = POINT_LIGHT_CAPACITY;
+            const int MAX_DIRECTIONAL_LIGHTS = DIRECTIONAL_LIGHT_CAPACITY;
 
             in vec3 resolvedViewPosition;
             in vec3 resolvedViewNormal;
@@ -68,6 +69,9 @@ public final class LambertProgram implements AutoCloseable {
             uniform vec3 pointLightColors[MAX_POINT_LIGHTS];
             uniform float pointLightDistances[MAX_POINT_LIGHTS];
             uniform float pointLightDecays[MAX_POINT_LIGHTS];
+            uniform int directionalLightCount;
+            uniform vec3 directionalLightDirections[MAX_DIRECTIONAL_LIGHTS];
+            uniform vec3 directionalLightColors[MAX_DIRECTIONAL_LIGHTS];
 
             out vec4 fragmentColor;
 
@@ -98,12 +102,21 @@ public final class LambertProgram implements AutoCloseable {
                             pointLightDecays[index]);
                     illumination += pointLightColors[index] * diffuse * attenuation;
                 }
+                for (int index = 0; index < MAX_DIRECTIONAL_LIGHTS; index++) {
+                    if (index >= directionalLightCount) {
+                        break;
+                    }
+                    float diffuse = max(dot(surfaceNormal, directionalLightDirections[index]), 0.0);
+                    illumination += directionalLightColors[index] * diffuse;
+                }
 
                 vec4 textureColor = useColorMap ? texture(colorMap, resolvedTextureCoordinate) : vec4(1.0);
                 vec4 surfaceColor = baseColor * resolvedVertexColor * textureColor;
                 fragmentColor = vec4(surfaceColor.rgb * illumination, surfaceColor.a);
             }
-            """.replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS));
+            """.replace(
+                    "POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
+            .replace("DIRECTIONAL_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_DIRECTIONAL_LIGHTS));
 
     private final int id;
     private final int modelMatrixLocation;
@@ -120,15 +133,23 @@ public final class LambertProgram implements AutoCloseable {
     private final int pointLightColorsLocation;
     private final int pointLightDistancesLocation;
     private final int pointLightDecaysLocation;
+    private final int directionalLightCountLocation;
+    private final int directionalLightDirectionsLocation;
+    private final int directionalLightColorsLocation;
     private final Matrix4f modelViewMatrix;
     private final Matrix3f normalMatrix;
     private final Vector3f viewPosition;
+    private final Vector3f directionalTarget;
+    private final Vector3f directionalWorldPosition;
+    private final Vector3f directionalViewDirection;
     private final float[] matrix4Values;
     private final float[] matrix3Values;
     private final float[] pointLightPositions;
     private final float[] pointLightColors;
     private final float[] pointLightDistances;
     private final float[] pointLightDecays;
+    private final float[] directionalLightDirections;
+    private final float[] directionalLightColors;
 
     /** Retains a linked program and all reusable transform and light staging. */
     private LambertProgram(int id) {
@@ -147,15 +168,25 @@ public final class LambertProgram implements AutoCloseable {
         pointLightColorsLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "pointLightColors[0]");
         pointLightDistancesLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "pointLightDistances[0]");
         pointLightDecaysLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "pointLightDecays[0]");
+        directionalLightCountLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "directionalLightCount");
+        directionalLightDirectionsLocation =
+                ProgramSupport.requiredUniform(id, "Built-in Lambert", "directionalLightDirections[0]");
+        directionalLightColorsLocation =
+                ProgramSupport.requiredUniform(id, "Built-in Lambert", "directionalLightColors[0]");
         modelViewMatrix = new Matrix4f();
         normalMatrix = new Matrix3f();
         viewPosition = new Vector3f();
+        directionalTarget = new Vector3f();
+        directionalWorldPosition = new Vector3f();
+        directionalViewDirection = new Vector3f();
         matrix4Values = new float[16];
         matrix3Values = new float[9];
         pointLightPositions = new float[Renderer.MAX_POINT_LIGHTS * 3];
         pointLightColors = new float[Renderer.MAX_POINT_LIGHTS * 3];
         pointLightDistances = new float[Renderer.MAX_POINT_LIGHTS];
         pointLightDecays = new float[Renderer.MAX_POINT_LIGHTS];
+        directionalLightDirections = new float[Renderer.MAX_DIRECTIONAL_LIGHTS * 3];
+        directionalLightColors = new float[Renderer.MAX_DIRECTIONAL_LIGHTS * 3];
     }
 
     /**
@@ -235,7 +266,7 @@ public final class LambertProgram implements AutoCloseable {
     }
 
     /**
-     * Uploads combined ambient and ordered point-light state without allocating.
+     * Uploads combined ambient and ordered point- and directional-light state without allocating.
      *
      * @param lights active visible lights
      * @param viewMatrix current view matrix
@@ -262,6 +293,41 @@ public final class LambertProgram implements AutoCloseable {
         glUniform3fv(pointLightColorsLocation, pointLightColors);
         glUniform1fv(pointLightDistancesLocation, pointLightDistances);
         glUniform1fv(pointLightDecaysLocation, pointLightDecays);
+        uploadDirectionalLights(lights, viewMatrix);
+    }
+
+    /** Uploads ordered directional-light state without allocating. */
+    private void uploadDirectionalLights(LightCollection lights, Matrix4fc viewMatrix) {
+        int count = lights.directionalLightCount();
+        glUniform1i(directionalLightCountLocation, count);
+        for (int index = 0; index < count; index++) {
+            DirectionalLight light = lights.directionalLight(index);
+            light.worldPosition(directionalWorldPosition);
+            light.target(directionalTarget);
+            setNormalizedDirectionFromTarget(light, directionalWorldPosition, directionalTarget);
+            viewMatrix.transformDirection(directionalViewDirection).normalize();
+            int componentIndex = index * 3;
+            directionalLightDirections[componentIndex] = directionalViewDirection.x();
+            directionalLightDirections[componentIndex + 1] = directionalViewDirection.y();
+            directionalLightDirections[componentIndex + 2] = directionalViewDirection.z();
+            directionalLightColors[componentIndex] = light.color().red() * light.intensity();
+            directionalLightColors[componentIndex + 1] = light.color().green() * light.intensity();
+            directionalLightColors[componentIndex + 2] = light.color().blue() * light.intensity();
+        }
+        glUniform3fv(directionalLightDirectionsLocation, directionalLightDirections);
+        glUniform3fv(directionalLightColorsLocation, directionalLightColors);
+    }
+
+    /** Resolves a robust normalized direction from the target toward the light. */
+    private void setNormalizedDirectionFromTarget(DirectionalLight light, Vector3f worldPosition, Vector3f target) {
+        double x = (double) worldPosition.x() - target.x();
+        double y = (double) worldPosition.y() - target.y();
+        double z = (double) worldPosition.z() - target.z();
+        double length = Math.sqrt(x * x + y * y + z * z);
+        if (length == 0.0) {
+            throw new IllegalStateException("DirectionalLight position must differ from its target: " + light);
+        }
+        directionalViewDirection.set((float) (x / length), (float) (y / length), (float) (z / length));
     }
 
     /** Deletes the linked context-local program. */

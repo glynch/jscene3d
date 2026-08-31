@@ -27,6 +27,7 @@ import io.github.glynch.jscene3d.helpers.AxesHelper;
 import io.github.glynch.jscene3d.helpers.BoxHelper;
 import io.github.glynch.jscene3d.helpers.GridHelper;
 import io.github.glynch.jscene3d.lights.AmbientLight;
+import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.lights.PointLight;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.DepthFunction;
@@ -255,6 +256,38 @@ final class RendererIT {
     }
 
     @Test
+    void rendersLambertMaterialWithDirectionalLightWorldPositionAndTarget() {
+        try (Window window = Window.create("Directional lighting integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                LambertMaterial material = new LambertMaterial(Color.RED)) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            Group lightParent = new Group();
+            lightParent.setPosition(0.0f, 0.0f, 1.0f);
+            DirectionalLight light = new DirectionalLight(Color.WHITE, 1.0f);
+            light.setPosition(0.0f, 0.0f, 0.0f);
+            lightParent.add(light);
+            scene.add(lightParent);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            light.setTarget(0.0f, 0.0f, 2.0f);
+            renderer.render(scene, camera);
+            assertPixelIsBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            light.setTarget(0.0f, 0.0f, 1.0f);
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessageContaining("DirectionalLight position must differ from its target");
+        }
+    }
+
+    @Test
     void appliesLambertVertexColorsAndColorMaps() {
         Texture texture = Texture.baseColor(1, 1, new byte[] {(byte) 0xff, 0, 0, (byte) 0xff});
         try (Window window = Window.create("Lambert surface inputs integration test");
@@ -289,7 +322,7 @@ final class RendererIT {
     }
 
     @Test
-    void validatesLambertNormalsAndVisiblePointLightLimit() {
+    void validatesLambertNormalsAndVisibleLightLimits() {
         try (Window window = Window.create("Lambert validation integration test");
                 Renderer renderer = Renderer.create(window);
                 BufferGeometry geometry = createTriangle();
@@ -319,6 +352,14 @@ final class RendererIT {
             excessLight.setVisible(false);
             renderer.render(scene, camera);
             assertThat(renderer.info().statistics().drawCalls()).isZero();
+
+            scene.clear();
+            for (int index = 0; index <= Renderer.MAX_DIRECTIONAL_LIGHTS; index++) {
+                scene.add(new DirectionalLight());
+            }
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("Scene has more visible directional lights than Renderer supports: 9 > 8");
         }
     }
 

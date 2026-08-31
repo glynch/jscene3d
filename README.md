@@ -110,16 +110,21 @@ blocks, and raw OpenGL access are not supported.
 
 ## Lighting
 
-`LambertMaterial` provides diffuse lighting from visible `AmbientLight` and
-`PointLight` scene nodes. Lit geometry must provide normals; color maps also
-require texture coordinates. A Lambert surface renders black when the scene has
-no lights because the renderer does not supply a hidden default light.
+`LambertMaterial` provides diffuse lighting from visible `AmbientLight`,
+`PointLight`, and `DirectionalLight` scene nodes. Lit geometry must provide
+normals; color maps also require texture coordinates. A Lambert surface renders
+black when the scene has no lights because the renderer does not supply a
+hidden default light.
 
 Point lights use their inherited world position. Their non-negative `decay`
 controls distance falloff, while a positive `distance` adds a smooth cutoff;
 zero distance leaves their range unlimited. Version 0.1 supports at most
 `Renderer.MAX_POINT_LIGHTS` visible point lights per scene and reports an error
-instead of silently dropping excess lights. Shadows are not yet supported.
+instead of silently dropping excess lights. Directional lights use their world
+position and a copied world-space target point to establish parallel incoming
+illumination; their distance from the target does not affect intensity. Version
+0.1 supports at most `Renderer.MAX_DIRECTIONAL_LIGHTS` visible directional
+lights per scene. Shadows are not yet supported.
 
 ## Lines
 

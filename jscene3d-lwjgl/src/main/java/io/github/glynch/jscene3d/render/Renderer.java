@@ -94,6 +94,9 @@ public final class Renderer implements AutoCloseable {
     /** Maximum number of visible point lights supported by one rendered scene in version 0.1. */
     public static final int MAX_POINT_LIGHTS = 8;
 
+    /** Maximum number of visible directional lights supported by one rendered scene in version 0.1. */
+    public static final int MAX_DIRECTIONAL_LIGHTS = 8;
+
     private final Window window;
     private final WindowContextRegistry.Access context;
     private final boolean automaticClear;
@@ -137,7 +140,7 @@ public final class Renderer implements AutoCloseable {
         geometryResources = new IdentityHashMap<>();
         textureResources = new IdentityHashMap<>();
         shaderPrograms = new HashMap<>();
-        renderList = new RenderList(MAX_POINT_LIGHTS);
+        renderList = new RenderList(MAX_POINT_LIGHTS, MAX_DIRECTIONAL_LIGHTS);
         frustum = new Frustum();
         matrixValues = new float[16];
         matrix3Values = new float[9];

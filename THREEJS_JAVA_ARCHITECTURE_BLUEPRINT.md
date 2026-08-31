@@ -410,6 +410,7 @@ io.github.glynch.jscene3d
 ├── lights
 │   ├── Light
 │   ├── AmbientLight
+│   ├── DirectionalLight
 │   └── PointLight
 ├── textures
 │   ├── Texture
@@ -1090,12 +1091,14 @@ justify it.
 Version 0.1 also includes a narrow diffuse lighting path needed by the Solar
 System Viewer. `LambertMaterial` supports base color, optional vertex colors,
 an optional color map, and inherited material render state. It requires
-geometry normals and responds to visible `AmbientLight` and `PointLight` scene
-nodes. Lights are sealed `Object3D` subclasses with linear-sRGB color and a
-non-negative practical intensity multiplier.
+geometry normals and responds to visible `AmbientLight`, `PointLight`, and
+`DirectionalLight` scene nodes. Lights are sealed `Object3D` subclasses with
+linear-sRGB color and a non-negative practical intensity multiplier.
 
 Point lights inherit their world position and expose non-negative distance and
-decay controls. The renderer supports eight visible point lights, aggregates
+decay controls. Directional lights derive their direction from their inherited
+world position and a copied world-space target point. The renderer supports
+eight visible point lights and eight visible directional lights, aggregates
 ambient contributions, and fails rather than silently dropping excess lights.
 This initial path excludes shadows, calibrated physical units, normal maps,
 environment lighting, and PBR behavior.

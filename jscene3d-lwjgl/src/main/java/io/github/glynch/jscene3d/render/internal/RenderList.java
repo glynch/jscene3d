@@ -39,13 +39,14 @@ public final class RenderList {
      * Creates reusable traversal, pooling, and submission collections.
      *
      * @param maximumPointLights maximum accepted visible point lights
+     * @param maximumDirectionalLights maximum accepted visible directional lights
      */
-    public RenderList(int maximumPointLights) {
+    public RenderList(int maximumPointLights, int maximumDirectionalLights) {
         pendingObjects = new ArrayDeque<>();
         itemPool = new ArrayList<>();
         opaqueItems = new ArrayList<>();
         transparentItems = new ArrayList<>();
-        lights = new LightCollection(maximumPointLights);
+        lights = new LightCollection(maximumPointLights, maximumDirectionalLights);
     }
 
     /**

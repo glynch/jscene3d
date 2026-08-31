@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.PlaneGeometry;
 import io.github.glynch.jscene3d.geometries.SphereGeometry;
 import io.github.glynch.jscene3d.lights.AmbientLight;
+import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.lights.PointLight;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
@@ -55,6 +56,10 @@ public final class LightingExample {
             Scene scene = new Scene();
             scene.setBackground(Color.srgb(0x050810));
             scene.add(new AmbientLight(Color.srgb(0x8090b0), 0.08f));
+            DirectionalLight directionalLight = new DirectionalLight(Color.srgb(0x9fc5ff), 0.45f);
+            directionalLight.setPosition(-4.0f, 5.0f, 3.0f);
+            directionalLight.setTarget(0.0f, 0.0f, 0.0f);
+            scene.add(directionalLight);
             scene.add(createSphere(sphereGeometry, cyanMaterial, -2.0f));
             scene.add(createSphere(sphereGeometry, yellowMaterial, 0.0f));
             scene.add(createSphere(sphereGeometry, magentaMaterial, 2.0f));

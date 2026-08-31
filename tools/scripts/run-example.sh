@@ -51,6 +51,7 @@ fi
 
 exec "${PROJECT_DIRECTORY}/mvnw" \
     -f "${PROJECT_DIRECTORY}/pom.xml" \
+    clean \
     compile \
     -pl jscene3d-examples \
     -am \

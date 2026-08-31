@@ -100,6 +100,14 @@ final class ExampleCatalog {
                         0xd8a43b,
                         StandardMaterialExample::create),
                 definition(
+                        "gltf-loading",
+                        "glTF loading",
+                        "Loading",
+                        "A bundled glTF 2.0 scene loaded through the optional glTF artifact.",
+                        List.of("gltf", "glb", "loader", "pbr"),
+                        0xe0a84f,
+                        GltfLoadingExample::create),
+                definition(
                         "orbit-controls",
                         "Orbit controls",
                         "Interaction",

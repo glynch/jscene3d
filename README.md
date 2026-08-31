@@ -82,6 +82,7 @@ scene without its large control overlays, and replaces the checked-in PNGs.
 `TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
+`GltfLoadingExample`,
 `SpotAndHemisphereLightsExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
@@ -98,6 +99,28 @@ read-only control-panel row.
 `TextureTransformsExample` displays an asymmetric generated pattern and provides
 live controls for offset, repeat, rotation, rotation center, and horizontal and
 vertical wrapping.
+
+## glTF loading
+
+The optional `jscene3d-gltf` artifact loads glTF 2.0 JSON and binary GLB files
+without requiring LWJGL, OpenGL, or a graphics context:
+
+```java
+try (LoadedGltf loaded = GltfLoader.load(Path.of("scene.glb"))) {
+    Scene scene = loaded.scene();
+    // Render or process the scene while the loaded owner remains open.
+}
+```
+
+The initial capability profile supports static selected-scene hierarchies, TRS
+and decomposable matrix transforms, triangle primitives, indices, positions,
+normals, primary texture coordinates, RGB/RGBA vertex colours,
+metallic-roughness materials, PNG/JPEG images, alpha modes, double-sided
+materials, and core sampler state. Unsupported required extensions, animation,
+skinning, morph targets, embedded cameras, secondary texture-coordinate
+selection, and non-triangle primitives fail with a source-aware diagnostic.
+JglTF performs container and reference parsing internally; no JglTF type is
+part of the public JScene3D API.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same runner without that JVM
@@ -241,6 +264,7 @@ intersection behavior.
   and the renderer-owned safe overlay canvas.
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType
   text rendering.
+- `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
 - `jscene3d-examples`: unpublished runnable examples depending on the public
   artifacts.
 

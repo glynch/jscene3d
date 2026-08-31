@@ -10,7 +10,7 @@ import java.nio.file.Path;
 /** Command-line developer utility that refreshes example-browser thumbnail images. */
 public final class ExampleThumbnailCapture {
     private static final Path DEFAULT_DIRECTORY =
-            Path.of("src", "main", "resources", "io", "github", "glynch", "jscene3d", "examples", "thumbnails");
+            Path.of("src", "main", "resources", "META-INF", "jscene3d", "examples", "thumbnails");
 
     /** Prevents instantiation of this utility entry point. */
     private ExampleThumbnailCapture() {

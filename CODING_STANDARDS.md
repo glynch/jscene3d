@@ -212,7 +212,7 @@ prior deprecation where practical.
   | `jscene3d-core` | 90% | 75% |
   | `jscene3d-lwjgl` | 25% | 18% |
   | `jscene3d-lwjgl` with `render-integration` | 80% | 55% |
-  | `jscene3d-gui` | 50% | 40% |
+  | `jscene3d-gui` | 85% | 70% |
 
   `jscene3d-lwjgl` has a deliberately separate lower headless floor because
   ordinary verification does not create an OpenGL context. The

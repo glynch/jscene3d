@@ -25,6 +25,7 @@ public final class FpsMonitor implements Overlay {
     private final LongSupplier nanoTime;
     private final GuiTheme theme;
     private final float[] samples = new float[SAMPLE_CAPACITY];
+    private final OverlayGuiCanvas overlayCanvas = new OverlayGuiCanvas();
 
     private boolean visible = true;
     private long previousNanos = Long.MIN_VALUE;
@@ -109,6 +110,16 @@ public final class FpsMonitor implements Overlay {
     /** Paints the monitor in the upper-left corner. */
     @Override
     public void paint(OverlayCanvas canvas, int width, int height) {
+        overlayCanvas.bind(Objects.requireNonNull(canvas, "canvas"));
+        try {
+            paint(overlayCanvas, width, height);
+        } finally {
+            overlayCanvas.unbind();
+        }
+    }
+
+    /** Paints the monitor through the internal headless-testable drawing boundary. */
+    void paint(GuiCanvas canvas, int width, int height) {
         Objects.requireNonNull(canvas, "canvas");
         Preconditions.requirePositive(width, "width");
         Preconditions.requirePositive(height, "height");
@@ -166,7 +177,7 @@ public final class FpsMonitor implements Overlay {
     }
 
     /** Paints chronological samples as a continuous antialiased line. */
-    private void paintGraph(OverlayCanvas canvas) {
+    private void paintGraph(GuiCanvas canvas) {
         if (sampleCount < 2) {
             return;
         }

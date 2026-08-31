@@ -51,6 +51,7 @@ public final class ControlPanel implements Overlay {
     private final String title;
     private final GuiTheme theme;
     private final List<Section> sections = new ArrayList<>();
+    private final OverlayGuiCanvas overlayCanvas = new OverlayGuiCanvas();
 
     private @Nullable SliderItem activeSlider;
     private boolean visible = true;
@@ -162,6 +163,16 @@ public final class ControlPanel implements Overlay {
     /** Paints the complete themed panel in the upper-right corner. */
     @Override
     public void paint(OverlayCanvas canvas, int width, int height) {
+        overlayCanvas.bind(Objects.requireNonNull(canvas, "canvas"));
+        try {
+            paint(overlayCanvas, width, height);
+        } finally {
+            overlayCanvas.unbind();
+        }
+    }
+
+    /** Paints the panel through the internal headless-testable drawing boundary. */
+    void paint(GuiCanvas canvas, int width, int height) {
         Objects.requireNonNull(canvas, "canvas");
         Preconditions.requirePositive(width, "width");
         Preconditions.requirePositive(height, "height");
@@ -197,7 +208,7 @@ public final class ControlPanel implements Overlay {
     }
 
     /** Paints one section header and its disclosure chevron. */
-    private void paintSection(OverlayCanvas canvas, Section section, float x, float y) {
+    private void paintSection(GuiCanvas canvas, Section section, float x, float y) {
         boolean hovered = contains(pointerX, pointerY, x, y, WIDTH, SECTION_HEIGHT);
         canvas.rectangle(
                 x + 1.0f, y, WIDTH - 2.0f, SECTION_HEIGHT, hovered ? theme.rowHover() : theme.section(), 0.98f);
@@ -456,13 +467,13 @@ public final class ControlPanel implements Overlay {
     /** Shared paint contract for one panel row. */
     private sealed interface Item permits BooleanItem, SliderItem, ButtonItem {
         /** Paints row-specific visuals. */
-        void paint(OverlayCanvas canvas, float x, float y, boolean hovered, GuiTheme theme);
+        void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme);
     }
 
     /** Explicitly bound checkbox row. */
     private record BooleanItem(String label, BooleanSupplier getter, BooleanConsumer setter) implements Item {
         @Override
-        public void paint(OverlayCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
             FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
             float boxX = x + WIDTH - 31.0f;
             float boxY = y + 10.0f;
@@ -486,7 +497,7 @@ public final class ControlPanel implements Overlay {
     private record SliderItem(String label, FloatSupplier getter, FloatConsumer setter, float minimum, float maximum)
             implements Item {
         @Override
-        public void paint(OverlayCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
             float value = Preconditions.requireFinite(getter.getAsFloat(), label);
             float fraction =
                     maximum == minimum ? 1.0f : Math.clamp((value - minimum) / (maximum - minimum), 0.0f, 1.0f);
@@ -512,7 +523,7 @@ public final class ControlPanel implements Overlay {
     /** Action-button row. */
     private record ButtonItem(String label, Runnable action) implements Item {
         @Override
-        public void paint(OverlayCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
             float buttonX = x + HORIZONTAL_PADDING;
             float buttonY = y + 6.0f;
             float buttonWidth = WIDTH - HORIZONTAL_PADDING * 2.0f;

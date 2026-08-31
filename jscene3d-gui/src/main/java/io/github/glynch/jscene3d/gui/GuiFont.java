@@ -7,7 +7,6 @@ package io.github.glynch.jscene3d.gui;
 import static org.lwjgl.stb.STBTruetype.stbtt_BakeFontBitmap;
 
 import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.render.OverlayCanvas;
 import io.github.glynch.jscene3d.render.OverlayImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +38,7 @@ final class GuiFont {
     }
 
     /** Appends one line of TrueType text with a top-aligned origin. */
-    void text(OverlayCanvas canvas, float x, float y, String text, float size, Color color) {
+    void text(GuiCanvas canvas, float x, float y, String text, float size, Color color) {
         float scale = size / BAKED_SIZE;
         float cursor = x;
         float baseline = y + size;

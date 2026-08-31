@@ -6,17 +6,18 @@ package io.github.glynch.jscene3d.render;
 
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Material;
-import io.github.glynch.jscene3d.core.Mesh;
+import io.github.glynch.jscene3d.core.Object3D;
 import java.util.Objects;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 
-/** Reusable renderer-internal description of one mesh submission. */
+/** Reusable renderer-internal description of one scene-object submission. */
 final class RenderItem {
-    private @Nullable Mesh mesh;
+    private @Nullable Object3D object;
     private @Nullable BufferGeometry geometry;
     private @Nullable Material material;
     private @Nullable Matrix4fc worldMatrix;
+    private @Nullable PrimitiveTopology topology;
     private int elementCount;
     private int materialSortKey;
     private int geometrySortKey;
@@ -46,29 +47,35 @@ final class RenderItem {
         return comparison == 0 ? Long.compare(first.traversalOrder, second.traversalOrder) : comparison;
     }
 
-    /** Assigns one active mesh submission to this pooled item. */
+    /** Assigns one active scene-object submission to this pooled item. */
     void assign(
-            Mesh mesh,
+            Object3D object,
             BufferGeometry geometry,
             Material material,
-            Matrix4fc worldMatrix,
+            PrimitiveTopology topology,
             int elementCount,
-            float cameraDepth,
+            Matrix4fc viewMatrix,
             long traversalOrder) {
-        this.mesh = mesh;
+        Matrix4fc assignedWorldMatrix = object.matrixWorld();
+        this.object = object;
         this.geometry = geometry;
         this.material = material;
-        this.worldMatrix = worldMatrix;
+        worldMatrix = assignedWorldMatrix;
+        this.topology = topology;
         this.elementCount = elementCount;
-        this.cameraDepth = cameraDepth;
+        float worldX = assignedWorldMatrix.m30();
+        float worldY = assignedWorldMatrix.m31();
+        float worldZ = assignedWorldMatrix.m32();
+        cameraDepth =
+                viewMatrix.m02() * worldX + viewMatrix.m12() * worldY + viewMatrix.m22() * worldZ + viewMatrix.m32();
         materialSortKey = System.identityHashCode(material);
         geometrySortKey = System.identityHashCode(geometry);
         this.traversalOrder = traversalOrder;
     }
 
-    /** Returns the active mesh. */
-    Mesh mesh() {
-        return Objects.requireNonNull(mesh, "Inactive render item has no mesh");
+    /** Returns the active scene object. */
+    Object3D object() {
+        return Objects.requireNonNull(object, "Inactive render item has no scene object");
     }
 
     /** Returns the active geometry. */
@@ -86,6 +93,11 @@ final class RenderItem {
         return Objects.requireNonNull(worldMatrix, "Inactive render item has no world matrix");
     }
 
+    /** Returns how successive geometry elements form primitives. */
+    PrimitiveTopology topology() {
+        return Objects.requireNonNull(topology, "Inactive render item has no topology");
+    }
+
     /** Returns the number of indexed or non-indexed elements to draw. */
     int elementCount() {
         return elementCount;
@@ -93,10 +105,11 @@ final class RenderItem {
 
     /** Clears references and scalar state before returning this item to the pool. */
     void release() {
-        mesh = null;
+        object = null;
         geometry = null;
         material = null;
         worldMatrix = null;
+        topology = null;
         elementCount = 0;
         materialSortKey = 0;
         geometrySortKey = 0;

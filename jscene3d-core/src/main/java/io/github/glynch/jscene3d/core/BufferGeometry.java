@@ -11,7 +11,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Application-owned, renderer-independent triangle geometry.
+ * Application-owned, renderer-independent vertex and index geometry.
  *
  * <p>Attributes retain library-owned {@link BufferAttribute} values in deterministic insertion
  * order. All attributes in one geometry have the same item count. An optional shared {@link
@@ -52,7 +52,7 @@ public final class BufferGeometry implements AutoCloseable {
     private long version;
     private boolean closed;
 
-    /** Creates empty, open triangle geometry. */
+    /** Creates empty, open geometry. */
     public BufferGeometry() {
         attributes = new LinkedHashMap<>();
         attributesView = Collections.unmodifiableMap(attributes);
@@ -193,7 +193,7 @@ public final class BufferGeometry implements AutoCloseable {
     }
 
     /**
-     * Sets the index buffer used for triangle drawing.
+     * Sets the index buffer used for indexed drawing.
      *
      * @param index index buffer to retain
      * @throws NullPointerException if {@code index} is {@code null}

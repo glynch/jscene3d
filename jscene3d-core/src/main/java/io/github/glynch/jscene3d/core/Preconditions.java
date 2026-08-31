@@ -18,6 +18,24 @@ final class Preconditions {
         throw new AssertionError("Preconditions cannot be instantiated");
     }
 
+    /** Requires an open geometry description. */
+    static BufferGeometry requireOpen(BufferGeometry geometry, String parameterName) {
+        BufferGeometry validGeometry = Objects.requireNonNull(geometry, parameterName);
+        if (validGeometry.isClosed()) {
+            throw new IllegalArgumentException(parameterName + " must be open");
+        }
+        return validGeometry;
+    }
+
+    /** Requires an open material description while preserving its concrete type. */
+    static <M extends Material> M requireOpen(M material, String parameterName) {
+        M validMaterial = Objects.requireNonNull(material, parameterName);
+        if (validMaterial.isClosed()) {
+            throw new IllegalArgumentException(parameterName + " must be open");
+        }
+        return validMaterial;
+    }
+
     /** Requires a finite floating-point value. */
     static float requireFinite(float value, String parameterName) {
         if (!Float.isFinite(value)) {

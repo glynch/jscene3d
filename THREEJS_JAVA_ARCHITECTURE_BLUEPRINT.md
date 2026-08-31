@@ -398,6 +398,7 @@ io.github.glynch.jscene3d
 │   ├── Material
 │   ├── BasicMaterial
 │   ├── LambertMaterial
+│   ├── LineBasicMaterial
 │   ├── ShaderMaterial
 │   ├── RenderSide
 │   ├── BlendMode
@@ -412,7 +413,9 @@ io.github.glynch.jscene3d
 │   ├── TextureFilter
 │   └── TextureWrap
 ├── objects
-│   └── Mesh
+│   ├── Mesh
+│   ├── Line
+│   └── LineSegments
 ├── render
 │   ├── Renderer
 │   ├── RendererOptions
@@ -1090,7 +1093,14 @@ ambient contributions, and fails rather than silently dropping excess lights.
 This initial path excludes shadows, calibrated physical units, normal maps,
 environment lighting, and PBR behavior.
 
-### 13.6 Shader variants
+### 13.6 `LineBasicMaterial`
+
+`LineBasicMaterial` provides unlit base color, optional vertex-color
+multiplication, and inherited opacity, transparency, and depth state. Line
+primitives have no face orientation, so inherited material-side selection is
+ignored. The portable raster width remains one framebuffer pixel.
+
+### 13.7 Shader variants
 
 Even a basic material can produce variants:
 
@@ -1243,6 +1253,13 @@ indexing, and sorting.
 The mesh owns references to geometry and material, not their exclusive
 lifecycle. Multiple meshes may share them.
 
+`Line` and `LineSegments` follow the same shared-resource and lifecycle model.
+`Line` interprets successive geometry elements as one connected strip;
+`LineSegments` interprets successive pairs as independent segments and rejects
+odd draw-range counts. Both retain `LineBasicMaterial`, support indexed and
+non-indexed geometry, and participate in transforms, visibility, frustum
+culling, opaque or transparent ordering, and depth state.
+
 ---
 
 ## 16. Renderer Public Interface
@@ -1321,8 +1338,11 @@ ResourceStatistics resources = info.resources();
 - Frame number.
 - Draw calls.
 - Rendered triangles.
+- Rendered line segments.
 - Visible mesh count.
 - Culled mesh count.
+- Visible line-object count.
+- Culled line-object count.
 - Buffer upload count and bytes uploaded for the frame.
 - Texture upload count and bytes uploaded for the frame.
 
@@ -1382,8 +1402,8 @@ For each node:
 
 - Skip invisible subtrees according to visibility semantics.
 - Apply camera layer filtering if layers are supported.
-- Identify renderable meshes.
-- Validate mesh geometry and material state.
+- Identify renderable meshes and line objects.
+- Validate geometry, topology, and material state.
 - Transform geometry bounds to world space.
 - Apply frustum culling unless disabled.
 - Create or reuse a render item.

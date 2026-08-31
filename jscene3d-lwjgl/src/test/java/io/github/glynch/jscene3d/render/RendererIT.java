@@ -21,6 +21,9 @@ import io.github.glynch.jscene3d.core.Color;
 import io.github.glynch.jscene3d.core.Group;
 import io.github.glynch.jscene3d.core.IndexBuffer;
 import io.github.glynch.jscene3d.core.LambertMaterial;
+import io.github.glynch.jscene3d.core.Line;
+import io.github.glynch.jscene3d.core.LineBasicMaterial;
+import io.github.glynch.jscene3d.core.LineSegments;
 import io.github.glynch.jscene3d.core.MaterialSide;
 import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.OrthographicCamera;
@@ -703,6 +706,48 @@ final class RendererIT {
         }
     }
 
+    @Test
+    void rendersConnectedAndIndexedLineSegmentsWithVertexColors() {
+        try (Window window = Window.create(320, 240, "Line rendering integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry stripGeometry = BufferGeometry.builder()
+                        .positions(-0.8f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.8f, 0.0f, 0.0f)
+                        .build();
+                BufferGeometry segmentsGeometry = BufferGeometry.builder()
+                        .positions(-0.8f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.8f, 0.0f, 0.0f)
+                        .vertexColors(Color.GREEN, Color.GREEN, Color.GREEN)
+                        .indices(0, 1, 1, 2)
+                        .build();
+                LineBasicMaterial redMaterial = new LineBasicMaterial(Color.RED);
+                LineBasicMaterial vertexColorMaterial = new LineBasicMaterial()) {
+            vertexColorMaterial.setUsesVertexColors(true);
+            Scene scene = new Scene();
+            scene.add(new Line(stripGeometry, redMaterial));
+            OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            RenderStatistics statistics = renderer.info().statistics();
+            assertThat(statistics.drawCalls()).isOne();
+            assertThat(statistics.lineSegments()).isEqualTo(2L);
+            assertThat(statistics.visibleLines()).isOne();
+            assertThat(statistics.triangles()).isZero();
+            assertThat(statistics.visibleMeshes()).isZero();
+            assertNeighborhoodContainsRed(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            scene.clear();
+            scene.add(new LineSegments(segmentsGeometry, vertexColorMaterial));
+            renderer.render(scene, camera);
+
+            assertThat(statistics.drawCalls()).isOne();
+            assertThat(statistics.lineSegments()).isEqualTo(2L);
+            assertThat(statistics.visibleLines()).isOne();
+            assertThat(renderer.info().resources().programCount()).isOne();
+            assertNeighborhoodContainsGreen(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+        }
+    }
+
     private static BufferGeometry createTriangle() {
         BufferGeometry geometry = new BufferGeometry();
         geometry.setAttribute(
@@ -788,6 +833,29 @@ final class RendererIT {
         int brightness =
                 Byte.toUnsignedInt(pixel.get(0)) + Byte.toUnsignedInt(pixel.get(1)) + Byte.toUnsignedInt(pixel.get(2));
         assertThat(brightness).isPositive();
+    }
+
+    private static void assertNeighborhoodContainsRed(int centerX, int centerY) {
+        assertThat(neighborhoodContainsColor(centerX, centerY, 0, 1, 2)).isTrue();
+    }
+
+    private static void assertNeighborhoodContainsGreen(int centerX, int centerY) {
+        assertThat(neighborhoodContainsColor(centerX, centerY, 1, 0, 2)).isTrue();
+    }
+
+    private static boolean neighborhoodContainsColor(
+            int centerX, int centerY, int dominantComponent, int firstLowComponent, int secondLowComponent) {
+        for (int y = centerY - 1; y <= centerY + 1; y++) {
+            for (int x = centerX - 1; x <= centerX + 1; x++) {
+                ByteBuffer pixel = readPixel(x, y);
+                if (Byte.toUnsignedInt(pixel.get(dominantComponent)) > 240
+                        && Byte.toUnsignedInt(pixel.get(firstLowComponent)) < 10
+                        && Byte.toUnsignedInt(pixel.get(secondLowComponent)) < 10) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static ByteBuffer readPixel(int x, int y) {

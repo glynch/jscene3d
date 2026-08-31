@@ -4,20 +4,23 @@
  */
 package io.github.glynch.jscene3d.core;
 
-/** A triangular scene object that binds one buffer geometry to one material. */
-public final class Mesh extends Object3D {
+/** A connected line strip that binds shared geometry to one line material. */
+public class Line extends Object3D {
     private BufferGeometry geometry;
-    private Material material;
+    private LineBasicMaterial material;
 
     /**
-     * Creates a mesh retaining shared geometry and material references.
+     * Creates a connected line strip retaining shared geometry and material references.
      *
-     * @param geometry open triangle geometry
-     * @param material open surface material
+     * <p>Successive geometry elements form connected segments. Zero or one selected element draws
+     * nothing.
+     *
+     * @param geometry open line geometry
+     * @param material open line material
      * @throws NullPointerException if an argument is {@code null}
      * @throws IllegalArgumentException if an argument is already closed
      */
-    public Mesh(BufferGeometry geometry, Material material) {
+    public Line(BufferGeometry geometry, LineBasicMaterial material) {
         this.geometry = Preconditions.requireOpen(geometry, "geometry");
         this.material = Preconditions.requireOpen(material, "material");
     }
@@ -25,12 +28,12 @@ public final class Mesh extends Object3D {
     /**
      * Returns the shared geometry.
      *
-     * @return the retained geometry
+     * @return retained geometry
      * @throws IllegalStateException if the retained geometry is closed
      */
-    public BufferGeometry geometry() {
+    public final BufferGeometry geometry() {
         if (geometry.isClosed()) {
-            throw new IllegalStateException("Mesh geometry is closed");
+            throw new IllegalStateException("Line geometry is closed");
         }
         return geometry;
     }
@@ -38,35 +41,35 @@ public final class Mesh extends Object3D {
     /**
      * Replaces the shared geometry reference.
      *
-     * @param geometry open triangle geometry
+     * @param geometry open line geometry
      * @throws NullPointerException if {@code geometry} is {@code null}
      * @throws IllegalArgumentException if {@code geometry} is closed
      */
-    public void setGeometry(BufferGeometry geometry) {
+    public final void setGeometry(BufferGeometry geometry) {
         this.geometry = Preconditions.requireOpen(geometry, "geometry");
     }
 
     /**
-     * Returns the shared material.
+     * Returns the shared line material.
      *
-     * @return the retained material
+     * @return retained line material
      * @throws IllegalStateException if the retained material is closed
      */
-    public Material material() {
+    public final LineBasicMaterial material() {
         if (material.isClosed()) {
-            throw new IllegalStateException("Mesh material is closed");
+            throw new IllegalStateException("Line material is closed");
         }
         return material;
     }
 
     /**
-     * Replaces the shared material reference.
+     * Replaces the shared line material reference.
      *
-     * @param material open surface material
+     * @param material open line material
      * @throws NullPointerException if {@code material} is {@code null}
      * @throws IllegalArgumentException if {@code material} is closed
      */
-    public void setMaterial(Material material) {
+    public final void setMaterial(LineBasicMaterial material) {
         this.material = Preconditions.requireOpen(material, "material");
     }
 }

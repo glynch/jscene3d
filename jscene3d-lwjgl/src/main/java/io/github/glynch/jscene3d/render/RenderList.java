@@ -9,6 +9,9 @@ import io.github.glynch.jscene3d.core.BoundingSphere;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.LambertMaterial;
 import io.github.glynch.jscene3d.core.Light;
+import io.github.glynch.jscene3d.core.Line;
+import io.github.glynch.jscene3d.core.LineBasicMaterial;
+import io.github.glynch.jscene3d.core.LineSegments;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.Object3D;
@@ -50,7 +53,9 @@ final class RenderList {
                     continue;
                 }
                 if (object instanceof Mesh mesh) {
-                    collect(mesh, viewMatrix, frustum, statistics);
+                    collectMesh(mesh, viewMatrix, frustum, statistics);
+                } else if (object instanceof Line line) {
+                    collectLine(line, viewMatrix, frustum, statistics);
                 }
                 if (object instanceof Light light) {
                     lights.add(light);
@@ -106,43 +111,64 @@ final class RenderList {
         traversalOrder = 0L;
     }
 
-    /** Validates and classifies one visible mesh, including optional frustum rejection. */
-    private void collect(Mesh mesh, Matrix4fc viewMatrix, Frustum frustum, RenderStatistics statistics) {
+    /** Validates and classifies one visible mesh. */
+    private void collectMesh(Mesh mesh, Matrix4fc viewMatrix, Frustum frustum, RenderStatistics statistics) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
-        if (!material.visible()) {
-            return;
-        }
-        int elementCount = geometry.drawRangeCount();
-        if (elementCount == 0) {
-            return;
-        }
         if (!(material instanceof BasicMaterial)
                 && !(material instanceof LambertMaterial)
                 && !(material instanceof ShaderMaterial)) {
             throw new IllegalStateException(
                     "Unsupported material type: " + material.getClass().getName());
         }
+        collect(mesh, geometry, material, PrimitiveTopology.TRIANGLES, viewMatrix, frustum, statistics);
+    }
 
-        Matrix4fc worldMatrix = mesh.matrixWorld();
-        if (mesh.isFrustumCullingEnabled()) {
+    /** Validates and classifies one visible line object. */
+    private void collectLine(Line line, Matrix4fc viewMatrix, Frustum frustum, RenderStatistics statistics) {
+        BufferGeometry geometry = line.geometry();
+        LineBasicMaterial material = line.material();
+        PrimitiveTopology topology =
+                line instanceof LineSegments ? PrimitiveTopology.LINE_SEGMENTS : PrimitiveTopology.LINE_STRIP;
+        collect(line, geometry, material, topology, viewMatrix, frustum, statistics);
+    }
+
+    /** Classifies one visible renderable scene object, including optional frustum rejection. */
+    private void collect(
+            Object3D object,
+            BufferGeometry geometry,
+            Material material,
+            PrimitiveTopology topology,
+            Matrix4fc viewMatrix,
+            Frustum frustum,
+            RenderStatistics statistics) {
+        if (!material.visible()) {
+            return;
+        }
+        int elementCount = geometry.drawRangeCount();
+        topology.validateElementCount(elementCount);
+        if (!topology.hasPrimitives(elementCount)) {
+            return;
+        }
+
+        Matrix4fc worldMatrix = object.matrixWorld();
+        if (object.isFrustumCullingEnabled()) {
             BoundingSphere boundingSphere = geometry.boundingSphere();
             if (boundingSphere == null) {
                 boundingSphere = geometry.computeBoundingSphere();
             }
             if (!frustum.intersects(boundingSphere, worldMatrix)) {
-                statistics.recordCulledMesh();
+                if (topology.isLine()) {
+                    statistics.recordCulledLine();
+                } else {
+                    statistics.recordCulledMesh();
+                }
                 return;
             }
         }
 
         RenderItem item = acquireItem();
-        float worldX = worldMatrix.m30();
-        float worldY = worldMatrix.m31();
-        float worldZ = worldMatrix.m32();
-        float cameraDepth =
-                viewMatrix.m02() * worldX + viewMatrix.m12() * worldY + viewMatrix.m22() * worldZ + viewMatrix.m32();
-        item.assign(mesh, geometry, material, worldMatrix, elementCount, cameraDepth, traversalOrder++);
+        item.assign(object, geometry, material, topology, elementCount, viewMatrix, traversalOrder++);
         if (material.transparent()) {
             transparentItems.add(item);
         } else {

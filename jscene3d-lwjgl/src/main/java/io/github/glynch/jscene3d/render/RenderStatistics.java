@@ -9,8 +9,11 @@ public final class RenderStatistics {
     private long frame;
     private int drawCalls;
     private long triangles;
+    private long lineSegments;
     private int visibleMeshes;
     private int culledMeshes;
+    private int visibleLines;
+    private int culledLines;
     private int bufferUploads;
     private long bufferUploadBytes;
     private int textureUploads;
@@ -49,6 +52,15 @@ public final class RenderStatistics {
     }
 
     /**
+     * Returns line segments submitted by the most recent frame.
+     *
+     * @return submitted line-segment count
+     */
+    public long lineSegments() {
+        return lineSegments;
+    }
+
+    /**
      * Returns visible meshes drawn by the most recent frame.
      *
      * @return visible-mesh count
@@ -64,6 +76,24 @@ public final class RenderStatistics {
      */
     public int culledMeshes() {
         return culledMeshes;
+    }
+
+    /**
+     * Returns visible line objects drawn by the most recent frame.
+     *
+     * @return visible line-object count
+     */
+    public int visibleLines() {
+        return visibleLines;
+    }
+
+    /**
+     * Returns line objects rejected by frustum culling during the most recent frame.
+     *
+     * @return culled line-object count
+     */
+    public int culledLines() {
+        return culledLines;
     }
 
     /**
@@ -106,8 +136,11 @@ public final class RenderStatistics {
     void beginFrame() {
         drawCalls = 0;
         triangles = 0L;
+        lineSegments = 0L;
         visibleMeshes = 0;
         culledMeshes = 0;
+        visibleLines = 0;
+        culledLines = 0;
         bufferUploads = 0;
         bufferUploadBytes = 0L;
         textureUploads = 0;
@@ -120,15 +153,27 @@ public final class RenderStatistics {
     }
 
     /** Records one visible mesh draw and its submitted triangle count. */
-    void recordDraw(int elementCount) {
+    void recordMeshDraw(int elementCount) {
         drawCalls++;
         visibleMeshes++;
         triangles += elementCount / 3L;
     }
 
+    /** Records one visible line-object draw and its submitted segment count. */
+    void recordLineDraw(long segmentCount) {
+        drawCalls++;
+        visibleLines++;
+        lineSegments += segmentCount;
+    }
+
     /** Records one mesh rejected by frustum culling. */
     void recordCulledMesh() {
         culledMeshes++;
+    }
+
+    /** Records one line object rejected by frustum culling. */
+    void recordCulledLine() {
+        culledLines++;
     }
 
     /** Records one GPU-buffer upload and its byte count. */

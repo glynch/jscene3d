@@ -5,11 +5,15 @@
 package io.github.glynch.jscene3d.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Color;
 import io.github.glynch.jscene3d.core.Group;
+import io.github.glynch.jscene3d.core.Line;
+import io.github.glynch.jscene3d.core.LineBasicMaterial;
+import io.github.glynch.jscene3d.core.LineSegments;
 import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.Scene;
 import java.util.ArrayList;
@@ -44,11 +48,11 @@ final class RenderListTest {
             build(renderList, scene);
 
             assertThat(renderList.opaqueCount()).isEqualTo(1);
-            assertThat(renderList.opaqueItem(0).mesh()).isSameAs(opaque);
+            assertThat(renderList.opaqueItem(0).object()).isSameAs(opaque);
             assertThat(renderList.transparentCount()).isEqualTo(3);
-            assertThat(renderList.transparentItem(0).mesh()).isSameAs(secondTransparent);
-            assertThat(renderList.transparentItem(1).mesh()).isSameAs(equalDepthTransparent);
-            assertThat(renderList.transparentItem(2).mesh()).isSameAs(firstTransparent);
+            assertThat(renderList.transparentItem(0).object()).isSameAs(secondTransparent);
+            assertThat(renderList.transparentItem(1).object()).isSameAs(equalDepthTransparent);
+            assertThat(renderList.transparentItem(2).object()).isSameAs(firstTransparent);
             renderList.clear();
         }
     }
@@ -133,9 +137,78 @@ final class RenderListTest {
         }
     }
 
+    @Test
+    void collectsLineStripsAndSegmentsWithTheirPrimitiveTopologies() {
+        try (BufferGeometry stripGeometry = createLineStrip();
+                BufferGeometry segmentsGeometry = createLineSegments();
+                LineBasicMaterial material = new LineBasicMaterial(Color.RED)) {
+            Line strip = new Line(stripGeometry, material);
+            LineSegments segments = new LineSegments(segmentsGeometry, material);
+            Scene scene = new Scene();
+            scene.add(strip);
+            scene.add(segments);
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
+
+            build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isEqualTo(2);
+            RenderItem stripItem = findOpaqueItem(renderList, strip);
+            RenderItem segmentsItem = findOpaqueItem(renderList, segments);
+            assertThat(stripItem.topology()).isEqualTo(PrimitiveTopology.LINE_STRIP);
+            assertThat(stripItem.elementCount()).isEqualTo(3);
+            assertThat(segmentsItem.topology()).isEqualTo(PrimitiveTopology.LINE_SEGMENTS);
+            assertThat(segmentsItem.elementCount()).isEqualTo(4);
+            renderList.clear();
+        }
+    }
+
+    @Test
+    void rejectsUnpairedLineSegmentElements() {
+        try (BufferGeometry geometry = createLineStrip();
+                LineBasicMaterial material = new LineBasicMaterial()) {
+            Scene scene = new Scene();
+            scene.add(new LineSegments(geometry, material));
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> build(renderList, scene))
+                    .withMessage("LineSegments draw range must contain an even number of elements: 3");
+        }
+    }
+
+    @Test
+    void cullsOutsideLinesAndReportsLineStatistics() {
+        try (BufferGeometry geometry = createLineSegments();
+                LineBasicMaterial material = new LineBasicMaterial()) {
+            Line line = new Line(geometry, material);
+            line.setPosition(3.0f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(line);
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
+
+            RenderStatistics statistics = build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isZero();
+            assertThat(statistics.culledLines()).isOne();
+            assertThat(statistics.culledMeshes()).isZero();
+        }
+    }
+
     private static BufferGeometry createTriangle() {
         return BufferGeometry.builder()
                 .positions(-0.2f, -0.2f, 0.0f, 0.2f, -0.2f, 0.0f, 0.0f, 0.2f, 0.0f)
+                .build();
+    }
+
+    private static BufferGeometry createLineStrip() {
+        return BufferGeometry.builder()
+                .positions(-0.5f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.5f, 0.0f, 0.0f)
+                .build();
+    }
+
+    private static BufferGeometry createLineSegments() {
+        return BufferGeometry.builder()
+                .positions(-0.5f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.5f, 0.0f, 0.0f)
                 .build();
     }
 
@@ -151,11 +224,21 @@ final class RenderListTest {
     private static RenderItem findOpaqueItem(RenderList renderList, Mesh mesh) {
         for (int index = 0; index < renderList.opaqueCount(); index++) {
             RenderItem item = renderList.opaqueItem(index);
-            if (item.mesh() == mesh) {
+            if (item.object() == mesh) {
                 return item;
             }
         }
         throw new AssertionError("Mesh is not present in the opaque render list");
+    }
+
+    private static RenderItem findOpaqueItem(RenderList renderList, Line line) {
+        for (int index = 0; index < renderList.opaqueCount(); index++) {
+            RenderItem item = renderList.opaqueItem(index);
+            if (item.object() == line) {
+                return item;
+            }
+        }
+        throw new AssertionError("Line is not present in the opaque render list");
     }
 
     private static List<RenderItem> opaqueItems(RenderList renderList) {

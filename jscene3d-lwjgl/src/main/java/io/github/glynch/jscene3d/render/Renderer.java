@@ -14,7 +14,6 @@ import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
 import static org.lwjgl.opengl.GL11.GL_FRONT;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
 import static org.lwjgl.opengl.GL11.glBlendFunc;
 import static org.lwjgl.opengl.GL11.glClear;
@@ -48,6 +47,7 @@ import io.github.glynch.jscene3d.core.Camera;
 import io.github.glynch.jscene3d.core.Color;
 import io.github.glynch.jscene3d.core.IndexBuffer;
 import io.github.glynch.jscene3d.core.LambertMaterial;
+import io.github.glynch.jscene3d.core.LineBasicMaterial;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.MaterialSide;
 import io.github.glynch.jscene3d.core.Scene;
@@ -92,6 +92,7 @@ public final class Renderer implements AutoCloseable {
     private float clearAlpha;
     private @Nullable BasicProgram basicProgram;
     private @Nullable LambertProgram lambertProgram;
+    private @Nullable LineProgram lineProgram;
     private @Nullable OverlayRenderer overlayRenderer;
     private @Nullable DefaultTexture defaultTexture;
     private boolean customViewport;
@@ -188,10 +189,10 @@ public final class Renderer implements AutoCloseable {
                 frustum.update(viewMatrix, projectionMatrix);
                 renderList.build(validScene, viewMatrix, frustum, statistics);
                 for (int index = 0; index < renderList.opaqueCount(); index++) {
-                    renderMesh(renderList.opaqueItem(index), viewMatrix, projectionMatrix);
+                    renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix);
                 }
                 for (int index = 0; index < renderList.transparentCount(); index++) {
-                    renderMesh(renderList.transparentItem(index), viewMatrix, projectionMatrix);
+                    renderItem(renderList.transparentItem(index), viewMatrix, projectionMatrix);
                 }
             }
             statistics.completeFrame();
@@ -339,6 +340,10 @@ public final class Renderer implements AutoCloseable {
                 lambertProgram.close();
                 lambertProgram = null;
             }
+            if (lineProgram != null) {
+                lineProgram.close();
+                lineProgram = null;
+            }
             if (overlayRenderer != null) {
                 overlayRenderer.close();
                 overlayRenderer = null;
@@ -359,27 +364,52 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
-    /** Synchronizes and submits one prepared mesh draw. */
-    private void renderMesh(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
+    /** Synchronizes and submits one prepared scene-object draw. */
+    private void renderItem(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
         BufferGeometry geometry = item.geometry();
         Material material = item.material();
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
         resources.setActiveGeometryResources(geometryResources.size());
-        applyMaterialState(material);
-        switch (material) {
-            case BasicMaterial basicMaterial ->
-                renderBasicMesh(item, geometry, basicMaterial, resource, viewMatrix, projectionMatrix);
-            case LambertMaterial lambertMaterial ->
-                renderLambertMesh(item, geometry, lambertMaterial, resource, viewMatrix, projectionMatrix);
-            case ShaderMaterial shaderMaterial ->
-                renderShaderMesh(item, geometry, shaderMaterial, resource, viewMatrix, projectionMatrix);
-            default ->
-                throw new IllegalStateException(
-                        "Unsupported material type: " + material.getClass().getName());
+        PrimitiveTopology topology = item.topology();
+        applyMaterialState(material, topology);
+        if (topology.isLine()) {
+            renderLine(item, geometry, (LineBasicMaterial) material, resource, viewMatrix, projectionMatrix);
+        } else {
+            switch (material) {
+                case BasicMaterial basicMaterial ->
+                    renderBasicMesh(item, geometry, basicMaterial, resource, viewMatrix, projectionMatrix);
+                case LambertMaterial lambertMaterial ->
+                    renderLambertMesh(item, geometry, lambertMaterial, resource, viewMatrix, projectionMatrix);
+                case ShaderMaterial shaderMaterial ->
+                    renderShaderMesh(item, geometry, shaderMaterial, resource, viewMatrix, projectionMatrix);
+                default ->
+                    throw new IllegalStateException("Unsupported mesh material type: "
+                            + material.getClass().getName());
+            }
         }
 
         resource.bind();
-        drawGeometry(geometry, item.elementCount());
+        drawGeometry(geometry, topology, item.elementCount());
+    }
+
+    /** Synchronizes and binds one built-in line-material draw. */
+    private void renderLine(
+            RenderItem item,
+            BufferGeometry geometry,
+            LineBasicMaterial material,
+            GeometryResource resource,
+            Matrix4fc viewMatrix,
+            Matrix4fc projectionMatrix) {
+        LineProgram program = lineProgram();
+        resource.synchronize(geometry, false, material.usesVertexColors(), false, "LineBasicMaterial", statistics);
+        glUseProgram(program.id());
+        uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
+        uploadMatrix(program.viewMatrixLocation(), viewMatrix);
+        uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
+        Color color = material.color();
+        float alpha = material.transparent() ? material.opacity() : 1.0f;
+        glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
+        glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
     }
 
     /** Synchronizes and binds one built-in basic-material draw. */
@@ -479,16 +509,20 @@ public final class Renderer implements AutoCloseable {
         uploadApplicationUniforms(program, material);
     }
 
-    /** Issues one indexed or non-indexed triangle draw and records its statistics. */
-    private void drawGeometry(BufferGeometry geometry, int elementCount) {
+    /** Issues one indexed or non-indexed primitive draw and records its statistics. */
+    private void drawGeometry(BufferGeometry geometry, PrimitiveTopology topology, int elementCount) {
         int start = geometry.drawRangeStart();
         IndexBuffer index = geometry.index();
         if (index == null) {
-            glDrawArrays(GL_TRIANGLES, start, elementCount);
+            glDrawArrays(topology.openGlMode(), start, elementCount);
         } else {
-            glDrawElements(GL_TRIANGLES, elementCount, GL_UNSIGNED_INT, (long) start * Integer.BYTES);
+            glDrawElements(topology.openGlMode(), elementCount, GL_UNSIGNED_INT, (long) start * Integer.BYTES);
         }
-        statistics.recordDraw(elementCount);
+        if (topology.isLine()) {
+            statistics.recordLineDraw(topology.primitiveCount(elementCount));
+        } else {
+            statistics.recordMeshDraw(elementCount);
+        }
     }
 
     /** Resolves a shared custom program, caching only a successful realization. */
@@ -606,6 +640,15 @@ public final class Renderer implements AutoCloseable {
         return lambertProgram;
     }
 
+    /** Lazily creates and returns the context-local built-in line program. */
+    private LineProgram lineProgram() {
+        if (lineProgram == null) {
+            lineProgram = LineProgram.create();
+            updateProgramCount();
+        }
+        return lineProgram;
+    }
+
     /** Lazily creates and returns context-local overlay drawing resources. */
     private OverlayRenderer overlayRenderer() {
         if (overlayRenderer == null) {
@@ -627,12 +670,13 @@ public final class Renderer implements AutoCloseable {
     private void updateProgramCount() {
         resources.setProgramCount((basicProgram == null ? 0 : 1)
                 + (lambertProgram == null ? 0 : 1)
+                + (lineProgram == null ? 0 : 1)
                 + (overlayRenderer == null ? 0 : 1)
                 + shaderPrograms.size());
     }
 
     /** Applies depth, blending, and face-culling state for one material. */
-    private void applyMaterialState(Material material) {
+    private void applyMaterialState(Material material, PrimitiveTopology topology) {
         if (material.depthTestEnabled()) {
             glEnable(GL_DEPTH_TEST);
         } else {
@@ -648,7 +692,7 @@ public final class Renderer implements AutoCloseable {
         }
 
         MaterialSide side = material.side();
-        if (side == MaterialSide.DOUBLE) {
+        if (topology.isLine() || side == MaterialSide.DOUBLE) {
             glDisable(GL_CULL_FACE);
         } else {
             glEnable(GL_CULL_FACE);

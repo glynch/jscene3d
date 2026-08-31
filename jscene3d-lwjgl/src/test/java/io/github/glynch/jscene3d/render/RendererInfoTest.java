@@ -21,8 +21,11 @@ final class RendererInfoTest {
         assertThat(statistics.frame()).isZero();
         assertThat(statistics.drawCalls()).isZero();
         assertThat(statistics.triangles()).isZero();
+        assertThat(statistics.lineSegments()).isZero();
         assertThat(statistics.visibleMeshes()).isZero();
         assertThat(statistics.culledMeshes()).isZero();
+        assertThat(statistics.visibleLines()).isZero();
+        assertThat(statistics.culledLines()).isZero();
         assertThat(statistics.bufferUploads()).isZero();
         assertThat(statistics.bufferUploadBytes()).isZero();
         assertThat(statistics.textureUploads()).isZero();
@@ -37,8 +40,10 @@ final class RendererInfoTest {
         RendererInfo info = new RendererInfo();
         RenderStatistics statistics = info.statistics();
         ResourceStatistics resources = info.resources();
-        statistics.recordDraw(6);
+        statistics.recordMeshDraw(6);
+        statistics.recordLineDraw(3L);
         statistics.recordCulledMesh();
+        statistics.recordCulledLine();
         statistics.recordUpload(24L);
         statistics.recordTextureUpload(16L);
         statistics.completeFrame();
@@ -51,8 +56,11 @@ final class RendererInfoTest {
         assertThat(statistics.frame()).isEqualTo(1L);
         assertThat(statistics.drawCalls()).isZero();
         assertThat(statistics.triangles()).isZero();
+        assertThat(statistics.lineSegments()).isZero();
         assertThat(statistics.visibleMeshes()).isZero();
         assertThat(statistics.culledMeshes()).isZero();
+        assertThat(statistics.visibleLines()).isZero();
+        assertThat(statistics.culledLines()).isZero();
         assertThat(statistics.bufferUploads()).isZero();
         assertThat(statistics.bufferUploadBytes()).isZero();
         assertThat(statistics.textureUploads()).isZero();

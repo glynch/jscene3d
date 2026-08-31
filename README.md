@@ -60,7 +60,9 @@ example without running tests or the full verification lifecycle.
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
 `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`, and
-`OrbitControlsExample` are also available using the same command. In
+`LineRenderingExample`, and `OrbitControlsExample` are also available using the
+same command. `LineRenderingExample` demonstrates a connected `Line`, indexed
+`LineSegments`, vertex colors, transforms, and orbit controls. In
 `OrbitControlsExample`, drag with the left mouse button to orbit; drag with the
 right mouse button or Shift-left to pan; and use the middle mouse button or
 scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates. The example
@@ -110,6 +112,15 @@ controls distance falloff, while a positive `distance` adds a smooth cutoff;
 zero distance leaves their range unlimited. Version 0.1 supports at most
 `Renderer.MAX_POINT_LIGHTS` visible point lights per scene and reports an error
 instead of silently dropping excess lights. Shadows are not yet supported.
+
+## Lines
+
+`Line` draws one connected strip through successive geometry elements, while
+`LineSegments` draws independent pairs. Both support indexed and non-indexed
+`BufferGeometry`, draw ranges, vertex colors, transforms, visibility, frustum
+culling, transparency, and depth state through `LineBasicMaterial`. An odd
+`LineSegments` draw-range count fails clearly because it leaves an unpaired
+element. Portable line width is fixed to one framebuffer pixel.
 
 ## Project structure
 

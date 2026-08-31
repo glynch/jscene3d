@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.render;
 
 import static io.github.glynch.jscene3d.core.Angles.PI;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.joml.Math.toRadians;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
@@ -36,6 +37,8 @@ import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.platform.WindowOptions;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import org.joml.Matrix3f;
+import org.joml.Matrix4f;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.BufferUtils;
 
@@ -540,6 +543,163 @@ final class RendererIT {
             assertCenterPixelIsRed(window);
             assertThat(renderer.info().statistics().textureUploads()).isEqualTo(1);
             assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void supportsExplicitFrameControlAndRejectsUseAfterClosure() {
+        RendererOptions options = RendererOptions.builder()
+                .automaticClear(false)
+                .clearColor(Color.BLUE)
+                .clearAlpha(0.5f)
+                .build();
+        try (Window window = Window.create("Renderer lifecycle integration test")) {
+            Renderer renderer = Renderer.create(window, options);
+            Scene scene = new Scene();
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+
+            renderer.setViewport(1, 2, 100, 80);
+            renderer.clear();
+            renderer.resetViewport();
+            renderer.setClearColor(Color.RED, 0.75f);
+            renderer.render(scene, camera);
+            renderer.render((canvas, width, height) -> canvas.clear());
+
+            assertThatIllegalArgumentException().isThrownBy(() -> renderer.setViewport(-1, 0, 1, 1));
+            assertThatIllegalArgumentException().isThrownBy(() -> renderer.setViewport(0, -1, 1, 1));
+            assertThatIllegalArgumentException().isThrownBy(() -> renderer.setViewport(0, 0, 0, 1));
+            assertThatIllegalArgumentException().isThrownBy(() -> renderer.setViewport(0, 0, 1, 0));
+            assertThatIllegalArgumentException().isThrownBy(() -> renderer.setClearColor(Color.BLACK, 1.1f));
+
+            renderer.close();
+            renderer.close();
+
+            assertThat(renderer.isClosed()).isTrue();
+            assertThatIllegalStateException().isThrownBy(renderer::clear).withMessage("Renderer is closed");
+            assertThatIllegalStateException()
+                    .isThrownBy(renderer::resetViewport)
+                    .withMessage("Renderer is closed");
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.setViewport(0, 0, 1, 1))
+                    .withMessage("Renderer is closed");
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.setClearColor(Color.BLACK, 1.0f))
+                    .withMessage("Renderer is closed");
+            assertThatIllegalStateException().isThrownBy(renderer::info).withMessage("Renderer is closed");
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("Renderer is closed");
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render((canvas, width, height) -> canvas.clear()))
+                    .withMessage("Renderer is closed");
+        }
+    }
+
+    @Test
+    void releasesClosedGeometryAndTextureRealizations() {
+        Texture texture = Texture.baseColor(1, 1, new byte[] {(byte) 255, 0, 0, (byte) 255});
+        try (Window window = Window.create("Renderer resource release test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTexturedTriangle();
+                BasicMaterial material = new BasicMaterial()) {
+            material.setColorMap(texture);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+            renderer.render(scene, camera);
+
+            assertThat(renderer.info().resources().activeGeometryResources()).isOne();
+            assertThat(renderer.info().resources().activeTextureResources()).isOne();
+
+            scene.clear();
+            geometry.close();
+            texture.close();
+            renderer.render(scene, camera);
+
+            assertThat(renderer.info().resources().activeGeometryResources()).isZero();
+            assertThat(renderer.info().resources().activeTextureResources()).isZero();
+        } finally {
+            texture.close();
+        }
+    }
+
+    @Test
+    void uploadsEverySupportedApplicationUniformTypeAndReportsMismatches() {
+        String fragmentShader = """
+                uniform int choice;
+                uniform vec2 offset;
+                uniform vec4 tint;
+                uniform mat3 transform3;
+                uniform mat4 transform4;
+                out vec4 fragmentColor;
+                void main() {
+                    vec3 transformed = transform3 * tint.rgb;
+                    vec4 transformed4 = transform4 * vec4(transformed, tint.a);
+                    fragmentColor = transformed4 + vec4(offset, float(choice), 0.0) * 0.001;
+                }
+                """;
+        String mismatchedFragmentShader = """
+                uniform float intensity;
+                out vec4 fragmentColor;
+                void main() {
+                    fragmentColor = vec4(intensity);
+                }
+                """;
+
+        try (Window window = Window.create("Complete shader uniform integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                ShaderMaterial material = new ShaderMaterial(CUSTOM_VERTEX_SHADER, fragmentShader);
+                ShaderMaterial mismatched = new ShaderMaterial(CUSTOM_VERTEX_SHADER, mismatchedFragmentShader)) {
+            material.setUniform("choice", 1);
+            material.setUniform("offset", 0.0f, 0.0f);
+            material.setUniform("tint", 1.0f, 0.0f, 0.0f, 1.0f);
+            material.setUniform("transform3", new Matrix3f());
+            material.setUniform("transform4", new Matrix4f());
+            mismatched.setUniform("intensity", 1);
+            Mesh triangle = new Mesh(geometry, material);
+            Scene scene = new Scene();
+            scene.add(triangle);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            triangle.setMaterial(mismatched);
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessageContaining("uniform intensity is configured as INTEGER")
+                    .withMessageContaining("active GLSL expects FLOAT");
+        }
+    }
+
+    @Test
+    void rendersTransparentBackFacesWithoutDepthState() {
+        try (Window window = Window.create("Material state integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            material.setSide(MaterialSide.BACK);
+            material.setTransparent(true);
+            material.setOpacity(0.5f);
+            material.setDepthTestEnabled(false);
+            material.setDepthWriteEnabled(false);
+            Mesh triangle = new Mesh(geometry, material);
+            triangle.rotateY(PI);
+            Scene scene = new Scene();
+            scene.add(triangle);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertPixelIsNotBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
         }
     }
 

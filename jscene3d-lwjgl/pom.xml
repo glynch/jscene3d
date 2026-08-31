@@ -129,8 +129,8 @@
                 </property>
             </activation>
             <properties>
-                <jscene3d.coverage.line.minimum>0.85</jscene3d.coverage.line.minimum>
-                <jscene3d.coverage.branch.minimum>0.65</jscene3d.coverage.branch.minimum>
+                <jscene3d.coverage.line.minimum>0.90</jscene3d.coverage.line.minimum>
+                <jscene3d.coverage.branch.minimum>0.75</jscene3d.coverage.branch.minimum>
             </properties>
         </profile>
         <profile>

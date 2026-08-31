@@ -85,8 +85,8 @@ final class OrbitControlsIT {
     }
 
     @Test
-    void roundTripsConfigurationAndRejectsInvalidValues() {
-        try (Window window = Window.create(320, 240, "Orbit controls configuration test")) {
+    void roundTripsInteractionAndMotionConfiguration() {
+        try (Window window = Window.create(320, 240, "Orbit controls interaction configuration test")) {
             PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, 4.0f / 3.0f, 0.1f, 100.0f);
             camera.setPosition(0.0f, 0.0f, 5.0f);
             OrbitControls controls = new OrbitControls(camera, window);
@@ -95,10 +95,6 @@ final class OrbitControlsIT {
             controls.setRotationEnabled(false);
             controls.setPanningEnabled(false);
             controls.setZoomEnabled(false);
-            controls.setDistanceLimits(2.0f, 10.0f);
-            controls.setZoomLimits(0.5f, 4.0f);
-            controls.setPolarAngleLimits(0.1f, 2.0f);
-            controls.setAzimuthAngleLimits(-1.0f, 1.0f);
             controls.setRotationSpeed(1.5f);
             controls.setPanSpeed(1.25f);
             controls.setZoomSpeed(0.75f);
@@ -114,14 +110,6 @@ final class OrbitControlsIT {
             assertThat(controls.isRotationEnabled()).isFalse();
             assertThat(controls.isPanningEnabled()).isFalse();
             assertThat(controls.isZoomEnabled()).isFalse();
-            assertThat(controls.minimumDistance()).isEqualTo(2.0f);
-            assertThat(controls.maximumDistance()).isEqualTo(10.0f);
-            assertThat(controls.minimumZoom()).isEqualTo(0.5f);
-            assertThat(controls.maximumZoom()).isEqualTo(4.0f);
-            assertThat(controls.minimumPolarAngle()).isEqualTo(0.1f);
-            assertThat(controls.maximumPolarAngle()).isEqualTo(2.0f);
-            assertThat(controls.minimumAzimuthAngle()).isEqualTo(-1.0f);
-            assertThat(controls.maximumAzimuthAngle()).isEqualTo(1.0f);
             assertThat(controls.rotationSpeed()).isEqualTo(1.5f);
             assertThat(controls.panSpeed()).isEqualTo(1.25f);
             assertThat(controls.zoomSpeed()).isEqualTo(0.75f);
@@ -132,6 +120,38 @@ final class OrbitControlsIT {
             assertThat(controls.isAutoRotationEnabled()).isTrue();
             assertThat(controls.autoRotationSpeed()).isEqualTo(-2.0f);
             assertThat(controls.isScreenSpacePanning()).isFalse();
+        }
+    }
+
+    @Test
+    void roundTripsCameraLimits() {
+        try (Window window = Window.create(320, 240, "Orbit controls limits configuration test")) {
+            PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, 4.0f / 3.0f, 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 5.0f);
+            OrbitControls controls = new OrbitControls(camera, window);
+
+            controls.setDistanceLimits(2.0f, 10.0f);
+            controls.setZoomLimits(0.5f, 4.0f);
+            controls.setPolarAngleLimits(0.1f, 2.0f);
+            controls.setAzimuthAngleLimits(-1.0f, 1.0f);
+
+            assertThat(controls.minimumDistance()).isEqualTo(2.0f);
+            assertThat(controls.maximumDistance()).isEqualTo(10.0f);
+            assertThat(controls.minimumZoom()).isEqualTo(0.5f);
+            assertThat(controls.maximumZoom()).isEqualTo(4.0f);
+            assertThat(controls.minimumPolarAngle()).isEqualTo(0.1f);
+            assertThat(controls.maximumPolarAngle()).isEqualTo(2.0f);
+            assertThat(controls.minimumAzimuthAngle()).isEqualTo(-1.0f);
+            assertThat(controls.maximumAzimuthAngle()).isEqualTo(1.0f);
+        }
+    }
+
+    @Test
+    void rejectsInvalidConfigurationValues() {
+        try (Window window = Window.create(320, 240, "Orbit controls invalid configuration test")) {
+            PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, 4.0f / 3.0f, 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 5.0f);
+            OrbitControls controls = new OrbitControls(camera, window);
 
             assertThatIllegalArgumentException().isThrownBy(() -> controls.setDistanceLimits(0.0f, 1.0f));
             assertThatIllegalArgumentException().isThrownBy(() -> controls.setDistanceLimits(2.0f, 1.0f));

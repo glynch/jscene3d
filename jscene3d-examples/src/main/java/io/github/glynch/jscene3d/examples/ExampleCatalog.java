@@ -92,6 +92,14 @@ final class ExampleCatalog {
                         0xffc928,
                         MaterialsExample::create),
                 definition(
+                        "standard-material",
+                        "Standard material",
+                        "Materials",
+                        "Metallic-roughness PBR across a grid of material values.",
+                        List.of("pbr", "metalness", "roughness", "standard"),
+                        0xd8a43b,
+                        StandardMaterialExample::create),
+                definition(
                         "orbit-controls",
                         "Orbit controls",
                         "Interaction",

@@ -37,10 +37,14 @@ public final class NormalProgram implements AutoCloseable {
             in vec3 resolvedViewNormal;
 
             uniform float opacity;
+            uniform float alphaCutoff;
 
             out vec4 fragmentColor;
 
             void main() {
+                if (alphaCutoff >= 0.0 && opacity < alphaCutoff) {
+                    discard;
+                }
                 vec3 surfaceNormal = gl_FrontFacing ? resolvedViewNormal : -resolvedViewNormal;
                 fragmentColor = vec4(normalize(surfaceNormal) * 0.5 + 0.5, opacity);
             }
@@ -52,6 +56,7 @@ public final class NormalProgram implements AutoCloseable {
     private final int projectionMatrixLocation;
     private final int normalMatrixLocation;
     private final int opacityLocation;
+    private final int alphaCutoffLocation;
     private final Matrix4f modelViewMatrix;
     private final Matrix3f normalMatrix;
     private final float[] matrix4Values;
@@ -65,6 +70,7 @@ public final class NormalProgram implements AutoCloseable {
         projectionMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "projectionMatrix");
         normalMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "normalMatrix");
         opacityLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "opacity");
+        alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "alphaCutoff");
         modelViewMatrix = new Matrix4f();
         normalMatrix = new Matrix3f();
         matrix4Values = new float[16];
@@ -102,6 +108,15 @@ public final class NormalProgram implements AutoCloseable {
      */
     public int opacityLocation() {
         return opacityLocation;
+    }
+
+    /**
+     * Returns the required alpha-cutoff uniform location.
+     *
+     * @return uniform location
+     */
+    public int alphaCutoffLocation() {
+        return alphaCutoffLocation;
     }
 
     /**

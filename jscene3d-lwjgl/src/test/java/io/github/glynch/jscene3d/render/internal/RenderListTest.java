@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.materials.NormalMaterial;
 import io.github.glynch.jscene3d.materials.PhongMaterial;
+import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Line;
@@ -157,22 +158,26 @@ final class RenderListTest {
     }
 
     @Test
-    void acceptsNormalAndPhongMeshMaterials() {
+    void acceptsNormalPhongAndStandardMeshMaterials() {
         try (BufferGeometry geometry = createTriangle();
                 NormalMaterial normalMaterial = new NormalMaterial();
-                PhongMaterial phongMaterial = new PhongMaterial()) {
+                PhongMaterial phongMaterial = new PhongMaterial();
+                StandardMaterial standardMaterial = new StandardMaterial()) {
             Mesh normalMesh = new Mesh(geometry, normalMaterial);
             Mesh phongMesh = new Mesh(geometry, phongMaterial);
+            Mesh standardMesh = new Mesh(geometry, standardMaterial);
             Scene scene = new Scene();
             scene.add(normalMesh);
             scene.add(phongMesh);
+            scene.add(standardMesh);
             RenderList renderList = newRenderList();
 
             build(renderList, scene);
 
-            assertThat(renderList.opaqueCount()).isEqualTo(2);
+            assertThat(renderList.opaqueCount()).isEqualTo(3);
             assertThat(findOpaqueItem(renderList, normalMesh).material()).isSameAs(normalMaterial);
             assertThat(findOpaqueItem(renderList, phongMesh).material()).isSameAs(phongMaterial);
+            assertThat(findOpaqueItem(renderList, standardMesh).material()).isSameAs(standardMaterial);
             renderList.clear();
         }
     }

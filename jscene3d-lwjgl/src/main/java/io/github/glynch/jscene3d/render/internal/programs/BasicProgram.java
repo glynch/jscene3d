@@ -45,12 +45,17 @@ public final class BasicProgram implements AutoCloseable {
             uniform vec4 baseColor;
             uniform sampler2D colorMap;
             uniform bool useColorMap;
+            uniform float alphaCutoff;
 
             out vec4 fragmentColor;
 
             void main() {
                 vec4 textureColor = useColorMap ? texture(colorMap, resolvedTextureCoordinate) : vec4(1.0);
-                fragmentColor = baseColor * resolvedVertexColor * textureColor;
+                vec4 resolvedColor = baseColor * resolvedVertexColor * textureColor;
+                if (alphaCutoff >= 0.0 && resolvedColor.a < alphaCutoff) {
+                    discard;
+                }
+                fragmentColor = resolvedColor;
             }
             """;
 
@@ -63,6 +68,7 @@ public final class BasicProgram implements AutoCloseable {
     private final int useVertexColorLocation;
     private final int colorMapLocation;
     private final int useColorMapLocation;
+    private final int alphaCutoffLocation;
 
     /** Retains a linked program and its required uniform locations. */
     private BasicProgram(int id) {
@@ -75,6 +81,7 @@ public final class BasicProgram implements AutoCloseable {
         useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "useVertexColor");
         colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "colorMap");
         useColorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "useColorMap");
+        alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "alphaCutoff");
     }
 
     /**
@@ -171,6 +178,15 @@ public final class BasicProgram implements AutoCloseable {
      */
     public int useColorMapLocation() {
         return useColorMapLocation;
+    }
+
+    /**
+     * Returns the required alpha-cutoff uniform location.
+     *
+     * @return uniform location
+     */
+    public int alphaCutoffLocation() {
+        return alphaCutoffLocation;
     }
 
     @Override

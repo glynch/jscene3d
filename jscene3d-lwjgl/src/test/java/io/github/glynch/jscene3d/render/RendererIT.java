@@ -31,6 +31,7 @@ import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.lights.HemisphereLight;
 import io.github.glynch.jscene3d.lights.PointLight;
 import io.github.glynch.jscene3d.lights.SpotLight;
+import io.github.glynch.jscene3d.materials.AlphaMode;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.DepthFunction;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
@@ -40,6 +41,7 @@ import io.github.glynch.jscene3d.materials.NormalMaterial;
 import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.ShaderAttribute;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
+import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Line;
@@ -1016,6 +1018,47 @@ final class RendererIT {
             renderer.render(scene, camera);
 
             assertPixelIsNotBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+        }
+    }
+
+    @Test
+    void rendersStandardMaterialTextureRolesAndMaskedAlpha() {
+        byte opaque = (byte) 255;
+        try (Window window = Window.create("Standard material integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTexturedTriangle();
+                StandardMaterial material = new StandardMaterial();
+                Texture colorMap = Texture.baseColor(1, 1, new byte[] {opaque, 0, 0, opaque});
+                Texture propertiesMap = Texture.data(1, 1, new byte[] {0, opaque, 0, opaque});
+                Texture normalMap = Texture.data(1, 1, new byte[] {(byte) 128, (byte) 128, opaque, opaque});
+                Texture occlusionMap = Texture.data(1, 1, new byte[] {opaque, opaque, opaque, opaque});
+                Texture emissiveMap = Texture.baseColor(1, 1, new byte[] {opaque, opaque, opaque, opaque})) {
+            material.setColorMap(colorMap);
+            material.setMetalnessRoughnessMap(propertiesMap);
+            material.setNormalMap(normalMap);
+            material.setOcclusionMap(occlusionMap);
+            material.setEmissiveMap(emissiveMap);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            scene.add(new AmbientLight(Color.WHITE));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsRed(window);
+            assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(5);
+            assertThat(renderer.info().resources().programCount()).isOne();
+
+            colorMap.setImage(1, 1, new byte[] {opaque, 0, 0, 0});
+            material.setAlphaMode(AlphaMode.MASK);
+            renderer.render(scene, camera);
+            assertPixelIsBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            material.setAlphaCutoff(0.0f);
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
         }
     }
 

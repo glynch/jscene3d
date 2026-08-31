@@ -63,6 +63,7 @@ public final class LambertProgram implements AutoCloseable {
             uniform vec4 baseColor;
             uniform sampler2D colorMap;
             uniform bool useColorMap;
+            uniform float alphaCutoff;
             uniform vec3 ambientLightColor;
             uniform int pointLightCount;
             uniform vec3 pointLightPositions[MAX_POINT_LIGHTS];
@@ -160,6 +161,9 @@ public final class LambertProgram implements AutoCloseable {
 
                 vec4 textureColor = useColorMap ? texture(colorMap, resolvedTextureCoordinate) : vec4(1.0);
                 vec4 surfaceColor = baseColor * resolvedVertexColor * textureColor;
+                if (alphaCutoff >= 0.0 && surfaceColor.a < alphaCutoff) {
+                    discard;
+                }
                 fragmentColor = vec4(surfaceColor.rgb * illumination, surfaceColor.a);
             }
             """.replace(
@@ -175,6 +179,7 @@ public final class LambertProgram implements AutoCloseable {
     private final int useVertexColorLocation;
     private final int colorMapLocation;
     private final int useColorMapLocation;
+    private final int alphaCutoffLocation;
 
     /** Retains a linked program and all reusable transform and light staging. */
     private LambertProgram(int id) {
@@ -185,6 +190,7 @@ public final class LambertProgram implements AutoCloseable {
         useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "useVertexColor");
         colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "colorMap");
         useColorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "useColorMap");
+        alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "alphaCutoff");
     }
 
     /**
@@ -245,6 +251,15 @@ public final class LambertProgram implements AutoCloseable {
      */
     public int useColorMapLocation() {
         return useColorMapLocation;
+    }
+
+    /**
+     * Returns the required alpha-cutoff uniform location.
+     *
+     * @return uniform location
+     */
+    public int alphaCutoffLocation() {
+        return alphaCutoffLocation;
     }
 
     /**

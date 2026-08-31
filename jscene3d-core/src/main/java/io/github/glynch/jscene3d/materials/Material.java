@@ -15,10 +15,19 @@ import java.util.Objects;
  * material, but those meshes cannot subsequently render with the closed material.
  */
 public abstract sealed class Material implements AutoCloseable
-        permits BasicMaterial, LambertMaterial, LineBasicMaterial, NormalMaterial, PhongMaterial, ShaderMaterial {
+        permits BasicMaterial,
+                LambertMaterial,
+                LineBasicMaterial,
+                NormalMaterial,
+                PhongMaterial,
+                ShaderMaterial,
+                StandardMaterial {
+    private static final float DEFAULT_ALPHA_CUTOFF = 0.5f;
+
     private boolean visible = true;
     private float opacity = 1.0f;
-    private boolean transparent;
+    private AlphaMode alphaMode;
+    private float alphaCutoff;
     private MaterialSide side;
     private boolean depthTestEnabled = true;
     private boolean depthWriteEnabled = true;
@@ -28,6 +37,8 @@ public abstract sealed class Material implements AutoCloseable
 
     /** Creates an open material with front-face rendering selected. */
     protected Material() {
+        alphaMode = AlphaMode.OPAQUE;
+        alphaCutoff = DEFAULT_ALPHA_CUTOFF;
         side = MaterialSide.FRONT;
         depthFunction = DepthFunction.LESS_OR_EQUAL;
     }
@@ -91,8 +102,7 @@ public abstract sealed class Material implements AutoCloseable
      * @throws IllegalStateException if this material is closed
      */
     public final boolean transparent() {
-        requireOpen();
-        return transparent;
+        return alphaMode() == AlphaMode.BLEND;
     }
 
     /**
@@ -102,9 +112,59 @@ public abstract sealed class Material implements AutoCloseable
      * @throws IllegalStateException if this material is closed
      */
     public final void setTransparent(boolean transparent) {
+        setAlphaMode(transparent ? AlphaMode.BLEND : AlphaMode.OPAQUE);
+    }
+
+    /**
+     * Returns how resolved fragment alpha participates in rendering.
+     *
+     * @return {@link AlphaMode#OPAQUE} by default
+     * @throws IllegalStateException if this material is closed
+     */
+    public final AlphaMode alphaMode() {
         requireOpen();
-        if (this.transparent != transparent) {
-            this.transparent = transparent;
+        return alphaMode;
+    }
+
+    /**
+     * Changes how resolved fragment alpha participates in rendering.
+     *
+     * @param alphaMode alpha treatment to apply
+     * @throws NullPointerException if {@code alphaMode} is {@code null}
+     * @throws IllegalStateException if this material is closed
+     */
+    public final void setAlphaMode(AlphaMode alphaMode) {
+        requireOpen();
+        AlphaMode validAlphaMode = Objects.requireNonNull(alphaMode, "alphaMode");
+        if (this.alphaMode != validAlphaMode) {
+            this.alphaMode = validAlphaMode;
+            version++;
+        }
+    }
+
+    /**
+     * Returns the alpha threshold used by masked rendering.
+     *
+     * @return value in the inclusive range {@code [0, 1]}, initially {@code 0.5}
+     * @throws IllegalStateException if this material is closed
+     */
+    public final float alphaCutoff() {
+        requireOpen();
+        return alphaCutoff;
+    }
+
+    /**
+     * Changes the alpha threshold used by {@link AlphaMode#MASK}.
+     *
+     * @param alphaCutoff finite value in the inclusive range {@code [0, 1]}
+     * @throws IllegalArgumentException if the value is non-finite or outside its valid range
+     * @throws IllegalStateException if this material is closed
+     */
+    public final void setAlphaCutoff(float alphaCutoff) {
+        requireOpen();
+        float validAlphaCutoff = Preconditions.requireInRange(alphaCutoff, 0.0f, 1.0f, "alphaCutoff");
+        if (this.alphaCutoff != validAlphaCutoff) {
+            this.alphaCutoff = validAlphaCutoff;
             version++;
         }
     }

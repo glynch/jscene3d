@@ -81,7 +81,7 @@ scene without its large control overlays, and replaces the checked-in PNGs.
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
 `TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
-`GeneratedGeometriesExample`, `MaterialsExample`,
+`GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
 `SpotAndHemisphereLightsExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
@@ -106,10 +106,12 @@ separately when the project needs complete verification.
 
 ## Transparency
 
-Setting a material's opacity does not implicitly enable blending; call
-`setTransparent(true)` when the material should enter the transparent render
-list. Transparent objects are sorted back-to-front by their object origins in
-camera space, with scene traversal order providing a stable tie-breaker.
+Setting a material's opacity does not implicitly enable blending. Select
+`AlphaMode.BLEND` when the material should enter the transparent render list,
+or `AlphaMode.MASK` with an alpha cutoff for binary cutout surfaces.
+`setTransparent(true)` remains a convenience alias for blend mode. Transparent
+objects are sorted back-to-front by their object origins in camera space, with
+scene traversal order providing a stable tie-breaker.
 
 This object-level sort cannot correctly resolve intersecting transparent meshes
 or triangles that overlap within one transparent mesh. Applications commonly
@@ -156,16 +158,21 @@ blocks, and raw OpenGL access are not supported.
 
 `LambertMaterial` provides diffuse lighting, while `PhongMaterial` adds
 Blinn-Phong specular highlights plus independent emissive color and intensity.
-Both respond to visible `AmbientLight`, `PointLight`, `DirectionalLight`,
-`SpotLight`, and `HemisphereLight` scene nodes, support base color, vertex
-colors, and transformed color maps, and require geometry normals. A
-non-emissive lit surface renders black when the scene has no lights because the
-renderer does not supply a hidden default light. `NormalMaterial` is an unlit
-diagnostic material that maps transformed view-space normals to RGB and
-therefore also requires geometry normals.
+`StandardMaterial` provides metallic-roughness physically based direct lighting,
+with base-color, metallic-roughness, normal, occlusion, and emissive texture
+roles. These lit materials respond to visible `AmbientLight`, `PointLight`,
+`DirectionalLight`, `SpotLight`, and `HemisphereLight` scene nodes, support base
+color and vertex colors, and require geometry normals. Every built-in texture
+role applies its texture's coordinate transform. A non-emissive lit surface
+renders black when the scene has no lights because the renderer does not supply
+a hidden default light. `NormalMaterial` is an unlit diagnostic material that
+maps transformed view-space normals to RGB and therefore also requires geometry
+normals.
 
 `MaterialsExample` compares Basic, Lambert, Normal, and Phong spheres side by
 side. Its control panel changes Phong shininess and emissive intensity live.
+`StandardMaterialExample` presents a metalness-by-roughness grid under direct
+lighting.
 `SpotAndHemisphereLightsExample` demonstrates the two directional-area light
 models with live controls for intensity, range, cone angle, penumbra, and decay.
 

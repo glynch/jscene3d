@@ -30,11 +30,16 @@ public final class LineProgram implements AutoCloseable {
             in vec4 resolvedVertexColor;
 
             uniform vec4 baseColor;
+            uniform float alphaCutoff;
 
             out vec4 fragmentColor;
 
             void main() {
-                fragmentColor = baseColor * resolvedVertexColor;
+                vec4 resolvedColor = baseColor * resolvedVertexColor;
+                if (alphaCutoff >= 0.0 && resolvedColor.a < alphaCutoff) {
+                    discard;
+                }
+                fragmentColor = resolvedColor;
             }
             """;
 
@@ -44,6 +49,7 @@ public final class LineProgram implements AutoCloseable {
     private final int projectionMatrixLocation;
     private final int baseColorLocation;
     private final int useVertexColorLocation;
+    private final int alphaCutoffLocation;
 
     /** Retains a linked program and its required uniform locations. */
     private LineProgram(int id) {
@@ -53,6 +59,7 @@ public final class LineProgram implements AutoCloseable {
         projectionMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in line", "projectionMatrix");
         baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in line", "baseColor");
         useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in line", "useVertexColor");
+        alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in line", "alphaCutoff");
     }
 
     /**
@@ -122,6 +129,15 @@ public final class LineProgram implements AutoCloseable {
      */
     public int useVertexColorLocation() {
         return useVertexColorLocation;
+    }
+
+    /**
+     * Returns the required alpha-cutoff uniform location.
+     *
+     * @return uniform location
+     */
+    public int alphaCutoffLocation() {
+        return alphaCutoffLocation;
     }
 
     @Override

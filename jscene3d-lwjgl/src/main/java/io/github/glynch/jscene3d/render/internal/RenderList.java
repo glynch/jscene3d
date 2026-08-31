@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.NormalMaterial;
 import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
+import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
@@ -184,6 +185,7 @@ public final class RenderList {
                     case NormalMaterial ignored -> true;
                     case PhongMaterial ignored -> true;
                     case ShaderMaterial ignored -> true;
+                    case StandardMaterial ignored -> true;
                 };
         if (!supported) {
             throw new IllegalStateException(

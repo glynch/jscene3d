@@ -63,6 +63,7 @@ public final class PhongProgram implements AutoCloseable {
             uniform vec4 baseColor;
             uniform sampler2D colorMap;
             uniform bool useColorMap;
+            uniform float alphaCutoff;
             uniform vec3 emissiveColor;
             uniform vec3 specularColor;
             uniform float shininess;
@@ -182,6 +183,9 @@ public final class PhongProgram implements AutoCloseable {
 
                 vec4 textureColor = useColorMap ? texture(colorMap, resolvedTextureCoordinate) : vec4(1.0);
                 vec4 surfaceColor = baseColor * resolvedVertexColor * textureColor;
+                if (alphaCutoff >= 0.0 && surfaceColor.a < alphaCutoff) {
+                    discard;
+                }
                 vec3 reflected = surfaceColor.rgb * diffuseIllumination
                         + specularColor * specularIllumination
                         + emissiveColor;
@@ -203,6 +207,7 @@ public final class PhongProgram implements AutoCloseable {
     private final int emissiveColorLocation;
     private final int specularColorLocation;
     private final int shininessLocation;
+    private final int alphaCutoffLocation;
 
     /** Retains a linked program and all reusable transform and light staging. */
     private PhongProgram(int id) {
@@ -216,6 +221,7 @@ public final class PhongProgram implements AutoCloseable {
         emissiveColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "emissiveColor");
         specularColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "specularColor");
         shininessLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "shininess");
+        alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "alphaCutoff");
     }
 
     /**
@@ -312,6 +318,15 @@ public final class PhongProgram implements AutoCloseable {
      */
     public int shininessLocation() {
         return shininessLocation;
+    }
+
+    /**
+     * Returns the required alpha-cutoff uniform location.
+     *
+     * @return uniform location
+     */
+    public int alphaCutoffLocation() {
+        return alphaCutoffLocation;
     }
 
     /**

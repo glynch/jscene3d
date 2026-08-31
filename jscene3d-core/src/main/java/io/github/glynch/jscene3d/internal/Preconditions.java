@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.internal;
 
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.Material;
+import io.github.glynch.jscene3d.textures.Texture;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.joml.Quaternionfc;
@@ -50,6 +51,21 @@ public final class Preconditions {
             throw new IllegalArgumentException(parameterName + " must be open");
         }
         return validMaterial;
+    }
+
+    /**
+     * Requires an open texture description.
+     *
+     * @param texture texture to validate
+     * @param parameterName parameter name used in diagnostics
+     * @return the validated texture
+     */
+    public static Texture requireOpen(Texture texture, String parameterName) {
+        Texture validTexture = Objects.requireNonNull(texture, parameterName);
+        if (validTexture.isClosed()) {
+            throw new IllegalArgumentException(parameterName + " must be open");
+        }
+        return validTexture;
     }
 
     /**

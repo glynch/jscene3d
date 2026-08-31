@@ -58,6 +58,7 @@ import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
 import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
 import io.github.glynch.jscene3d.lwjgl.internal.WindowContextRegistry;
+import io.github.glynch.jscene3d.materials.AlphaMode;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
@@ -69,6 +70,7 @@ import io.github.glynch.jscene3d.materials.ShaderAttribute;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.materials.ShaderUniform;
 import io.github.glynch.jscene3d.materials.ShaderUniformType;
+import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.internal.Frustum;
@@ -82,6 +84,7 @@ import io.github.glynch.jscene3d.render.internal.programs.NormalProgram;
 import io.github.glynch.jscene3d.render.internal.programs.PhongProgram;
 import io.github.glynch.jscene3d.render.internal.programs.ShaderProgram;
 import io.github.glynch.jscene3d.render.internal.programs.ShaderProgramKey;
+import io.github.glynch.jscene3d.render.internal.programs.StandardProgram;
 import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
 import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
 import io.github.glynch.jscene3d.render.internal.resources.TextureResource;
@@ -96,6 +99,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.joml.Matrix3f;
 import org.joml.Matrix4fc;
+import org.joml.Vector2f;
 import org.jspecify.annotations.Nullable;
 
 /** Owns rendering and all OpenGL state for one JScene3D window context. */
@@ -126,6 +130,7 @@ public final class Renderer implements AutoCloseable {
     private final float[] matrixValues;
     private final float[] matrix3Values;
     private final Matrix3f textureTransformMatrix;
+    private final Vector2f normalScale;
     private final OverlayCanvas overlayCanvas;
     private final int maxTextureUnits;
 
@@ -136,6 +141,7 @@ public final class Renderer implements AutoCloseable {
     private @Nullable LineProgram lineProgram;
     private @Nullable NormalProgram normalProgram;
     private @Nullable PhongProgram phongProgram;
+    private @Nullable StandardProgram standardProgram;
     private @Nullable OverlayRenderer overlayRenderer;
     private @Nullable DefaultTexture defaultTexture;
     private boolean customViewport;
@@ -163,6 +169,7 @@ public final class Renderer implements AutoCloseable {
         matrixValues = new float[16];
         matrix3Values = new float[9];
         textureTransformMatrix = new Matrix3f();
+        normalScale = new Vector2f();
         overlayCanvas = new OverlayCanvas();
         maxTextureUnits = glGetInteger(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
     }
@@ -430,6 +437,10 @@ public final class Renderer implements AutoCloseable {
                 phongProgram.close();
                 phongProgram = null;
             }
+            if (standardProgram != null) {
+                standardProgram.close();
+                standardProgram = null;
+            }
             if (overlayRenderer != null) {
                 overlayRenderer.close();
                 overlayRenderer = null;
@@ -472,6 +483,8 @@ public final class Renderer implements AutoCloseable {
                     renderPhongMesh(item, geometry, phongMaterial, resource, viewMatrix, projectionMatrix);
                 case ShaderMaterial shaderMaterial ->
                     renderShaderMesh(item, geometry, shaderMaterial, resource, viewMatrix, projectionMatrix);
+                case StandardMaterial standardMaterial ->
+                    renderStandardMesh(item, geometry, standardMaterial, resource, viewMatrix, projectionMatrix);
                 default ->
                     throw new IllegalStateException("Unsupported mesh material type: "
                             + material.getClass().getName());
@@ -497,9 +510,10 @@ public final class Renderer implements AutoCloseable {
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
         Color color = material.color();
-        float alpha = material.transparent() ? material.opacity() : 1.0f;
+        float alpha = resolvedAlpha(material);
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
         glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
     }
 
     /** Synchronizes and binds one built-in basic-material draw. */
@@ -526,9 +540,10 @@ public final class Renderer implements AutoCloseable {
             uploadTextureTransform(program.colorMapTransformLocation(), colorMap);
         }
         Color color = material.color();
-        float alpha = material.transparent() ? material.opacity() : 1.0f;
+        float alpha = resolvedAlpha(material);
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
         glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
         glActiveTexture(GL_TEXTURE0);
         if (colorMap == null) {
             defaultTexture().bind();
@@ -566,9 +581,10 @@ public final class Renderer implements AutoCloseable {
         }
         program.uploadLights(renderList.lights(), viewMatrix);
         Color color = material.color();
-        float alpha = material.transparent() ? material.opacity() : 1.0f;
+        float alpha = resolvedAlpha(material);
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
         glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
         glActiveTexture(GL_TEXTURE0);
         if (colorMap == null) {
             defaultTexture().bind();
@@ -596,7 +612,8 @@ public final class Renderer implements AutoCloseable {
 
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
-        glUniform1f(program.opacityLocation(), material.transparent() ? material.opacity() : 1.0f);
+        glUniform1f(program.opacityLocation(), resolvedAlpha(material));
+        glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
     }
 
     /** Synchronizes and binds one built-in Blinn-Phong-material draw. */
@@ -622,9 +639,10 @@ public final class Renderer implements AutoCloseable {
         }
         program.uploadLights(renderList.lights(), viewMatrix);
         Color color = material.color();
-        float alpha = material.transparent() ? material.opacity() : 1.0f;
+        float alpha = resolvedAlpha(material);
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
         glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
         Color emissive = material.emissive();
         float emissiveIntensity = material.emissiveIntensity();
         glUniform3f(
@@ -649,6 +667,61 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
+    /** Synchronizes and binds one metallic-roughness physically based material draw. */
+    private void renderStandardMesh(
+            RenderItem item,
+            BufferGeometry geometry,
+            StandardMaterial material,
+            GeometryResource resource,
+            Matrix4fc viewMatrix,
+            Matrix4fc projectionMatrix) {
+        StandardProgram program = standardProgram();
+        @Nullable Texture colorMap = material.colorMap().orElse(null);
+        @Nullable
+        Texture metalnessRoughnessMap = material.metalnessRoughnessMap().orElse(null);
+        @Nullable Texture normalMap = material.normalMap().orElse(null);
+        @Nullable Texture occlusionMap = material.occlusionMap().orElse(null);
+        @Nullable Texture emissiveMap = material.emissiveMap().orElse(null);
+        requireOpenTexture(colorMap, "StandardMaterial colorMap");
+        requireOpenTexture(metalnessRoughnessMap, "StandardMaterial metalnessRoughnessMap");
+        requireOpenTexture(normalMap, "StandardMaterial normalMap");
+        requireOpenTexture(occlusionMap, "StandardMaterial occlusionMap");
+        requireOpenTexture(emissiveMap, "StandardMaterial emissiveMap");
+        boolean requiresTextureCoordinates = colorMap != null
+                || metalnessRoughnessMap != null
+                || normalMap != null
+                || occlusionMap != null
+                || emissiveMap != null;
+        recordUploads(resource.synchronize(
+                geometry, true, material.usesVertexColors(), requiresTextureCoordinates, "StandardMaterial"));
+
+        glUseProgram(program.id());
+        program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
+        program.uploadLights(renderList.lights(), viewMatrix);
+        Color color = material.color();
+        glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), resolvedAlpha(material));
+        glUniform1f(program.metalnessLocation(), material.metalness());
+        glUniform1f(program.roughnessLocation(), material.roughness());
+        Color emissive = material.emissive();
+        float emissiveIntensity = material.emissiveIntensity();
+        glUniform3f(
+                program.emissiveColorLocation(),
+                emissive.red() * emissiveIntensity,
+                emissive.green() * emissiveIntensity,
+                emissive.blue() * emissiveIntensity);
+        material.normalScale(normalScale);
+        glUniform2f(program.normalScaleLocation(), normalScale.x(), normalScale.y());
+        glUniform1f(program.occlusionStrengthLocation(), material.occlusionStrength());
+        glUniform1f(
+                program.alphaCutoffLocation(), material.alphaMode() == AlphaMode.MASK ? material.alphaCutoff() : -1.0f);
+        glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        bindStandardTexture(colorMap, program.colorMap(), 0);
+        bindStandardTexture(metalnessRoughnessMap, program.metalnessRoughnessMap(), 1);
+        bindStandardTexture(normalMap, program.normalMap(), 2);
+        bindStandardTexture(occlusionMap, program.occlusionMap(), 3);
+        bindStandardTexture(emissiveMap, program.emissiveMap(), 4);
+    }
+
     /** Synchronizes and binds one custom shader-material draw. */
     private void renderShaderMesh(
             RenderItem item,
@@ -657,6 +730,10 @@ public final class Renderer implements AutoCloseable {
             GeometryResource resource,
             Matrix4fc viewMatrix,
             Matrix4fc projectionMatrix) {
+        if (material.alphaMode() == AlphaMode.MASK) {
+            throw new IllegalStateException(
+                    "ShaderMaterial does not provide automatic alpha masking; implement discard in the shader");
+        }
         ShaderProgram program = shaderProgram(material);
         Set<ShaderAttribute> requiredAttributes = material.requiredAttributes();
         recordUploads(resource.synchronize(
@@ -790,6 +867,44 @@ public final class Renderer implements AutoCloseable {
         glUniform1i(location, textureUnit);
     }
 
+    /** Binds one optional standard-material texture role to its fixed texture unit. */
+    private void bindStandardTexture(
+            @Nullable Texture texture, StandardProgram.TextureLocations locations, int textureUnit) {
+        if (textureUnit >= maxTextureUnits) {
+            throw new IllegalStateException(
+                    "StandardMaterial requires more texture units than this context supports: " + (textureUnit + 1));
+        }
+        glActiveTexture(GL_TEXTURE0 + textureUnit);
+        glUniform1i(locations.sampler(), textureUnit);
+        if (texture == null) {
+            defaultTexture().bind();
+            glUniform1i(locations.enabled(), 0);
+            return;
+        }
+        TextureResource textureResource = textureResources.computeIfAbsent(texture, ignored -> new TextureResource());
+        resources.setActiveTextureResources(textureResources.size());
+        synchronizeTexture(textureResource, texture);
+        uploadTextureTransform(locations.transform(), texture);
+        glUniform1i(locations.enabled(), 1);
+    }
+
+    /** Rejects a closed optional texture while allowing an absent role. */
+    private static void requireOpenTexture(@Nullable Texture texture, String label) {
+        if (texture != null && texture.isClosed()) {
+            throw new IllegalStateException(label + " is closed");
+        }
+    }
+
+    /** Resolves the fragment alpha used by masked and blended materials. */
+    private static float resolvedAlpha(Material material) {
+        return material.alphaMode() == AlphaMode.OPAQUE ? 1.0f : material.opacity();
+    }
+
+    /** Resolves the active mask threshold, or a disabled sentinel for other alpha modes. */
+    private static float resolvedAlphaCutoff(Material material) {
+        return material.alphaMode() == AlphaMode.MASK ? material.alphaCutoff() : -1.0f;
+    }
+
     /** Records the buffer uploads performed while synchronizing one geometry. */
     private void recordUploads(GeometryResource.UploadResult uploads) {
         statistics.recordUploads(uploads.count(), uploads.byteCount());
@@ -848,6 +963,15 @@ public final class Renderer implements AutoCloseable {
         return phongProgram;
     }
 
+    /** Lazily creates and returns the context-local standard material program. */
+    private StandardProgram standardProgram() {
+        if (standardProgram == null) {
+            standardProgram = StandardProgram.create();
+            updateProgramCount();
+        }
+        return standardProgram;
+    }
+
     /** Lazily creates and returns context-local overlay drawing resources. */
     private OverlayRenderer overlayRenderer() {
         if (overlayRenderer == null) {
@@ -872,6 +996,7 @@ public final class Renderer implements AutoCloseable {
                 + (lineProgram == null ? 0 : 1)
                 + (normalProgram == null ? 0 : 1)
                 + (phongProgram == null ? 0 : 1)
+                + (standardProgram == null ? 0 : 1)
                 + (overlayRenderer == null ? 0 : 1)
                 + shaderPrograms.size());
     }
@@ -897,7 +1022,7 @@ public final class Renderer implements AutoCloseable {
         }
         glDepthMask(material.depthWriteEnabled());
 
-        if (material.transparent()) {
+        if (material.alphaMode() == AlphaMode.BLEND) {
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         } else {

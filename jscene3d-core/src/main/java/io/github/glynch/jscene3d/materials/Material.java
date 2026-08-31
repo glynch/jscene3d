@@ -14,8 +14,8 @@ import java.util.Objects;
  * upload-visible property changes. Closure is terminal and does not close meshes that share the
  * material, but those meshes cannot subsequently render with the closed material.
  */
-public sealed class Material implements AutoCloseable
-        permits BasicMaterial, LambertMaterial, LineBasicMaterial, ShaderMaterial {
+public abstract sealed class Material implements AutoCloseable
+        permits BasicMaterial, LambertMaterial, LineBasicMaterial, NormalMaterial, PhongMaterial, ShaderMaterial {
     private boolean visible = true;
     private float opacity = 1.0f;
     private boolean transparent;

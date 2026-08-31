@@ -61,7 +61,8 @@ example without running tests or the full verification lifecycle.
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
 `TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
-`GeneratedGeometriesExample`, `OrbitControlsExample`, and
+`GeneratedGeometriesExample`, `MaterialsExample`,
+`SpotAndHemisphereLightsExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
 connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
@@ -108,7 +109,8 @@ replace equal-depth fragments while remaining occluded by closer geometry.
 repeat, and rotation center, plus a radians-based rotation setter. Corresponding
 copy-out methods never expose mutable internal vectors or matrices. The cached
 homogeneous transform is applied automatically by `BasicMaterial` and
-`LambertMaterial` color maps without modifying geometry UV attributes.
+`LambertMaterial` and `PhongMaterial` color maps without modifying geometry UV
+attributes.
 
 Image, sampler, and transform changes have independent versions. Updating a
 texture transform therefore uploads only a small matrix uniform during a draw;
@@ -132,11 +134,20 @@ blocks, and raw OpenGL access are not supported.
 
 ## Lighting
 
-`LambertMaterial` provides diffuse lighting from visible `AmbientLight`,
-`PointLight`, and `DirectionalLight` scene nodes. Lit geometry must provide
-normals; color maps also require texture coordinates. A Lambert surface renders
-black when the scene has no lights because the renderer does not supply a
-hidden default light.
+`LambertMaterial` provides diffuse lighting, while `PhongMaterial` adds
+Blinn-Phong specular highlights plus independent emissive color and intensity.
+Both respond to visible `AmbientLight`, `PointLight`, `DirectionalLight`,
+`SpotLight`, and `HemisphereLight` scene nodes, support base color, vertex
+colors, and transformed color maps, and require geometry normals. A
+non-emissive lit surface renders black when the scene has no lights because the
+renderer does not supply a hidden default light. `NormalMaterial` is an unlit
+diagnostic material that maps transformed view-space normals to RGB and
+therefore also requires geometry normals.
+
+`MaterialsExample` compares Basic, Lambert, Normal, and Phong spheres side by
+side. Its control panel changes Phong shininess and emissive intensity live.
+`SpotAndHemisphereLightsExample` demonstrates the two directional-area light
+models with live controls for intensity, range, cone angle, penumbra, and decay.
 
 Point lights use their inherited world position. Their non-negative `decay`
 controls distance falloff, while a positive `distance` adds a smooth cutoff;
@@ -146,7 +157,12 @@ instead of silently dropping excess lights. Directional lights use their world
 position and a copied world-space target point to establish parallel incoming
 illumination; their distance from the target does not affect intensity. Version
 0.1 supports at most `Renderer.MAX_DIRECTIONAL_LIGHTS` visible directional
-lights per scene. Shadows are not yet supported.
+lights per scene. Spotlights illuminate toward a copied world-space target and
+provide distance, decay, cone-angle, and penumbra controls. Hemisphere lights
+blend their sky and ground colors using the surface normal and the light's
+world-space direction. The corresponding limits are
+`Renderer.MAX_SPOT_LIGHTS` and `Renderer.MAX_HEMISPHERE_LIGHTS`. Shadows are
+not yet supported.
 
 ## Lines
 

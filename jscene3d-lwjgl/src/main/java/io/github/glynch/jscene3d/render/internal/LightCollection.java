@@ -6,8 +6,10 @@ package io.github.glynch.jscene3d.render.internal;
 
 import io.github.glynch.jscene3d.lights.AmbientLight;
 import io.github.glynch.jscene3d.lights.DirectionalLight;
+import io.github.glynch.jscene3d.lights.HemisphereLight;
 import io.github.glynch.jscene3d.lights.Light;
 import io.github.glynch.jscene3d.lights.PointLight;
+import io.github.glynch.jscene3d.lights.SpotLight;
 import io.github.glynch.jscene3d.math.Color;
 import java.util.ArrayList;
 
@@ -15,8 +17,12 @@ import java.util.ArrayList;
 public final class LightCollection {
     private final int maximumPointLights;
     private final int maximumDirectionalLights;
+    private final int maximumSpotLights;
+    private final int maximumHemisphereLights;
     private final ArrayList<PointLight> pointLights;
     private final ArrayList<DirectionalLight> directionalLights;
+    private final ArrayList<SpotLight> spotLights;
+    private final ArrayList<HemisphereLight> hemisphereLights;
 
     private float ambientRed;
     private float ambientGreen;
@@ -27,12 +33,19 @@ public final class LightCollection {
      *
      * @param maximumPointLights maximum accepted visible point lights
      * @param maximumDirectionalLights maximum accepted visible directional lights
+     * @param maximumSpotLights maximum accepted visible spotlights
+     * @param maximumHemisphereLights maximum accepted visible hemisphere lights
      */
-    public LightCollection(int maximumPointLights, int maximumDirectionalLights) {
+    public LightCollection(
+            int maximumPointLights, int maximumDirectionalLights, int maximumSpotLights, int maximumHemisphereLights) {
         this.maximumPointLights = maximumPointLights;
         this.maximumDirectionalLights = maximumDirectionalLights;
+        this.maximumSpotLights = maximumSpotLights;
+        this.maximumHemisphereLights = maximumHemisphereLights;
         pointLights = new ArrayList<>(maximumPointLights);
         directionalLights = new ArrayList<>(maximumDirectionalLights);
+        spotLights = new ArrayList<>(maximumSpotLights);
+        hemisphereLights = new ArrayList<>(maximumHemisphereLights);
     }
 
     /**
@@ -44,7 +57,9 @@ public final class LightCollection {
         switch (light) {
             case AmbientLight ambientLight -> addAmbient(ambientLight);
             case DirectionalLight directionalLight -> addDirectional(directionalLight);
+            case HemisphereLight hemisphereLight -> addHemisphere(hemisphereLight);
             case PointLight pointLight -> addPoint(pointLight);
+            case SpotLight spotLight -> addSpot(spotLight);
         }
     }
 
@@ -113,10 +128,50 @@ public final class LightCollection {
         return directionalLights.get(index);
     }
 
+    /**
+     * Returns the number of visible spotlights.
+     *
+     * @return visible spotlight count
+     */
+    public int spotLightCount() {
+        return spotLights.size();
+    }
+
+    /**
+     * Returns a visible spotlight by deterministic scene order.
+     *
+     * @param index zero-based light position
+     * @return visible spotlight
+     */
+    public SpotLight spotLight(int index) {
+        return spotLights.get(index);
+    }
+
+    /**
+     * Returns the number of visible hemisphere lights.
+     *
+     * @return visible hemisphere-light count
+     */
+    public int hemisphereLightCount() {
+        return hemisphereLights.size();
+    }
+
+    /**
+     * Returns a visible hemisphere light by deterministic scene order.
+     *
+     * @param index zero-based light position
+     * @return visible hemisphere light
+     */
+    public HemisphereLight hemisphereLight(int index) {
+        return hemisphereLights.get(index);
+    }
+
     /** Releases active references and values while retaining collection capacity. */
     public void clear() {
         pointLights.clear();
         directionalLights.clear();
+        spotLights.clear();
+        hemisphereLights.clear();
         ambientRed = 0.0f;
         ambientGreen = 0.0f;
         ambientBlue = 0.0f;
@@ -151,6 +206,28 @@ public final class LightCollection {
                     + maximumDirectionalLights);
         }
         directionalLights.add(light);
+    }
+
+    /** Adds one spotlight while enforcing the deterministic renderer limit. */
+    private void addSpot(SpotLight light) {
+        if (spotLights.size() == maximumSpotLights) {
+            throw new IllegalStateException("Scene has more visible spotlights than Renderer supports: "
+                    + (spotLights.size() + 1)
+                    + " > "
+                    + maximumSpotLights);
+        }
+        spotLights.add(light);
+    }
+
+    /** Adds one hemisphere light while enforcing the deterministic renderer limit. */
+    private void addHemisphere(HemisphereLight light) {
+        if (hemisphereLights.size() == maximumHemisphereLights) {
+            throw new IllegalStateException("Scene has more visible hemisphere lights than Renderer supports: "
+                    + (hemisphereLights.size() + 1)
+                    + " > "
+                    + maximumHemisphereLights);
+        }
+        hemisphereLights.add(light);
     }
 
     /** Requires one accumulated ambient channel to remain finite. */

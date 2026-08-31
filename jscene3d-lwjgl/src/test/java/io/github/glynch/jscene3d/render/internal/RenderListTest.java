@@ -10,6 +10,8 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
+import io.github.glynch.jscene3d.materials.NormalMaterial;
+import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Line;
@@ -44,7 +46,7 @@ final class RenderListTest {
             scene.add(opaque);
             scene.add(secondTransparent);
             scene.add(equalDepthTransparent);
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             build(renderList, scene);
 
@@ -71,7 +73,7 @@ final class RenderListTest {
             scene.add(firstMesh);
             scene.add(secondMesh);
             scene.add(thirdMesh);
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             build(renderList, scene);
             RenderItem firstMeshItem = findOpaqueItem(renderList, firstMesh);
@@ -110,7 +112,7 @@ final class RenderListTest {
             Scene transparentScene = new Scene();
             transparentScene.add(laterTransparent);
             transparentScene.add(earlierTransparent);
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             Scene opaqueScene = new Scene();
             firstMaterial.setTransparent(false);
@@ -144,12 +146,33 @@ final class RenderListTest {
             Scene scene = new Scene();
             scene.add(hiddenGroup);
             scene.add(invisibleMaterialMesh);
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             build(renderList, scene);
 
             assertThat(renderList.opaqueCount()).isZero();
             assertThat(renderList.transparentCount()).isZero();
+            renderList.clear();
+        }
+    }
+
+    @Test
+    void acceptsNormalAndPhongMeshMaterials() {
+        try (BufferGeometry geometry = createTriangle();
+                NormalMaterial normalMaterial = new NormalMaterial();
+                PhongMaterial phongMaterial = new PhongMaterial()) {
+            Mesh normalMesh = new Mesh(geometry, normalMaterial);
+            Mesh phongMesh = new Mesh(geometry, phongMaterial);
+            Scene scene = new Scene();
+            scene.add(normalMesh);
+            scene.add(phongMesh);
+            RenderList renderList = newRenderList();
+
+            build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isEqualTo(2);
+            assertThat(findOpaqueItem(renderList, normalMesh).material()).isSameAs(normalMaterial);
+            assertThat(findOpaqueItem(renderList, phongMesh).material()).isSameAs(phongMaterial);
             renderList.clear();
         }
     }
@@ -162,7 +185,7 @@ final class RenderListTest {
             mesh.setPosition(3.0f, 0.0f, 0.0f);
             Scene scene = new Scene();
             scene.add(mesh);
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             build(renderList, scene);
 
@@ -191,7 +214,7 @@ final class RenderListTest {
             Scene scene = new Scene();
             scene.add(strip);
             scene.add(segments);
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             build(renderList, scene);
 
@@ -212,7 +235,7 @@ final class RenderListTest {
                 LineBasicMaterial material = new LineBasicMaterial()) {
             Scene scene = new Scene();
             scene.add(new LineSegments(geometry, material));
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             assertThatIllegalStateException()
                     .isThrownBy(() -> build(renderList, scene))
@@ -228,7 +251,7 @@ final class RenderListTest {
             line.setPosition(3.0f, 0.0f, 0.0f);
             Scene scene = new Scene();
             scene.add(line);
-            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS, Renderer.MAX_DIRECTIONAL_LIGHTS);
+            RenderList renderList = newRenderList();
 
             build(renderList, scene);
 
@@ -254,6 +277,14 @@ final class RenderListTest {
         return BufferGeometry.builder()
                 .positions(-0.5f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.5f, 0.0f, 0.0f)
                 .build();
+    }
+
+    private static RenderList newRenderList() {
+        return new RenderList(
+                Renderer.MAX_POINT_LIGHTS,
+                Renderer.MAX_DIRECTIONAL_LIGHTS,
+                Renderer.MAX_SPOT_LIGHTS,
+                Renderer.MAX_HEMISPHERE_LIGHTS);
     }
 
     private static void build(RenderList renderList, Scene scene) {

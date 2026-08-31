@@ -28,12 +28,16 @@ import io.github.glynch.jscene3d.helpers.BoxHelper;
 import io.github.glynch.jscene3d.helpers.GridHelper;
 import io.github.glynch.jscene3d.lights.AmbientLight;
 import io.github.glynch.jscene3d.lights.DirectionalLight;
+import io.github.glynch.jscene3d.lights.HemisphereLight;
 import io.github.glynch.jscene3d.lights.PointLight;
+import io.github.glynch.jscene3d.lights.SpotLight;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.DepthFunction;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.materials.MaterialSide;
+import io.github.glynch.jscene3d.materials.NormalMaterial;
+import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.ShaderAttribute;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.math.Color;
@@ -288,6 +292,68 @@ final class RendererIT {
     }
 
     @Test
+    void rendersLambertMaterialWithHemisphereSkyAndGroundColors() {
+        try (Window window = Window.create("Hemisphere lighting integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                LambertMaterial material = new LambertMaterial(Color.WHITE)) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            HemisphereLight light = new HemisphereLight(Color.RED, Color.BLUE);
+            light.setPosition(0.0f, 0.0f, 1.0f);
+            scene.add(light);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            light.setPosition(0.0f, 0.0f, -1.0f);
+            renderer.render(scene, camera);
+            assertPixelIsBlue(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            light.setPosition(0.0f, 0.0f, 0.0f);
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessageContaining("HemisphereLight world position must not be zero");
+        }
+    }
+
+    @Test
+    void rendersPhongMaterialInsideASpotlightCone() {
+        try (Window window = Window.create("Spotlight integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                PhongMaterial material = new PhongMaterial(Color.RED)) {
+            material.setSpecular(Color.BLACK);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            SpotLight light = new SpotLight(Color.WHITE);
+            light.setPosition(0.0f, 0.0f, 1.0f);
+            light.setTarget(0.0f, 0.0f, 0.0f);
+            light.setAngle(toRadians(15.0f));
+            light.setDecay(0.0f);
+            scene.add(light);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            light.setTarget(2.0f, 0.0f, 0.0f);
+            renderer.render(scene, camera);
+            assertPixelIsBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            light.setTarget(0.0f, 0.0f, 1.0f);
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessageContaining("SpotLight position must differ from its target");
+        }
+    }
+
+    @Test
     void appliesLambertVertexColorsAndColorMaps() {
         Texture texture = Texture.baseColor(1, 1, new byte[] {(byte) 0xff, 0, 0, (byte) 0xff});
         try (Window window = Window.create("Lambert surface inputs integration test");
@@ -316,6 +382,94 @@ final class RendererIT {
             assertThatIllegalStateException()
                     .isThrownBy(() -> renderer.render(scene, camera))
                     .withMessage("LambertMaterial colorMap is closed");
+        } finally {
+            texture.close();
+        }
+    }
+
+    @Test
+    void rendersViewSpaceNormalsWithoutSceneLights() {
+        try (Window window = Window.create("Normal material integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                NormalMaterial material = new NormalMaterial()) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsPositiveZNormal(window);
+            assertThat(renderer.info().resources().programCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void rendersPhongEmissiveAndSpecularContributions() {
+        try (Window window = Window.create("Phong lighting integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                PhongMaterial material = new PhongMaterial(Color.BLACK)) {
+            material.setEmissive(Color.RED);
+            material.setSpecular(Color.WHITE);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            material.setEmissive(Color.BLACK);
+            DirectionalLight light = new DirectionalLight(Color.WHITE, 1.0f);
+            light.setPosition(0.0f, 0.0f, 1.0f);
+            scene.add(light);
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsWhite(window);
+        }
+    }
+
+    @Test
+    void appliesPhongVertexColorsAndColorMapsAndValidatesNormals() {
+        Texture texture = Texture.baseColor(1, 1, new byte[] {(byte) 0xff, 0, 0, (byte) 0xff});
+        try (Window window = Window.create("Phong surface inputs integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTexturedGreenTriangle();
+                PhongMaterial material = new PhongMaterial()) {
+            material.setSpecular(Color.BLACK);
+            material.setUsesVertexColors(true);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            scene.add(new AmbientLight(Color.WHITE));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsGreen(window);
+
+            material.setUsesVertexColors(false);
+            material.setColorMap(texture);
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            texture.close();
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("PhongMaterial colorMap is closed");
+
+            material.clearColorMap();
+            scene.clear();
+            try (BufferGeometry unlitGeometry = createTriangle()) {
+                scene.add(new Mesh(unlitGeometry, material));
+                assertThatIllegalStateException()
+                        .isThrownBy(() -> renderer.render(scene, camera))
+                        .withMessage("PhongMaterial requires a normal attribute but geometry has none");
+            }
         } finally {
             texture.close();
         }
@@ -360,6 +514,22 @@ final class RendererIT {
             assertThatIllegalStateException()
                     .isThrownBy(() -> renderer.render(scene, camera))
                     .withMessage("Scene has more visible directional lights than Renderer supports: 9 > 8");
+
+            scene.clear();
+            for (int index = 0; index <= Renderer.MAX_SPOT_LIGHTS; index++) {
+                scene.add(new SpotLight());
+            }
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("Scene has more visible spotlights than Renderer supports: 9 > 8");
+
+            scene.clear();
+            for (int index = 0; index <= Renderer.MAX_HEMISPHERE_LIGHTS; index++) {
+                scene.add(new HemisphereLight());
+            }
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("Scene has more visible hemisphere lights than Renderer supports: 9 > 8");
         }
     }
 
@@ -1087,6 +1257,22 @@ final class RendererIT {
         assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(1))).isGreaterThan(240);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+
+    private static void assertCenterPixelIsWhite(Window window) {
+        ByteBuffer pixel = readPixel(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isGreaterThan(240);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isGreaterThan(240);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isGreaterThan(240);
+    }
+
+    private static void assertCenterPixelIsPositiveZNormal(Window window) {
+        ByteBuffer pixel = readPixel(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isBetween(180, 195);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isBetween(180, 195);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isGreaterThan(250);
     }
 
     private static void assertPixelIsRed(int x, int y) {

@@ -60,6 +60,8 @@ import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.MaterialSide;
+import io.github.glynch.jscene3d.materials.NormalMaterial;
+import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.ShaderAttribute;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.materials.ShaderUniform;
@@ -73,6 +75,8 @@ import io.github.glynch.jscene3d.render.internal.RenderList;
 import io.github.glynch.jscene3d.render.internal.programs.BasicProgram;
 import io.github.glynch.jscene3d.render.internal.programs.LambertProgram;
 import io.github.glynch.jscene3d.render.internal.programs.LineProgram;
+import io.github.glynch.jscene3d.render.internal.programs.NormalProgram;
+import io.github.glynch.jscene3d.render.internal.programs.PhongProgram;
 import io.github.glynch.jscene3d.render.internal.programs.ShaderProgram;
 import io.github.glynch.jscene3d.render.internal.programs.ShaderProgramKey;
 import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
@@ -98,6 +102,12 @@ public final class Renderer implements AutoCloseable {
     /** Maximum number of visible directional lights supported by one rendered scene in version 0.1. */
     public static final int MAX_DIRECTIONAL_LIGHTS = 8;
 
+    /** Maximum number of visible spotlights supported by one rendered scene in version 0.1. */
+    public static final int MAX_SPOT_LIGHTS = 8;
+
+    /** Maximum number of visible hemisphere lights supported by one rendered scene in version 0.1. */
+    public static final int MAX_HEMISPHERE_LIGHTS = 8;
+
     private final Window window;
     private final WindowContextRegistry.Access context;
     private final boolean automaticClear;
@@ -120,6 +130,8 @@ public final class Renderer implements AutoCloseable {
     private @Nullable BasicProgram basicProgram;
     private @Nullable LambertProgram lambertProgram;
     private @Nullable LineProgram lineProgram;
+    private @Nullable NormalProgram normalProgram;
+    private @Nullable PhongProgram phongProgram;
     private @Nullable OverlayRenderer overlayRenderer;
     private @Nullable DefaultTexture defaultTexture;
     private boolean customViewport;
@@ -142,7 +154,7 @@ public final class Renderer implements AutoCloseable {
         geometryResources = new IdentityHashMap<>();
         textureResources = new IdentityHashMap<>();
         shaderPrograms = new HashMap<>();
-        renderList = new RenderList(MAX_POINT_LIGHTS, MAX_DIRECTIONAL_LIGHTS);
+        renderList = new RenderList(MAX_POINT_LIGHTS, MAX_DIRECTIONAL_LIGHTS, MAX_SPOT_LIGHTS, MAX_HEMISPHERE_LIGHTS);
         frustum = new Frustum();
         matrixValues = new float[16];
         matrix3Values = new float[9];
@@ -374,6 +386,14 @@ public final class Renderer implements AutoCloseable {
                 lineProgram.close();
                 lineProgram = null;
             }
+            if (normalProgram != null) {
+                normalProgram.close();
+                normalProgram = null;
+            }
+            if (phongProgram != null) {
+                phongProgram.close();
+                phongProgram = null;
+            }
             if (overlayRenderer != null) {
                 overlayRenderer.close();
                 overlayRenderer = null;
@@ -410,6 +430,10 @@ public final class Renderer implements AutoCloseable {
                     renderBasicMesh(item, geometry, basicMaterial, resource, viewMatrix, projectionMatrix);
                 case LambertMaterial lambertMaterial ->
                     renderLambertMesh(item, geometry, lambertMaterial, resource, viewMatrix, projectionMatrix);
+                case NormalMaterial normalMaterial ->
+                    renderNormalMesh(item, geometry, normalMaterial, resource, viewMatrix, projectionMatrix);
+                case PhongMaterial phongMaterial ->
+                    renderPhongMesh(item, geometry, phongMaterial, resource, viewMatrix, projectionMatrix);
                 case ShaderMaterial shaderMaterial ->
                     renderShaderMesh(item, geometry, shaderMaterial, resource, viewMatrix, projectionMatrix);
                 default ->
@@ -509,6 +533,72 @@ public final class Renderer implements AutoCloseable {
         float alpha = material.transparent() ? material.opacity() : 1.0f;
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
         glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        glActiveTexture(GL_TEXTURE0);
+        if (colorMap == null) {
+            defaultTexture().bind();
+            glUniform1i(program.useColorMapLocation(), 0);
+        } else {
+            TextureResource textureResource =
+                    textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
+            resources.setActiveTextureResources(textureResources.size());
+            synchronizeTexture(textureResource, colorMap);
+            glUniform1i(program.colorMapLocation(), 0);
+            glUniform1i(program.useColorMapLocation(), 1);
+        }
+    }
+
+    /** Synchronizes and binds one built-in normal-visualization draw. */
+    private void renderNormalMesh(
+            RenderItem item,
+            BufferGeometry geometry,
+            NormalMaterial material,
+            GeometryResource resource,
+            Matrix4fc viewMatrix,
+            Matrix4fc projectionMatrix) {
+        NormalProgram program = normalProgram();
+        recordUploads(resource.synchronize(geometry, true, false, false, "NormalMaterial"));
+
+        glUseProgram(program.id());
+        program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
+        glUniform1f(program.opacityLocation(), material.transparent() ? material.opacity() : 1.0f);
+    }
+
+    /** Synchronizes and binds one built-in Blinn-Phong-material draw. */
+    private void renderPhongMesh(
+            RenderItem item,
+            BufferGeometry geometry,
+            PhongMaterial material,
+            GeometryResource resource,
+            Matrix4fc viewMatrix,
+            Matrix4fc projectionMatrix) {
+        PhongProgram program = phongProgram();
+        @Nullable Texture colorMap = material.colorMap().orElse(null);
+        if (colorMap != null && colorMap.isClosed()) {
+            throw new IllegalStateException("PhongMaterial colorMap is closed");
+        }
+        recordUploads(
+                resource.synchronize(geometry, true, material.usesVertexColors(), colorMap != null, "PhongMaterial"));
+
+        glUseProgram(program.id());
+        program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
+        if (colorMap != null) {
+            uploadTextureTransform(program.colorMapTransformLocation(), colorMap);
+        }
+        program.uploadLights(renderList.lights(), viewMatrix);
+        Color color = material.color();
+        float alpha = material.transparent() ? material.opacity() : 1.0f;
+        glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
+        glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        Color emissive = material.emissive();
+        float emissiveIntensity = material.emissiveIntensity();
+        glUniform3f(
+                program.emissiveColorLocation(),
+                emissive.red() * emissiveIntensity,
+                emissive.green() * emissiveIntensity,
+                emissive.blue() * emissiveIntensity);
+        Color specular = material.specular();
+        glUniform3f(program.specularColorLocation(), specular.red(), specular.green(), specular.blue());
+        glUniform1f(program.shininessLocation(), material.shininess());
         glActiveTexture(GL_TEXTURE0);
         if (colorMap == null) {
             defaultTexture().bind();
@@ -704,6 +794,24 @@ public final class Renderer implements AutoCloseable {
         return lineProgram;
     }
 
+    /** Lazily creates and returns the context-local built-in normal program. */
+    private NormalProgram normalProgram() {
+        if (normalProgram == null) {
+            normalProgram = NormalProgram.create();
+            updateProgramCount();
+        }
+        return normalProgram;
+    }
+
+    /** Lazily creates and returns the context-local built-in Phong program. */
+    private PhongProgram phongProgram() {
+        if (phongProgram == null) {
+            phongProgram = PhongProgram.create();
+            updateProgramCount();
+        }
+        return phongProgram;
+    }
+
     /** Lazily creates and returns context-local overlay drawing resources. */
     private OverlayRenderer overlayRenderer() {
         if (overlayRenderer == null) {
@@ -726,6 +834,8 @@ public final class Renderer implements AutoCloseable {
         resources.setProgramCount((basicProgram == null ? 0 : 1)
                 + (lambertProgram == null ? 0 : 1)
                 + (lineProgram == null ? 0 : 1)
+                + (normalProgram == null ? 0 : 1)
+                + (phongProgram == null ? 0 : 1)
                 + (overlayRenderer == null ? 0 : 1)
                 + shaderPrograms.size());
     }

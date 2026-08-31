@@ -10,6 +10,8 @@ import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.materials.Material;
+import io.github.glynch.jscene3d.materials.NormalMaterial;
+import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.objects.Line;
@@ -40,13 +42,17 @@ public final class RenderList {
      *
      * @param maximumPointLights maximum accepted visible point lights
      * @param maximumDirectionalLights maximum accepted visible directional lights
+     * @param maximumSpotLights maximum accepted visible spotlights
+     * @param maximumHemisphereLights maximum accepted visible hemisphere lights
      */
-    public RenderList(int maximumPointLights, int maximumDirectionalLights) {
+    public RenderList(
+            int maximumPointLights, int maximumDirectionalLights, int maximumSpotLights, int maximumHemisphereLights) {
         pendingObjects = new ArrayDeque<>();
         itemPool = new ArrayList<>();
         opaqueItems = new ArrayList<>();
         transparentItems = new ArrayList<>();
-        lights = new LightCollection(maximumPointLights, maximumDirectionalLights);
+        lights = new LightCollection(
+                maximumPointLights, maximumDirectionalLights, maximumSpotLights, maximumHemisphereLights);
     }
 
     /**
@@ -170,9 +176,16 @@ public final class RenderList {
     private void collectMesh(Mesh mesh, Matrix4fc viewMatrix, Frustum frustum) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
-        if (!(material instanceof BasicMaterial)
-                && !(material instanceof LambertMaterial)
-                && !(material instanceof ShaderMaterial)) {
+        boolean supported =
+                switch (material) {
+                    case BasicMaterial ignored -> true;
+                    case LambertMaterial ignored -> true;
+                    case LineBasicMaterial ignored -> false;
+                    case NormalMaterial ignored -> true;
+                    case PhongMaterial ignored -> true;
+                    case ShaderMaterial ignored -> true;
+                };
+        if (!supported) {
             throw new IllegalStateException(
                     "Unsupported material type: " + material.getClass().getName());
         }

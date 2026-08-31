@@ -8,6 +8,7 @@ import static io.github.glynch.jscene3d.testing.JomlAssertions.assertVector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.joml.Math.toRadians;
 
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Object3D;
@@ -49,6 +50,74 @@ final class LightTest {
         assertThat(directionalLight.intensity()).isEqualTo(0.5f);
         assertThat(pointLight.color()).isEqualTo(Color.RED);
         assertThat(pointLight.intensity()).isEqualTo(12.0f);
+    }
+
+    @Test
+    void providesDocumentedHemisphereDefaultsAndMutation() {
+        HemisphereLight light = new HemisphereLight();
+        Vector3f position = new Vector3f();
+
+        assertThat(light.color()).isEqualTo(Color.WHITE);
+        assertThat(light.groundColor()).isEqualTo(Color.WHITE);
+        assertThat(light.intensity()).isEqualTo(1.0f);
+        assertVector(light.worldPosition(position), 0.0f, 1.0f, 0.0f);
+
+        light.setColor(Color.BLUE);
+        light.setGroundColor(Color.RED);
+        light.setIntensity(0.5f);
+
+        assertThat(light.color()).isEqualTo(Color.BLUE);
+        assertThat(light.groundColor()).isEqualTo(Color.RED);
+        assertThat(light.intensity()).isEqualTo(0.5f);
+    }
+
+    @Test
+    void providesDocumentedSpotlightDefaultsAndMutation() {
+        SpotLight light = new SpotLight();
+        Vector3f target = new Vector3f();
+        Vector3f position = new Vector3f();
+
+        assertThat(light.color()).isEqualTo(Color.WHITE);
+        assertThat(light.intensity()).isEqualTo(1.0f);
+        assertThat(light.distance()).isZero();
+        assertThat(light.decay()).isEqualTo(2.0f);
+        assertThat(light.angle()).isEqualTo(toRadians(60.0f));
+        assertThat(light.penumbra()).isZero();
+        assertVector(light.worldPosition(position), 0.0f, 1.0f, 0.0f);
+        assertVector(light.target(target), 0.0f, 0.0f, 0.0f);
+
+        light.setDistance(12.0f);
+        light.setDecay(1.0f);
+        light.setAngle(toRadians(30.0f));
+        light.setPenumbra(0.5f);
+        light.setTarget(1.0f, 2.0f, 3.0f);
+
+        assertThat(light.distance()).isEqualTo(12.0f);
+        assertThat(light.decay()).isEqualTo(1.0f);
+        assertThat(light.angle()).isEqualTo(toRadians(30.0f));
+        assertThat(light.penumbra()).isEqualTo(0.5f);
+        assertVector(light.target(target), 1.0f, 2.0f, 3.0f);
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void rejectsInvalidHemisphereAndSpotlightProperties() {
+        HemisphereLight hemisphereLight = new HemisphereLight();
+        SpotLight spotLight = new SpotLight();
+
+        assertThatNullPointerException().isThrownBy(() -> new HemisphereLight(null, Color.WHITE));
+        assertThatNullPointerException().isThrownBy(() -> new HemisphereLight(Color.WHITE, null));
+        assertThatNullPointerException().isThrownBy(() -> hemisphereLight.setGroundColor(null));
+        assertThatNullPointerException().isThrownBy(() -> new SpotLight(null));
+        assertThatNullPointerException().isThrownBy(() -> spotLight.setTarget(null));
+        assertThatNullPointerException().isThrownBy(() -> spotLight.target(null));
+        assertThatIllegalArgumentException().isThrownBy(() -> spotLight.setDistance(-1.0f));
+        assertThatIllegalArgumentException().isThrownBy(() -> spotLight.setDecay(Float.NaN));
+        assertThatIllegalArgumentException().isThrownBy(() -> spotLight.setAngle(0.0f));
+        assertThatIllegalArgumentException().isThrownBy(() -> spotLight.setAngle(toRadians(91.0f)));
+        assertThatIllegalArgumentException().isThrownBy(() -> spotLight.setPenumbra(-0.1f));
+        assertThatIllegalArgumentException().isThrownBy(() -> spotLight.setPenumbra(1.1f));
+        assertThatIllegalArgumentException().isThrownBy(() -> spotLight.setTarget(0.0f, Float.NaN, 0.0f));
     }
 
     @Test
@@ -140,17 +209,22 @@ final class LightTest {
         AmbientLight ambientLight = new AmbientLight();
         DirectionalLight directionalLight = new DirectionalLight();
         PointLight pointLight = new PointLight();
+        HemisphereLight hemisphereLight = new HemisphereLight();
+        SpotLight spotLight = new SpotLight();
         root.add(ambientLight);
         root.add(directionalLight);
+        root.add(hemisphereLight);
         root.add(pointLight);
+        root.add(spotLight);
         List<Object3D> visited = new ArrayList<>();
 
         root.traverseVisible(visited::add);
-        assertThat(visited).containsExactly(root, ambientLight, directionalLight, pointLight);
+        assertThat(visited)
+                .containsExactly(root, ambientLight, directionalLight, hemisphereLight, pointLight, spotLight);
 
         ambientLight.setVisible(false);
         visited.clear();
         root.traverseVisible(visited::add);
-        assertThat(visited).containsExactly(root, directionalLight, pointLight);
+        assertThat(visited).containsExactly(root, directionalLight, hemisphereLight, pointLight, spotLight);
     }
 }

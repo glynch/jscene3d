@@ -10,8 +10,8 @@ import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
 import org.joml.Matrix4fc;
 
-/** Compiled built-in diffuse Lambert mesh program. */
-public final class LambertProgram implements AutoCloseable {
+/** Compiled built-in Blinn-Phong mesh program. */
+public final class PhongProgram implements AutoCloseable {
     private static final String VERTEX_SOURCE = """
             #version 330 core
             layout(location = 0) in vec3 position;
@@ -63,6 +63,9 @@ public final class LambertProgram implements AutoCloseable {
             uniform vec4 baseColor;
             uniform sampler2D colorMap;
             uniform bool useColorMap;
+            uniform vec3 emissiveColor;
+            uniform vec3 specularColor;
+            uniform float shininess;
             uniform vec3 ambientLightColor;
             uniform int pointLightCount;
             uniform vec3 pointLightPositions[MAX_POINT_LIGHTS];
@@ -97,6 +100,15 @@ public final class LambertProgram implements AutoCloseable {
                 return falloff;
             }
 
+            float specularStrength(vec3 normal, vec3 lightDirection, vec3 viewDirection) {
+                float diffuse = dot(normal, lightDirection);
+                if (diffuse <= 0.0) {
+                    return 0.0;
+                }
+                vec3 halfDirection = normalize(lightDirection + viewDirection);
+                return pow(max(dot(normal, halfDirection), 0.0), shininess);
+            }
+
             float spotAttenuation(float angleCosine, float coneCosine, float penumbraCosine) {
                 if (penumbraCosine <= coneCosine) {
                     return step(coneCosine, angleCosine);
@@ -105,8 +117,11 @@ public final class LambertProgram implements AutoCloseable {
             }
 
             void main() {
-                vec3 surfaceNormal = gl_FrontFacing ? resolvedViewNormal : -resolvedViewNormal;
-                vec3 illumination = ambientLightColor;
+                vec3 surfaceNormal = normalize(gl_FrontFacing ? resolvedViewNormal : -resolvedViewNormal);
+                vec3 viewDirection = normalize(-resolvedViewPosition);
+                vec3 diffuseIllumination = ambientLightColor;
+                vec3 specularIllumination = vec3(0.0);
+
                 for (int index = 0; index < MAX_POINT_LIGHTS; index++) {
                     if (index >= pointLightCount) {
                         break;
@@ -114,19 +129,24 @@ public final class LambertProgram implements AutoCloseable {
                     vec3 lightOffset = pointLightPositions[index] - resolvedViewPosition;
                     float lightDistance = length(lightOffset);
                     vec3 lightDirection = lightOffset / max(lightDistance, 0.01);
-                    float diffuse = max(dot(surfaceNormal, lightDirection), 0.0);
                     float attenuation = distanceAttenuation(
                             lightDistance,
                             pointLightDistances[index],
                             pointLightDecays[index]);
-                    illumination += pointLightColors[index] * diffuse * attenuation;
+                    vec3 radiance = pointLightColors[index] * attenuation;
+                    diffuseIllumination += radiance * max(dot(surfaceNormal, lightDirection), 0.0);
+                    specularIllumination += radiance
+                            * specularStrength(surfaceNormal, lightDirection, viewDirection);
                 }
                 for (int index = 0; index < MAX_DIRECTIONAL_LIGHTS; index++) {
                     if (index >= directionalLightCount) {
                         break;
                     }
-                    float diffuse = max(dot(surfaceNormal, directionalLightDirections[index]), 0.0);
-                    illumination += directionalLightColors[index] * diffuse;
+                    vec3 lightDirection = directionalLightDirections[index];
+                    vec3 radiance = directionalLightColors[index];
+                    diffuseIllumination += radiance * max(dot(surfaceNormal, lightDirection), 0.0);
+                    specularIllumination += radiance
+                            * specularStrength(surfaceNormal, lightDirection, viewDirection);
                 }
                 for (int index = 0; index < MAX_SPOT_LIGHTS; index++) {
                     if (index >= spotLightCount) {
@@ -144,15 +164,17 @@ public final class LambertProgram implements AutoCloseable {
                             lightDistance,
                             spotLightDistances[index],
                             spotLightDecays[index]);
-                    float diffuse = max(dot(surfaceNormal, lightDirection), 0.0);
-                    illumination += spotLightColors[index] * diffuse * distanceFalloff * coneAttenuation;
+                    vec3 radiance = spotLightColors[index] * distanceFalloff * coneAttenuation;
+                    diffuseIllumination += radiance * max(dot(surfaceNormal, lightDirection), 0.0);
+                    specularIllumination += radiance
+                            * specularStrength(surfaceNormal, lightDirection, viewDirection);
                 }
                 for (int index = 0; index < MAX_HEMISPHERE_LIGHTS; index++) {
                     if (index >= hemisphereLightCount) {
                         break;
                     }
                     float skyWeight = dot(surfaceNormal, hemisphereLightDirections[index]) * 0.5 + 0.5;
-                    illumination += mix(
+                    diffuseIllumination += mix(
                             hemisphereLightGroundColors[index],
                             hemisphereLightSkyColors[index],
                             skyWeight);
@@ -160,7 +182,10 @@ public final class LambertProgram implements AutoCloseable {
 
                 vec4 textureColor = useColorMap ? texture(colorMap, resolvedTextureCoordinate) : vec4(1.0);
                 vec4 surfaceColor = baseColor * resolvedVertexColor * textureColor;
-                fragmentColor = vec4(surfaceColor.rgb * illumination, surfaceColor.a);
+                vec3 reflected = surfaceColor.rgb * diffuseIllumination
+                        + specularColor * specularIllumination
+                        + emissiveColor;
+                fragmentColor = vec4(reflected, surfaceColor.a);
             }
             """.replace(
                     "POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
@@ -175,27 +200,33 @@ public final class LambertProgram implements AutoCloseable {
     private final int useVertexColorLocation;
     private final int colorMapLocation;
     private final int useColorMapLocation;
+    private final int emissiveColorLocation;
+    private final int specularColorLocation;
+    private final int shininessLocation;
 
     /** Retains a linked program and all reusable transform and light staging. */
-    private LambertProgram(int id) {
+    private PhongProgram(int id) {
         this.id = id;
-        litState = new LitProgramState(id, "Built-in Lambert");
-        colorMapTransformLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "colorMapTransform");
-        baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "baseColor");
-        useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "useVertexColor");
-        colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "colorMap");
-        useColorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "useColorMap");
+        litState = new LitProgramState(id, "Built-in Phong");
+        colorMapTransformLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "colorMapTransform");
+        baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "baseColor");
+        useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "useVertexColor");
+        colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "colorMap");
+        useColorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "useColorMap");
+        emissiveColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "emissiveColor");
+        specularColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "specularColor");
+        shininessLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "shininess");
     }
 
     /**
-     * Compiles, links, validates, and returns the built-in Lambert program.
+     * Compiles, links, validates, and returns the built-in Phong program.
      *
-     * @return linked Lambert program
+     * @return linked Phong program
      */
-    public static LambertProgram create() {
-        int program = ProgramSupport.createLinkedProgram("Built-in Lambert", VERTEX_SOURCE, FRAGMENT_SOURCE);
+    public static PhongProgram create() {
+        int program = ProgramSupport.createLinkedProgram("Built-in Phong", VERTEX_SOURCE, FRAGMENT_SOURCE);
         try {
-            return new LambertProgram(program);
+            return new PhongProgram(program);
         } catch (RuntimeException exception) {
             glDeleteProgram(program);
             throw exception;
@@ -248,12 +279,39 @@ public final class LambertProgram implements AutoCloseable {
     }
 
     /**
-     * Returns the required color-map texture-coordinate transform uniform location.
+     * Returns the required color-map transform uniform location.
      *
      * @return uniform location
      */
     public int colorMapTransformLocation() {
         return colorMapTransformLocation;
+    }
+
+    /**
+     * Returns the required emissive-color uniform location.
+     *
+     * @return uniform location
+     */
+    public int emissiveColorLocation() {
+        return emissiveColorLocation;
+    }
+
+    /**
+     * Returns the required specular-color uniform location.
+     *
+     * @return uniform location
+     */
+    public int specularColorLocation() {
+        return specularColorLocation;
+    }
+
+    /**
+     * Returns the required shininess uniform location.
+     *
+     * @return uniform location
+     */
+    public int shininessLocation() {
+        return shininessLocation;
     }
 
     /**

@@ -404,6 +404,8 @@ io.github.glynch.jscene3d
 │   ├── BasicMaterial
 │   ├── LambertMaterial
 │   ├── LineBasicMaterial
+│   ├── NormalMaterial
+│   ├── PhongMaterial
 │   ├── ShaderMaterial
 │   ├── MaterialSide
 │   └── DepthFunction
@@ -411,7 +413,9 @@ io.github.glynch.jscene3d
 │   ├── Light
 │   ├── AmbientLight
 │   ├── DirectionalLight
-│   └── PointLight
+│   ├── HemisphereLight
+│   ├── PointLight
+│   └── SpotLight
 ├── textures
 │   ├── Texture
 │   ├── TextureFilter
@@ -1110,16 +1114,20 @@ justify it.
 Version 0.1 also includes a narrow diffuse lighting path needed by the Solar
 System Viewer. `LambertMaterial` supports base color, optional vertex colors,
 an optional color map, and inherited material render state. It requires
-geometry normals and responds to visible `AmbientLight`, `PointLight`, and
-`DirectionalLight` scene nodes. Lights are sealed `Object3D` subclasses with
-linear-sRGB color and a non-negative practical intensity multiplier.
+geometry normals and responds to visible `AmbientLight`, `PointLight`,
+`DirectionalLight`, `SpotLight`, and `HemisphereLight` scene nodes. Lights are
+sealed `Object3D` subclasses with linear-sRGB color and a non-negative practical
+intensity multiplier.
 
 Point lights inherit their world position and expose non-negative distance and
 decay controls. Directional lights derive their direction from their inherited
-world position and a copied world-space target point. The renderer supports
-eight visible point lights and eight visible directional lights, aggregates
-ambient contributions, and fails rather than silently dropping excess lights.
-This initial path excludes shadows, calibrated physical units, normal maps,
+world position and a copied world-space target point. Spotlights similarly aim
+at a copied target and add a bounded cone angle, penumbra, distance, and decay.
+Hemisphere lights blend sky and ground colors according to the surface normal
+and the light's world-space direction. The renderer supports eight visible
+lights of each positional or directional type, aggregates ambient
+contributions, and fails rather than silently dropping excess lights. This
+initial path excludes shadows, calibrated physical units, normal maps,
 environment lighting, and PBR behavior.
 
 ### 13.6 `LineBasicMaterial`
@@ -1133,7 +1141,20 @@ All materials expose a `DepthFunction`, defaulting to `LESS_OR_EQUAL`. This
 allows deliberately ordered coplanar objects to replace equal-depth fragments
 without bypassing occlusion by genuinely closer geometry.
 
-### 13.7 Shader variants
+### 13.7 `NormalMaterial` and `PhongMaterial`
+
+`NormalMaterial` is an unlit diagnostic material that maps transformed
+view-space normals to RGB. It deliberately exposes no inactive normal-map,
+bump-map, displacement, or wireframe properties.
+
+`PhongMaterial` adds Blinn-Phong specular highlights to the existing lit path.
+It supports base color, optional vertex colors, an optional transformed color
+map, emissive color and intensity, specular color, shininess, and inherited
+material state. It responds to the same ambient, point, directional, spot, and
+hemisphere lights as `LambertMaterial`. Common transform and light-uniform
+staging is shared by the Lambert and Phong renderer programs.
+
+### 13.8 Shader variants
 
 Even a basic material can produce variants:
 
@@ -2688,7 +2709,7 @@ can be enabled when the repository becomes public and CI capacity is available.
 
 - Interactive Solar System Viewer Integration Example.
 - Box, plane, sphere, and ring generators.
-- Diffuse Lambert material with ambient and point lights.
+- Diffuse Lambert and specular Phong materials with all version 0.1 lights.
 - `ShaderMaterial` escape hatch.
 - Error and lifecycle documentation.
 - Supported-platform documentation.
@@ -2722,18 +2743,17 @@ and focused examples exist.
 
 After that block, a plausible sequence is:
 
-1. Normal material for debugging.
-2. Animation clips and mixers.
-3. Skinning.
-4. Morph targets.
-5. Render targets and framebuffer management.
-6. Shadow maps.
-7. Instanced meshes.
-8. Environment maps and image-based lighting.
-9. Additional glTF extensions and optional compression integrations.
-10. Additional material models when an example requires them.
-11. Post-processing graph.
-12. Additional renderer only if product requirements justify it.
+1. Animation clips and mixers.
+2. Skinning.
+3. Morph targets.
+4. Render targets and framebuffer management.
+5. Shadow maps.
+6. Instanced meshes.
+7. Environment maps and image-based lighting.
+8. Additional glTF extensions and optional compression integrations.
+9. Additional material models when an example requires them.
+10. Post-processing graph.
+11. Additional renderer only if product requirements justify it.
 
 The sequence should be adjusted by real user needs. For example, a
 data-visualization library may prioritize lines, points, labels, and picking
@@ -3123,8 +3143,9 @@ and deterministic lifecycle safety. It targets Java 21 and OpenGL 3.3 Core,
 publishes separate core, LWJGL, and optional GUI JPMS artifacts through Maven
 Central, and uses Apache-2.0.
 
-Version 0.1 includes custom GLSL through `ShaderMaterial`, diffuse
-`LambertMaterial`, ambient and point lights, PNG and JPEG texture loading,
+Version 0.1 includes custom GLSL through `ShaderMaterial`, Basic, Lambert,
+Normal, Phong, and line materials, ambient, point, directional, spot, and
+hemisphere lights, PNG and JPEG texture loading,
 genuine module-path and classpath use, multiple independent
 Window-Renderer Pairs on one render thread, and explicit idempotent terminal
 closure. It excludes raw OpenGL interoperability and shared contexts. The

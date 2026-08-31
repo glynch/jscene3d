@@ -34,7 +34,9 @@ public final class LambertProgram implements AutoCloseable {
             uniform mat4 viewMatrix;
             uniform mat4 projectionMatrix;
             uniform mat3 normalMatrix;
+            uniform mat3 colorMapTransform;
             uniform bool useVertexColor;
+            uniform bool useColorMap;
 
             out vec3 resolvedViewPosition;
             out vec3 resolvedViewNormal;
@@ -46,7 +48,14 @@ public final class LambertProgram implements AutoCloseable {
                 resolvedViewPosition = viewPosition.xyz;
                 resolvedViewNormal = normalize(normalMatrix * normal);
                 resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
-                resolvedTextureCoordinate = vec2(textureCoordinate.x, 1.0 - textureCoordinate.y);
+                if (useColorMap) {
+                    vec2 transformedTextureCoordinate =
+                            (colorMapTransform * vec3(textureCoordinate, 1.0)).xy;
+                    resolvedTextureCoordinate =
+                            vec2(transformedTextureCoordinate.x, 1.0 - transformedTextureCoordinate.y);
+                } else {
+                    resolvedTextureCoordinate = vec2(0.0);
+                }
                 gl_Position = projectionMatrix * viewPosition;
             }
             """;
@@ -123,6 +132,7 @@ public final class LambertProgram implements AutoCloseable {
     private final int viewMatrixLocation;
     private final int projectionMatrixLocation;
     private final int normalMatrixLocation;
+    private final int colorMapTransformLocation;
     private final int baseColorLocation;
     private final int useVertexColorLocation;
     private final int colorMapLocation;
@@ -158,6 +168,7 @@ public final class LambertProgram implements AutoCloseable {
         viewMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "viewMatrix");
         projectionMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "projectionMatrix");
         normalMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "normalMatrix");
+        colorMapTransformLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "colorMapTransform");
         baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "baseColor");
         useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "useVertexColor");
         colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "colorMap");
@@ -247,6 +258,15 @@ public final class LambertProgram implements AutoCloseable {
      */
     public int useColorMapLocation() {
         return useColorMapLocation;
+    }
+
+    /**
+     * Returns the required color-map texture-coordinate transform uniform location.
+     *
+     * @return uniform location
+     */
+    public int colorMapTransformLocation() {
+        return colorMapTransformLocation;
     }
 
     /**

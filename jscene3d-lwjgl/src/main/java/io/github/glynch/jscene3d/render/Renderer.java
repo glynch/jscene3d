@@ -86,6 +86,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.joml.Matrix3f;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 
@@ -110,6 +111,7 @@ public final class Renderer implements AutoCloseable {
     private final Frustum frustum;
     private final float[] matrixValues;
     private final float[] matrix3Values;
+    private final Matrix3f textureTransformMatrix;
     private final OverlayCanvas overlayCanvas;
     private final int maxTextureUnits;
 
@@ -144,6 +146,7 @@ public final class Renderer implements AutoCloseable {
         frustum = new Frustum();
         matrixValues = new float[16];
         matrix3Values = new float[9];
+        textureTransformMatrix = new Matrix3f();
         overlayCanvas = new OverlayCanvas();
         maxTextureUnits = glGetInteger(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
     }
@@ -459,6 +462,9 @@ public final class Renderer implements AutoCloseable {
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
+        if (colorMap != null) {
+            uploadTextureTransform(program.colorMapTransformLocation(), colorMap);
+        }
         Color color = material.color();
         float alpha = material.transparent() ? material.opacity() : 1.0f;
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
@@ -495,6 +501,9 @@ public final class Renderer implements AutoCloseable {
 
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
+        if (colorMap != null) {
+            uploadTextureTransform(program.colorMapTransformLocation(), colorMap);
+        }
         program.uploadLights(renderList.lights(), viewMatrix);
         Color color = material.color();
         float alpha = material.transparent() ? material.opacity() : 1.0f;
@@ -630,6 +639,13 @@ public final class Renderer implements AutoCloseable {
             matrixValues[index] = uniform.floatComponent(index);
         }
         glUniformMatrix4fv(location, false, matrixValues);
+    }
+
+    /** Uploads one built-in color-map UV transform without allocating. */
+    private void uploadTextureTransform(int location, Texture texture) {
+        texture.transformMatrix(textureTransformMatrix);
+        textureTransformMatrix.get(matrix3Values);
+        glUniformMatrix3fv(location, false, matrix3Values);
     }
 
     /** Synchronizes and binds one active texture uniform to a consecutive texture unit. */

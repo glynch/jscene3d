@@ -59,7 +59,7 @@ example without running tests or the full verification lifecycle.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
-`TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
+`TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
@@ -74,6 +74,9 @@ also demonstrates the optional themed control panel and FPS monitor from
 `ObjectSelectionExample` casts a ray from each unclaimed primary-button press,
 highlights the nearest intersected mesh, and reports the selection in a
 read-only control-panel row.
+`TextureTransformsExample` displays an asymmetric generated pattern and provides
+live controls for offset, repeat, rotation, rotation center, and horizontal and
+vertical wrapping.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same runner without that JVM
@@ -98,6 +101,21 @@ within its opaque or transparent list. Render order does not bypass depth
 testing or move objects between those lists. Materials default to
 `DepthFunction.LESS_OR_EQUAL`, allowing a deliberately later coplanar object to
 replace equal-depth fragments while remaining occluded by closer geometry.
+
+## Texture transforms
+
+`Texture` provides scalar and `Vector2fc` setters for texture-coordinate offset,
+repeat, and rotation center, plus a radians-based rotation setter. Corresponding
+copy-out methods never expose mutable internal vectors or matrices. The cached
+homogeneous transform is applied automatically by `BasicMaterial` and
+`LambertMaterial` color maps without modifying geometry UV attributes.
+
+Image, sampler, and transform changes have independent versions. Updating a
+texture transform therefore uploads only a small matrix uniform during a draw;
+it does not upload pixels, regenerate mipmaps, or reapply OpenGL sampler state.
+Repeats outside the unit interval tile only with `TextureWrap.REPEAT` or
+`TextureWrap.MIRRORED_REPEAT`. Custom `ShaderMaterial` programs remain
+responsible for any texture-coordinate transforms they require.
 
 ## Custom shaders
 

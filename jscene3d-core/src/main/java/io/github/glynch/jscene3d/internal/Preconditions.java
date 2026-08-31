@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.materials.Material;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.joml.Quaternionfc;
+import org.joml.Vector2fc;
 import org.joml.Vector3fc;
 
 /** Shared implementation-only precondition checks used across feature packages. */
@@ -63,6 +64,20 @@ public final class Preconditions {
             throw new IllegalArgumentException(parameterName + " must be finite: " + value);
         }
         return value;
+    }
+
+    /**
+     * Requires a non-null two-dimensional vector with finite components.
+     *
+     * @param value vector to validate
+     * @param parameterName parameter name used in diagnostics
+     * @return the validated vector
+     */
+    public static Vector2fc requireFinite(Vector2fc value, String parameterName) {
+        Vector2fc validValue = Objects.requireNonNull(value, parameterName);
+        requireFinite(validValue.x(), parameterName + ".x");
+        requireFinite(validValue.y(), parameterName + ".y");
+        return validValue;
     }
 
     /**

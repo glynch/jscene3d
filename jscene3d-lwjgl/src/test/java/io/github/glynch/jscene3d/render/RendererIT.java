@@ -524,6 +524,65 @@ final class RendererIT {
     }
 
     @Test
+    void appliesTextureTransformsToBasicAndLambertWithoutReuploadingTheImage() {
+        WindowOptions windowOptions = WindowOptions.builder()
+                .size(320, 240)
+                .title("Texture transform integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+        byte[] pixels = {(byte) 0xff, 0, 0, (byte) 0xff, 0, 0, (byte) 0xff, (byte) 0xff};
+        try (Window window = Window.create(windowOptions);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTexturedTriangle();
+                Texture texture = Texture.baseColor(1, 2, pixels);
+                BasicMaterial basicMaterial = new BasicMaterial();
+                LambertMaterial lambertMaterial = new LambertMaterial()) {
+            texture.setMinificationFilter(TextureFilter.NEAREST);
+            texture.setMagnificationFilter(TextureFilter.NEAREST);
+            basicMaterial.setColorMap(texture);
+            lambertMaterial.setColorMap(texture);
+            Mesh basicTriangle = new Mesh(geometry, basicMaterial);
+            basicTriangle.setPosition(-0.4f, 0.0f, 0.0f);
+            Mesh lambertTriangle = new Mesh(geometry, lambertMaterial);
+            lambertTriangle.setPosition(0.4f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(basicTriangle);
+            scene.add(lambertTriangle);
+            scene.add(new AmbientLight(Color.WHITE));
+            OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+            int upperY = Math.round(window.framebufferHeight() * 0.56f);
+            int lowerY = Math.round(window.framebufferHeight() * 0.44f);
+            int leftX = Math.round(window.framebufferWidth() * 0.3f);
+            int rightX = Math.round(window.framebufferWidth() * 0.7f);
+
+            renderer.render(scene, camera);
+            assertPixelIsRed(leftX, upperY);
+            assertPixelIsBlue(leftX, lowerY);
+            assertPixelIsRed(rightX, upperY);
+            assertPixelIsBlue(rightX, lowerY);
+
+            texture.setOffset(0.0f, -0.5f);
+            renderer.render(scene, camera);
+            assertPixelIsBlue(leftX, upperY);
+            assertPixelIsBlue(leftX, lowerY);
+            assertPixelIsBlue(rightX, upperY);
+            assertPixelIsBlue(rightX, lowerY);
+            assertThat(renderer.info().statistics().textureUploads()).isZero();
+
+            texture.setOffset(0.0f, 0.0f);
+            texture.setCenter(0.5f, 0.5f);
+            texture.setRotation((float) Math.PI);
+            renderer.render(scene, camera);
+            assertPixelIsBlue(leftX, upperY);
+            assertPixelIsRed(leftX, lowerY);
+            assertPixelIsBlue(rightX, upperY);
+            assertPixelIsRed(rightX, lowerY);
+            assertThat(renderer.info().statistics().textureUploads()).isZero();
+        }
+    }
+
+    @Test
     void rendersTypedCustomUniformsAndReusesTheStructuralProgram() {
         WindowOptions windowOptions = WindowOptions.builder()
                 .size(320, 240)
@@ -984,6 +1043,14 @@ final class RendererIT {
     private static BufferGeometry createTexturedTriangle() {
         return BufferGeometry.builder()
                 .positions(-0.25f, -0.25f, 0.0f, 0.25f, -0.25f, 0.0f, 0.0f, 0.25f, 0.0f)
+                .uvs(0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f)
+                .build();
+    }
+
+    private static BufferGeometry createLitTexturedTriangle() {
+        return BufferGeometry.builder()
+                .positions(-0.25f, -0.25f, 0.0f, 0.25f, -0.25f, 0.0f, 0.0f, 0.25f, 0.0f)
+                .normals(0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f)
                 .uvs(0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f)
                 .build();
     }

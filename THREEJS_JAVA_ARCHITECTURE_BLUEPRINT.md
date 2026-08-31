@@ -450,9 +450,11 @@ io.github.glynch.jscene3d
 │   ├── FpsMonitor
 │   └── GuiTheme
 └── examples
-    ├── TriangleExample
+    ├── BasicTriangleExample
     ├── HierarchyExample
     ├── TexturedCubeExample
+    ├── TextureTransformsExample
+    ├── ObjectSelectionExample
     └── TransparencyExample
 ```
 
@@ -473,9 +475,9 @@ Initial published artifact boundary:
 ```text
 io.github.glynch:jscene3d-core  io.github.glynch:jscene3d-lwjgl  io.github.glynch:jscene3d-gui
 ----------------------------    --------------------------------  -------------------------------
-scene graph                     OpenGL renderer                   optional control panels
-cameras                         GLFW window and input integration FPS and diagnostic monitors
-geometry and materials          perspective OrbitControls        themes and TrueType text
+scene graph                     OpenGL renderer                   control panels
+cameras                         GLFW window/input                 diagnostics
+geometry/materials              perspective OrbitControls        TrueType UI
 textures and JOML-facing APIs   safe logical overlay canvas
 ```
 
@@ -1180,6 +1182,7 @@ A texture describes:
 - Color-space interpretation.
 - Minification and magnification filters.
 - Horizontal and vertical wrap modes.
+- Texture-coordinate offset, repeat, rotation, and rotation center.
 - Mipmap policy.
 - Flip policy if needed.
 - Upload version.
@@ -1239,9 +1242,11 @@ path is added only if measurement shows that the one-time copy is material.
 
 ### 14.4 Upload behavior
 
-The renderer uploads a texture lazily on first use and re-uploads or updates it
-when its version changes. Texture parameters should be applied only when their
-relevant version changes.
+The renderer uploads a texture lazily on first use. Image, sampler, and
+texture-coordinate transform changes have independent versions so each renderer
+performs only the relevant work. Pixel changes re-upload the image and regenerate
+mipmaps, sampler changes reapply OpenGL texture parameters, and transform changes
+do neither.
 
 Version 0.1 accepts one base image and does not accept caller-supplied mip
 levels. `MipmapMode.GENERATE` is the default: each renderer generates the full
@@ -1255,6 +1260,24 @@ not want mipmaps. A texture with that mode must use a non-mipmap minification
 filter. Texture construction or configuration commit rejects incompatible
 filter and mipmap combinations with `IllegalArgumentException`; the renderer
 never silently substitutes a different filter.
+
+### 14.5 Texture-coordinate transforms
+
+`Texture` owns finite offset, repeat, rotation, and rotation-center values. Its
+Java interface provides scalar setters and `Vector2fc` copy-in overloads rather
+than exposing directly mutable properties. Rotation is expressed in radians.
+Vector and matrix reads copy into caller-owned JOML storage.
+
+The texture caches a homogeneous three-by-three transform whenever one of these
+values changes. `BasicMaterial` and `LambertMaterial` upload that matrix and
+apply it before the renderer's image-orientation conversion. Geometry UV
+attributes and `RaycastHit` texture coordinates remain unchanged. A transform
+edit therefore has constant CPU cost and one small uniform upload per textured
+draw, with no image upload, mipmap regeneration, or sampler update.
+
+Repeats outside the unit interval produce tiling only when the corresponding
+wrap mode is `REPEAT` or `MIRRORED_REPEAT`. `ShaderMaterial` remains an explicit
+escape hatch and must apply any desired texture transform itself.
 
 ---
 
@@ -2634,17 +2657,20 @@ and observable completion criteria.
 - Texture description.
 - Texture GPU realization.
 - Sampler state.
+- Texture-coordinate transforms.
 - Basic color-space handling.
 - Transparent render list.
 - Blend and depth-write behavior.
 
 #### Texture and transparency visible proof
 
-- Render a textured cube and a transparent object with deterministic ordering.
+- Render a textured cube, an interactively transformed texture, and a transparent
+  object with deterministic ordering.
 
 #### Texture and transparency acceptance criteria
 
 - Shared textures upload once per renderer.
+- Transform changes do not re-upload image data or reapply sampler state.
 - Texture close/release behavior is verified.
 - Unsupported formats fail clearly.
 - Transparent limitations are documented.
@@ -2653,12 +2679,10 @@ and observable completion criteria.
 
 #### Public Preview Gate
 
-The repository remains private until the interactive Solar System Viewer runs
-on the Verified Platform and demonstrates scene hierarchy, perspective camera
-use, generated geometry, materials, rendering, window/input behavior, and clean
-shutdown through the public interface. At that point the repository becomes
-public, the cross-platform GitHub Actions matrix is enabled using standard
-hosted runners, and the remainder of 0.1 hardening continues in public.
+The repository remains private during current 0.1 development. Repository
+visibility is an owner-controlled release decision; completing a feature or
+example never changes it automatically. A cross-platform GitHub Actions matrix
+can be enabled when the repository becomes public and CI capacity is available.
 
 #### Public 0.1 hardening deliverables
 
@@ -3164,8 +3188,8 @@ under real usage.
 
 The most consequential early rule is worth repeating:
 
-> BufferGeometry, materials, and textures describe rendering. The renderer owns their
-> context-specific GPU realization.
+> BufferGeometry, materials, and textures describe rendering. The renderer
+> owns their context-specific GPU realization.
 
 That rule provides the strongest foundation for a high-level Java graphics
 library that remains understandable as it grows.

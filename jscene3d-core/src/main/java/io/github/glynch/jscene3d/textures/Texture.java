@@ -8,6 +8,9 @@ import io.github.glynch.jscene3d.internal.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
+import org.joml.Matrix3f;
+import org.joml.Vector2f;
+import org.joml.Vector2fc;
 
 /**
  * Renderer-independent RGBA8 image and sampler description.
@@ -15,8 +18,9 @@ import java.util.Objects;
  * <p>A texture owns a defensive copy of its pixels and retains them until terminal closure so the
  * same description can be realized by multiple renderers. Pixels are row-major beginning with the
  * top row, matching conventional disk-image storage; the renderer resolves the texture-coordinate
- * orientation. Texture instances are mutable, application-owned, shareable, and not thread-safe.
- * They never contain an OpenGL identifier.
+ * orientation. Offset, repeat, rotation, and rotation-center values define a cached UV transform
+ * without changing geometry data. Texture instances are mutable, application-owned, shareable,
+ * and not thread-safe. They never contain an OpenGL identifier.
  */
 public final class Texture implements AutoCloseable {
     private static final TexturePixelFormat PIXEL_FORMAT = TexturePixelFormat.RGBA8;
@@ -30,9 +34,18 @@ public final class Texture implements AutoCloseable {
     private TextureWrap horizontalWrap = TextureWrap.CLAMP_TO_EDGE;
     private TextureWrap verticalWrap = TextureWrap.CLAMP_TO_EDGE;
     private MipmapMode mipmapMode = MipmapMode.GENERATE;
+    private final Matrix3f transformMatrix = new Matrix3f();
+    private float offsetU;
+    private float offsetV;
+    private float repeatU = 1.0f;
+    private float repeatV = 1.0f;
+    private float rotation;
+    private float centerU;
+    private float centerV;
     private long version;
     private long imageVersion;
     private long samplerVersion;
+    private long transformVersion;
     private boolean closed;
 
     /** Creates a texture after validating and copying its initial image. */
@@ -367,7 +380,259 @@ public final class Texture implements AutoCloseable {
     }
 
     /**
-     * Returns the version of all image and sampler changes.
+     * Returns the horizontal texture-coordinate offset.
+     *
+     * @return horizontal offset, initially zero
+     * @throws IllegalStateException if this texture is closed
+     */
+    public float offsetU() {
+        requireOpen();
+        return offsetU;
+    }
+
+    /**
+     * Returns the vertical texture-coordinate offset.
+     *
+     * @return vertical offset, initially zero
+     * @throws IllegalStateException if this texture is closed
+     */
+    public float offsetV() {
+        requireOpen();
+        return offsetV;
+    }
+
+    /**
+     * Copies the current texture-coordinate offset into caller-owned storage.
+     *
+     * @param destination vector receiving the horizontal and vertical offsets
+     * @return {@code destination}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     * @throws IllegalStateException if this texture is closed
+     */
+    public Vector2f offset(Vector2f destination) {
+        requireOpen();
+        return Objects.requireNonNull(destination, "destination").set(offsetU, offsetV);
+    }
+
+    /**
+     * Sets the texture-coordinate offset.
+     *
+     * @param u horizontal offset in texture-coordinate units
+     * @param v vertical offset in texture-coordinate units
+     * @throws IllegalArgumentException if either value is not finite
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setOffset(float u, float v) {
+        requireOpen();
+        float validU = Preconditions.requireFinite(u, "u");
+        float validV = Preconditions.requireFinite(v, "v");
+        if (offsetU != validU || offsetV != validV) {
+            offsetU = validU;
+            offsetV = validV;
+            updateTransformMatrix();
+            markTransformChanged();
+        }
+    }
+
+    /**
+     * Copies an existing value into the texture-coordinate offset.
+     *
+     * @param offset horizontal and vertical offsets
+     * @throws NullPointerException if {@code offset} is {@code null}
+     * @throws IllegalArgumentException if either component is not finite
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setOffset(Vector2fc offset) {
+        Vector2fc validOffset = Preconditions.requireFinite(offset, "offset");
+        setOffset(validOffset.x(), validOffset.y());
+    }
+
+    /**
+     * Returns the horizontal texture-coordinate repeat factor.
+     *
+     * @return horizontal repeat factor, initially one
+     * @throws IllegalStateException if this texture is closed
+     */
+    public float repeatU() {
+        requireOpen();
+        return repeatU;
+    }
+
+    /**
+     * Returns the vertical texture-coordinate repeat factor.
+     *
+     * @return vertical repeat factor, initially one
+     * @throws IllegalStateException if this texture is closed
+     */
+    public float repeatV() {
+        requireOpen();
+        return repeatV;
+    }
+
+    /**
+     * Copies the current texture-coordinate repeat factors into caller-owned storage.
+     *
+     * @param destination vector receiving the horizontal and vertical repeat factors
+     * @return {@code destination}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     * @throws IllegalStateException if this texture is closed
+     */
+    public Vector2f repeat(Vector2f destination) {
+        requireOpen();
+        return Objects.requireNonNull(destination, "destination").set(repeatU, repeatV);
+    }
+
+    /**
+     * Sets the texture-coordinate repeat factors.
+     *
+     * <p>Values beyond one tile only repeat when the corresponding wrap mode is {@link
+     * TextureWrap#REPEAT} or {@link TextureWrap#MIRRORED_REPEAT}. Negative and zero factors are
+     * valid.
+     *
+     * @param u horizontal repeat factor
+     * @param v vertical repeat factor
+     * @throws IllegalArgumentException if either value is not finite
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setRepeat(float u, float v) {
+        requireOpen();
+        float validU = Preconditions.requireFinite(u, "u");
+        float validV = Preconditions.requireFinite(v, "v");
+        if (repeatU != validU || repeatV != validV) {
+            repeatU = validU;
+            repeatV = validV;
+            updateTransformMatrix();
+            markTransformChanged();
+        }
+    }
+
+    /**
+     * Copies an existing value into the texture-coordinate repeat factors.
+     *
+     * @param repeat horizontal and vertical repeat factors
+     * @throws NullPointerException if {@code repeat} is {@code null}
+     * @throws IllegalArgumentException if either component is not finite
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setRepeat(Vector2fc repeat) {
+        Vector2fc validRepeat = Preconditions.requireFinite(repeat, "repeat");
+        setRepeat(validRepeat.x(), validRepeat.y());
+    }
+
+    /**
+     * Returns the texture-coordinate rotation in radians.
+     *
+     * @return counter-clockwise rotation, initially zero
+     * @throws IllegalStateException if this texture is closed
+     */
+    public float rotation() {
+        requireOpen();
+        return rotation;
+    }
+
+    /**
+     * Sets the counter-clockwise texture-coordinate rotation in radians.
+     *
+     * @param rotation rotation in radians
+     * @throws IllegalArgumentException if {@code rotation} is not finite
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setRotation(float rotation) {
+        requireOpen();
+        float validRotation = Preconditions.requireFinite(rotation, "rotation");
+        if (this.rotation != validRotation) {
+            this.rotation = validRotation;
+            updateTransformMatrix();
+            markTransformChanged();
+        }
+    }
+
+    /**
+     * Returns the horizontal coordinate of the rotation center.
+     *
+     * @return horizontal rotation center, initially zero
+     * @throws IllegalStateException if this texture is closed
+     */
+    public float centerU() {
+        requireOpen();
+        return centerU;
+    }
+
+    /**
+     * Returns the vertical coordinate of the rotation center.
+     *
+     * @return vertical rotation center, initially zero
+     * @throws IllegalStateException if this texture is closed
+     */
+    public float centerV() {
+        requireOpen();
+        return centerV;
+    }
+
+    /**
+     * Copies the current rotation center into caller-owned storage.
+     *
+     * @param destination vector receiving the horizontal and vertical center coordinates
+     * @return {@code destination}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     * @throws IllegalStateException if this texture is closed
+     */
+    public Vector2f center(Vector2f destination) {
+        requireOpen();
+        return Objects.requireNonNull(destination, "destination").set(centerU, centerV);
+    }
+
+    /**
+     * Sets the center around which texture coordinates rotate.
+     *
+     * @param u horizontal center coordinate
+     * @param v vertical center coordinate
+     * @throws IllegalArgumentException if either value is not finite
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setCenter(float u, float v) {
+        requireOpen();
+        float validU = Preconditions.requireFinite(u, "u");
+        float validV = Preconditions.requireFinite(v, "v");
+        if (centerU != validU || centerV != validV) {
+            centerU = validU;
+            centerV = validV;
+            updateTransformMatrix();
+            markTransformChanged();
+        }
+    }
+
+    /**
+     * Copies an existing value into the texture-coordinate rotation center.
+     *
+     * @param center horizontal and vertical center coordinates
+     * @throws NullPointerException if {@code center} is {@code null}
+     * @throws IllegalArgumentException if either component is not finite
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setCenter(Vector2fc center) {
+        Vector2fc validCenter = Preconditions.requireFinite(center, "center");
+        setCenter(validCenter.x(), validCenter.y());
+    }
+
+    /**
+     * Copies the cached homogeneous texture-coordinate transform into caller-owned storage.
+     *
+     * <p>The matrix applies repeat and counter-clockwise rotation around the configured center,
+     * followed by offset. The renderer applies its image-orientation conversion separately.
+     *
+     * @param destination matrix receiving the current transform
+     * @return {@code destination}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     * @throws IllegalStateException if this texture is closed
+     */
+    public Matrix3f transformMatrix(Matrix3f destination) {
+        requireOpen();
+        return Objects.requireNonNull(destination, "destination").set(transformMatrix);
+    }
+
+    /**
+     * Returns the version of all image, sampler, and texture-coordinate transform changes.
      *
      * @return monotonically increasing overall version, initially zero
      * @throws IllegalStateException if this texture is closed
@@ -397,6 +662,17 @@ public final class Texture implements AutoCloseable {
     public long samplerVersion() {
         requireOpen();
         return samplerVersion;
+    }
+
+    /**
+     * Returns the version of texture-coordinate transform changes.
+     *
+     * @return monotonically increasing transform version, initially zero
+     * @throws IllegalStateException if this texture is closed
+     */
+    public long transformVersion() {
+        requireOpen();
+        return transformVersion;
     }
 
     /**
@@ -459,6 +735,28 @@ public final class Texture implements AutoCloseable {
     /** Records a sampler-visible change. */
     private void markSamplerChanged() {
         samplerVersion++;
+        version++;
+    }
+
+    /** Recomputes the cached homogeneous UV transform without allocating. */
+    private void updateTransformMatrix() {
+        float cosine = (float) Math.cos(rotation);
+        float sine = (float) Math.sin(rotation);
+        transformMatrix.set(
+                repeatU * cosine,
+                -repeatV * sine,
+                0.0f,
+                repeatU * sine,
+                repeatV * cosine,
+                0.0f,
+                -repeatU * (cosine * centerU + sine * centerV) + centerU + offsetU,
+                -repeatV * (-sine * centerU + cosine * centerV) + centerV + offsetV,
+                1.0f);
+    }
+
+    /** Records a texture-coordinate transform change. */
+    private void markTransformChanged() {
+        transformVersion++;
         version++;
     }
 

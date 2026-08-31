@@ -210,16 +210,19 @@ prior deprecation where practical.
   | Artifact | Line coverage | Branch coverage |
   | --- | ---: | ---: |
   | `jscene3d-core` | 90% | 75% |
-  | `jscene3d-lwjgl` | 25% | 18% |
-  | `jscene3d-lwjgl` with `render-integration` | 80% | 55% |
+  | Headless LWJGL control/input core (per class) | 90% | 75% |
+  | `jscene3d-lwjgl` with `render-integration` | 85% | 65% |
   | `jscene3d-gui` | 85% | 70% |
 
-  `jscene3d-lwjgl` has a deliberately separate lower headless floor because
-  ordinary verification does not create an OpenGL context. The
-  `render-integration` profile adds its native integration coverage to the same
-  execution data. Raise each floor as coverage improves; never lower one merely
-  to make a change pass. Examples are compiled but excluded from percentage
-  gates because they are executable documentation rather than library code.
+  Ordinary verification enforces the headless floor individually for
+  `OrbitLimits`, `OrbitState`, the controls preconditions, `InputState`, `Key`,
+  and `MouseButton`; it does not publish a misleading whole-artifact percentage
+  for native code that cannot execute without an OpenGL context. The
+  `render-integration` profile adds native integration coverage to the same
+  execution data and enforces the whole LWJGL artifact. Raise each floor as
+  coverage improves; never lower one merely to make a change pass. Examples are
+  compiled but excluded from percentage gates because they are executable
+  documentation rather than library code.
 - Require explicit branch coverage for hierarchy-cycle rejection, lifecycle
   transitions, public validation, and renderer cleanup regardless of the
   percentage floors.

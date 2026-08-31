@@ -418,7 +418,8 @@ io.github.glynch.jscene3d
 │   ├── LineSegments
 │   └── helpers
 │       ├── AxesHelper
-│       └── GridHelper
+│       ├── GridHelper
+│       └── BoxHelper
 ├── render
 │   ├── Renderer
 │   ├── RendererOptions
@@ -1270,9 +1271,12 @@ odd draw-range counts. Both retain `LineBasicMaterial`, support indexed and
 non-indexed geometry, and participate in transforms, visibility, frustum
 culling, opaque or transparent ordering, and depth state.
 
-`AxesHelper` and `GridHelper` are renderer-independent `LineSegments` scene
+`AxesHelper`, `GridHelper`, and `BoxHelper` are renderer-independent
+`LineSegments` scene
 objects. `AxesHelper` generates red, green, and blue positive coordinate axes;
-`GridHelper` generates a configurable XZ reference grid. Unlike ordinary lines,
+`GridHelper` generates a configurable XZ reference grid; `BoxHelper` generates
+world-axis-aligned bounds around visible renderable geometry in a target
+subtree and refreshes explicitly after target changes. Unlike ordinary lines,
 each helper owns and closes its generated geometry and material. Replacing
 either resource is unsupported because doing so would make lifecycle ownership
 ambiguous.

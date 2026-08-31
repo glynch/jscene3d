@@ -16,6 +16,8 @@ import static org.lwjgl.opengl.GL11.glReadPixels;
 import io.github.glynch.jscene3d.core.AmbientLight;
 import io.github.glynch.jscene3d.core.AxesHelper;
 import io.github.glynch.jscene3d.core.BasicMaterial;
+import io.github.glynch.jscene3d.core.BoxGeometry;
+import io.github.glynch.jscene3d.core.BoxHelper;
 import io.github.glynch.jscene3d.core.BufferAttribute;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Color;
@@ -774,6 +776,41 @@ final class RendererIT {
             assertThat(statistics.triangles()).isZero();
             assertThat(renderer.info().resources().activeGeometryResources()).isEqualTo(2);
             assertThat(renderer.info().resources().programCount()).isOne();
+        }
+    }
+
+    @Test
+    void rendersAndUpdatesBoxHelperBounds() {
+        try (Window window = Window.create(320, 240, "Box helper integration test");
+                BufferGeometry boxGeometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
+                BasicMaterial boxMaterial = new BasicMaterial(Color.srgb(0x404040));
+                Renderer renderer = Renderer.create(window)) {
+            Mesh box = new Mesh(boxGeometry, boxMaterial);
+            try (BoxHelper helper = new BoxHelper(box)) {
+                Scene scene = new Scene();
+                scene.add(box);
+                scene.add(helper);
+                PerspectiveCamera camera =
+                        new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 10.0f);
+                camera.setPosition(2.0f, 2.0f, 2.0f);
+                camera.lookAt(0.0f, 0.0f, 0.0f);
+
+                renderer.render(scene, camera);
+
+                RenderStatistics statistics = renderer.info().statistics();
+                assertThat(statistics.drawCalls()).isEqualTo(2);
+                assertThat(statistics.triangles()).isEqualTo(12L);
+                assertThat(statistics.lineSegments()).isEqualTo(12L);
+                assertThat(statistics.visibleMeshes()).isOne();
+                assertThat(statistics.visibleLines()).isOne();
+
+                box.setPosition(0.25f, 0.0f, 0.0f);
+                helper.update();
+                renderer.render(scene, camera);
+
+                assertThat(statistics.bufferUploads()).isOne();
+                assertThat(statistics.drawCalls()).isEqualTo(2);
+            }
         }
     }
 

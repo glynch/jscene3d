@@ -11,9 +11,14 @@ abstract class GeneratedLineSegmentsHelper extends LineSegments implements AutoC
 
     /** Retains generated geometry and creates its owned vertex-color material. */
     GeneratedLineSegmentsHelper(BufferGeometry geometry) {
-        super(geometry, createMaterial(), false);
+        this(geometry, createVertexColorMaterial());
+    }
+
+    /** Retains generated geometry and a supplied owned material. */
+    GeneratedLineSegmentsHelper(BufferGeometry geometry, LineBasicMaterial material) {
+        super(geometry, material, false);
         ownedGeometry = geometry;
-        ownedMaterial = material();
+        ownedMaterial = material;
     }
 
     /**
@@ -33,7 +38,7 @@ abstract class GeneratedLineSegmentsHelper extends LineSegments implements AutoC
     }
 
     /** Creates the common white material that reveals generated vertex colors. */
-    private static LineBasicMaterial createMaterial() {
+    private static LineBasicMaterial createVertexColorMaterial() {
         LineBasicMaterial material = new LineBasicMaterial();
         material.setUsesVertexColors(true);
         return material;

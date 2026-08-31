@@ -60,7 +60,8 @@ example without running tests or the full verification lifecycle.
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
 `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
-`LineRenderingExample`, `HelpersExample`, and `OrbitControlsExample` are also
+`LineRenderingExample`, `HelpersExample`, `BoxHelperExample`, and
+`OrbitControlsExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
 connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
 controls. In
@@ -131,9 +132,12 @@ element. Portable line width is fixed to one framebuffer pixel.
 
 `AxesHelper` supplies red, green, and blue positive X, Y, and Z axes.
 `GridHelper` supplies a configurable XZ reference grid with optional distinct
-center-line and grid colors. Both are ordinary `LineSegments` scene objects and
-own their generated geometry and material, so close the helper itself when it
-is no longer needed. Their generated resources cannot be replaced.
+center-line and grid colors. `BoxHelper` supplies world-axis-aligned wireframe
+bounds around visible mesh and line geometry in a target subtree; call
+`update()` after changing the target. All three are ordinary `LineSegments`
+scene objects and own their generated geometry and material, so close the helper
+itself when it is no longer needed. Their generated resources cannot be
+replaced.
 `HelpersExample` gives the axes a higher render order than the grid so their
 coplanar X and Z segments remain distinct without altering either helper's
 position or disabling depth testing.

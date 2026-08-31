@@ -23,6 +23,8 @@ import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.OrthographicCamera;
 import io.github.glynch.jscene3d.core.PerspectiveCamera;
 import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.core.ShaderAttribute;
+import io.github.glynch.jscene3d.core.ShaderMaterial;
 import io.github.glynch.jscene3d.core.Texture;
 import io.github.glynch.jscene3d.core.TextureFilter;
 import io.github.glynch.jscene3d.core.TextureWrap;
@@ -35,6 +37,32 @@ import org.junit.jupiter.api.Test;
 import org.lwjgl.BufferUtils;
 
 final class RendererIT {
+    private static final String CUSTOM_VERTEX_SHADER = """
+            in vec3 position;
+
+            uniform mat4 modelViewMatrix;
+            uniform mat4 projectionMatrix;
+
+            void main() {
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+            """;
+    private static final String CUSTOM_FRAGMENT_SHADER = """
+            out vec4 fragmentColor;
+
+            uniform vec3 tint;
+            uniform float intensity;
+            uniform bool enabled;
+
+            void main() {
+            #ifdef USE_TINT
+                fragmentColor = vec4(enabled ? tint * intensity : vec3(0.0), 1.0);
+            #else
+                fragmentColor = vec4(1.0, 0.0, 1.0, 1.0);
+            #endif
+            }
+            """;
+
     @Test
     void rendersGeometryAndUploadsOnlyChangedData() {
         WindowOptions windowOptions = WindowOptions.builder()
@@ -291,6 +319,116 @@ final class RendererIT {
         }
     }
 
+    @Test
+    void rendersTypedCustomUniformsAndReusesTheStructuralProgram() {
+        WindowOptions windowOptions = WindowOptions.builder()
+                .size(320, 240)
+                .title("Shader material integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+
+        try (Window window = Window.create(windowOptions);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                ShaderMaterial firstMaterial = createCustomMaterial();
+                ShaderMaterial secondMaterial = createCustomMaterial()) {
+            firstMaterial.setUniform("tint", Color.RED);
+            firstMaterial.setUniform("intensity", 1.0f);
+            firstMaterial.setUniform("enabled", true);
+            secondMaterial.setUniform("tint", Color.BLUE);
+            secondMaterial.setUniform("intensity", 1.0f);
+            secondMaterial.setUniform("enabled", true);
+
+            Mesh triangle = new Mesh(geometry, firstMaterial);
+            Scene scene = new Scene();
+            scene.add(triangle);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsRed(window);
+            assertThat(renderer.info().resources().programCount()).isEqualTo(1);
+
+            triangle.setMaterial(secondMaterial);
+            renderer.render(scene, camera);
+
+            assertPixelIsBlue(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+            assertThat(renderer.info().resources().programCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void reportsMissingCustomUniformsAndNumberedCompilationFailures() {
+        try (Window window = Window.create("Shader diagnostics integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                ShaderMaterial missingUniform = createCustomMaterial();
+                ShaderMaterial invalidShader =
+                        new ShaderMaterial("in vec3 position; void main() { invalidToken }", CUSTOM_FRAGMENT_SHADER)) {
+            Scene scene = new Scene();
+            Mesh triangle = new Mesh(geometry, missingUniform);
+            scene.add(triangle);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessageContaining("ShaderMaterial has no value for active uniform:");
+
+            triangle.setMaterial(invalidShader);
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessageContaining("vertex shader compilation failed")
+                    .withMessageContaining("Numbered source:");
+        }
+    }
+
+    @Test
+    void bindsCustomTextureUniformsAndDeclaredTextureCoordinates() {
+        String vertexShader = """
+                in vec3 position;
+                in vec2 uv;
+                uniform mat4 modelViewMatrix;
+                uniform mat4 projectionMatrix;
+                out vec2 textureCoordinate;
+                void main() {
+                    textureCoordinate = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+                """;
+        String fragmentShader = """
+                in vec2 textureCoordinate;
+                uniform sampler2D colorMap;
+                out vec4 fragmentColor;
+                void main() {
+                    fragmentColor = texture(colorMap, vec2(textureCoordinate.x, 1.0 - textureCoordinate.y));
+                }
+                """;
+        try (Window window = Window.create("Custom texture uniform integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTexturedTriangle();
+                Texture texture = Texture.baseColor(1, 1, new byte[] {(byte) 0xff, 0, 0, (byte) 0xff});
+                ShaderMaterial material = ShaderMaterial.builder(vertexShader, fragmentShader)
+                        .requireAttribute(ShaderAttribute.UV)
+                        .build()) {
+            material.setUniform("colorMap", texture);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsRed(window);
+            assertThat(renderer.info().statistics().textureUploads()).isEqualTo(1);
+            assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(1);
+        }
+    }
+
     private static BufferGeometry createTriangle() {
         BufferGeometry geometry = new BufferGeometry();
         geometry.setAttribute(
@@ -309,6 +447,12 @@ final class RendererIT {
         return BufferGeometry.builder()
                 .positions(-0.25f, -0.25f, 0.0f, 0.25f, -0.25f, 0.0f, 0.0f, 0.25f, 0.0f)
                 .uvs(0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f)
+                .build();
+    }
+
+    private static ShaderMaterial createCustomMaterial() {
+        return ShaderMaterial.builder(CUSTOM_VERTEX_SHADER, CUSTOM_FRAGMENT_SHADER)
+                .define("USE_TINT")
                 .build();
     }
 

@@ -30,12 +30,14 @@ import org.jspecify.annotations.Nullable;
 /** Context-local GPU realization of one buffer geometry. */
 final class GeometryResource implements AutoCloseable {
     private static final int POSITION_LOCATION = 0;
-    private static final int COLOR_LOCATION = 1;
+    private static final int NORMAL_LOCATION = 1;
     private static final int UV_LOCATION = 2;
+    private static final int COLOR_LOCATION = 3;
 
     private final int vertexArray;
 
     private @Nullable AttributeResource positions;
+    private @Nullable AttributeResource normals;
     private @Nullable AttributeResource colors;
     private @Nullable AttributeResource uvs;
     private @Nullable IndexResource indices;
@@ -48,20 +50,29 @@ final class GeometryResource implements AutoCloseable {
     /** Synchronizes changed CPU attributes and indices into context-local GPU buffers. */
     void synchronize(
             BufferGeometry geometry,
+            boolean requiresNormals,
             boolean requiresVertexColors,
             boolean requiresTextureCoordinates,
+            String materialLabel,
             RenderStatistics statistics) {
         @Nullable BufferAttribute positionAttribute = geometry.attribute(BufferGeometry.POSITION);
+        @Nullable BufferAttribute normalAttribute = geometry.attribute(BufferGeometry.NORMAL);
         @Nullable BufferAttribute colorAttribute = geometry.attribute(BufferGeometry.COLOR);
         @Nullable BufferAttribute uvAttribute = geometry.attribute(BufferGeometry.UV);
+        if (requiresNormals && normalAttribute == null) {
+            throw new IllegalStateException(materialLabel + " requires a normal attribute but geometry has none");
+        }
+        if (normalAttribute != null && normalAttribute.itemSize() != 3) {
+            throw new IllegalStateException("normal attribute itemSize must be 3: " + normalAttribute.itemSize());
+        }
         if (requiresVertexColors && colorAttribute == null) {
-            throw new IllegalStateException("BasicMaterial uses vertex colors but geometry has no color attribute");
+            throw new IllegalStateException(materialLabel + " requires a color attribute but geometry has none");
         }
         if (colorAttribute != null && colorAttribute.itemSize() != 3 && colorAttribute.itemSize() != 4) {
             throw new IllegalStateException("color attribute itemSize must be 3 or 4: " + colorAttribute.itemSize());
         }
         if (requiresTextureCoordinates && uvAttribute == null) {
-            throw new IllegalStateException("BasicMaterial has a color map but geometry has no uv attribute");
+            throw new IllegalStateException(materialLabel + " requires a uv attribute but geometry has none");
         }
         if (uvAttribute != null && uvAttribute.itemSize() != 2) {
             throw new IllegalStateException("uv attribute itemSize must be 2: " + uvAttribute.itemSize());
@@ -69,6 +80,7 @@ final class GeometryResource implements AutoCloseable {
 
         glBindVertexArray(vertexArray);
         positions = synchronizeAttribute(positions, positionAttribute, POSITION_LOCATION, 3, true, statistics);
+        normals = synchronizeAttribute(normals, normalAttribute, NORMAL_LOCATION, 3, false, statistics);
         colors = synchronizeAttribute(
                 colors,
                 colorAttribute,
@@ -89,6 +101,7 @@ final class GeometryResource implements AutoCloseable {
     @Override
     public void close() {
         closeAttribute(positions);
+        closeAttribute(normals);
         closeAttribute(colors);
         closeAttribute(uvs);
         if (indices != null) {

@@ -5,11 +5,14 @@
 package io.github.glynch.jscene3d.core;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 import org.joml.Quaternionfc;
 import org.joml.Vector3fc;
 
 /** Reusable precondition checks for core arguments. */
 final class Preconditions {
+    private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_]\\w*");
+
     /** Prevents instantiation of this validation utility class. */
     private Preconditions() {
         throw new AssertionError("Preconditions cannot be instantiated");
@@ -91,6 +94,24 @@ final class Preconditions {
         String validValue = Objects.requireNonNull(value, parameterName);
         if (validValue.isEmpty()) {
             throw new IllegalArgumentException(parameterName + " must not be empty");
+        }
+        return validValue;
+    }
+
+    /** Requires a non-null, non-blank string. */
+    static String requireNonBlank(String value, String parameterName) {
+        String validValue = Objects.requireNonNull(value, parameterName);
+        if (validValue.isBlank()) {
+            throw new IllegalArgumentException(parameterName + " must not be blank");
+        }
+        return validValue;
+    }
+
+    /** Requires an identifier accepted by GLSL and Java-style named APIs. */
+    static String requireIdentifier(String value, String parameterName) {
+        String validValue = requireNonEmpty(value, parameterName);
+        if (!IDENTIFIER.matcher(validValue).matches() || validValue.startsWith("gl_")) {
+            throw new IllegalArgumentException(parameterName + " must be a valid non-reserved identifier: " + value);
         }
         return validValue;
     }

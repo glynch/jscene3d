@@ -9,6 +9,7 @@ import static org.lwjgl.opengl.GL20.GL_FRAGMENT_SHADER;
 import static org.lwjgl.opengl.GL20.GL_LINK_STATUS;
 import static org.lwjgl.opengl.GL20.GL_VERTEX_SHADER;
 import static org.lwjgl.opengl.GL20.glAttachShader;
+import static org.lwjgl.opengl.GL20.glBindAttribLocation;
 import static org.lwjgl.opengl.GL20.glCompileShader;
 import static org.lwjgl.opengl.GL20.glCreateProgram;
 import static org.lwjgl.opengl.GL20.glCreateShader;
@@ -22,6 +23,8 @@ import static org.lwjgl.opengl.GL20.glGetUniformLocation;
 import static org.lwjgl.opengl.GL20.glLinkProgram;
 import static org.lwjgl.opengl.GL20.glShaderSource;
 
+import java.util.Map;
+
 /** Shared compilation and validation for renderer-owned OpenGL programs. */
 final class ProgramSupport {
     /** Prevents instantiation of this shader-program utility class. */
@@ -31,6 +34,12 @@ final class ProgramSupport {
 
     /** Compiles two stages, links them, and releases intermediate shader objects. */
     static int createLinkedProgram(String label, String vertexSource, String fragmentSource) {
+        return createLinkedProgram(label, vertexSource, fragmentSource, Map.of());
+    }
+
+    /** Compiles two stages, binds named attributes, links them, and releases shader objects. */
+    static int createLinkedProgram(
+            String label, String vertexSource, String fragmentSource, Map<String, Integer> attributeBindings) {
         int vertexShader = compileShader(GL_VERTEX_SHADER, label, "vertex", vertexSource);
         int fragmentShader = 0;
         int program = 0;
@@ -39,6 +48,9 @@ final class ProgramSupport {
             program = glCreateProgram();
             glAttachShader(program, vertexShader);
             glAttachShader(program, fragmentShader);
+            for (Map.Entry<String, Integer> binding : attributeBindings.entrySet()) {
+                glBindAttribLocation(program, binding.getValue(), binding.getKey());
+            }
             glLinkProgram(program);
             if (glGetProgrami(program, GL_LINK_STATUS) == 0) {
                 throw new IllegalStateException(label + " program link failed:\n" + glGetProgramInfoLog(program));
@@ -74,9 +86,24 @@ final class ProgramSupport {
         if (glGetShaderi(shader, GL_COMPILE_STATUS) == 0) {
             String infoLog = glGetShaderInfoLog(shader);
             glDeleteShader(shader);
-            throw new IllegalStateException(
-                    programLabel + " " + stageLabel + " shader compilation failed:\n" + infoLog);
+            throw new IllegalStateException(programLabel
+                    + ' '
+                    + stageLabel
+                    + " shader compilation failed:\n"
+                    + infoLog
+                    + "\nNumbered source:\n"
+                    + numberSource(source));
         }
         return shader;
+    }
+
+    /** Adds stable one-based line numbers to diagnostic shader source. */
+    private static String numberSource(String source) {
+        String[] lines = source.split("\\R", -1);
+        StringBuilder numbered = new StringBuilder(source.length() + lines.length * 8);
+        for (int index = 0; index < lines.length; index++) {
+            numbered.append(index + 1).append(" | ").append(lines[index]).append('\n');
+        }
+        return numbered.toString();
     }
 }

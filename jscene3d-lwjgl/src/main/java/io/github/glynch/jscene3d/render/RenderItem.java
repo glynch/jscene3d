@@ -4,8 +4,8 @@
  */
 package io.github.glynch.jscene3d.render;
 
-import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BufferGeometry;
+import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.Mesh;
 import java.util.Objects;
 import org.joml.Matrix4fc;
@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
 final class RenderItem {
     private @Nullable Mesh mesh;
     private @Nullable BufferGeometry geometry;
-    private @Nullable BasicMaterial material;
+    private @Nullable Material material;
     private @Nullable Matrix4fc worldMatrix;
     private int elementCount;
     private int materialSortKey;
@@ -50,7 +50,7 @@ final class RenderItem {
     void assign(
             Mesh mesh,
             BufferGeometry geometry,
-            BasicMaterial material,
+            Material material,
             Matrix4fc worldMatrix,
             int elementCount,
             float cameraDepth,
@@ -76,8 +76,8 @@ final class RenderItem {
         return Objects.requireNonNull(geometry, "Inactive render item has no geometry");
     }
 
-    /** Returns the active basic material. */
-    BasicMaterial material() {
+    /** Returns the active material. */
+    Material material() {
         return Objects.requireNonNull(material, "Inactive render item has no material");
     }
 

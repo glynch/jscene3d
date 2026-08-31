@@ -11,6 +11,7 @@ import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.Object3D;
 import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.core.ShaderMaterial;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,7 +104,7 @@ final class RenderList {
         if (elementCount == 0) {
             return;
         }
-        if (!(material instanceof BasicMaterial basicMaterial)) {
+        if (!(material instanceof BasicMaterial) && !(material instanceof ShaderMaterial)) {
             throw new IllegalStateException(
                     "Unsupported material type: " + material.getClass().getName());
         }
@@ -126,8 +127,8 @@ final class RenderList {
         float worldZ = worldMatrix.m32();
         float cameraDepth =
                 viewMatrix.m02() * worldX + viewMatrix.m12() * worldY + viewMatrix.m22() * worldZ + viewMatrix.m32();
-        item.assign(mesh, geometry, basicMaterial, worldMatrix, elementCount, cameraDepth, traversalOrder++);
-        if (basicMaterial.transparent()) {
+        item.assign(mesh, geometry, material, worldMatrix, elementCount, cameraDepth, traversalOrder++);
+        if (material.transparent()) {
             transparentItems.add(item);
         } else {
             opaqueItems.add(item);

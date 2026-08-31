@@ -46,8 +46,8 @@ Build and run the visible basic-triangle example with:
 ```
 
 `TransformsExample`, `HierarchyExample`, `CamerasExample`,
-`BufferGeometryExample`, `TexturedCubeExample`, `TransparencyExample`, and
-`OrbitControlsExample` are also available using the same command. In
+`BufferGeometryExample`, `TexturedCubeExample`, `TransparencyExample`,
+`ShaderMaterialExample`, and `OrbitControlsExample` are also available using the same command. In
 `OrbitControlsExample`, drag with the left mouse button to
 orbit; drag with the right mouse button or Shift-left to pan; and use the middle
 mouse button or scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates.
@@ -70,6 +70,19 @@ or triangles that overlap within one transparent mesh. Applications commonly
 disable depth writes for blended surfaces with `setDepthWriteEnabled(false)`,
 as demonstrated by `TransparencyExample`; the choice remains explicit because
 some effects require depth writes.
+
+## Custom shaders
+
+`ShaderMaterial` accepts immutable OpenGL 3.3 Core vertex and fragment source,
+optional preprocessor definitions, and declared standard attribute requirements.
+Runtime values use typed `setUniform` overloads; JOML vectors and matrices are
+copied, while textures remain shared and application-owned.
+
+The renderer supplies any active `modelMatrix`, `viewMatrix`,
+`projectionMatrix`, `modelViewMatrix`, and `normalMatrix` uniforms. Version 0.1
+supports scalar, boolean, vector, matrix, `Color`, and two-dimensional `Texture`
+uniforms. Uniform and attribute arrays, custom vertex attributes, uniform
+blocks, and raw OpenGL access are not supported.
 
 ## Project structure
 

@@ -26,11 +26,17 @@ import static org.lwjgl.opengl.GL11.glDrawArrays;
 import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glFrontFace;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL11.glViewport;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS;
+import static org.lwjgl.opengl.GL20.glUniform1f;
 import static org.lwjgl.opengl.GL20.glUniform1i;
+import static org.lwjgl.opengl.GL20.glUniform2f;
+import static org.lwjgl.opengl.GL20.glUniform3f;
 import static org.lwjgl.opengl.GL20.glUniform4f;
+import static org.lwjgl.opengl.GL20.glUniformMatrix3fv;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_SRGB;
@@ -44,13 +50,19 @@ import io.github.glynch.jscene3d.core.IndexBuffer;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.MaterialSide;
 import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.core.ShaderAttribute;
+import io.github.glynch.jscene3d.core.ShaderMaterial;
+import io.github.glynch.jscene3d.core.ShaderUniform;
+import io.github.glynch.jscene3d.core.ShaderUniformType;
 import io.github.glynch.jscene3d.core.Texture;
 import io.github.glynch.jscene3d.internal.WindowContextRegistry;
 import io.github.glynch.jscene3d.platform.Window;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 
@@ -64,10 +76,13 @@ public final class Renderer implements AutoCloseable {
     private final ResourceStatistics resources;
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
     private final IdentityHashMap<Texture, TextureResource> textureResources;
+    private final Map<ShaderProgramKey, ShaderProgram> shaderPrograms;
     private final RenderList renderList;
     private final Frustum frustum;
     private final float[] matrixValues;
+    private final float[] matrix3Values;
     private final OverlayCanvas overlayCanvas;
+    private final int maxTextureUnits;
 
     private Color clearColor;
     private float clearAlpha;
@@ -93,10 +108,13 @@ public final class Renderer implements AutoCloseable {
         resources = info.resources();
         geometryResources = new IdentityHashMap<>();
         textureResources = new IdentityHashMap<>();
+        shaderPrograms = new HashMap<>();
         renderList = new RenderList();
         frustum = new Frustum();
         matrixValues = new float[16];
+        matrix3Values = new float[9];
         overlayCanvas = new OverlayCanvas();
+        maxTextureUnits = glGetInteger(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
     }
 
     /**
@@ -304,6 +322,10 @@ public final class Renderer implements AutoCloseable {
                 resource.close();
             }
             textureResources.clear();
+            for (ShaderProgram program : shaderPrograms.values()) {
+                program.close();
+            }
+            shaderPrograms.clear();
             if (basicProgram != null) {
                 basicProgram.close();
                 basicProgram = null;
@@ -331,16 +353,39 @@ public final class Renderer implements AutoCloseable {
     /** Synchronizes and submits one prepared mesh draw. */
     private void renderMesh(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
         BufferGeometry geometry = item.geometry();
-        BasicMaterial material = item.material();
-        BasicProgram program = basicProgram();
+        Material material = item.material();
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
+        resources.setActiveGeometryResources(geometryResources.size());
+        applyMaterialState(material);
+        switch (material) {
+            case BasicMaterial basicMaterial ->
+                renderBasicMesh(item, geometry, basicMaterial, resource, viewMatrix, projectionMatrix);
+            case ShaderMaterial shaderMaterial ->
+                renderShaderMesh(item, geometry, shaderMaterial, resource, viewMatrix, projectionMatrix);
+            default ->
+                throw new IllegalStateException(
+                        "Unsupported material type: " + material.getClass().getName());
+        }
+
+        resource.bind();
+        drawGeometry(geometry, item.elementCount());
+    }
+
+    /** Synchronizes and binds one built-in basic-material draw. */
+    private void renderBasicMesh(
+            RenderItem item,
+            BufferGeometry geometry,
+            BasicMaterial material,
+            GeometryResource resource,
+            Matrix4fc viewMatrix,
+            Matrix4fc projectionMatrix) {
+        BasicProgram program = basicProgram();
         @Nullable Texture colorMap = material.colorMap().orElse(null);
         if (colorMap != null && colorMap.isClosed()) {
             throw new IllegalStateException("BasicMaterial colorMap is closed");
         }
-        resources.setActiveGeometryResources(geometryResources.size());
-        resource.synchronize(geometry, material.usesVertexColors(), colorMap != null, statistics);
-        applyMaterialState(material);
+        resource.synchronize(
+                geometry, false, material.usesVertexColors(), colorMap != null, "BasicMaterial", statistics);
 
         glUseProgram(program.id());
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
@@ -362,10 +407,33 @@ public final class Renderer implements AutoCloseable {
             glUniform1i(program.colorMapLocation(), 0);
             glUniform1i(program.useColorMapLocation(), 1);
         }
-        resource.bind();
+    }
 
+    /** Synchronizes and binds one custom shader-material draw. */
+    private void renderShaderMesh(
+            RenderItem item,
+            BufferGeometry geometry,
+            ShaderMaterial material,
+            GeometryResource resource,
+            Matrix4fc viewMatrix,
+            Matrix4fc projectionMatrix) {
+        ShaderProgram program = shaderProgram(material);
+        Set<ShaderAttribute> requiredAttributes = material.requiredAttributes();
+        resource.synchronize(
+                geometry,
+                requiredAttributes.contains(ShaderAttribute.NORMAL),
+                requiredAttributes.contains(ShaderAttribute.COLOR),
+                requiredAttributes.contains(ShaderAttribute.UV),
+                "ShaderMaterial",
+                statistics);
+        glUseProgram(program.id());
+        program.uploadAutomaticUniforms(item.worldMatrix(), viewMatrix, projectionMatrix);
+        uploadApplicationUniforms(program, material);
+    }
+
+    /** Issues one indexed or non-indexed triangle draw and records its statistics. */
+    private void drawGeometry(BufferGeometry geometry, int elementCount) {
         int start = geometry.drawRangeStart();
-        int elementCount = item.elementCount();
         IndexBuffer index = geometry.index();
         if (index == null) {
             glDrawArrays(GL_TRIANGLES, start, elementCount);
@@ -373,6 +441,103 @@ public final class Renderer implements AutoCloseable {
             glDrawElements(GL_TRIANGLES, elementCount, GL_UNSIGNED_INT, (long) start * Integer.BYTES);
         }
         statistics.recordDraw(elementCount);
+    }
+
+    /** Resolves a shared custom program, caching only a successful realization. */
+    private ShaderProgram shaderProgram(ShaderMaterial material) {
+        ShaderProgramKey key = ShaderProgramKey.from(material);
+        ShaderProgram program = shaderPrograms.get(key);
+        if (program == null) {
+            program = ShaderProgram.create(key);
+            shaderPrograms.put(key, program);
+            updateProgramCount();
+        }
+        return program;
+    }
+
+    /** Validates and uploads every active application-controlled uniform. */
+    private void uploadApplicationUniforms(ShaderProgram program, ShaderMaterial material) {
+        Map<String, ShaderUniform> values = material.uniforms();
+        int textureUnit = 0;
+        for (ShaderProgram.ActiveUniform activeUniform : program.applicationUniforms()) {
+            ShaderUniform value = values.get(activeUniform.name());
+            if (value == null) {
+                throw new IllegalStateException(
+                        "ShaderMaterial has no value for active uniform: " + activeUniform.name());
+            }
+            requireCompatibleUniformType(activeUniform, value);
+            int location = activeUniform.location();
+            switch (value.type()) {
+                case FLOAT -> glUniform1f(location, value.floatComponent(0));
+                case INTEGER -> glUniform1i(location, value.integerValue());
+                case BOOLEAN -> glUniform1i(location, value.booleanValue() ? 1 : 0);
+                case VECTOR2 -> glUniform2f(location, value.floatComponent(0), value.floatComponent(1));
+                case VECTOR3, COLOR ->
+                    glUniform3f(location, value.floatComponent(0), value.floatComponent(1), value.floatComponent(2));
+                case VECTOR4 ->
+                    glUniform4f(
+                            location,
+                            value.floatComponent(0),
+                            value.floatComponent(1),
+                            value.floatComponent(2),
+                            value.floatComponent(3));
+                case MATRIX3 -> uploadUniformMatrix3(location, value);
+                case MATRIX4 -> uploadUniformMatrix4(location, value);
+                case TEXTURE -> {
+                    bindUniformTexture(activeUniform.name(), location, value.textureValue(), textureUnit);
+                    textureUnit++;
+                }
+            }
+        }
+    }
+
+    /** Requires a configured Java uniform type to match its active GLSL declaration. */
+    private static void requireCompatibleUniformType(
+            ShaderProgram.ActiveUniform activeUniform, ShaderUniform configuredUniform) {
+        ShaderUniformType expected = activeUniform.type();
+        ShaderUniformType actual = configuredUniform.type();
+        boolean compatible =
+                expected == actual || (expected == ShaderUniformType.VECTOR3 && actual == ShaderUniformType.COLOR);
+        if (!compatible) {
+            throw new IllegalStateException("ShaderMaterial uniform "
+                    + activeUniform.name()
+                    + " is configured as "
+                    + actual
+                    + ", but active GLSL expects "
+                    + expected);
+        }
+    }
+
+    /** Copies and uploads one configured three-by-three matrix. */
+    private void uploadUniformMatrix3(int location, ShaderUniform uniform) {
+        for (int index = 0; index < matrix3Values.length; index++) {
+            matrix3Values[index] = uniform.floatComponent(index);
+        }
+        glUniformMatrix3fv(location, false, matrix3Values);
+    }
+
+    /** Copies and uploads one configured four-by-four matrix. */
+    private void uploadUniformMatrix4(int location, ShaderUniform uniform) {
+        for (int index = 0; index < matrixValues.length; index++) {
+            matrixValues[index] = uniform.floatComponent(index);
+        }
+        glUniformMatrix4fv(location, false, matrixValues);
+    }
+
+    /** Synchronizes and binds one active texture uniform to a consecutive texture unit. */
+    private void bindUniformTexture(String name, int location, Texture texture, int textureUnit) {
+        if (texture.isClosed()) {
+            throw new IllegalStateException("ShaderMaterial texture uniform is closed: " + name);
+        }
+        if (textureUnit >= maxTextureUnits) {
+            throw new IllegalStateException(
+                    "ShaderMaterial requires more texture units than this context supports: " + (textureUnit + 1));
+        }
+        glActiveTexture(GL_TEXTURE0 + textureUnit);
+        TextureResource textureResource = textureResources.computeIfAbsent(texture, ignored -> new TextureResource());
+        resources.setActiveTextureResources(textureResources.size());
+        textureResource.synchronize(texture, statistics);
+        glUniform1i(location, textureUnit);
     }
 
     /** Lazily creates and returns the context-local built-in program. */
@@ -403,7 +568,8 @@ public final class Renderer implements AutoCloseable {
 
     /** Synchronizes the diagnostic program count with realized built-in programs. */
     private void updateProgramCount() {
-        resources.setProgramCount((basicProgram == null ? 0 : 1) + (overlayRenderer == null ? 0 : 1));
+        resources.setProgramCount(
+                (basicProgram == null ? 0 : 1) + (overlayRenderer == null ? 0 : 1) + shaderPrograms.size());
     }
 
     /** Applies depth, blending, and face-culling state for one material. */

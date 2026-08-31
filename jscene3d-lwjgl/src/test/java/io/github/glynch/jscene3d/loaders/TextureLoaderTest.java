@@ -7,8 +7,8 @@ package io.github.glynch.jscene3d.loaders;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import io.github.glynch.jscene3d.core.Texture;
-import io.github.glynch.jscene3d.core.TextureColorSpace;
+import io.github.glynch.jscene3d.textures.Texture;
+import io.github.glynch.jscene3d.textures.TextureColorSpace;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.render;
 
+import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
 

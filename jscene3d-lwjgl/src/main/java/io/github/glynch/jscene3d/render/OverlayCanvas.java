@@ -4,7 +4,8 @@
  */
 package io.github.glynch.jscene3d.render;
 
-import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
+import io.github.glynch.jscene3d.math.Color;
 import java.util.Arrays;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -50,7 +51,7 @@ public final class OverlayCanvas {
             return;
         }
         beginCommand(null);
-        rectangleVertices(x, y, width, height, color, alpha, -1.0f, -1.0f, -1.0f, -1.0f);
+        rectangleVertices(x, y, width, height, color, alpha, null);
     }
 
     /**
@@ -151,17 +152,7 @@ public final class OverlayCanvas {
             return;
         }
         beginCommand(validRegion.image());
-        rectangleVertices(
-                x,
-                y,
-                width,
-                height,
-                color,
-                alpha,
-                validRegion.minimumU(),
-                validRegion.minimumV(),
-                validRegion.maximumU(),
-                validRegion.maximumV());
+        rectangleVertices(x, y, width, height, color, alpha, validRegion);
     }
 
     /** Clears all accumulated vertices and commands while retaining storage. */
@@ -244,7 +235,7 @@ public final class OverlayCanvas {
         activeImage = null;
     }
 
-    /** Appends a rectangle with explicit texture coordinates. */
+    /** Appends a solid or alpha-masked rectangle using an optional image region. */
     private void rectangleVertices(
             float x,
             float y,
@@ -252,10 +243,11 @@ public final class OverlayCanvas {
             float height,
             Color color,
             float alpha,
-            float minimumU,
-            float minimumV,
-            float maximumU,
-            float maximumV) {
+            OverlayImage.@Nullable Region region) {
+        float minimumU = region == null ? -1.0f : region.minimumU();
+        float minimumV = region == null ? -1.0f : region.minimumV();
+        float maximumU = region == null ? -1.0f : region.maximumU();
+        float maximumV = region == null ? -1.0f : region.maximumV();
         ensureVertexCapacity(RECTANGLE_VERTEX_COUNT * COMPONENTS_PER_VERTEX);
         vertex(x, y, minimumU, minimumV, color, alpha);
         vertex(x + width, y, maximumU, minimumV, color, alpha);

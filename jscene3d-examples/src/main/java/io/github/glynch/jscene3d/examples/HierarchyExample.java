@@ -4,10 +4,10 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.Group;
-import io.github.glynch.jscene3d.core.Object3D;
-import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Group;
+import io.github.glynch.jscene3d.objects.Object3D;
+import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

@@ -131,6 +131,14 @@ threads.
 - `jscene3d-gui` uses JPMS module name
   `io.github.glynch.jscene3d.gui`.
 - Export only intentional caller packages.
+- Organize public core types by feature package: `cameras`, `geometries`,
+  `helpers`, `lights`, `materials`, `math`, `objects`, `scenes`, and `textures`.
+  Do not recreate a broad `core` package as a general dumping ground.
+- Keep renderer orchestration and its supported diagnostics and overlay boundary
+  in `render`; place render-list, program, and GPU-resource implementation in
+  unexported `render.internal` packages.
+- Keep optional GUI controls and themes in `gui`; place font, drawing-adapter,
+  and validation implementation in unexported `gui.internal` packages.
 - Keep implementation in unexported `.internal` packages and prefer
   package-private implementation types.
 - Never use split packages across artifacts.

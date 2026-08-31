@@ -4,17 +4,17 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_THREE;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
-import io.github.glynch.jscene3d.core.AxesHelper;
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.GridHelper;
-import io.github.glynch.jscene3d.core.PerspectiveCamera;
-import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.helpers.AxesHelper;
+import io.github.glynch.jscene3d.helpers.GridHelper;
+import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.Renderer;
+import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays an XZ reference grid and colored positive coordinate axes. */
 public final class HelpersExample {

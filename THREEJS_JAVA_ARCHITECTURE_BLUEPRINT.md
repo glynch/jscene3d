@@ -377,12 +377,19 @@ direction rather than requiring one class per line immediately.
 
 ```text
 io.github.glynch.jscene3d
-├── core
+├── math
+│   ├── Color
+│   ├── BoundingBox
+│   ├── BoundingSphere
+│   └── Angles
+├── objects
 │   ├── Object3D
 │   ├── Group
-│   ├── Scene
-│   ├── Layers
-│   └── traversal utilities
+│   ├── Mesh
+│   ├── Line
+│   └── LineSegments
+├── scenes
+│   └── Scene
 ├── cameras
 │   ├── Camera
 │   ├── PerspectiveCamera
@@ -391,8 +398,6 @@ io.github.glynch.jscene3d
 │   ├── BufferGeometry
 │   ├── BufferAttribute
 │   ├── IndexBuffer
-│   ├── BoundingBox
-│   ├── BoundingSphere
 │   └── generators
 ├── materials
 │   ├── Material
@@ -400,8 +405,7 @@ io.github.glynch.jscene3d
 │   ├── LambertMaterial
 │   ├── LineBasicMaterial
 │   ├── ShaderMaterial
-│   ├── RenderSide
-│   ├── BlendMode
+│   ├── MaterialSide
 │   └── DepthFunction
 ├── lights
 │   ├── Light
@@ -409,17 +413,12 @@ io.github.glynch.jscene3d
 │   └── PointLight
 ├── textures
 │   ├── Texture
-│   ├── ImageData
 │   ├── TextureFilter
 │   └── TextureWrap
-├── objects
-│   ├── Mesh
-│   ├── Line
-│   ├── LineSegments
-│   └── helpers
-│       ├── AxesHelper
-│       ├── GridHelper
-│       └── BoxHelper
+├── helpers
+│   ├── AxesHelper
+│   ├── GridHelper
+│   └── BoxHelper
 ├── render
 │   ├── Renderer
 │   ├── RendererOptions
@@ -429,22 +428,23 @@ io.github.glynch.jscene3d
 │   └── internal
 │       ├── RenderList
 │       ├── RenderItem
-│       ├── GeometryStore
-│       ├── TextureStore
-│       ├── ProgramCache
-│       ├── ShaderCompiler
-│       ├── UniformBinder
-│       ├── GlStateCache
-│       └── Frustum
+│       ├── Frustum
+│       ├── programs
+│       └── resources
 ├── platform
 │   ├── Window
 │   ├── WindowOptions
 │   ├── InputState
 │   ├── Key
-│   ├── MouseButton
-│   └── glfw
+│   └── MouseButton
 ├── controls
 │   └── OrbitControls
+├── loaders
+│   └── TextureLoader
+├── gui
+│   ├── ControlPanel
+│   ├── FpsMonitor
+│   └── GuiTheme
 └── examples
     ├── TriangleExample
     ├── HierarchyExample
@@ -455,9 +455,9 @@ io.github.glynch.jscene3d
 Recommended dependency direction:
 
 ```text
-core <- cameras
-core + geometries + materials <- objects
-core + cameras + geometries + materials + textures <- render
+math <- geometries + materials + textures
+objects + geometries + materials <- cameras + lights + scenes + helpers
+cameras + geometries + lights + materials + objects + scenes + textures <- render
 LWJGL OpenGL <- render implementation
 LWJGL GLFW <- platform implementation
 ```

@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.math.Color;
 import org.junit.jupiter.api.Test;
 
 final class OverlayCanvasTest {

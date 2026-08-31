@@ -4,11 +4,11 @@
  */
 package io.github.glynch.jscene3d.controls;
 
-import static io.github.glynch.jscene3d.core.Angles.PI;
-import static io.github.glynch.jscene3d.core.Angles.TWO_PI;
+import static io.github.glynch.jscene3d.math.Angles.PI;
+import static io.github.glynch.jscene3d.math.Angles.TWO_PI;
 
-import io.github.glynch.jscene3d.core.Camera;
-import io.github.glynch.jscene3d.core.OrthographicCamera;
+import io.github.glynch.jscene3d.cameras.Camera;
+import io.github.glynch.jscene3d.cameras.OrthographicCamera;
 import io.github.glynch.jscene3d.platform.InputState;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.MouseButton;

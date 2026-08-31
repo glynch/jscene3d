@@ -4,10 +4,10 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_THREE;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
-import io.github.glynch.jscene3d.core.PerspectiveCamera;
 import io.github.glynch.jscene3d.gui.ControlPanel;
 import io.github.glynch.jscene3d.gui.FpsMonitor;
 import io.github.glynch.jscene3d.platform.Key;

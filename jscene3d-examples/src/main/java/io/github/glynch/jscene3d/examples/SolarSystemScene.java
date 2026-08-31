@@ -4,19 +4,19 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_TWO;
-import static io.github.glynch.jscene3d.core.Angles.TWO_PI;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_TWO;
+import static io.github.glynch.jscene3d.math.Angles.TWO_PI;
 
-import io.github.glynch.jscene3d.core.AmbientLight;
-import io.github.glynch.jscene3d.core.BasicMaterial;
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.Group;
-import io.github.glynch.jscene3d.core.LambertMaterial;
-import io.github.glynch.jscene3d.core.MaterialSide;
-import io.github.glynch.jscene3d.core.Mesh;
-import io.github.glynch.jscene3d.core.PointLight;
-import io.github.glynch.jscene3d.core.RotationOrder;
-import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.lights.AmbientLight;
+import io.github.glynch.jscene3d.lights.PointLight;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.materials.LambertMaterial;
+import io.github.glynch.jscene3d.materials.MaterialSide;
+import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Group;
+import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.objects.RotationOrder;
+import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,7 +28,7 @@ final class SolarSystemScene implements AutoCloseable {
     private final Scene scene = new Scene();
     private final List<OrbitingBody> orbitingBodies = new ArrayList<>();
     private final Mesh starField;
-    private final Mesh sun;
+    private final Mesh sunMesh;
 
     private boolean paused;
     private float timeScale = DEFAULT_TIME_SCALE;
@@ -40,8 +40,8 @@ final class SolarSystemScene implements AutoCloseable {
         scene.setBackground(Color.BLACK);
         starField = createStarField();
         scene.add(starField);
-        sun = createSun();
-        scene.add(sun);
+        sunMesh = createSun();
+        scene.add(sunMesh);
         scene.add(new AmbientLight(Color.srgb(0x8fa0c0), 0.06f));
 
         PointLight sunlight = new PointLight(Color.srgb(0xfff1d0), 1.35f);
@@ -124,7 +124,7 @@ final class SolarSystemScene implements AutoCloseable {
             orbitingBodies.get(index).advance(scaledSeconds);
         }
         sunRotation = (sunRotation + scaledSeconds * 0.12f) % TWO_PI;
-        sun.setRotationFromEuler(0.0f, sunRotation, 0.0f, RotationOrder.XYZ);
+        sunMesh.setRotationFromEuler(0.0f, sunRotation, 0.0f, RotationOrder.XYZ);
     }
 
     /** Restores the initial arrangement without changing pause or display settings. */
@@ -133,7 +133,7 @@ final class SolarSystemScene implements AutoCloseable {
             orbitingBodies.get(index).reset();
         }
         sunRotation = 0.0f;
-        sun.setRotationFromEuler(0.0f, 0.0f, 0.0f, RotationOrder.XYZ);
+        sunMesh.setRotationFromEuler(0.0f, 0.0f, 0.0f, RotationOrder.XYZ);
     }
 
     /** Closes all geometry, texture, and material descriptions owned by this scene. */

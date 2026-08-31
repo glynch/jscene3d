@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.controls;
 
-import static io.github.glynch.jscene3d.core.Angles.PI;
+import static io.github.glynch.jscene3d.math.Angles.PI;
 
 /** Package-private validated distance, zoom, and angle limits for orbit state application. */
 final class OrbitLimits {

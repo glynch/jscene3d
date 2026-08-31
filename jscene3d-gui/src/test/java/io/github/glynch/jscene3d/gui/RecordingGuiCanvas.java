@@ -4,7 +4,8 @@
  */
 package io.github.glynch.jscene3d.gui;
 
-import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.gui.internal.GuiCanvas;
+import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.render.OverlayImage;
 import java.util.ArrayList;
 import java.util.List;

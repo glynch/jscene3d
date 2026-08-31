@@ -4,15 +4,15 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import io.github.glynch.jscene3d.core.BasicMaterial;
-import io.github.glynch.jscene3d.core.BufferGeometry;
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.LambertMaterial;
-import io.github.glynch.jscene3d.core.Material;
-import io.github.glynch.jscene3d.core.RingGeometry;
-import io.github.glynch.jscene3d.core.SphereGeometry;
-import io.github.glynch.jscene3d.core.Texture;
+import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.RingGeometry;
+import io.github.glynch.jscene3d.geometries.SphereGeometry;
 import io.github.glynch.jscene3d.loaders.TextureLoader;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.materials.LambertMaterial;
+import io.github.glynch.jscene3d.materials.Material;
+import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.textures.Texture;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;

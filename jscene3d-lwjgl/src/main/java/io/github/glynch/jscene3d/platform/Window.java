@@ -23,7 +23,7 @@ import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
 import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
-import io.github.glynch.jscene3d.internal.WindowContextRegistry;
+import io.github.glynch.jscene3d.lwjgl.internal.WindowContextRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

@@ -50,23 +50,36 @@ import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_SRGB;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 
-import io.github.glynch.jscene3d.core.BasicMaterial;
-import io.github.glynch.jscene3d.core.BufferGeometry;
-import io.github.glynch.jscene3d.core.Camera;
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.IndexBuffer;
-import io.github.glynch.jscene3d.core.LambertMaterial;
-import io.github.glynch.jscene3d.core.LineBasicMaterial;
-import io.github.glynch.jscene3d.core.Material;
-import io.github.glynch.jscene3d.core.MaterialSide;
-import io.github.glynch.jscene3d.core.Scene;
-import io.github.glynch.jscene3d.core.ShaderAttribute;
-import io.github.glynch.jscene3d.core.ShaderMaterial;
-import io.github.glynch.jscene3d.core.ShaderUniform;
-import io.github.glynch.jscene3d.core.ShaderUniformType;
-import io.github.glynch.jscene3d.core.Texture;
-import io.github.glynch.jscene3d.internal.WindowContextRegistry;
+import io.github.glynch.jscene3d.cameras.Camera;
+import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.IndexBuffer;
+import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
+import io.github.glynch.jscene3d.lwjgl.internal.WindowContextRegistry;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.materials.LambertMaterial;
+import io.github.glynch.jscene3d.materials.LineBasicMaterial;
+import io.github.glynch.jscene3d.materials.Material;
+import io.github.glynch.jscene3d.materials.MaterialSide;
+import io.github.glynch.jscene3d.materials.ShaderAttribute;
+import io.github.glynch.jscene3d.materials.ShaderMaterial;
+import io.github.glynch.jscene3d.materials.ShaderUniform;
+import io.github.glynch.jscene3d.materials.ShaderUniformType;
+import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.platform.Window;
+import io.github.glynch.jscene3d.render.internal.Frustum;
+import io.github.glynch.jscene3d.render.internal.PrimitiveTopology;
+import io.github.glynch.jscene3d.render.internal.RenderItem;
+import io.github.glynch.jscene3d.render.internal.RenderList;
+import io.github.glynch.jscene3d.render.internal.programs.BasicProgram;
+import io.github.glynch.jscene3d.render.internal.programs.LambertProgram;
+import io.github.glynch.jscene3d.render.internal.programs.LineProgram;
+import io.github.glynch.jscene3d.render.internal.programs.ShaderProgram;
+import io.github.glynch.jscene3d.render.internal.programs.ShaderProgramKey;
+import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
+import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
+import io.github.glynch.jscene3d.render.internal.resources.TextureResource;
+import io.github.glynch.jscene3d.scenes.Scene;
+import io.github.glynch.jscene3d.textures.Texture;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -196,7 +209,9 @@ public final class Renderer implements AutoCloseable {
                 Matrix4fc viewMatrix = validCamera.viewMatrix();
                 Matrix4fc projectionMatrix = validCamera.projectionMatrix();
                 frustum.update(viewMatrix, projectionMatrix);
-                renderList.build(validScene, viewMatrix, frustum, statistics);
+                renderList.build(validScene, viewMatrix, frustum);
+                statistics.recordCulledMeshes(renderList.culledMeshes());
+                statistics.recordCulledLines(renderList.culledLines());
                 for (int index = 0; index < renderList.opaqueCount(); index++) {
                     renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix);
                 }
@@ -410,7 +425,7 @@ public final class Renderer implements AutoCloseable {
             Matrix4fc viewMatrix,
             Matrix4fc projectionMatrix) {
         LineProgram program = lineProgram();
-        resource.synchronize(geometry, false, material.usesVertexColors(), false, "LineBasicMaterial", statistics);
+        recordUploads(resource.synchronize(geometry, false, material.usesVertexColors(), false, "LineBasicMaterial"));
         glUseProgram(program.id());
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
@@ -434,8 +449,8 @@ public final class Renderer implements AutoCloseable {
         if (colorMap != null && colorMap.isClosed()) {
             throw new IllegalStateException("BasicMaterial colorMap is closed");
         }
-        resource.synchronize(
-                geometry, false, material.usesVertexColors(), colorMap != null, "BasicMaterial", statistics);
+        recordUploads(
+                resource.synchronize(geometry, false, material.usesVertexColors(), colorMap != null, "BasicMaterial"));
 
         glUseProgram(program.id());
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
@@ -453,7 +468,7 @@ public final class Renderer implements AutoCloseable {
             TextureResource textureResource =
                     textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
             resources.setActiveTextureResources(textureResources.size());
-            textureResource.synchronize(colorMap, statistics);
+            synchronizeTexture(textureResource, colorMap);
             glUniform1i(program.colorMapLocation(), 0);
             glUniform1i(program.useColorMapLocation(), 1);
         }
@@ -472,8 +487,8 @@ public final class Renderer implements AutoCloseable {
         if (colorMap != null && colorMap.isClosed()) {
             throw new IllegalStateException("LambertMaterial colorMap is closed");
         }
-        resource.synchronize(
-                geometry, true, material.usesVertexColors(), colorMap != null, "LambertMaterial", statistics);
+        recordUploads(
+                resource.synchronize(geometry, true, material.usesVertexColors(), colorMap != null, "LambertMaterial"));
 
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
@@ -490,7 +505,7 @@ public final class Renderer implements AutoCloseable {
             TextureResource textureResource =
                     textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
             resources.setActiveTextureResources(textureResources.size());
-            textureResource.synchronize(colorMap, statistics);
+            synchronizeTexture(textureResource, colorMap);
             glUniform1i(program.colorMapLocation(), 0);
             glUniform1i(program.useColorMapLocation(), 1);
         }
@@ -506,13 +521,12 @@ public final class Renderer implements AutoCloseable {
             Matrix4fc projectionMatrix) {
         ShaderProgram program = shaderProgram(material);
         Set<ShaderAttribute> requiredAttributes = material.requiredAttributes();
-        resource.synchronize(
+        recordUploads(resource.synchronize(
                 geometry,
                 requiredAttributes.contains(ShaderAttribute.NORMAL),
                 requiredAttributes.contains(ShaderAttribute.COLOR),
                 requiredAttributes.contains(ShaderAttribute.UV),
-                "ShaderMaterial",
-                statistics);
+                "ShaderMaterial"));
         glUseProgram(program.id());
         program.uploadAutomaticUniforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         uploadApplicationUniforms(program, material);
@@ -627,8 +641,21 @@ public final class Renderer implements AutoCloseable {
         glActiveTexture(GL_TEXTURE0 + textureUnit);
         TextureResource textureResource = textureResources.computeIfAbsent(texture, ignored -> new TextureResource());
         resources.setActiveTextureResources(textureResources.size());
-        textureResource.synchronize(texture, statistics);
+        synchronizeTexture(textureResource, texture);
         glUniform1i(location, textureUnit);
+    }
+
+    /** Records the buffer uploads performed while synchronizing one geometry. */
+    private void recordUploads(GeometryResource.UploadResult uploads) {
+        statistics.recordUploads(uploads.count(), uploads.byteCount());
+    }
+
+    /** Synchronizes one texture and records an image upload when one occurred. */
+    private void synchronizeTexture(TextureResource resource, Texture texture) {
+        long uploadedBytes = resource.synchronize(texture);
+        if (uploadedBytes > 0L) {
+            statistics.recordTextureUpload(uploadedBytes);
+        }
     }
 
     /** Lazily creates and returns the context-local built-in program. */

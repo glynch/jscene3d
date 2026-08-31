@@ -4,7 +4,8 @@
  */
 package io.github.glynch.jscene3d.render;
 
-import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
+import io.github.glynch.jscene3d.math.Color;
 import java.util.Objects;
 
 /** Immutable options used to create a renderer. */

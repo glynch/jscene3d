@@ -4,26 +4,26 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_THREE;
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_TWO;
-import static io.github.glynch.jscene3d.core.Angles.TWO_PI;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_TWO;
+import static io.github.glynch.jscene3d.math.Angles.TWO_PI;
 
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
-import io.github.glynch.jscene3d.core.AmbientLight;
-import io.github.glynch.jscene3d.core.BasicMaterial;
-import io.github.glynch.jscene3d.core.BufferGeometry;
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.LambertMaterial;
-import io.github.glynch.jscene3d.core.MaterialSide;
-import io.github.glynch.jscene3d.core.Mesh;
-import io.github.glynch.jscene3d.core.PerspectiveCamera;
-import io.github.glynch.jscene3d.core.PlaneGeometry;
-import io.github.glynch.jscene3d.core.PointLight;
-import io.github.glynch.jscene3d.core.Scene;
-import io.github.glynch.jscene3d.core.SphereGeometry;
+import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.PlaneGeometry;
+import io.github.glynch.jscene3d.geometries.SphereGeometry;
+import io.github.glynch.jscene3d.lights.AmbientLight;
+import io.github.glynch.jscene3d.lights.PointLight;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.materials.LambertMaterial;
+import io.github.glynch.jscene3d.materials.MaterialSide;
+import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.Renderer;
+import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays diffuse materials illuminated by ambient and moving point lights. */
 public final class LightingExample {

@@ -6,8 +6,8 @@ package io.github.glynch.jscene3d.examples;
 
 import static org.joml.Math.toRadians;
 
-import io.github.glynch.jscene3d.core.OrthographicCamera;
-import io.github.glynch.jscene3d.core.PerspectiveCamera;
+import io.github.glynch.jscene3d.cameras.OrthographicCamera;
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 

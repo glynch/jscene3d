@@ -176,9 +176,25 @@ public final class RenderStatistics {
         culledLines++;
     }
 
+    /** Records meshes rejected by frustum culling. */
+    void recordCulledMeshes(int count) {
+        culledMeshes += count;
+    }
+
+    /** Records line objects rejected by frustum culling. */
+    void recordCulledLines(int count) {
+        culledLines += count;
+    }
+
     /** Records one GPU-buffer upload and its byte count. */
     void recordUpload(long byteCount) {
         bufferUploads++;
+        bufferUploadBytes += byteCount;
+    }
+
+    /** Records several GPU-buffer uploads and their combined byte count. */
+    void recordUploads(int count, long byteCount) {
+        bufferUploads += count;
         bufferUploadBytes += byteCount;
     }
 

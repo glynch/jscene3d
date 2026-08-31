@@ -4,15 +4,15 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import io.github.glynch.jscene3d.core.BasicMaterial;
-import io.github.glynch.jscene3d.core.BoxGeometry;
-import io.github.glynch.jscene3d.core.BufferAttribute;
-import io.github.glynch.jscene3d.core.BufferGeometry;
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.IndexBuffer;
-import io.github.glynch.jscene3d.core.Mesh;
-import io.github.glynch.jscene3d.core.PlaneGeometry;
-import io.github.glynch.jscene3d.core.SphereGeometry;
+import io.github.glynch.jscene3d.geometries.BoxGeometry;
+import io.github.glynch.jscene3d.geometries.BufferAttribute;
+import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.IndexBuffer;
+import io.github.glynch.jscene3d.geometries.PlaneGeometry;
+import io.github.glynch.jscene3d.geometries.SphereGeometry;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Mesh;
 import java.util.Objects;
 
 /** Demonstrates buffer geometry, scoped edits, built-in factories, and mesh binding. */

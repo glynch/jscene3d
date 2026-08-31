@@ -4,19 +4,19 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_THREE;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
-import io.github.glynch.jscene3d.core.BasicMaterial;
-import io.github.glynch.jscene3d.core.BoxGeometry;
-import io.github.glynch.jscene3d.core.BufferGeometry;
-import io.github.glynch.jscene3d.core.Mesh;
-import io.github.glynch.jscene3d.core.PerspectiveCamera;
-import io.github.glynch.jscene3d.core.Scene;
-import io.github.glynch.jscene3d.core.Texture;
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.geometries.BoxGeometry;
+import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.loaders.TextureLoader;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.Renderer;
+import io.github.glynch.jscene3d.scenes.Scene;
+import io.github.glynch.jscene3d.textures.Texture;
 import java.nio.file.Path;
 
 /** Displays a rotating textured cube using a generated checkerboard or caller-supplied image. */

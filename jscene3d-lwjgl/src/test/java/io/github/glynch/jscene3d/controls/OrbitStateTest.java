@@ -4,17 +4,17 @@
  */
 package io.github.glynch.jscene3d.controls;
 
-import static io.github.glynch.jscene3d.core.Angles.PI;
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_FOUR;
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_TWO;
-import static io.github.glynch.jscene3d.core.Angles.TWO_PI;
+import static io.github.glynch.jscene3d.math.Angles.PI;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_FOUR;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_TWO;
+import static io.github.glynch.jscene3d.math.Angles.TWO_PI;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.data.Offset.offset;
 
-import io.github.glynch.jscene3d.core.Camera;
-import io.github.glynch.jscene3d.core.OrthographicCamera;
-import io.github.glynch.jscene3d.core.PerspectiveCamera;
+import io.github.glynch.jscene3d.cameras.Camera;
+import io.github.glynch.jscene3d.cameras.OrthographicCamera;
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import org.assertj.core.data.Offset;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;

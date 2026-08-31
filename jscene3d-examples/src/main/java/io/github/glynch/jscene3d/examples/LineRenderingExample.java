@@ -4,20 +4,20 @@
  */
 package io.github.glynch.jscene3d.examples;
 
-import static io.github.glynch.jscene3d.core.Angles.PI_OVER_THREE;
-import static io.github.glynch.jscene3d.core.Angles.TWO_PI;
+import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
+import static io.github.glynch.jscene3d.math.Angles.TWO_PI;
 
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.controls.OrbitControls;
-import io.github.glynch.jscene3d.core.BufferGeometry;
-import io.github.glynch.jscene3d.core.Color;
-import io.github.glynch.jscene3d.core.Line;
-import io.github.glynch.jscene3d.core.LineBasicMaterial;
-import io.github.glynch.jscene3d.core.LineSegments;
-import io.github.glynch.jscene3d.core.PerspectiveCamera;
-import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.materials.LineBasicMaterial;
+import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Line;
+import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.Renderer;
+import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Displays a connected orbit and independent vertex-colored coordinate axes. */
 public final class LineRenderingExample {

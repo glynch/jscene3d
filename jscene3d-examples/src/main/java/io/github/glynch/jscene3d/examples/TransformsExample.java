@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.examples;
 
 import static org.joml.Math.PI_OVER_2_f;
 
-import io.github.glynch.jscene3d.core.Object3D;
+import io.github.glynch.jscene3d.objects.Object3D;
 import org.joml.Vector3f;
 
 /** Demonstrates automatic local and inherited world transforms. */

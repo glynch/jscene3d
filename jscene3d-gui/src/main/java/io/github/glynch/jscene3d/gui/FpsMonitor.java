@@ -4,6 +4,10 @@
  */
 package io.github.glynch.jscene3d.gui;
 
+import io.github.glynch.jscene3d.gui.internal.GuiCanvas;
+import io.github.glynch.jscene3d.gui.internal.GuiFont;
+import io.github.glynch.jscene3d.gui.internal.OverlayGuiCanvas;
+import io.github.glynch.jscene3d.gui.internal.Preconditions;
 import io.github.glynch.jscene3d.render.Overlay;
 import io.github.glynch.jscene3d.render.OverlayCanvas;
 import java.util.Objects;

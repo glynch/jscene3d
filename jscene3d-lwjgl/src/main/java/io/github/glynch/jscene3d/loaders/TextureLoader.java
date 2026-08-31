@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.loaders;
 
-import io.github.glynch.jscene3d.core.Texture;
+import io.github.glynch.jscene3d.textures.Texture;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;

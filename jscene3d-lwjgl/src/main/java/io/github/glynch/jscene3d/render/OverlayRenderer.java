@@ -51,6 +51,8 @@ import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 
+import io.github.glynch.jscene3d.render.internal.programs.OverlayProgram;
+import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.IdentityHashMap;

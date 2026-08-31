@@ -47,6 +47,7 @@ import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Camera;
 import io.github.glynch.jscene3d.core.Color;
 import io.github.glynch.jscene3d.core.IndexBuffer;
+import io.github.glynch.jscene3d.core.LambertMaterial;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.MaterialSide;
 import io.github.glynch.jscene3d.core.Scene;
@@ -68,6 +69,9 @@ import org.jspecify.annotations.Nullable;
 
 /** Owns rendering and all OpenGL state for one JScene3D window context. */
 public final class Renderer implements AutoCloseable {
+    /** Maximum number of visible point lights supported by one rendered scene in version 0.1. */
+    public static final int MAX_POINT_LIGHTS = 8;
+
     private final Window window;
     private final WindowContextRegistry.Access context;
     private final boolean automaticClear;
@@ -87,6 +91,7 @@ public final class Renderer implements AutoCloseable {
     private Color clearColor;
     private float clearAlpha;
     private @Nullable BasicProgram basicProgram;
+    private @Nullable LambertProgram lambertProgram;
     private @Nullable OverlayRenderer overlayRenderer;
     private @Nullable DefaultTexture defaultTexture;
     private boolean customViewport;
@@ -109,7 +114,7 @@ public final class Renderer implements AutoCloseable {
         geometryResources = new IdentityHashMap<>();
         textureResources = new IdentityHashMap<>();
         shaderPrograms = new HashMap<>();
-        renderList = new RenderList();
+        renderList = new RenderList(MAX_POINT_LIGHTS);
         frustum = new Frustum();
         matrixValues = new float[16];
         matrix3Values = new float[9];
@@ -330,6 +335,10 @@ public final class Renderer implements AutoCloseable {
                 basicProgram.close();
                 basicProgram = null;
             }
+            if (lambertProgram != null) {
+                lambertProgram.close();
+                lambertProgram = null;
+            }
             if (overlayRenderer != null) {
                 overlayRenderer.close();
                 overlayRenderer = null;
@@ -360,6 +369,8 @@ public final class Renderer implements AutoCloseable {
         switch (material) {
             case BasicMaterial basicMaterial ->
                 renderBasicMesh(item, geometry, basicMaterial, resource, viewMatrix, projectionMatrix);
+            case LambertMaterial lambertMaterial ->
+                renderLambertMesh(item, geometry, lambertMaterial, resource, viewMatrix, projectionMatrix);
             case ShaderMaterial shaderMaterial ->
                 renderShaderMesh(item, geometry, shaderMaterial, resource, viewMatrix, projectionMatrix);
             default ->
@@ -391,6 +402,43 @@ public final class Renderer implements AutoCloseable {
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
+        Color color = material.color();
+        float alpha = material.transparent() ? material.opacity() : 1.0f;
+        glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
+        glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        glActiveTexture(GL_TEXTURE0);
+        if (colorMap == null) {
+            defaultTexture().bind();
+            glUniform1i(program.useColorMapLocation(), 0);
+        } else {
+            TextureResource textureResource =
+                    textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
+            resources.setActiveTextureResources(textureResources.size());
+            textureResource.synchronize(colorMap, statistics);
+            glUniform1i(program.colorMapLocation(), 0);
+            glUniform1i(program.useColorMapLocation(), 1);
+        }
+    }
+
+    /** Synchronizes and binds one built-in diffuse Lambert-material draw. */
+    private void renderLambertMesh(
+            RenderItem item,
+            BufferGeometry geometry,
+            LambertMaterial material,
+            GeometryResource resource,
+            Matrix4fc viewMatrix,
+            Matrix4fc projectionMatrix) {
+        LambertProgram program = lambertProgram();
+        @Nullable Texture colorMap = material.colorMap().orElse(null);
+        if (colorMap != null && colorMap.isClosed()) {
+            throw new IllegalStateException("LambertMaterial colorMap is closed");
+        }
+        resource.synchronize(
+                geometry, true, material.usesVertexColors(), colorMap != null, "LambertMaterial", statistics);
+
+        glUseProgram(program.id());
+        program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
+        program.uploadLights(renderList.lights(), viewMatrix);
         Color color = material.color();
         float alpha = material.transparent() ? material.opacity() : 1.0f;
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
@@ -549,6 +597,15 @@ public final class Renderer implements AutoCloseable {
         return basicProgram;
     }
 
+    /** Lazily creates and returns the context-local built-in Lambert program. */
+    private LambertProgram lambertProgram() {
+        if (lambertProgram == null) {
+            lambertProgram = LambertProgram.create();
+            updateProgramCount();
+        }
+        return lambertProgram;
+    }
+
     /** Lazily creates and returns context-local overlay drawing resources. */
     private OverlayRenderer overlayRenderer() {
         if (overlayRenderer == null) {
@@ -568,8 +625,10 @@ public final class Renderer implements AutoCloseable {
 
     /** Synchronizes the diagnostic program count with realized built-in programs. */
     private void updateProgramCount() {
-        resources.setProgramCount(
-                (basicProgram == null ? 0 : 1) + (overlayRenderer == null ? 0 : 1) + shaderPrograms.size());
+        resources.setProgramCount((basicProgram == null ? 0 : 1)
+                + (lambertProgram == null ? 0 : 1)
+                + (overlayRenderer == null ? 0 : 1)
+                + shaderPrograms.size());
     }
 
     /** Applies depth, blending, and face-culling state for one material. */

@@ -12,16 +12,19 @@ import static org.lwjgl.opengl.GL11.GL_RGBA;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL11.glReadPixels;
 
+import io.github.glynch.jscene3d.core.AmbientLight;
 import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BufferAttribute;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Color;
 import io.github.glynch.jscene3d.core.Group;
 import io.github.glynch.jscene3d.core.IndexBuffer;
+import io.github.glynch.jscene3d.core.LambertMaterial;
 import io.github.glynch.jscene3d.core.MaterialSide;
 import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.OrthographicCamera;
 import io.github.glynch.jscene3d.core.PerspectiveCamera;
+import io.github.glynch.jscene3d.core.PointLight;
 import io.github.glynch.jscene3d.core.Scene;
 import io.github.glynch.jscene3d.core.ShaderAttribute;
 import io.github.glynch.jscene3d.core.ShaderMaterial;
@@ -156,6 +159,117 @@ final class RendererIT {
             renderer.render(scene, camera);
 
             assertCenterPixelIsRed(window);
+        }
+    }
+
+    @Test
+    void rendersLambertMaterialWithVisibleAmbientAndParentedPointLights() {
+        try (Window window = Window.create("Lambert lighting integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                LambertMaterial material = new LambertMaterial(Color.RED)) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertPixelIsBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            AmbientLight ambientLight = new AmbientLight(Color.WHITE);
+            scene.add(ambientLight);
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            ambientLight.setVisible(false);
+            Group lightParent = new Group();
+            PointLight pointLight = new PointLight(Color.WHITE);
+            pointLight.setDecay(0.0f);
+            lightParent.setPosition(0.0f, 0.0f, 1.0f);
+            lightParent.add(pointLight);
+            scene.add(lightParent);
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            lightParent.setPosition(0.0f, 0.0f, -1.0f);
+            renderer.render(scene, camera);
+            assertPixelIsBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            lightParent.setPosition(0.0f, 0.0f, 1.0f);
+            pointLight.setDistance(0.5f);
+            renderer.render(scene, camera);
+            assertPixelIsBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            assertThat(renderer.info().resources().programCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void appliesLambertVertexColorsAndColorMaps() {
+        Texture texture = Texture.baseColor(1, 1, new byte[] {(byte) 0xff, 0, 0, (byte) 0xff});
+        try (Window window = Window.create("Lambert surface inputs integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTexturedGreenTriangle();
+                LambertMaterial material = new LambertMaterial()) {
+            material.setUsesVertexColors(true);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            scene.add(new AmbientLight(Color.WHITE));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsGreen(window);
+
+            material.setUsesVertexColors(false);
+            material.setColorMap(texture);
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+            assertThat(renderer.info().statistics().textureUploads()).isEqualTo(1);
+            assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(1);
+
+            texture.close();
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("LambertMaterial colorMap is closed");
+        } finally {
+            texture.close();
+        }
+    }
+
+    @Test
+    void validatesLambertNormalsAndVisiblePointLightLimit() {
+        try (Window window = Window.create("Lambert validation integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                LambertMaterial material = new LambertMaterial()) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            scene.add(new AmbientLight());
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("LambertMaterial requires a normal attribute but geometry has none");
+
+            scene.clear();
+            PointLight lastLight = null;
+            for (int index = 0; index <= Renderer.MAX_POINT_LIGHTS; index++) {
+                lastLight = new PointLight();
+                scene.add(lastLight);
+            }
+            PointLight excessLight = Objects.requireNonNull(lastLight);
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("Scene has more visible point lights than Renderer supports: 9 > 8");
+
+            excessLight.setVisible(false);
+            renderer.render(scene, camera);
+            assertThat(renderer.info().statistics().drawCalls()).isZero();
         }
     }
 
@@ -450,6 +564,22 @@ final class RendererIT {
                 .build();
     }
 
+    private static BufferGeometry createLitTriangle() {
+        return BufferGeometry.builder()
+                .positions(-0.8f, -0.8f, 0.0f, 0.8f, -0.8f, 0.0f, 0.0f, 0.8f, 0.0f)
+                .normals(0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f)
+                .build();
+    }
+
+    private static BufferGeometry createLitTexturedGreenTriangle() {
+        return BufferGeometry.builder()
+                .positions(-0.8f, -0.8f, 0.0f, 0.8f, -0.8f, 0.0f, 0.0f, 0.8f, 0.0f)
+                .normals(0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f)
+                .uvs(0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f)
+                .vertexColors(Color.GREEN, Color.GREEN, Color.GREEN)
+                .build();
+    }
+
     private static ShaderMaterial createCustomMaterial() {
         return ShaderMaterial.builder(CUSTOM_VERTEX_SHADER, CUSTOM_FRAGMENT_SHADER)
                 .define("USE_TINT")
@@ -458,6 +588,14 @@ final class RendererIT {
 
     private static void assertCenterPixelIsRed(Window window) {
         assertPixelIsRed(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+    }
+
+    private static void assertCenterPixelIsGreen(Window window) {
+        ByteBuffer pixel = readPixel(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isGreaterThan(240);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
     }
 
     private static void assertPixelIsRed(int x, int y) {

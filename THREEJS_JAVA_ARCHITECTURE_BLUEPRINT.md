@@ -397,10 +397,15 @@ io.github.glynch.jscene3d
 ├── materials
 │   ├── Material
 │   ├── BasicMaterial
+│   ├── LambertMaterial
 │   ├── ShaderMaterial
 │   ├── RenderSide
 │   ├── BlendMode
 │   └── DepthFunction
+├── lights
+│   ├── Light
+│   ├── AmbientLight
+│   └── PointLight
 ├── textures
 │   ├── Texture
 │   ├── ImageData
@@ -1069,7 +1074,22 @@ example:
 Avoid a reflection-heavy universal object mapper until concrete use cases
 justify it.
 
-### 13.5 Shader variants
+### 13.5 `LambertMaterial` and initial lights
+
+Version 0.1 also includes a narrow diffuse lighting path needed by the Solar
+System Viewer. `LambertMaterial` supports base color, optional vertex colors,
+an optional color map, and inherited material render state. It requires
+geometry normals and responds to visible `AmbientLight` and `PointLight` scene
+nodes. Lights are sealed `Object3D` subclasses with linear-sRGB color and a
+non-negative practical intensity multiplier.
+
+Point lights inherit their world position and expose non-negative distance and
+decay controls. The renderer supports eight visible point lights, aggregates
+ambient contributions, and fails rather than silently dropping excess lights.
+This initial path excludes shadows, calibrated physical units, normal maps,
+environment lighting, and PBR behavior.
+
+### 13.6 Shader variants
 
 Even a basic material can produce variants:
 
@@ -1095,7 +1115,7 @@ instancing=false
 
 Color changes update uniforms. They do not compile a new program.
 
-### 13.6 Shader source ownership
+### 13.7 Shader source ownership
 
 Built-in shaders should be library resources controlled and versioned with the
 renderer implementation. Custom shader strings belong to `ShaderMaterial`.
@@ -2581,6 +2601,7 @@ hosted runners, and the remainder of 0.1 hardening continues in public.
 
 - Interactive Solar System Viewer Integration Example.
 - Box, plane, and sphere generators.
+- Diffuse Lambert material with ambient and point lights.
 - `ShaderMaterial` escape hatch.
 - Error and lifecycle documentation.
 - Supported-platform documentation.
@@ -2605,7 +2626,7 @@ hosted runners, and the remainder of 0.1 hardening continues in public.
 ## 32. Post-0.1 Feature Sequence
 
 The first major post-0.1 feature block is correctly rendered static glTF 2.0
-and GLB loading. It introduces the minimum supporting lighting and
+and GLB loading. It builds on the initial ambient and point lights, introduces
 metallic-roughness PBR material behavior, then loads static scene hierarchy,
 triangle meshes, textures, core PBR materials, and perspective or orthographic
 cameras. It excludes animation, skinning, morph targets, lights stored in the
@@ -3016,8 +3037,9 @@ and deterministic lifecycle safety. It targets Java 21 and OpenGL 3.3 Core,
 publishes separate core, LWJGL, and optional GUI JPMS artifacts through Maven
 Central, and uses Apache-2.0.
 
-Version 0.1 includes custom GLSL through `ShaderMaterial`, PNG and JPEG texture
-loading, genuine module-path and classpath use, multiple independent
+Version 0.1 includes custom GLSL through `ShaderMaterial`, diffuse
+`LambertMaterial`, ambient and point lights, PNG and JPEG texture loading,
+genuine module-path and classpath use, multiple independent
 Window-Renderer Pairs on one render thread, and explicit idempotent terminal
 closure. It excludes raw OpenGL interoperability and shared contexts. The
 interactive Solar System Viewer is the first Integration Example and the Public

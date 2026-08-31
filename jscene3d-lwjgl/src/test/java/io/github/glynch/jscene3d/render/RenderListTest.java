@@ -39,7 +39,7 @@ final class RenderListTest {
             scene.add(opaque);
             scene.add(secondTransparent);
             scene.add(equalDepthTransparent);
-            RenderList renderList = new RenderList();
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
 
             build(renderList, scene);
 
@@ -66,7 +66,7 @@ final class RenderListTest {
             scene.add(firstMesh);
             scene.add(secondMesh);
             scene.add(thirdMesh);
-            RenderList renderList = new RenderList();
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
 
             build(renderList, scene);
             RenderItem firstMeshItem = findOpaqueItem(renderList, firstMesh);
@@ -96,7 +96,7 @@ final class RenderListTest {
             Scene scene = new Scene();
             scene.add(hiddenGroup);
             scene.add(invisibleMaterialMesh);
-            RenderList renderList = new RenderList();
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
 
             build(renderList, scene);
 
@@ -114,7 +114,7 @@ final class RenderListTest {
             mesh.setPosition(3.0f, 0.0f, 0.0f);
             Scene scene = new Scene();
             scene.add(mesh);
-            RenderList renderList = new RenderList();
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
 
             RenderStatistics culledStatistics = build(renderList, scene);
 

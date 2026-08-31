@@ -47,9 +47,10 @@ Build and run the visible basic-triangle example with:
 
 `TransformsExample`, `HierarchyExample`, `CamerasExample`,
 `BufferGeometryExample`, `TexturedCubeExample`, `TransparencyExample`,
-`ShaderMaterialExample`, and `OrbitControlsExample` are also available using the same command. In
-`OrbitControlsExample`, drag with the left mouse button to
-orbit; drag with the right mouse button or Shift-left to pan; and use the middle
+`ShaderMaterialExample`, `LightingExample`, and `OrbitControlsExample` are also
+available using the same command. In `OrbitControlsExample`, drag with the left
+mouse button to orbit; drag with the right mouse button or Shift-left to pan;
+and use the middle
 mouse button or scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates.
 The example also demonstrates the optional themed control panel and FPS monitor
 from `jscene3d-gui`; interacting with the panel does not move the camera.
@@ -83,6 +84,19 @@ The renderer supplies any active `modelMatrix`, `viewMatrix`,
 supports scalar, boolean, vector, matrix, `Color`, and two-dimensional `Texture`
 uniforms. Uniform and attribute arrays, custom vertex attributes, uniform
 blocks, and raw OpenGL access are not supported.
+
+## Lighting
+
+`LambertMaterial` provides diffuse lighting from visible `AmbientLight` and
+`PointLight` scene nodes. Lit geometry must provide normals; color maps also
+require texture coordinates. A Lambert surface renders black when the scene has
+no lights because the renderer does not supply a hidden default light.
+
+Point lights use their inherited world position. Their non-negative `decay`
+controls distance falloff, while a positive `distance` adds a smooth cutoff;
+zero distance leaves their range unlimited. Version 0.1 supports at most
+`Renderer.MAX_POINT_LIGHTS` visible point lights per scene and reports an error
+instead of silently dropping excess lights. Shadows are not yet supported.
 
 ## Project structure
 

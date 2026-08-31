@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.render;
 import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BoundingSphere;
 import io.github.glynch.jscene3d.core.BufferGeometry;
+import io.github.glynch.jscene3d.core.LambertMaterial;
+import io.github.glynch.jscene3d.core.Light;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.Object3D;
@@ -23,16 +25,18 @@ final class RenderList {
     private final ArrayList<RenderItem> itemPool;
     private final ArrayList<RenderItem> opaqueItems;
     private final ArrayList<RenderItem> transparentItems;
+    private final LightCollection lights;
 
     private int activeItemCount;
     private long traversalOrder;
 
     /** Creates reusable traversal, pooling, and submission collections. */
-    RenderList() {
+    RenderList(int maximumPointLights) {
         pendingObjects = new ArrayDeque<>();
         itemPool = new ArrayList<>();
         opaqueItems = new ArrayList<>();
         transparentItems = new ArrayList<>();
+        lights = new LightCollection(maximumPointLights);
     }
 
     /** Rebuilds opaque and transparent submissions from a scene hierarchy. */
@@ -47,6 +51,9 @@ final class RenderList {
                 }
                 if (object instanceof Mesh mesh) {
                     collect(mesh, viewMatrix, frustum, statistics);
+                }
+                if (object instanceof Light light) {
+                    lights.add(light);
                 }
                 List<Object3D> children = object.children();
                 for (int index = children.size() - 1; index >= 0; index--) {
@@ -81,11 +88,17 @@ final class RenderList {
         return transparentItems.get(index);
     }
 
+    /** Returns the stable visible-light collection for the active frame. */
+    LightCollection lights() {
+        return lights;
+    }
+
     /** Releases active submissions while retaining allocated pooling capacity. */
     void clear() {
         pendingObjects.clear();
         opaqueItems.clear();
         transparentItems.clear();
+        lights.clear();
         for (int index = 0; index < activeItemCount; index++) {
             itemPool.get(index).release();
         }
@@ -104,7 +117,9 @@ final class RenderList {
         if (elementCount == 0) {
             return;
         }
-        if (!(material instanceof BasicMaterial) && !(material instanceof ShaderMaterial)) {
+        if (!(material instanceof BasicMaterial)
+                && !(material instanceof LambertMaterial)
+                && !(material instanceof ShaderMaterial)) {
             throw new IllegalStateException(
                     "Unsupported material type: " + material.getClass().getName());
         }

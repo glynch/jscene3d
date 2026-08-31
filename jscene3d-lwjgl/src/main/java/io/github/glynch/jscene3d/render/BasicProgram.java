@@ -12,6 +12,7 @@ final class BasicProgram implements AutoCloseable {
             #version 330 core
             layout(location = 0) in vec3 position;
             layout(location = 1) in vec4 vertexColor;
+            layout(location = 2) in vec2 textureCoordinate;
 
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
@@ -19,22 +20,28 @@ final class BasicProgram implements AutoCloseable {
             uniform bool useVertexColor;
 
             out vec4 resolvedVertexColor;
+            out vec2 resolvedTextureCoordinate;
 
             void main() {
                 resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
+                resolvedTextureCoordinate = vec2(textureCoordinate.x, 1.0 - textureCoordinate.y);
                 gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
             }
             """;
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             in vec4 resolvedVertexColor;
+            in vec2 resolvedTextureCoordinate;
 
             uniform vec4 baseColor;
+            uniform sampler2D colorMap;
+            uniform bool useColorMap;
 
             out vec4 fragmentColor;
 
             void main() {
-                fragmentColor = baseColor * resolvedVertexColor;
+                vec4 textureColor = useColorMap ? texture(colorMap, resolvedTextureCoordinate) : vec4(1.0);
+                fragmentColor = baseColor * resolvedVertexColor * textureColor;
             }
             """;
 
@@ -44,48 +51,30 @@ final class BasicProgram implements AutoCloseable {
     private final int projectionMatrixLocation;
     private final int baseColorLocation;
     private final int useVertexColorLocation;
+    private final int colorMapLocation;
+    private final int useColorMapLocation;
 
     /** Retains a linked program and its required uniform locations. */
-    private BasicProgram(
-            int id,
-            int modelMatrixLocation,
-            int viewMatrixLocation,
-            int projectionMatrixLocation,
-            int baseColorLocation,
-            int useVertexColorLocation) {
+    private BasicProgram(int id) {
         this.id = id;
-        this.modelMatrixLocation = modelMatrixLocation;
-        this.viewMatrixLocation = viewMatrixLocation;
-        this.projectionMatrixLocation = projectionMatrixLocation;
-        this.baseColorLocation = baseColorLocation;
-        this.useVertexColorLocation = useVertexColorLocation;
+        modelMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "modelMatrix");
+        viewMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "viewMatrix");
+        projectionMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "projectionMatrix");
+        baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "baseColor");
+        useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "useVertexColor");
+        colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "colorMap");
+        useColorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "useColorMap");
     }
 
     /** Compiles, links, and validates the built-in basic-material program. */
     static BasicProgram create() {
         int program = ProgramSupport.createLinkedProgram("Built-in basic", VERTEX_SOURCE, FRAGMENT_SOURCE);
-        int modelMatrixLocation;
-        int viewMatrixLocation;
-        int projectionMatrixLocation;
-        int baseColorLocation;
-        int useVertexColorLocation;
         try {
-            modelMatrixLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "modelMatrix");
-            viewMatrixLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "viewMatrix");
-            projectionMatrixLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "projectionMatrix");
-            baseColorLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "baseColor");
-            useVertexColorLocation = ProgramSupport.requiredUniform(program, "Built-in basic", "useVertexColor");
+            return new BasicProgram(program);
         } catch (RuntimeException exception) {
             glDeleteProgram(program);
             throw exception;
         }
-        return new BasicProgram(
-                program,
-                modelMatrixLocation,
-                viewMatrixLocation,
-                projectionMatrixLocation,
-                baseColorLocation,
-                useVertexColorLocation);
     }
 
     /** Returns the context-local OpenGL program name. */
@@ -116,6 +105,16 @@ final class BasicProgram implements AutoCloseable {
     /** Returns the required vertex-color switch uniform location. */
     int useVertexColorLocation() {
         return useVertexColorLocation;
+    }
+
+    /** Returns the required base-color sampler uniform location. */
+    int colorMapLocation() {
+        return colorMapLocation;
+    }
+
+    /** Returns the required base-color texture switch uniform location. */
+    int useColorMapLocation() {
+        return useColorMapLocation;
     }
 
     @Override

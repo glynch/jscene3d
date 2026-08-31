@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.render;
 /** Stable read-only view of GPU resources currently realized by a renderer. */
 public final class ResourceStatistics {
     private int activeGeometryResources;
+    private int activeTextureResources;
     private int programCount;
 
     /** Creates zero-valued resource statistics for one renderer. */
@@ -24,6 +25,15 @@ public final class ResourceStatistics {
     }
 
     /**
+     * Returns currently realized texture resources.
+     *
+     * @return active texture-resource count
+     */
+    public int activeTextureResources() {
+        return activeTextureResources;
+    }
+
+    /**
      * Returns currently compiled shader programs.
      *
      * @return compiled-program count
@@ -35,6 +45,11 @@ public final class ResourceStatistics {
     /** Replaces the current context-local geometry-resource count. */
     void setActiveGeometryResources(int activeGeometryResources) {
         this.activeGeometryResources = activeGeometryResources;
+    }
+
+    /** Replaces the current context-local texture-resource count. */
+    void setActiveTextureResources(int activeTextureResources) {
+        this.activeTextureResources = activeTextureResources;
     }
 
     /** Replaces the current context-local shader-program count. */

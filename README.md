@@ -46,8 +46,9 @@ Build and run the visible basic-triangle example with:
 ```
 
 `TransformsExample`, `HierarchyExample`, `CamerasExample`,
-`BufferGeometryExample`, and `OrbitControlsExample` are also available using
-the same command. In `OrbitControlsExample`, drag with the left mouse button to
+`BufferGeometryExample`, `TexturedCubeExample`, `TransparencyExample`, and
+`OrbitControlsExample` are also available using the same command. In
+`OrbitControlsExample`, drag with the left mouse button to
 orbit; drag with the right mouse button or Shift-left to pan; and use the middle
 mouse button or scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates.
 The example also demonstrates the optional themed control panel and FPS monitor
@@ -56,6 +57,19 @@ from `jscene3d-gui`; interacting with the panel does not move the camera.
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same command without that JVM
 option. The examples artifact is never deployed.
+
+## Transparency
+
+Setting a material's opacity does not implicitly enable blending; call
+`setTransparent(true)` when the material should enter the transparent render
+list. Transparent objects are sorted back-to-front by their object origins in
+camera space, with scene traversal order providing a stable tie-breaker.
+
+This object-level sort cannot correctly resolve intersecting transparent meshes
+or triangles that overlap within one transparent mesh. Applications commonly
+disable depth writes for blended surfaces with `setDepthWriteEnabled(false)`,
+as demonstrated by `TransparencyExample`; the choice remains explicit because
+some effects require depth writes.
 
 ## Project structure
 

@@ -13,6 +13,8 @@ public final class RenderStatistics {
     private int culledMeshes;
     private int bufferUploads;
     private long bufferUploadBytes;
+    private int textureUploads;
+    private long textureUploadBytes;
 
     /** Creates zero-valued frame statistics for one renderer. */
     RenderStatistics() {
@@ -82,6 +84,24 @@ public final class RenderStatistics {
         return bufferUploadBytes;
     }
 
+    /**
+     * Returns texture image uploads performed during the most recent frame.
+     *
+     * @return texture-upload count
+     */
+    public int textureUploads() {
+        return textureUploads;
+    }
+
+    /**
+     * Returns texture image bytes uploaded during the most recent frame.
+     *
+     * @return uploaded texture byte count
+     */
+    public long textureUploadBytes() {
+        return textureUploadBytes;
+    }
+
     /** Clears per-frame counters while retaining the completed-frame number. */
     void beginFrame() {
         drawCalls = 0;
@@ -90,6 +110,8 @@ public final class RenderStatistics {
         culledMeshes = 0;
         bufferUploads = 0;
         bufferUploadBytes = 0L;
+        textureUploads = 0;
+        textureUploadBytes = 0L;
     }
 
     /** Records successful completion of the current render call. */
@@ -113,5 +135,11 @@ public final class RenderStatistics {
     void recordUpload(long byteCount) {
         bufferUploads++;
         bufferUploadBytes += byteCount;
+    }
+
+    /** Records one GPU texture-image upload and its byte count. */
+    void recordTextureUpload(long byteCount) {
+        textureUploads++;
+        textureUploadBytes += byteCount;
     }
 }

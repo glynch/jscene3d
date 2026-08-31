@@ -25,7 +25,10 @@ final class RendererInfoTest {
         assertThat(statistics.culledMeshes()).isZero();
         assertThat(statistics.bufferUploads()).isZero();
         assertThat(statistics.bufferUploadBytes()).isZero();
+        assertThat(statistics.textureUploads()).isZero();
+        assertThat(statistics.textureUploadBytes()).isZero();
         assertThat(resources.activeGeometryResources()).isZero();
+        assertThat(resources.activeTextureResources()).isZero();
         assertThat(resources.programCount()).isZero();
     }
 
@@ -37,8 +40,10 @@ final class RendererInfoTest {
         statistics.recordDraw(6);
         statistics.recordCulledMesh();
         statistics.recordUpload(24L);
+        statistics.recordTextureUpload(16L);
         statistics.completeFrame();
         resources.setActiveGeometryResources(2);
+        resources.setActiveTextureResources(3);
         resources.setProgramCount(1);
 
         statistics.beginFrame();
@@ -50,7 +55,10 @@ final class RendererInfoTest {
         assertThat(statistics.culledMeshes()).isZero();
         assertThat(statistics.bufferUploads()).isZero();
         assertThat(statistics.bufferUploadBytes()).isZero();
+        assertThat(statistics.textureUploads()).isZero();
+        assertThat(statistics.textureUploadBytes()).isZero();
         assertThat(resources.activeGeometryResources()).isEqualTo(2);
+        assertThat(resources.activeTextureResources()).isEqualTo(3);
         assertThat(resources.programCount()).isEqualTo(1);
     }
 }

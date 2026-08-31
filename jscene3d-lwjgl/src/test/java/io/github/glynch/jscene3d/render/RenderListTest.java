@@ -19,27 +19,36 @@ import org.junit.jupiter.api.Test;
 
 final class RenderListTest {
     @Test
-    void partitionsOpaqueAndTransparentItemsWhilePreservingTransparentOrder() {
+    void partitionsOpaqueAndStablySortsTransparentItemsBackToFront() {
         try (BufferGeometry geometry = createTriangle();
                 BasicMaterial opaqueMaterial = new BasicMaterial(Color.RED);
                 BasicMaterial transparentMaterial = new BasicMaterial(Color.BLUE)) {
             transparentMaterial.setTransparent(true);
             Mesh firstTransparent = new Mesh(geometry, transparentMaterial);
+            firstTransparent.setPosition(0.0f, 0.0f, -1.0f);
+            firstTransparent.setFrustumCullingEnabled(false);
             Mesh opaque = new Mesh(geometry, opaqueMaterial);
             Mesh secondTransparent = new Mesh(geometry, transparentMaterial);
+            secondTransparent.setPosition(0.0f, 0.0f, -3.0f);
+            secondTransparent.setFrustumCullingEnabled(false);
+            Mesh equalDepthTransparent = new Mesh(geometry, transparentMaterial);
+            equalDepthTransparent.setPosition(1.0f, 0.0f, -3.0f);
+            equalDepthTransparent.setFrustumCullingEnabled(false);
             Scene scene = new Scene();
             scene.add(firstTransparent);
             scene.add(opaque);
             scene.add(secondTransparent);
+            scene.add(equalDepthTransparent);
             RenderList renderList = new RenderList();
 
             build(renderList, scene);
 
             assertThat(renderList.opaqueCount()).isEqualTo(1);
             assertThat(renderList.opaqueItem(0).mesh()).isSameAs(opaque);
-            assertThat(renderList.transparentCount()).isEqualTo(2);
-            assertThat(renderList.transparentItem(0).mesh()).isSameAs(firstTransparent);
-            assertThat(renderList.transparentItem(1).mesh()).isSameAs(secondTransparent);
+            assertThat(renderList.transparentCount()).isEqualTo(3);
+            assertThat(renderList.transparentItem(0).mesh()).isSameAs(secondTransparent);
+            assertThat(renderList.transparentItem(1).mesh()).isSameAs(equalDepthTransparent);
+            assertThat(renderList.transparentItem(2).mesh()).isSameAs(firstTransparent);
             renderList.clear();
         }
     }
@@ -135,7 +144,7 @@ final class RenderListTest {
         frustum.update(new Matrix4f(), new Matrix4f());
         RenderStatistics statistics = new RenderStatistics();
         statistics.beginFrame();
-        renderList.build(scene, frustum, statistics);
+        renderList.build(scene, new Matrix4f(), frustum, statistics);
         return statistics;
     }
 

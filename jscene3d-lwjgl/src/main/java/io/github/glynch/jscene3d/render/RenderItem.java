@@ -20,6 +20,7 @@ final class RenderItem {
     private int elementCount;
     private int materialSortKey;
     private int geometrySortKey;
+    private float cameraDepth;
     private long traversalOrder;
 
     /** Creates an inactive item ready for pooled assignment. */
@@ -39,6 +40,12 @@ final class RenderItem {
         return comparison;
     }
 
+    /** Orders transparent items back-to-front with stable traversal order for equal depths. */
+    static int compareTransparent(RenderItem first, RenderItem second) {
+        int comparison = Float.compare(first.cameraDepth, second.cameraDepth);
+        return comparison == 0 ? Long.compare(first.traversalOrder, second.traversalOrder) : comparison;
+    }
+
     /** Assigns one active mesh submission to this pooled item. */
     void assign(
             Mesh mesh,
@@ -46,12 +53,14 @@ final class RenderItem {
             BasicMaterial material,
             Matrix4fc worldMatrix,
             int elementCount,
+            float cameraDepth,
             long traversalOrder) {
         this.mesh = mesh;
         this.geometry = geometry;
         this.material = material;
         this.worldMatrix = worldMatrix;
         this.elementCount = elementCount;
+        this.cameraDepth = cameraDepth;
         materialSortKey = System.identityHashCode(material);
         geometrySortKey = System.identityHashCode(geometry);
         this.traversalOrder = traversalOrder;
@@ -91,6 +100,7 @@ final class RenderItem {
         elementCount = 0;
         materialSortKey = 0;
         geometrySortKey = 0;
+        cameraDepth = 0.0f;
         traversalOrder = 0L;
     }
 }

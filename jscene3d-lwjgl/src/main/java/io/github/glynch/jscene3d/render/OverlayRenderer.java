@@ -66,19 +66,21 @@ final class OverlayRenderer implements AutoCloseable {
     private final OverlayProgram program;
     private final int vertexArray;
     private final int vertexBuffer;
+    private final DefaultTexture defaultTexture;
     private final IdentityHashMap<OverlayImage, Integer> textures = new IdentityHashMap<>();
 
     private FloatBuffer staging = BufferUtils.createFloatBuffer(INITIAL_COMPONENT_CAPACITY);
 
     /** Creates the program, vertex array, and dynamic vertex buffer atomically. */
-    private OverlayRenderer(OverlayProgram program, int vertexArray, int vertexBuffer) {
+    private OverlayRenderer(OverlayProgram program, int vertexArray, int vertexBuffer, DefaultTexture defaultTexture) {
         this.program = program;
         this.vertexArray = vertexArray;
         this.vertexBuffer = vertexBuffer;
+        this.defaultTexture = defaultTexture;
     }
 
     /** Creates context-local overlay resources or releases partial construction on failure. */
-    static OverlayRenderer create() {
+    static OverlayRenderer create(DefaultTexture defaultTexture) {
         OverlayProgram program = OverlayProgram.create();
         int vertexArray = 0;
         int vertexBuffer = 0;
@@ -95,7 +97,7 @@ final class OverlayRenderer implements AutoCloseable {
             glVertexAttribPointer(2, 4, GL_FLOAT, false, STRIDE_BYTES, 4L * Float.BYTES);
             glBindVertexArray(0);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
-            return new OverlayRenderer(program, vertexArray, vertexBuffer);
+            return new OverlayRenderer(program, vertexArray, vertexBuffer, defaultTexture);
         } catch (RuntimeException exception) {
             if (vertexBuffer != 0) {
                 glDeleteBuffers(vertexBuffer);
@@ -152,7 +154,7 @@ final class OverlayRenderer implements AutoCloseable {
     private void bindImage(@Nullable OverlayImage image) {
         if (image == null) {
             glUniform1i(program.usesAlphaMaskLocation(), 0);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            defaultTexture.bind();
             return;
         }
         glUniform1i(program.usesAlphaMaskLocation(), 1);

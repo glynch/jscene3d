@@ -27,6 +27,8 @@ import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glFrontFace;
 import static org.lwjgl.opengl.GL11.glViewport;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL20.glUniform1i;
 import static org.lwjgl.opengl.GL20.glUniform4f;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
@@ -42,6 +44,7 @@ import io.github.glynch.jscene3d.core.IndexBuffer;
 import io.github.glynch.jscene3d.core.Material;
 import io.github.glynch.jscene3d.core.MaterialSide;
 import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.core.Texture;
 import io.github.glynch.jscene3d.internal.WindowContextRegistry;
 import io.github.glynch.jscene3d.platform.Window;
 import java.util.IdentityHashMap;
@@ -60,6 +63,7 @@ public final class Renderer implements AutoCloseable {
     private final RenderStatistics statistics;
     private final ResourceStatistics resources;
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
+    private final IdentityHashMap<Texture, TextureResource> textureResources;
     private final RenderList renderList;
     private final Frustum frustum;
     private final float[] matrixValues;
@@ -69,6 +73,7 @@ public final class Renderer implements AutoCloseable {
     private float clearAlpha;
     private @Nullable BasicProgram basicProgram;
     private @Nullable OverlayRenderer overlayRenderer;
+    private @Nullable DefaultTexture defaultTexture;
     private boolean customViewport;
     private int viewportX;
     private int viewportY;
@@ -87,6 +92,7 @@ public final class Renderer implements AutoCloseable {
         statistics = info.statistics();
         resources = info.resources();
         geometryResources = new IdentityHashMap<>();
+        textureResources = new IdentityHashMap<>();
         renderList = new RenderList();
         frustum = new Frustum();
         matrixValues = new float[16];
@@ -142,6 +148,7 @@ public final class Renderer implements AutoCloseable {
         Camera validCamera = Objects.requireNonNull(camera, "camera");
         context.makeCurrent();
         releaseClosedGeometryResources();
+        releaseClosedTextureResources();
         statistics.beginFrame();
 
         int framebufferWidth = context.framebufferWidth();
@@ -156,7 +163,7 @@ public final class Renderer implements AutoCloseable {
                 Matrix4fc viewMatrix = validCamera.viewMatrix();
                 Matrix4fc projectionMatrix = validCamera.projectionMatrix();
                 frustum.update(viewMatrix, projectionMatrix);
-                renderList.build(validScene, frustum, statistics);
+                renderList.build(validScene, viewMatrix, frustum, statistics);
                 for (int index = 0; index < renderList.opaqueCount(); index++) {
                     renderMesh(renderList.opaqueItem(index), viewMatrix, projectionMatrix);
                 }
@@ -293,6 +300,10 @@ public final class Renderer implements AutoCloseable {
                 resource.close();
             }
             geometryResources.clear();
+            for (TextureResource resource : textureResources.values()) {
+                resource.close();
+            }
+            textureResources.clear();
             if (basicProgram != null) {
                 basicProgram.close();
                 basicProgram = null;
@@ -301,10 +312,15 @@ public final class Renderer implements AutoCloseable {
                 overlayRenderer.close();
                 overlayRenderer = null;
             }
+            if (defaultTexture != null) {
+                defaultTexture.close();
+                defaultTexture = null;
+            }
             glBindVertexArray(0);
             glUseProgram(0);
             renderList.clear();
             resources.setActiveGeometryResources(0);
+            resources.setActiveTextureResources(0);
             resources.setProgramCount(0);
             closed = true;
         } finally {
@@ -318,8 +334,12 @@ public final class Renderer implements AutoCloseable {
         BasicMaterial material = item.material();
         BasicProgram program = basicProgram();
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
+        @Nullable Texture colorMap = material.colorMap().orElse(null);
+        if (colorMap != null && colorMap.isClosed()) {
+            throw new IllegalStateException("BasicMaterial colorMap is closed");
+        }
         resources.setActiveGeometryResources(geometryResources.size());
-        resource.synchronize(geometry, material.usesVertexColors(), statistics);
+        resource.synchronize(geometry, material.usesVertexColors(), colorMap != null, statistics);
         applyMaterialState(material);
 
         glUseProgram(program.id());
@@ -330,6 +350,18 @@ public final class Renderer implements AutoCloseable {
         float alpha = material.transparent() ? material.opacity() : 1.0f;
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
         glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
+        glActiveTexture(GL_TEXTURE0);
+        if (colorMap == null) {
+            defaultTexture().bind();
+            glUniform1i(program.useColorMapLocation(), 0);
+        } else {
+            TextureResource textureResource =
+                    textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
+            resources.setActiveTextureResources(textureResources.size());
+            textureResource.synchronize(colorMap, statistics);
+            glUniform1i(program.colorMapLocation(), 0);
+            glUniform1i(program.useColorMapLocation(), 1);
+        }
         resource.bind();
 
         int start = geometry.drawRangeStart();
@@ -355,10 +387,18 @@ public final class Renderer implements AutoCloseable {
     /** Lazily creates and returns context-local overlay drawing resources. */
     private OverlayRenderer overlayRenderer() {
         if (overlayRenderer == null) {
-            overlayRenderer = OverlayRenderer.create();
+            overlayRenderer = OverlayRenderer.create(defaultTexture());
             updateProgramCount();
         }
         return overlayRenderer;
+    }
+
+    /** Lazily creates the complete fallback image required by optional sampler uniforms. */
+    private DefaultTexture defaultTexture() {
+        if (defaultTexture == null) {
+            defaultTexture = new DefaultTexture();
+        }
+        return defaultTexture;
     }
 
     /** Synchronizes the diagnostic program count with realized built-in programs. */
@@ -426,6 +466,20 @@ public final class Renderer implements AutoCloseable {
             }
         }
         resources.setActiveGeometryResources(geometryResources.size());
+    }
+
+    /** Releases realized GPU resources whose texture descriptions were closed. */
+    private void releaseClosedTextureResources() {
+        Iterator<Map.Entry<Texture, TextureResource>> iterator =
+                textureResources.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Texture, TextureResource> entry = iterator.next();
+            if (entry.getKey().isClosed()) {
+                entry.getValue().close();
+                iterator.remove();
+            }
+        }
+        resources.setActiveTextureResources(textureResources.size());
     }
 
     /** Rejects renderer use after close. */

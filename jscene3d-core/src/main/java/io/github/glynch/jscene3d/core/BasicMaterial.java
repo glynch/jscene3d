@@ -5,11 +5,14 @@
 package io.github.glynch.jscene3d.core;
 
 import java.util.Objects;
+import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
-/** Unlit material with a base color and optional per-vertex color multiplication. */
+/** Unlit material with a base color and optional vertex-color and color-map multiplication. */
 public final class BasicMaterial extends Material {
     private Color color;
     private boolean usesVertexColors;
+    private @Nullable Texture colorMap;
 
     /** Creates an opaque white basic material. */
     public BasicMaterial() {
@@ -74,6 +77,50 @@ public final class BasicMaterial extends Material {
         requireOpen();
         if (usesVertexColors != enabled) {
             usesVertexColors = enabled;
+            markChanged();
+        }
+    }
+
+    /**
+     * Returns the optional base-color texture multiplied with the material and vertex colors.
+     *
+     * @return the shared texture, or an empty value when no color map is selected
+     * @throws IllegalStateException if this material is closed
+     */
+    public Optional<Texture> colorMap() {
+        requireOpen();
+        return Optional.ofNullable(colorMap);
+    }
+
+    /**
+     * Selects a shared base-color texture without transferring ownership.
+     *
+     * @param colorMap open texture to sample
+     * @throws NullPointerException if {@code colorMap} is {@code null}
+     * @throws IllegalArgumentException if {@code colorMap} is closed
+     * @throws IllegalStateException if this material is closed
+     */
+    public void setColorMap(Texture colorMap) {
+        requireOpen();
+        Texture validColorMap = Objects.requireNonNull(colorMap, "colorMap");
+        if (validColorMap.isClosed()) {
+            throw new IllegalArgumentException("colorMap must be open");
+        }
+        if (this.colorMap != validColorMap) {
+            this.colorMap = validColorMap;
+            markChanged();
+        }
+    }
+
+    /**
+     * Removes the selected base-color texture without closing it.
+     *
+     * @throws IllegalStateException if this material is closed
+     */
+    public void clearColorMap() {
+        requireOpen();
+        if (colorMap != null) {
+            colorMap = null;
             markChanged();
         }
     }

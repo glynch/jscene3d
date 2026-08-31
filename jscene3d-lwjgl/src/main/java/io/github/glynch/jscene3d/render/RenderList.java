@@ -35,7 +35,7 @@ final class RenderList {
     }
 
     /** Rebuilds opaque and transparent submissions from a scene hierarchy. */
-    void build(Scene scene, Frustum frustum, RenderStatistics statistics) {
+    void build(Scene scene, Matrix4fc viewMatrix, Frustum frustum, RenderStatistics statistics) {
         clear();
         pendingObjects.push(scene);
         try {
@@ -45,7 +45,7 @@ final class RenderList {
                     continue;
                 }
                 if (object instanceof Mesh mesh) {
-                    collect(mesh, frustum, statistics);
+                    collect(mesh, viewMatrix, frustum, statistics);
                 }
                 List<Object3D> children = object.children();
                 for (int index = children.size() - 1; index >= 0; index--) {
@@ -53,6 +53,7 @@ final class RenderList {
                 }
             }
             opaqueItems.sort(RenderItem::compareOpaque);
+            transparentItems.sort(RenderItem::compareTransparent);
         } catch (RuntimeException exception) {
             clear();
             throw exception;
@@ -74,7 +75,7 @@ final class RenderList {
         return transparentItems.size();
     }
 
-    /** Returns a transparent submission by traversal position. */
+    /** Returns a transparent submission by back-to-front sorted position. */
     RenderItem transparentItem(int index) {
         return transparentItems.get(index);
     }
@@ -92,7 +93,7 @@ final class RenderList {
     }
 
     /** Validates and classifies one visible mesh, including optional frustum rejection. */
-    private void collect(Mesh mesh, Frustum frustum, RenderStatistics statistics) {
+    private void collect(Mesh mesh, Matrix4fc viewMatrix, Frustum frustum, RenderStatistics statistics) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
         if (!material.visible()) {
@@ -120,7 +121,12 @@ final class RenderList {
         }
 
         RenderItem item = acquireItem();
-        item.assign(mesh, geometry, basicMaterial, worldMatrix, elementCount, traversalOrder++);
+        float worldX = worldMatrix.m30();
+        float worldY = worldMatrix.m31();
+        float worldZ = worldMatrix.m32();
+        float cameraDepth =
+                viewMatrix.m02() * worldX + viewMatrix.m12() * worldY + viewMatrix.m22() * worldZ + viewMatrix.m32();
+        item.assign(mesh, geometry, basicMaterial, worldMatrix, elementCount, cameraDepth, traversalOrder++);
         if (basicMaterial.transparent()) {
             transparentItems.add(item);
         } else {

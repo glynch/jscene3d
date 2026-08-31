@@ -23,6 +23,9 @@ import io.github.glynch.jscene3d.core.Mesh;
 import io.github.glynch.jscene3d.core.OrthographicCamera;
 import io.github.glynch.jscene3d.core.PerspectiveCamera;
 import io.github.glynch.jscene3d.core.Scene;
+import io.github.glynch.jscene3d.core.Texture;
+import io.github.glynch.jscene3d.core.TextureFilter;
+import io.github.glynch.jscene3d.core.TextureWrap;
 import io.github.glynch.jscene3d.platform.VerticalSync;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.platform.WindowOptions;
@@ -218,9 +221,73 @@ final class RendererIT {
             renderer.render(overlay);
 
             assertThat(renderer.info().resources().programCount()).isEqualTo(2);
-            int panelX = window.framebufferWidth() - 20;
-            int panelY = window.framebufferHeight() - 20;
+            int panelX = Math.round((window.width() - 20.0f) * window.framebufferWidth() / window.width());
+            int panelY = Math.round((window.height() - 20.0f) * window.framebufferHeight() / window.height());
             assertPixelIsNotBlack(panelX, panelY);
+        }
+    }
+
+    @Test
+    void uploadsAndSamplesASharedColorMapOnlyWhenItsImageChanges() {
+        WindowOptions windowOptions = WindowOptions.builder()
+                .size(320, 240)
+                .title("Texture integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+
+        byte[] pixels = {(byte) 0xff, 0, 0, (byte) 0xff, 0, 0, (byte) 0xff, (byte) 0xff};
+        Texture texture = Texture.baseColor(1, 2, pixels);
+        texture.setMinificationFilter(TextureFilter.NEAREST);
+        texture.setMagnificationFilter(TextureFilter.NEAREST);
+        try (Window window = Window.create(windowOptions);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTexturedTriangle();
+                BasicMaterial material = new BasicMaterial()) {
+            material.setColorMap(texture);
+            Mesh leftTriangle = new Mesh(geometry, material);
+            leftTriangle.setPosition(-0.4f, 0.0f, 0.0f);
+            Mesh rightTriangle = new Mesh(geometry, material);
+            rightTriangle.setPosition(0.4f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(leftTriangle);
+            scene.add(rightTriangle);
+            OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            RenderStatistics statistics = renderer.info().statistics();
+            ResourceStatistics resources = renderer.info().resources();
+            assertThat(statistics.textureUploads()).isEqualTo(1);
+            assertThat(statistics.textureUploadBytes()).isEqualTo(8L);
+            assertThat(resources.activeTextureResources()).isEqualTo(1);
+            int upperY = Math.round(window.framebufferHeight() * 0.56f);
+            int lowerY = Math.round(window.framebufferHeight() * 0.44f);
+            int leftX = Math.round(window.framebufferWidth() * 0.3f);
+            int rightX = Math.round(window.framebufferWidth() * 0.7f);
+            assertPixelIsRed(leftX, upperY);
+            assertPixelIsBlue(leftX, lowerY);
+            assertPixelIsRed(rightX, upperY);
+            assertPixelIsBlue(rightX, lowerY);
+
+            renderer.render(scene, camera);
+            assertThat(statistics.textureUploads()).isZero();
+
+            texture.setHorizontalWrap(TextureWrap.REPEAT);
+            renderer.render(scene, camera);
+            assertThat(statistics.textureUploads()).isZero();
+
+            texture.setImage(1, 2, pixels);
+            renderer.render(scene, camera);
+            assertThat(statistics.textureUploads()).isEqualTo(1);
+
+            texture.close();
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("BasicMaterial colorMap is closed");
+            assertThat(resources.activeTextureResources()).isZero();
+        } finally {
+            texture.close();
         }
     }
 
@@ -235,6 +302,13 @@ final class RendererIT {
     private static BufferGeometry createSmallTriangle() {
         return BufferGeometry.builder()
                 .positions(-0.2f, -0.2f, 0.0f, 0.2f, -0.2f, 0.0f, 0.0f, 0.2f, 0.0f)
+                .build();
+    }
+
+    private static BufferGeometry createTexturedTriangle() {
+        return BufferGeometry.builder()
+                .positions(-0.25f, -0.25f, 0.0f, 0.25f, -0.25f, 0.0f, 0.0f, 0.25f, 0.0f)
+                .uvs(0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f)
                 .build();
     }
 
@@ -256,6 +330,14 @@ final class RendererIT {
         assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+
+    private static void assertPixelIsBlue(int x, int y) {
+        ByteBuffer pixel = readPixel(x, y);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isGreaterThan(240);
     }
 
     private static void assertPixelIsNotBlack(int x, int y) {

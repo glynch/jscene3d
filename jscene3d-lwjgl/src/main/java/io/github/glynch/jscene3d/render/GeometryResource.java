@@ -31,11 +31,13 @@ import org.jspecify.annotations.Nullable;
 final class GeometryResource implements AutoCloseable {
     private static final int POSITION_LOCATION = 0;
     private static final int COLOR_LOCATION = 1;
+    private static final int UV_LOCATION = 2;
 
     private final int vertexArray;
 
     private @Nullable AttributeResource positions;
     private @Nullable AttributeResource colors;
+    private @Nullable AttributeResource uvs;
     private @Nullable IndexResource indices;
 
     /** Allocates the vertex-array object that owns geometry bindings. */
@@ -44,14 +46,25 @@ final class GeometryResource implements AutoCloseable {
     }
 
     /** Synchronizes changed CPU attributes and indices into context-local GPU buffers. */
-    void synchronize(BufferGeometry geometry, boolean requiresVertexColors, RenderStatistics statistics) {
+    void synchronize(
+            BufferGeometry geometry,
+            boolean requiresVertexColors,
+            boolean requiresTextureCoordinates,
+            RenderStatistics statistics) {
         @Nullable BufferAttribute positionAttribute = geometry.attribute(BufferGeometry.POSITION);
         @Nullable BufferAttribute colorAttribute = geometry.attribute(BufferGeometry.COLOR);
+        @Nullable BufferAttribute uvAttribute = geometry.attribute(BufferGeometry.UV);
         if (requiresVertexColors && colorAttribute == null) {
             throw new IllegalStateException("BasicMaterial uses vertex colors but geometry has no color attribute");
         }
         if (colorAttribute != null && colorAttribute.itemSize() != 3 && colorAttribute.itemSize() != 4) {
             throw new IllegalStateException("color attribute itemSize must be 3 or 4: " + colorAttribute.itemSize());
+        }
+        if (requiresTextureCoordinates && uvAttribute == null) {
+            throw new IllegalStateException("BasicMaterial has a color map but geometry has no uv attribute");
+        }
+        if (uvAttribute != null && uvAttribute.itemSize() != 2) {
+            throw new IllegalStateException("uv attribute itemSize must be 2: " + uvAttribute.itemSize());
         }
 
         glBindVertexArray(vertexArray);
@@ -63,6 +76,7 @@ final class GeometryResource implements AutoCloseable {
                 colorAttribute == null ? 4 : colorAttribute.itemSize(),
                 false,
                 statistics);
+        uvs = synchronizeAttribute(uvs, uvAttribute, UV_LOCATION, 2, false, statistics);
         indices = synchronizeIndex(indices, geometry.index(), statistics);
         glBindVertexArray(0);
     }
@@ -76,6 +90,7 @@ final class GeometryResource implements AutoCloseable {
     public void close() {
         closeAttribute(positions);
         closeAttribute(colors);
+        closeAttribute(uvs);
         if (indices != null) {
             glDeleteBuffers(indices.buffer);
         }

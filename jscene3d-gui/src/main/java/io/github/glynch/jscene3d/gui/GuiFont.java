@@ -113,8 +113,8 @@ final class GuiFont {
                                 baked.minimumY / (float) ATLAS_HEIGHT,
                                 baked.maximumX / (float) ATLAS_WIDTH,
                                 baked.maximumY / (float) ATLAS_HEIGHT),
-                        baked.maximumX - baked.minimumX,
-                        baked.maximumY - baked.minimumY,
+                        (float) baked.maximumX - baked.minimumX,
+                        (float) baked.maximumY - baked.minimumY,
                         baked.offsetX,
                         baked.offsetY,
                         baked.advance);

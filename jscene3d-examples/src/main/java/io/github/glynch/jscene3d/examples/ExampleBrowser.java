@@ -70,8 +70,9 @@ public final class ExampleBrowser {
             float elapsedSeconds =
                     Math.clamp((nowNanos - previousNanos) / 1_000_000_000.0f, 0.0f, MAXIMUM_FRAME_SECONDS);
             previousNanos = nowNanos;
-            boolean pointerCaptured = gallery.capturesPointer() || !context.containsPointer();
-            session.update(new ExampleFrame(elapsedSeconds, pointerCaptured));
+            boolean inputCaptured =
+                    gallery.capturesPointer() || gallery.capturesKeyboard() || !context.containsPointer();
+            session.update(new ExampleFrame(elapsedSeconds, inputCaptured));
             context.applyRendererViewport();
             session.render();
             renderer.render(gallery);

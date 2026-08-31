@@ -37,6 +37,7 @@ public final class GalleryPanel implements Overlay {
     private static final float TITLE_FONT_SIZE = 19.0f;
     private static final float BODY_FONT_SIZE = 13.0f;
     private static final float SMALL_FONT_SIZE = 11.0f;
+    private static final double SCROLL_UNITS_PER_CARD = 3.0;
     private static final int MAXIMUM_QUERY_CODE_POINTS = 80;
     private static final GuiFont FONT = GuiFont.defaultFont();
 
@@ -51,8 +52,9 @@ public final class GalleryPanel implements Overlay {
     private int filteredCount;
     private int selectedIndex;
     private int firstVisibleIndex;
-    private boolean searchFocused;
+    private Focus focus = Focus.LIST;
     private boolean capturesPointer;
+    private double accumulatedScrollY;
     private double pointerX = Double.NEGATIVE_INFINITY;
     private double pointerY = Double.NEGATIVE_INFINITY;
 
@@ -115,7 +117,8 @@ public final class GalleryPanel implements Overlay {
                 input.wasMouseButtonPressed(MouseButton.LEFT),
                 input.scrollDeltaY(),
                 input.wasKeyPressed(Key.BACKSPACE),
-                typedText.toString());
+                typedText.toString(),
+                Navigation.from(input));
         return update(galleryInput, validWindow.width(), validWindow.height());
     }
 
@@ -143,7 +146,16 @@ public final class GalleryPanel implements Overlay {
      * @return whether search has keyboard focus
      */
     public boolean isSearchFocused() {
-        return searchFocused;
+        return focus == Focus.SEARCH;
+    }
+
+    /**
+     * Returns whether keyboard input belongs to the gallery rather than the live example.
+     *
+     * @return whether the gallery list or search field has keyboard focus
+     */
+    public boolean capturesKeyboard() {
+        return focus != Focus.NONE;
     }
 
     /**
@@ -208,7 +220,7 @@ public final class GalleryPanel implements Overlay {
         float x = OUTER_PADDING;
         float y = HEADER_HEIGHT + 7.0f;
         float width = CARD_WIDTH;
-        Color border = searchFocused ? theme.accent() : theme.border();
+        Color border = isSearchFocused() ? theme.accent() : theme.border();
         canvas.roundedRectangle(x, y, width, 32.0f, 6.0f, border, 1.0f);
         canvas.roundedRectangle(x + 1.0f, y + 1.0f, width - 2.0f, 30.0f, 5.0f, theme.control(), 1.0f);
         String text = query.isEmpty() ? "Search examples" : visibleQuery(width - 38.0f);
@@ -288,16 +300,21 @@ public final class GalleryPanel implements Overlay {
         capturesPointer = pointerInside;
         boolean changed = false;
         if (validInput.pressed()) {
-            changed |= activate(pointerX, pointerY, windowHeight);
-            if (!pointerInside) {
-                changed |= setSearchFocused(false);
+            if (pointerInside) {
+                changed |= activate(pointerX, pointerY, windowHeight);
+            } else {
+                changed |= setFocus(Focus.NONE);
+                accumulatedScrollY = 0.0;
             }
         }
         if (pointerInside && validInput.scrollDeltaY() != 0.0) {
             changed |= scroll(validInput.scrollDeltaY(), windowHeight);
         }
-        if (searchFocused) {
+        if (isSearchFocused()) {
             changed |= editQuery(validInput);
+        }
+        if (capturesKeyboard() && validInput.navigation() != Navigation.NONE) {
+            changed |= navigate(validInput.navigation(), windowHeight);
         }
         return changed;
     }
@@ -305,42 +322,108 @@ public final class GalleryPanel implements Overlay {
     /** Activates the search field, clear affordance, or one visible card. */
     private boolean activate(double x, double y, int windowHeight) {
         if (contains(x, y, OUTER_PADDING, HEADER_HEIGHT + 7.0f, CARD_WIDTH, 32.0f)) {
+            boolean changed = setFocus(Focus.SEARCH);
             if (!query.isEmpty() && x >= WIDTH - OUTER_PADDING - 28.0f) {
                 query.setLength(0);
                 updateFilter();
                 return true;
             }
-            return setSearchFocused(true);
+            return changed;
         }
+        boolean changed = setFocus(Focus.LIST);
         if (x < 0.0 || x >= WIDTH || y < CONTENT_TOP) {
-            return false;
+            return changed;
         }
         int cardOffset = (int) ((y - CONTENT_TOP) / (CARD_HEIGHT + CARD_GAP));
         float cardY = CONTENT_TOP + cardOffset * (CARD_HEIGHT + CARD_GAP);
         if (cardOffset >= visibleCardCount(windowHeight)
                 || !contains(x, y, OUTER_PADDING, cardY, CARD_WIDTH, CARD_HEIGHT)) {
-            return false;
+            return changed;
         }
         int filteredIndex = firstVisibleIndex + cardOffset;
         if (filteredIndex >= filteredCount) {
-            return false;
+            return changed;
         }
         int replacement = filteredIndices[filteredIndex];
-        boolean changed = replacement != selectedIndex || searchFocused;
+        changed |= replacement != selectedIndex;
         selectedIndex = replacement;
-        searchFocused = false;
         return changed;
     }
 
-    /** Applies discrete card scrolling while keeping the final page full where possible. */
+    /** Accumulates normalized wheel or trackpad movement before advancing one complete card. */
     private boolean scroll(double deltaY, int windowHeight) {
-        int maximumFirst = Math.max(0, filteredCount - visibleCardCount(windowHeight));
-        int replacement = firstVisibleIndex;
-        if (deltaY < 0.0 && firstVisibleIndex < maximumFirst) {
-            replacement++;
-        } else if (deltaY > 0.0 && firstVisibleIndex > 0) {
-            replacement--;
+        if (accumulatedScrollY * deltaY < 0.0) {
+            accumulatedScrollY = 0.0;
         }
+        double normalizedDelta = Math.clamp(deltaY, -1.0, 1.0);
+        accumulatedScrollY =
+                Math.clamp(accumulatedScrollY + normalizedDelta, -SCROLL_UNITS_PER_CARD, SCROLL_UNITS_PER_CARD);
+        if (Math.abs(accumulatedScrollY) < SCROLL_UNITS_PER_CARD) {
+            return false;
+        }
+        int cardDelta = accumulatedScrollY < 0.0 ? 1 : -1;
+        accumulatedScrollY = 0.0;
+        return scrollByCards(cardDelta, windowHeight);
+    }
+
+    /** Moves the first visible card by a signed count within the available result pages. */
+    private boolean scrollByCards(int cardDelta, int windowHeight) {
+        int maximumFirst = Math.max(0, filteredCount - visibleCardCount(windowHeight));
+        int replacement = (int) Math.clamp((long) firstVisibleIndex + cardDelta, 0L, maximumFirst);
+        if (replacement == firstVisibleIndex) {
+            return false;
+        }
+        firstVisibleIndex = replacement;
+        return true;
+    }
+
+    /** Applies one focused keyboard-navigation command to the filtered results. */
+    private boolean navigate(Navigation navigation, int windowHeight) {
+        if (filteredCount == 0) {
+            return false;
+        }
+        int currentPosition = filteredPosition(selectedIndex);
+        int finalPosition = filteredCount - 1;
+        int pageSize = visibleCardCount(windowHeight);
+        int replacementPosition =
+                switch (navigation) {
+                    case PREVIOUS -> currentPosition < 0 ? finalPosition : Math.max(currentPosition - 1, 0);
+                    case NEXT -> currentPosition < 0 ? 0 : Math.min(currentPosition + 1, finalPosition);
+                    case PREVIOUS_PAGE -> currentPosition < 0 ? finalPosition : Math.max(currentPosition - pageSize, 0);
+                    case NEXT_PAGE -> currentPosition < 0 ? 0 : Math.min(currentPosition + pageSize, finalPosition);
+                    case FIRST -> 0;
+                    case LAST -> finalPosition;
+                    case NONE -> currentPosition;
+                };
+        if (replacementPosition < 0) {
+            return false;
+        }
+        boolean changed = selectedIndex != filteredIndices[replacementPosition];
+        selectedIndex = filteredIndices[replacementPosition];
+        return ensureVisible(replacementPosition, windowHeight) || changed;
+    }
+
+    /** Returns one item's position in the current filtered ordering, or {@code -1} when absent. */
+    private int filteredPosition(int itemIndex) {
+        for (int filteredIndex = 0; filteredIndex < filteredCount; filteredIndex++) {
+            if (filteredIndices[filteredIndex] == itemIndex) {
+                return filteredIndex;
+            }
+        }
+        return -1;
+    }
+
+    /** Adjusts the first visible card so the supplied filtered position is fully visible. */
+    private boolean ensureVisible(int filteredPosition, int windowHeight) {
+        int visibleCount = visibleCardCount(windowHeight);
+        int replacement = firstVisibleIndex;
+        if (filteredPosition < firstVisibleIndex) {
+            replacement = filteredPosition;
+        } else if (filteredPosition >= firstVisibleIndex + visibleCount) {
+            replacement = filteredPosition - visibleCount + 1;
+        }
+        int maximumFirst = Math.max(0, filteredCount - visibleCount);
+        replacement = Math.clamp(replacement, 0, maximumFirst);
         if (replacement == firstVisibleIndex) {
             return false;
         }
@@ -381,6 +464,7 @@ public final class GalleryPanel implements Overlay {
             }
         }
         firstVisibleIndex = 0;
+        accumulatedScrollY = 0.0;
     }
 
     /** Returns whether every query term occurs in one item's searchable metadata. */
@@ -419,12 +503,12 @@ public final class GalleryPanel implements Overlay {
         return Math.max(1, (int) ((height - CONTENT_TOP + CARD_GAP) / (CARD_HEIGHT + CARD_GAP)));
     }
 
-    /** Replaces search focus and reports whether it changed. */
-    private boolean setSearchFocused(boolean replacement) {
-        if (searchFocused == replacement) {
+    /** Replaces gallery focus and reports whether it changed. */
+    private boolean setFocus(Focus replacement) {
+        if (focus == replacement) {
             return false;
         }
-        searchFocused = replacement;
+        focus = replacement;
         return true;
     }
 
@@ -450,11 +534,59 @@ public final class GalleryPanel implements Overlay {
         return x >= left && x < left + width && y >= top && y < top + height;
     }
 
+    /** Distinguishes the native gallery's keyboard focus targets. */
+    private enum Focus {
+        NONE,
+        LIST,
+        SEARCH
+    }
+
+    /** One filtered-result keyboard-navigation command. */
+    enum Navigation {
+        FIRST(Key.HOME),
+        LAST(Key.END),
+        PREVIOUS_PAGE(Key.PAGE_UP),
+        NEXT_PAGE(Key.PAGE_DOWN),
+        PREVIOUS(Key.UP),
+        NEXT(Key.DOWN),
+        NONE(null);
+
+        private final @Nullable Key key;
+
+        /** Associates a command with its physical key, or no key for the neutral command. */
+        Navigation(@Nullable Key key) {
+            this.key = key;
+        }
+
+        /** Returns the first navigation command pressed during the latest input poll. */
+        private static Navigation from(InputState input) {
+            for (Navigation navigation : values()) {
+                if (navigation.key != null && input.wasKeyPressed(navigation.key)) {
+                    return navigation;
+                }
+            }
+            return NONE;
+        }
+    }
+
     /** One headless-testable input snapshot. */
-    record GalleryInput(double x, double y, boolean pressed, double scrollDeltaY, boolean backspace, String typedText) {
+    record GalleryInput(
+            double x,
+            double y,
+            boolean pressed,
+            double scrollDeltaY,
+            boolean backspace,
+            String typedText,
+            Navigation navigation) {
+        /** Creates a snapshot without keyboard navigation. */
+        GalleryInput(double x, double y, boolean pressed, double scrollDeltaY, boolean backspace, String typedText) {
+            this(x, y, pressed, scrollDeltaY, backspace, typedText, Navigation.NONE);
+        }
+
         /** Rejects a null text payload. */
         GalleryInput {
             Objects.requireNonNull(typedText, "typedText");
+            Objects.requireNonNull(navigation, "navigation");
         }
     }
 }

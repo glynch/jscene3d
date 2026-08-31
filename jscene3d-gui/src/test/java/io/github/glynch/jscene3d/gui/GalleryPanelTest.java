@@ -39,10 +39,45 @@ final class GalleryPanelTest {
         panel.update(new GalleryPanel.GalleryInput(40.0, 380.0, true, 0.0, false, ""), 1000, 720);
         assertThat(panel.selectedItem().id()).isEqualTo("lights");
 
-        boolean changed = panel.update(new GalleryPanel.GalleryInput(40.0, 350.0, false, -1.0, false, ""), 1000, 400);
+        boolean firstPartialScroll =
+                panel.update(new GalleryPanel.GalleryInput(40.0, 350.0, false, -1.0, false, ""), 1000, 400);
+        boolean secondPartialScroll =
+                panel.update(new GalleryPanel.GalleryInput(40.0, 350.0, false, -1.0, false, ""), 1000, 400);
+        boolean completeScroll =
+                panel.update(new GalleryPanel.GalleryInput(40.0, 350.0, false, -1.0, false, ""), 1000, 400);
 
-        assertThat(changed).isTrue();
+        assertThat(firstPartialScroll).isFalse();
+        assertThat(secondPartialScroll).isFalse();
+        assertThat(completeScroll).isTrue();
         assertThat(panel.capturesPointer()).isTrue();
+    }
+
+    @Test
+    void navigatesFilteredResultsWhileFocusedAndReleasesKeyboardToContent() {
+        GalleryPanel panel = new GalleryPanel("JScene3D", items());
+
+        assertThat(panel.capturesKeyboard()).isTrue();
+        panel.update(navigation(GalleryPanel.Navigation.NEXT), 1000, 720);
+        assertThat(panel.selectedItem().id()).isEqualTo("lights");
+        panel.update(navigation(GalleryPanel.Navigation.LAST), 1000, 720);
+        assertThat(panel.selectedItem().id()).isEqualTo("solar");
+        panel.update(navigation(GalleryPanel.Navigation.FIRST), 1000, 720);
+        assertThat(panel.selectedItem().id()).isEqualTo("materials");
+        panel.update(navigation(GalleryPanel.Navigation.NEXT_PAGE), 1000, 720);
+        assertThat(panel.selectedItem().id()).isEqualTo("solar");
+        panel.update(navigation(GalleryPanel.Navigation.PREVIOUS_PAGE), 1000, 720);
+        assertThat(panel.selectedItem().id()).isEqualTo("materials");
+
+        panel.update(new GalleryPanel.GalleryInput(20.0, 75.0, true, 0.0, false, ""), 1000, 720);
+        panel.update(new GalleryPanel.GalleryInput(20.0, 75.0, false, 0.0, false, "light"), 1000, 720);
+        panel.update(navigation(GalleryPanel.Navigation.PREVIOUS), 1000, 720);
+        assertThat(panel.selectedItem().id()).isEqualTo("lights");
+        assertThat(panel.isSearchFocused()).isTrue();
+
+        panel.update(new GalleryPanel.GalleryInput(500.0, 350.0, true, 0.0, false, ""), 1000, 720);
+        panel.update(navigation(GalleryPanel.Navigation.LAST), 1000, 720);
+        assertThat(panel.capturesKeyboard()).isFalse();
+        assertThat(panel.selectedItem().id()).isEqualTo("lights");
     }
 
     @Test
@@ -84,8 +119,8 @@ final class GalleryPanelTest {
     void scrollsInBothDirectionsAndReleasesFocusOutsideSidebar() {
         GalleryPanel panel = new GalleryPanel("JScene3D", items());
         panel.update(new GalleryPanel.GalleryInput(20.0, 75.0, true, 0.0, false, ""), 1000, 400);
-        panel.update(new GalleryPanel.GalleryInput(40.0, 350.0, false, -1.0, false, ""), 1000, 400);
-        panel.update(new GalleryPanel.GalleryInput(40.0, 350.0, false, 1.0, false, ""), 1000, 400);
+        applyScroll(panel, -1.0);
+        applyScroll(panel, 1.0);
 
         assertThat(panel.update(new GalleryPanel.GalleryInput(500.0, 350.0, true, 0.0, false, ""), 1000, 400))
                 .isTrue();
@@ -109,5 +144,17 @@ final class GalleryPanelTest {
                         "materials", "Materials", "Features", "Material comparison", List.of("phong"), THUMBNAIL),
                 new GalleryItem("lights", "Lighting", "Features", "Light comparison", List.of("spot"), THUMBNAIL),
                 new GalleryItem("solar", "Solar System", "Showcases", "Planet viewer", List.of("texture"), THUMBNAIL));
+    }
+
+    /** Creates a keyboard-navigation input snapshot outside the sidebar without clicking. */
+    private static GalleryPanel.GalleryInput navigation(GalleryPanel.Navigation navigation) {
+        return new GalleryPanel.GalleryInput(500.0, 350.0, false, 0.0, false, "", navigation);
+    }
+
+    /** Applies enough normalized input events to move exactly one card. */
+    private static void applyScroll(GalleryPanel panel, double deltaY) {
+        for (int event = 0; event < 3; event++) {
+            panel.update(new GalleryPanel.GalleryInput(40.0, 350.0, false, deltaY, false, ""), 1000, 400);
+        }
     }
 }

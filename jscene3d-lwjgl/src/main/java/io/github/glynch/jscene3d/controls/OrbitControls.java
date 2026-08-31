@@ -734,7 +734,7 @@ public final class OrbitControls {
      *     state
      */
     public boolean update(float elapsedSeconds) {
-        return update(elapsedSeconds, true);
+        return update(elapsedSeconds, true, true);
     }
 
     /**
@@ -763,11 +763,38 @@ public final class OrbitControls {
      *     state
      */
     public boolean updateWithoutPointerInput(float elapsedSeconds) {
-        return update(elapsedSeconds, false);
+        return update(elapsedSeconds, false, true);
+    }
+
+    /**
+     * Applies pending motion without reading pointer or keyboard input at a nominal 60 Hz.
+     *
+     * <p>This is intended for frames in which a host interface has claimed all user input.
+     * Automatic rotation and damping continue normally.
+     *
+     * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
+     */
+    public boolean updateWithoutUserInput() {
+        return updateWithoutUserInput(DEFAULT_SECONDS_PER_UPDATE);
+    }
+
+    /**
+     * Applies pending motion without reading pointer or keyboard input.
+     *
+     * @param elapsedSeconds finite non-negative time since the previous update
+     * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalArgumentException if {@code elapsedSeconds} is invalid
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
+     */
+    public boolean updateWithoutUserInput(float elapsedSeconds) {
+        return update(elapsedSeconds, false, false);
     }
 
     /** Applies input categories selected by the caller and all pending motion. */
-    private boolean update(float elapsedSeconds, boolean pointerInputEnabled) {
+    private boolean update(float elapsedSeconds, boolean pointerInputEnabled, boolean keyboardInputEnabled) {
         float validElapsedSeconds = Preconditions.requireNonNegative(elapsedSeconds, "elapsedSeconds");
         if (!enabled) {
             return false;
@@ -778,7 +805,7 @@ public final class OrbitControls {
         InputState input = window.input();
         boolean modifierDown = isModifierDown(input);
         boolean userInteracting = pointerInputEnabled && processPointerInput(input, modifierDown);
-        userInteracting |= processKeyboardInput(input, modifierDown);
+        userInteracting |= keyboardInputEnabled && processKeyboardInput(input, modifierDown);
         if (pointerInputEnabled && zoomEnabled && input.scrollDeltaY() != 0.0) {
             orbitState.dolly(input.scrollDeltaY(), zoomSpeed);
             userInteracting = true;

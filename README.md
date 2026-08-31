@@ -49,8 +49,11 @@ selected. Its left sidebar provides captured thumbnails, category and tag
 search, scrolling, and persistent selection; the right content area hosts the
 fully interactive example. Switching cards closes the previous example's GPU
 resources before creating the replacement. The examples continue to run as
-independent applications through the same lifecycle. For example, launch the
-Solar System Viewer directly with:
+independent applications through the same lifecycle. Use Up and Down to move
+through filtered results, Page Up and Page Down to move by a visible page, and
+Home or End to reach either boundary. Clicking the rendered example returns
+keyboard control to that example; clicking the gallery or search field returns
+it to the browser. For example, launch the Solar System Viewer directly with:
 
 ```shell
 ./tools/scripts/run-example.sh SolarSystemViewer

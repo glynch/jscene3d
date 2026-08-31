@@ -84,7 +84,7 @@ public final class ObjectSelectionExample {
         example.setPointerCapture(panel::capturesPointer);
         example.setFrameAction((ignored, frame) -> {
             panel.update();
-            if (!frame.pointerCaptured() && !panel.capturesPointer()) {
+            if (!frame.inputCaptured() && !panel.capturesPointer()) {
                 selectOnPointerPress(context, camera, scene, raycaster, selection);
             }
             fpsMonitor.update();

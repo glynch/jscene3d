@@ -96,7 +96,9 @@ public final class SolarSystemViewer {
             panel.update();
             float elapsedSeconds = Math.min(frame.elapsedSeconds(), MAXIMUM_FRAME_SECONDS);
             solarSystem.update(elapsedSeconds);
-            if (frame.pointerCaptured() || panel.capturesPointer()) {
+            if (frame.inputCaptured()) {
+                controls.updateWithoutUserInput(elapsedSeconds);
+            } else if (panel.capturesPointer()) {
                 controls.updateWithoutPointerInput(elapsedSeconds);
             } else {
                 controls.update(elapsedSeconds);

@@ -235,7 +235,7 @@ final class OrbitControlsIT {
     }
 
     @Test
-    void suppressesPointerInputButRetainsAutomaticAndDampedMotion() {
+    void suppressesClaimedInputButRetainsAutomaticAndDampedMotion() {
         try (Window window = Window.create(320, 240, "Orbit controls suppressed-input test")) {
             PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, 4.0f / 3.0f, 0.1f, 100.0f);
             camera.setPosition(0.0f, 0.0f, 5.0f);
@@ -246,6 +246,11 @@ final class OrbitControlsIT {
             InputStateTestDriver.movePointer(input, 140.0, 100.0);
 
             assertThat(controls.updateWithoutPointerInput()).isFalse();
+            Vector3f targetBeforeSuppressedKeyboard = new Vector3f(controls.target());
+            InputStateTestDriver.press(input, Key.LEFT);
+            assertThat(controls.updateWithoutUserInput()).isFalse();
+            assertThat(controls.target()).isEqualTo(targetBeforeSuppressedKeyboard);
+            InputStateTestDriver.release(input, Key.LEFT);
             InputStateTestDriver.release(input, MouseButton.LEFT);
             InputStateTestDriver.beginPoll(input);
 
@@ -255,7 +260,7 @@ final class OrbitControlsIT {
             assertThat(controls.update(1.0f)).isTrue();
 
             controls.setAutoRotationEnabled(true);
-            assertThat(controls.updateWithoutPointerInput(1.0f)).isTrue();
+            assertThat(controls.updateWithoutUserInput(1.0f)).isTrue();
         }
     }
 

@@ -156,7 +156,9 @@ public final class SceneExample implements HostedExample {
         ExampleFrame validFrame = Objects.requireNonNull(frame, "frame");
         frameAction.update(this, validFrame);
         if (controls != null) {
-            if (validFrame.pointerCaptured() || pointerCapture.getAsBoolean()) {
+            if (validFrame.inputCaptured()) {
+                controls.updateWithoutUserInput(validFrame.elapsedSeconds());
+            } else if (pointerCapture.getAsBoolean()) {
                 controls.updateWithoutPointerInput(validFrame.elapsedSeconds());
             } else {
                 controls.update(validFrame.elapsedSeconds());

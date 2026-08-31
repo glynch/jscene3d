@@ -24,6 +24,7 @@ final class Object3DTest {
         assertThat(object.parent()).isNull();
         assertThat(object.isVisible()).isTrue();
         assertThat(object.isFrustumCullingEnabled()).isTrue();
+        assertThat(object.renderOrder()).isZero();
         assertThat(children).isSameAs(object.children()).isEmpty();
         Object3D rejectedChild = new Object3D();
         assertThatThrownBy(() -> children.add(rejectedChild)).isInstanceOf(UnsupportedOperationException.class);
@@ -40,6 +41,15 @@ final class Object3DTest {
         object.setFrustumCullingEnabled(false);
 
         assertThat(object.isFrustumCullingEnabled()).isFalse();
+    }
+
+    @Test
+    void controlsExplicitRenderOrder() {
+        Object3D object = new Object3D();
+
+        object.setRenderOrder(-3);
+
+        assertThat(object.renderOrder()).isEqualTo(-3);
     }
 
     @Test

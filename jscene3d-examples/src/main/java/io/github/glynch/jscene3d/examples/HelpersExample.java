@@ -36,6 +36,7 @@ public final class HelpersExample {
             Scene scene = new Scene();
             scene.setBackground(Color.BLACK);
             scene.add(grid);
+            axes.setRenderOrder(1);
             scene.add(axes);
 
             PerspectiveCamera camera =

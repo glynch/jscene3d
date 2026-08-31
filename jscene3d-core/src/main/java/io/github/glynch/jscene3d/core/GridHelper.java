@@ -54,7 +54,7 @@ public final class GridHelper extends GeneratedLineSegmentsHelper {
         int validDivisions = Preconditions.requirePositive(divisions, "divisions");
         Color validCenterLineColor = Objects.requireNonNull(centerLineColor, "centerLineColor");
         Color validGridColor = Objects.requireNonNull(gridColor, "gridColor");
-        long vertexCount = ((long) validDivisions + 1L) * 4L;
+        long vertexCount = (validDivisions + 1L) * 4L;
         float[] positions = new float[Preconditions.requireArrayLength(vertexCount, 3, "grid position")];
         Color[] colors = new Color[Preconditions.requireArrayLength(vertexCount, 1, "grid color")];
         float halfSize = validSize * 0.5f;

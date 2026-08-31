@@ -19,6 +19,7 @@ import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BufferAttribute;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.core.DepthFunction;
 import io.github.glynch.jscene3d.core.GridHelper;
 import io.github.glynch.jscene3d.core.Group;
 import io.github.glynch.jscene3d.core.IndexBuffer;
@@ -776,12 +777,86 @@ final class RendererIT {
         }
     }
 
+    @Test
+    void usesRenderOrderAndDepthFunctionToResolveCoincidentLines() {
+        try (Window window = Window.create(320, 240, "Coplanar line ordering integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = BufferGeometry.builder()
+                        .positions(-0.8f, 0.0f, 0.0f, 0.8f, 0.0f, 0.0f)
+                        .build();
+                LineBasicMaterial gridMaterial = new LineBasicMaterial(Color.GRAY);
+                LineBasicMaterial axisMaterial = new LineBasicMaterial(Color.RED);
+                LineBasicMaterial foregroundMaterial = new LineBasicMaterial(Color.BLUE)) {
+            LineSegments gridLine = new LineSegments(geometry, gridMaterial);
+            LineSegments axisLine = new LineSegments(geometry, axisMaterial);
+            axisLine.setRenderOrder(1);
+            axisMaterial.setDepthFunction(DepthFunction.LESS_OR_EQUAL);
+            Scene scene = new Scene();
+            scene.add(gridLine);
+            scene.add(axisLine);
+            OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertNeighborhoodContainsRed(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            LineSegments foregroundLine = new LineSegments(geometry, foregroundMaterial);
+            foregroundLine.setPosition(0.0f, 0.0f, 0.1f);
+            scene.add(foregroundLine);
+            renderer.render(scene, camera);
+
+            assertNeighborhoodContainsBlue(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+        }
+    }
+
+    @Test
+    void mapsEveryMaterialDepthFunction() {
+        try (Window window = Window.create(320, 240, "Depth function integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.NEVER, false);
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.LESS, true);
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.EQUAL, false);
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.LESS_OR_EQUAL, true);
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.GREATER, false);
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.NOT_EQUAL, true);
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.GREATER_OR_EQUAL, false);
+            assertDepthFunctionResult(window, renderer, scene, camera, material, DepthFunction.ALWAYS, true);
+        }
+    }
+
     private static BufferGeometry createTriangle() {
         BufferGeometry geometry = new BufferGeometry();
         geometry.setAttribute(
                 BufferGeometry.POSITION,
                 BufferAttribute.of(new float[] {-0.8f, -0.8f, 0.0f, 0.8f, -0.8f, 0.0f, 0.0f, 0.8f, 0.0f}, 3));
         return geometry;
+    }
+
+    /** Renders one depth comparison against the cleared depth buffer and checks its result. */
+    private static void assertDepthFunctionResult(
+            Window window,
+            Renderer renderer,
+            Scene scene,
+            PerspectiveCamera camera,
+            BasicMaterial material,
+            DepthFunction depthFunction,
+            boolean expectedToRender) {
+        material.setDepthFunction(depthFunction);
+        renderer.render(scene, camera);
+        if (expectedToRender) {
+            assertCenterPixelIsRed(window);
+        } else {
+            assertPixelIsBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+        }
     }
 
     private static BufferGeometry createSmallTriangle() {
@@ -869,6 +944,10 @@ final class RendererIT {
 
     private static void assertNeighborhoodContainsGreen(int centerX, int centerY) {
         assertThat(neighborhoodContainsColor(centerX, centerY, 1, 0, 2)).isTrue();
+    }
+
+    private static void assertNeighborhoodContainsBlue(int centerX, int centerY) {
+        assertThat(neighborhoodContainsColor(centerX, centerY, 2, 0, 1)).isTrue();
     }
 
     private static boolean neighborhoodContainsColor(

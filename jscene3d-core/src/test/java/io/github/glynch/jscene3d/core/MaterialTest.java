@@ -24,6 +24,7 @@ final class MaterialTest {
             assertThat(material.side()).isEqualTo(MaterialSide.FRONT);
             assertThat(material.depthTestEnabled()).isTrue();
             assertThat(material.depthWriteEnabled()).isTrue();
+            assertThat(material.depthFunction()).isEqualTo(DepthFunction.LESS_OR_EQUAL);
             assertThat(material.version()).isZero();
         }
     }
@@ -40,9 +41,10 @@ final class MaterialTest {
             material.setSide(MaterialSide.DOUBLE);
             material.setDepthTestEnabled(false);
             material.setDepthWriteEnabled(false);
+            material.setDepthFunction(DepthFunction.GREATER);
             material.setColorMap(texture);
 
-            assertThat(material.version()).isEqualTo(9L);
+            assertThat(material.version()).isEqualTo(10L);
 
             material.setColor(Color.BLUE);
             material.setUsesVertexColors(true);
@@ -52,14 +54,15 @@ final class MaterialTest {
             material.setSide(MaterialSide.DOUBLE);
             material.setDepthTestEnabled(false);
             material.setDepthWriteEnabled(false);
+            material.setDepthFunction(DepthFunction.GREATER);
             material.setColorMap(texture);
 
-            assertThat(material.version()).isEqualTo(9L);
+            assertThat(material.version()).isEqualTo(10L);
             assertThat(material.colorMap()).containsSame(texture);
 
             material.clearColorMap();
             material.clearColorMap();
-            assertThat(material.version()).isEqualTo(10L);
+            assertThat(material.version()).isEqualTo(11L);
         }
     }
 
@@ -72,6 +75,7 @@ final class MaterialTest {
             assertThatIllegalArgumentException().isThrownBy(() -> material.setOpacity(1.1f));
             assertThatNullPointerException().isThrownBy(() -> material.setColor(null));
             assertThatNullPointerException().isThrownBy(() -> material.setSide(null));
+            assertThatNullPointerException().isThrownBy(() -> material.setDepthFunction(null));
             assertThatNullPointerException().isThrownBy(() -> material.setColorMap(null));
         }
         assertThatNullPointerException().isThrownBy(() -> new BasicMaterial(null));

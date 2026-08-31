@@ -612,6 +612,7 @@ Tests must establish the conventions with concrete examples:
 - World matrix.
 - Visibility.
 - Frustum-culling eligibility.
+- Explicit render order within the opaque or transparent render list.
 - Optional layer mask.
 - Local-matrix update behavior.
 - World-matrix update behavior.
@@ -657,6 +658,8 @@ public class Object3D {
     public void setVisible(boolean visible);
     public boolean isFrustumCullingEnabled();
     public void setFrustumCullingEnabled(boolean enabled);
+    public int renderOrder();
+    public void setRenderOrder(int renderOrder);
 
     public boolean add(Object3D child);
     public boolean remove(Object3D child);
@@ -1102,6 +1105,10 @@ environment lighting, and PBR behavior.
 multiplication, and inherited opacity, transparency, and depth state. Line
 primitives have no face orientation, so inherited material-side selection is
 ignored. The portable raster width remains one framebuffer pixel.
+
+All materials expose a `DepthFunction`, defaulting to `LESS_OR_EQUAL`. This
+allows deliberately ordered coplanar objects to replace equal-depth fragments
+without bypassing occlusion by genuinely closer geometry.
 
 ### 13.7 Shader variants
 
@@ -2056,7 +2063,7 @@ context-bound OpenGL resources.
 
 ### 25.1 Opaque sorting
 
-The initial opaque sort key may include:
+The opaque sort key includes:
 
 1. Explicit render order.
 2. Program key or program identity.
@@ -2064,11 +2071,12 @@ The initial opaque sort key may include:
 4. BufferGeometry identity.
 5. Stable object identity.
 
-The exact order should be profiled and must remain deterministic.
+Explicit render order is compared first. The remaining batching keys may be
+profiled, but their final traversal-order tie-breaker remains deterministic.
 
 ### 25.2 Transparent sorting
 
-The initial transparent sort key may include:
+The transparent sort key includes:
 
 1. Explicit render order.
 2. Camera-space depth, back-to-front.

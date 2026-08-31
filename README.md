@@ -60,9 +60,10 @@ example without running tests or the full verification lifecycle.
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
 `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
-`LineRenderingExample`, `HelpersExample`, and `OrbitControlsExample` are also available using the
-same command. `LineRenderingExample` demonstrates a connected `Line`, indexed
-`LineSegments`, vertex colors, transforms, and orbit controls. In
+`LineRenderingExample`, `HelpersExample`, and `OrbitControlsExample` are also
+available using the same command. `LineRenderingExample` demonstrates a
+connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
+controls. In
 `OrbitControlsExample`, drag with the left mouse button to orbit; drag with the
 right mouse button or Shift-left to pan; and use the middle mouse button or
 scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates. The example
@@ -86,6 +87,12 @@ or triangles that overlap within one transparent mesh. Applications commonly
 disable depth writes for blended surfaces with `setDepthWriteEnabled(false)`,
 as demonstrated by `TransparencyExample`; the choice remains explicit because
 some effects require depth writes.
+
+Every `Object3D` has an explicit render order, with lower values rendered first
+within its opaque or transparent list. Render order does not bypass depth
+testing or move objects between those lists. Materials default to
+`DepthFunction.LESS_OR_EQUAL`, allowing a deliberately later coplanar object to
+replace equal-depth fragments while remaining occluded by closer geometry.
 
 ## Custom shaders
 
@@ -127,6 +134,9 @@ element. Portable line width is fixed to one framebuffer pixel.
 center-line and grid colors. Both are ordinary `LineSegments` scene objects and
 own their generated geometry and material, so close the helper itself when it
 is no longer needed. Their generated resources cannot be replaced.
+`HelpersExample` gives the axes a higher render order than the grid so their
+coplanar X and Z segments remain distinct without altering either helper's
+position or disabling depth testing.
 
 ## Project structure
 

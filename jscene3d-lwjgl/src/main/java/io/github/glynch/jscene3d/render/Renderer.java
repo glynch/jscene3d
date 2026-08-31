@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.render;
 
+import static org.lwjgl.opengl.GL11.GL_ALWAYS;
 import static org.lwjgl.opengl.GL11.GL_BACK;
 import static org.lwjgl.opengl.GL11.GL_BLEND;
 import static org.lwjgl.opengl.GL11.GL_CCW;
@@ -11,7 +12,14 @@ import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.GL_CULL_FACE;
 import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11.GL_EQUAL;
 import static org.lwjgl.opengl.GL11.GL_FRONT;
+import static org.lwjgl.opengl.GL11.GL_GEQUAL;
+import static org.lwjgl.opengl.GL11.GL_GREATER;
+import static org.lwjgl.opengl.GL11.GL_LEQUAL;
+import static org.lwjgl.opengl.GL11.GL_LESS;
+import static org.lwjgl.opengl.GL11.GL_NEVER;
+import static org.lwjgl.opengl.GL11.GL_NOTEQUAL;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
@@ -19,6 +27,7 @@ import static org.lwjgl.opengl.GL11.glBlendFunc;
 import static org.lwjgl.opengl.GL11.glClear;
 import static org.lwjgl.opengl.GL11.glClearColor;
 import static org.lwjgl.opengl.GL11.glCullFace;
+import static org.lwjgl.opengl.GL11.glDepthFunc;
 import static org.lwjgl.opengl.GL11.glDepthMask;
 import static org.lwjgl.opengl.GL11.glDisable;
 import static org.lwjgl.opengl.GL11.glDrawArrays;
@@ -679,6 +688,18 @@ public final class Renderer implements AutoCloseable {
     private void applyMaterialState(Material material, PrimitiveTopology topology) {
         if (material.depthTestEnabled()) {
             glEnable(GL_DEPTH_TEST);
+            int depthFunction =
+                    switch (material.depthFunction()) {
+                        case NEVER -> GL_NEVER;
+                        case LESS -> GL_LESS;
+                        case EQUAL -> GL_EQUAL;
+                        case LESS_OR_EQUAL -> GL_LEQUAL;
+                        case GREATER -> GL_GREATER;
+                        case NOT_EQUAL -> GL_NOTEQUAL;
+                        case GREATER_OR_EQUAL -> GL_GEQUAL;
+                        case ALWAYS -> GL_ALWAYS;
+                    };
+            glDepthFunc(depthFunction);
         } else {
             glDisable(GL_DEPTH_TEST);
         }

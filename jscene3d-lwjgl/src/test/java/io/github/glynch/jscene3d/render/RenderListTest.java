@@ -88,6 +88,49 @@ final class RenderListTest {
     }
 
     @Test
+    void appliesRenderOrderBeforeOpaqueBatchingAndTransparentDepth() {
+        try (BufferGeometry geometry = createTriangle();
+                BasicMaterial firstMaterial = new BasicMaterial(Color.RED);
+                BasicMaterial secondMaterial = new BasicMaterial(Color.BLUE)) {
+            Mesh laterOpaque = new Mesh(geometry, firstMaterial);
+            laterOpaque.setRenderOrder(4);
+            Mesh earlierOpaque = new Mesh(geometry, secondMaterial);
+            earlierOpaque.setRenderOrder(-2);
+            Mesh laterTransparent = new Mesh(geometry, firstMaterial);
+            laterTransparent.setRenderOrder(3);
+            laterTransparent.setPosition(0.0f, 0.0f, -10.0f);
+            laterTransparent.setFrustumCullingEnabled(false);
+            Mesh earlierTransparent = new Mesh(geometry, secondMaterial);
+            earlierTransparent.setRenderOrder(-1);
+            earlierTransparent.setPosition(0.0f, 0.0f, -1.0f);
+            earlierTransparent.setFrustumCullingEnabled(false);
+            firstMaterial.setTransparent(true);
+            secondMaterial.setTransparent(true);
+            Scene transparentScene = new Scene();
+            transparentScene.add(laterTransparent);
+            transparentScene.add(earlierTransparent);
+            RenderList renderList = new RenderList(Renderer.MAX_POINT_LIGHTS);
+
+            Scene opaqueScene = new Scene();
+            firstMaterial.setTransparent(false);
+            secondMaterial.setTransparent(false);
+            opaqueScene.add(laterOpaque);
+            opaqueScene.add(earlierOpaque);
+            build(renderList, opaqueScene);
+            assertThat(renderList.opaqueItem(0).object()).isSameAs(earlierOpaque);
+            assertThat(renderList.opaqueItem(1).object()).isSameAs(laterOpaque);
+
+            renderList.clear();
+            firstMaterial.setTransparent(true);
+            secondMaterial.setTransparent(true);
+            build(renderList, transparentScene);
+            assertThat(renderList.transparentItem(0).object()).isSameAs(earlierTransparent);
+            assertThat(renderList.transparentItem(1).object()).isSameAs(laterTransparent);
+            renderList.clear();
+        }
+    }
+
+    @Test
     void skipsInvisibleSubtreesAndMaterials() {
         try (BufferGeometry geometry = createTriangle();
                 BasicMaterial visibleMaterial = new BasicMaterial(Color.RED);

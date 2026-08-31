@@ -21,12 +21,14 @@ public sealed class Material implements AutoCloseable
     private MaterialSide side;
     private boolean depthTestEnabled = true;
     private boolean depthWriteEnabled = true;
+    private DepthFunction depthFunction;
     private long version;
     private boolean closed;
 
     /** Creates an open material with front-face rendering selected. */
     protected Material() {
         side = MaterialSide.FRONT;
+        depthFunction = DepthFunction.LESS_OR_EQUAL;
     }
 
     /**
@@ -154,6 +156,33 @@ public sealed class Material implements AutoCloseable
         requireOpen();
         if (depthTestEnabled != enabled) {
             depthTestEnabled = enabled;
+            version++;
+        }
+    }
+
+    /**
+     * Returns the comparison used when depth testing is enabled.
+     *
+     * @return {@link DepthFunction#LESS_OR_EQUAL} by default
+     * @throws IllegalStateException if this material is closed
+     */
+    public final DepthFunction depthFunction() {
+        requireOpen();
+        return depthFunction;
+    }
+
+    /**
+     * Changes the comparison used when depth testing is enabled.
+     *
+     * @param depthFunction depth comparison to apply
+     * @throws NullPointerException if {@code depthFunction} is {@code null}
+     * @throws IllegalStateException if this material is closed
+     */
+    public final void setDepthFunction(DepthFunction depthFunction) {
+        requireOpen();
+        DepthFunction validDepthFunction = Objects.requireNonNull(depthFunction, "depthFunction");
+        if (this.depthFunction != validDepthFunction) {
+            this.depthFunction = validDepthFunction;
             version++;
         }
     }

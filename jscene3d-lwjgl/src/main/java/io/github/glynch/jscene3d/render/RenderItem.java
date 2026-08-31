@@ -21,6 +21,7 @@ final class RenderItem {
     private int elementCount;
     private int materialSortKey;
     private int geometrySortKey;
+    private int renderOrder;
     private float cameraDepth;
     private long traversalOrder;
 
@@ -29,9 +30,12 @@ final class RenderItem {
         // References are assigned when this pooled item participates in a frame.
     }
 
-    /** Orders opaque items by material, geometry, and stable traversal order. */
+    /** Orders opaque items by explicit order, material, geometry, and stable traversal order. */
     static int compareOpaque(RenderItem first, RenderItem second) {
-        int comparison = Integer.compare(first.materialSortKey, second.materialSortKey);
+        int comparison = Integer.compare(first.renderOrder, second.renderOrder);
+        if (comparison == 0) {
+            comparison = Integer.compare(first.materialSortKey, second.materialSortKey);
+        }
         if (comparison == 0) {
             comparison = Integer.compare(first.geometrySortKey, second.geometrySortKey);
         }
@@ -41,9 +45,12 @@ final class RenderItem {
         return comparison;
     }
 
-    /** Orders transparent items back-to-front with stable traversal order for equal depths. */
+    /** Orders transparent items by explicit order, then back-to-front with stable ties. */
     static int compareTransparent(RenderItem first, RenderItem second) {
-        int comparison = Float.compare(first.cameraDepth, second.cameraDepth);
+        int comparison = Integer.compare(first.renderOrder, second.renderOrder);
+        if (comparison == 0) {
+            comparison = Float.compare(first.cameraDepth, second.cameraDepth);
+        }
         return comparison == 0 ? Long.compare(first.traversalOrder, second.traversalOrder) : comparison;
     }
 
@@ -70,6 +77,7 @@ final class RenderItem {
                 viewMatrix.m02() * worldX + viewMatrix.m12() * worldY + viewMatrix.m22() * worldZ + viewMatrix.m32();
         materialSortKey = System.identityHashCode(material);
         geometrySortKey = System.identityHashCode(geometry);
+        renderOrder = object.renderOrder();
         this.traversalOrder = traversalOrder;
     }
 
@@ -113,6 +121,7 @@ final class RenderItem {
         elementCount = 0;
         materialSortKey = 0;
         geometrySortKey = 0;
+        renderOrder = 0;
         cameraDepth = 0.0f;
         traversalOrder = 0L;
     }

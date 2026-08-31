@@ -46,6 +46,7 @@ public class Object3D {
     private @Nullable Object3D resolvedWorldParent;
     private boolean visible;
     private boolean frustumCullingEnabled;
+    private int renderOrder;
     private int activeTraversalCount;
     private long localTransformVersion;
     private long localMatrixVersion;
@@ -365,6 +366,30 @@ public class Object3D {
      */
     public final void setVisible(boolean visible) {
         this.visible = visible;
+    }
+
+    /**
+     * Returns this object's explicit order within its opaque or transparent render list.
+     *
+     * <p>Lower values render first. Equal values retain the renderer's normal batching and depth
+     * ordering rules.
+     *
+     * @return zero by default
+     */
+    public final int renderOrder() {
+        return renderOrder;
+    }
+
+    /**
+     * Changes this object's explicit order within its opaque or transparent render list.
+     *
+     * <p>Render order does not move an object between the opaque and transparent lists and does
+     * not bypass depth testing.
+     *
+     * @param renderOrder order value, with lower values rendered first
+     */
+    public final void setRenderOrder(int renderOrder) {
+        this.renderOrder = renderOrder;
     }
 
     /**

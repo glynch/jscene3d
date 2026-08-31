@@ -13,7 +13,11 @@ readonly EXAMPLES_PACKAGE="io.github.glynch.jscene3d.examples"
 readonly EXAMPLES_SOURCE_DIRECTORY="${PROJECT_DIRECTORY}/jscene3d-examples/src/main/java/io/github/glynch/jscene3d/examples"
 
 print_examples() {
-    find "${EXAMPLES_SOURCE_DIRECTORY}" -maxdepth 1 -type f -name '*Example.java' -exec basename {} .java \; | sort
+    find "${EXAMPLES_SOURCE_DIRECTORY}" -maxdepth 1 -type f -name '*.java' -exec grep -l 'public static void main' {} \; \
+        | while IFS= read -r source_file; do
+            basename "${source_file}" .java
+        done \
+        | sort
 }
 
 print_usage() {

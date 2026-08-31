@@ -59,6 +59,32 @@ final class BufferGeometryFactoriesTest {
     }
 
     @Test
+    void createsRingWithRadialAngularTextureCoordinatesAndOutwardWinding() {
+        try (BufferGeometry ring = RingGeometry.create(1.0f, 3.0f, 4)) {
+            assertGeometryShape(ring, 10, 24);
+            BoundingBox box = Objects.requireNonNull(ring.boundingBox());
+            assertVector(box.minimum(), -3.0f, -3.0f, 0.0f);
+            assertVector(box.maximum(), 3.0f, 3.0f, 0.0f);
+            BufferAttribute textureCoordinates = Objects.requireNonNull(ring.attribute(BufferGeometry.UV));
+            assertThat(textureCoordinates.value(0, 0)).isZero();
+            assertThat(textureCoordinates.value(0, 1)).isZero();
+            assertThat(textureCoordinates.value(1, 0)).isEqualTo(1.0f);
+            assertThat(textureCoordinates.value(1, 1)).isZero();
+            assertThat(textureCoordinates.value(8, 0)).isZero();
+            assertThat(textureCoordinates.value(8, 1)).isEqualTo(1.0f);
+            assertAllTrianglesFaceExpectedNormals(ring);
+        }
+    }
+
+    @Test
+    void createsRingWithDocumentedDefaultSegments() {
+        try (BufferGeometry ring = RingGeometry.create(0.5f, 1.0f)) {
+            assertThat(ring.vertexCount()).isEqualTo(2 * 33);
+            assertThat(Objects.requireNonNull(ring.index()).count()).isEqualTo(6 * 32);
+        }
+    }
+
+    @Test
     void rejectsInvalidFactoryParameters() {
         assertThatIllegalArgumentException().isThrownBy(() -> PlaneGeometry.create(0.0f, 1.0f));
         assertThatIllegalArgumentException().isThrownBy(() -> BoxGeometry.create(1.0f, Float.NaN, 1.0f));
@@ -67,6 +93,10 @@ final class BufferGeometryFactoriesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> SphereGeometry.create(1.0f, 8, 1));
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> SphereGeometry.create(1.0f, Integer.MAX_VALUE, Integer.MAX_VALUE));
+        assertThatIllegalArgumentException().isThrownBy(() -> RingGeometry.create(-1.0f, 2.0f));
+        assertThatIllegalArgumentException().isThrownBy(() -> RingGeometry.create(2.0f, 2.0f));
+        assertThatIllegalArgumentException().isThrownBy(() -> RingGeometry.create(1.0f, 2.0f, 2));
+        assertThatIllegalArgumentException().isThrownBy(() -> RingGeometry.create(1.0f, 2.0f, Integer.MAX_VALUE));
     }
 
     private static void assertGeometryShape(BufferGeometry geometry, int vertexCount, int indexCount) {

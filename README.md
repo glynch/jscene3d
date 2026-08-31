@@ -38,25 +38,34 @@ internal development smoke test; applications do not receive raw OpenGL access.
 
 ## Run examples
 
-Run the visible basic-triangle example with:
+Run the interactive Solar System Viewer with:
 
 ```shell
-./tools/scripts/run-example.sh BasicTriangleExample
+./tools/scripts/run-example.sh SolarSystemViewer
 ```
+
+The viewer demonstrates the complete version 0.1 rendering path with a textured
+Sun, all eight planets, Earth's Moon, Saturn's transparent rings, a star field,
+Lambert lighting, scene hierarchy, orbit controls, four-times requested MSAA,
+an interactive control panel, and an optional FPS monitor. Its distances, sizes,
+and orbital speeds are intentionally stylized for visibility rather than being
+an astronomical simulation. The bundled textures are distributed under CC BY
+4.0; see their
+[attribution and checksums](jscene3d-examples/src/main/resources/io/github/glynch/jscene3d/examples/solar-system/ATTRIBUTION.md).
 
 List the available examples with `./tools/scripts/run-example.sh --list`. The
 runner incrementally compiles the required artifacts and launches the selected
 example without running tests or the full verification lifecycle.
 
-`TransformsExample`, `HierarchyExample`, `CamerasExample`,
-`BufferGeometryExample`, `TexturedCubeExample`, `TransparencyExample`,
-`ShaderMaterialExample`, `LightingExample`, and `OrbitControlsExample` are also
-available using the same command. In `OrbitControlsExample`, drag with the left
-mouse button to orbit; drag with the right mouse button or Shift-left to pan;
-and use the middle mouse button or scroll wheel to dolly. Arrow keys pan, while
-Shift-arrow rotates. The example also demonstrates the optional themed control
-panel and FPS monitor from `jscene3d-gui`; interacting with the panel does not
-move the camera.
+`BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
+`CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
+`TransparencyExample`, `ShaderMaterialExample`, `LightingExample`, and
+`OrbitControlsExample` are also available using the same command. In
+`OrbitControlsExample`, drag with the left mouse button to orbit; drag with the
+right mouse button or Shift-left to pan; and use the middle mouse button or
+scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates. The example
+also demonstrates the optional themed control panel and FPS monitor from
+`jscene3d-gui`; interacting with the panel does not move the camera.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same runner without that JVM

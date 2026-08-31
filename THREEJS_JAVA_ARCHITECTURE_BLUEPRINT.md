@@ -988,8 +988,8 @@ binding makes it easy.
 
 ### 12.7 BufferGeometry generators
 
-Generators such as box, plane, and sphere should create ordinary `BufferGeometry`
-values. They do not need a deep inheritance hierarchy.
+Generators such as box, plane, sphere, and ring should create ordinary
+`BufferGeometry` values. They do not need a deep inheritance hierarchy.
 
 Recommended early generators:
 
@@ -997,6 +997,7 @@ Recommended early generators:
 - Plane.
 - Box.
 - UV sphere.
+- Ring.
 
 Each generator must test:
 
@@ -2600,7 +2601,7 @@ hosted runners, and the remainder of 0.1 hardening continues in public.
 #### Public 0.1 hardening deliverables
 
 - Interactive Solar System Viewer Integration Example.
-- Box, plane, and sphere generators.
+- Box, plane, sphere, and ring generators.
 - Diffuse Lambert material with ambient and point lights.
 - `ShaderMaterial` escape hatch.
 - Error and lifecycle documentation.

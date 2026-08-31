@@ -61,7 +61,8 @@ example without running tests or the full verification lifecycle.
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
 `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
-`GeneratedGeometriesExample`, and `OrbitControlsExample` are also
+`GeneratedGeometriesExample`, `OrbitControlsExample`, and
+`ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
 connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
 controls. In
@@ -70,6 +71,9 @@ right mouse button or Shift-left to pan; and use the middle mouse button or
 scroll wheel to dolly. Arrow keys pan, while Shift-arrow rotates. The example
 also demonstrates the optional themed control panel and FPS monitor from
 `jscene3d-gui`; interacting with the panel does not move the camera.
+`ObjectSelectionExample` casts a ray from each unclaimed primary-button press,
+highlights the nearest intersected mesh, and reports the selection in a
+read-only control-panel row.
 
 On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same runner without that JVM
@@ -154,10 +158,24 @@ overloads support tessellation, angular extents, and open-ended cylinders and
 cones. `GeneratedGeometriesExample` displays all four with Lambert lighting and
 orbit controls.
 
+## Raycasting
+
+`Raycaster` creates normalized world-space rays explicitly or from perspective
+and orthographic camera coordinates. It intersects visible triangle meshes on
+the CPU, returning immutable `RaycastHit` values ordered nearest-first. Mesh
+queries respect hierarchy transforms, material visibility and side selection,
+indexed or non-indexed draw ranges, and optional texture coordinates. Cached
+bounding spheres and supplied bounding boxes provide broad-phase rejection
+before individual triangles are tested.
+
+Line picking is not included in version 0.1 because it requires an explicit
+world- or screen-space distance tolerance rather than exact triangle
+intersection behavior.
+
 ## Project structure
 
-- `jscene3d-core`: renderer-independent scene, camera, geometry, material, and
-  texture descriptions.
+- `jscene3d-core`: renderer-independent scene, camera, geometry, material,
+  texture, and raycasting APIs.
 - `jscene3d-lwjgl`: the OpenGL renderer, GLFW platform integration, controls,
   and the renderer-owned safe overlay canvas.
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType

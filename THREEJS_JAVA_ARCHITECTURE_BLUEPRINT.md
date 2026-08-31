@@ -420,6 +420,9 @@ io.github.glynch.jscene3d
 │   ├── AxesHelper
 │   ├── GridHelper
 │   └── BoxHelper
+├── raycasting
+│   ├── Raycaster
+│   └── RaycastHit
 ├── render
 │   ├── Renderer
 │   ├── RendererOptions
@@ -989,15 +992,29 @@ BufferGeometry should support:
 - Invalidating computed bounds when position data changes.
 
 Frustum culling should depend primarily on the bounding sphere initially.
-Bounding boxes remain useful for tooling and later raycasting.
+Bounding boxes remain useful for tooling and raycasting broad-phase rejection.
 
-### 12.6 Primitive topology
+### 12.6 Raycasting
+
+Version 0.1 includes renderer-independent CPU raycasting for visible triangle
+meshes. `Raycaster` accepts an explicit normalized world ray or derives one
+from perspective and orthographic camera coordinates. It traverses hierarchies
+iteratively and returns immutable nearest-first `RaycastHit` values containing
+the mesh, distance, world point, face index, and optional interpolated texture
+coordinate.
+
+Mesh intersection respects world transforms, reflected winding, material side
+and visibility, index buffers, and draw ranges. Bounding spheres and available
+bounding boxes reject misses before triangle testing. Line picking remains out
+of scope until its world- or screen-space distance tolerance is defined.
+
+### 12.7 Primitive topology
 
 Start with triangles. Add lines and points only when their object and material
 behavior is defined. Avoid exposing every OpenGL topology merely because the
 binding makes it easy.
 
-### 12.7 BufferGeometry generators
+### 12.8 BufferGeometry generators
 
 Generators such as box, plane, sphere, and ring should create ordinary
 `BufferGeometry` values. They do not need a deep inheritance hierarchy.
@@ -2685,15 +2702,14 @@ After that block, a plausible sequence is:
 2. Animation clips and mixers.
 3. Skinning.
 4. Morph targets.
-5. Raycasting and picking.
-6. Render targets and framebuffer management.
-7. Shadow maps.
-8. Instanced meshes.
-9. Environment maps and image-based lighting.
-10. Additional glTF extensions and optional compression integrations.
-11. Lambert or Blinn-Phong material when a non-PBR lit material is useful.
-12. Post-processing graph.
-13. Additional renderer only if product requirements justify it.
+5. Render targets and framebuffer management.
+6. Shadow maps.
+7. Instanced meshes.
+8. Environment maps and image-based lighting.
+9. Additional glTF extensions and optional compression integrations.
+10. Additional material models when an example requires them.
+11. Post-processing graph.
+12. Additional renderer only if product requirements justify it.
 
 The sequence should be adjusted by real user needs. For example, a
 data-visualization library may prioritize lines, points, labels, and picking

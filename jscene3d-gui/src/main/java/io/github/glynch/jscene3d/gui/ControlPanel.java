@@ -17,15 +17,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Themed immediate control panel explicitly bound to application state.
  *
- * <p>Sections contain checkboxes, floating-point sliders, and action buttons. Bindings use Java
- * method references or lambdas; the panel does not use reflection or direct field access. Call
- * {@link #update()} after {@link Window#pollEvents()}, then pass this overlay to the renderer after
- * drawing the scene.
+ * <p>Sections contain read-only text, checkboxes, floating-point sliders, and action buttons.
+ * Bindings use Java method references or lambdas; the panel does not use reflection or direct
+ * field access. Call {@link #update()} after {@link Window#pollEvents()}, then pass this overlay to
+ * the renderer after drawing the scene.
  *
  * <p>The panel owns no native or GPU resources. It is mutable, not thread-safe, and subject to its
  * window's thread affinity.
@@ -311,6 +312,7 @@ public final class ControlPanel implements Overlay {
                 buttonItem.action.run();
                 yield true;
             }
+            case TextItem ignored -> false;
         };
     }
 
@@ -463,13 +465,24 @@ public final class ControlPanel implements Overlay {
             items.add(new ButtonItem(
                     Preconditions.requireNonBlank(label, "label"), Objects.requireNonNull(action, "action")));
         }
+
+        /**
+         * Adds a read-only text value supplied when the panel is painted.
+         *
+         * @param label non-blank row label
+         * @param getter current non-null text supplier
+         */
+        public void addText(String label, Supplier<String> getter) {
+            items.add(new TextItem(
+                    Preconditions.requireNonBlank(label, "label"), Objects.requireNonNull(getter, "getter")));
+        }
     }
 
     /** One frame of primary-pointer state in logical window coordinates. */
     record PointerFrame(double x, double y, boolean pressed, boolean down, boolean released) {}
 
     /** Shared paint contract for one panel row. */
-    private sealed interface Item permits BooleanItem, SliderItem, ButtonItem {
+    private sealed interface Item permits BooleanItem, SliderItem, ButtonItem, TextItem {
         /** Paints row-specific visuals. */
         void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme);
     }
@@ -534,6 +547,17 @@ public final class ControlPanel implements Overlay {
             canvas.roundedRectangle(buttonX, buttonY, buttonWidth, 26.0f, 5.0f, theme.accent(), hovered ? 1.0f : 0.82f);
             float textX = buttonX + (buttonWidth - FONT.width(label, ITEM_FONT_SIZE)) * 0.5f;
             FONT.text(canvas, textX, y + 11.0f, label, ITEM_FONT_SIZE, theme.text());
+        }
+    }
+
+    /** Explicitly bound read-only text row. */
+    private record TextItem(String label, Supplier<String> getter) implements Item {
+        @Override
+        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+            String value = Objects.requireNonNull(getter.get(), label + " value");
+            FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
+            float valueX = x + WIDTH - HORIZONTAL_PADDING - FONT.width(value, VALUE_FONT_SIZE);
+            FONT.text(canvas, valueX, y + 11.5f, value, VALUE_FONT_SIZE, theme.text());
         }
     }
 }

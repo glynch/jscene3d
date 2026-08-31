@@ -32,6 +32,7 @@ final class CoreModuleDescriptorTest {
                         "io.github.glynch.jscene3d.materials",
                         "io.github.glynch.jscene3d.math",
                         "io.github.glynch.jscene3d.objects",
+                        "io.github.glynch.jscene3d.raycasting",
                         "io.github.glynch.jscene3d.scenes",
                         "io.github.glynch.jscene3d.textures");
     }

@@ -14,6 +14,7 @@ module io.github.glynch.jscene3d.core {
     exports io.github.glynch.jscene3d.materials;
     exports io.github.glynch.jscene3d.math;
     exports io.github.glynch.jscene3d.objects;
+    exports io.github.glynch.jscene3d.raycasting;
     exports io.github.glynch.jscene3d.scenes;
     exports io.github.glynch.jscene3d.textures;
 }

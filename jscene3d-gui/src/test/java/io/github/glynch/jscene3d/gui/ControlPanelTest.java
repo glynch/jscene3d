@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import io.github.glynch.jscene3d.gui.internal.GuiCanvas;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 final class ControlPanelTest {
@@ -114,6 +115,24 @@ final class ControlPanelTest {
     }
 
     @Test
+    void paintsCurrentReadOnlyTextWithoutActivatingIt() {
+        ControlPanel panel = new ControlPanel("Controls");
+        AtomicReference<String> selected = new AtomicReference<>("none");
+        panel.addSection("Selection").addText("selected", selected::get);
+        RecordingGuiCanvas firstCanvas = new RecordingGuiCanvas();
+
+        panel.paint(firstCanvas, 800, 600);
+        selected.set("cyan box");
+        RecordingGuiCanvas secondCanvas = new RecordingGuiCanvas();
+        panel.paint(secondCanvas, 800, 600);
+
+        assertThat(firstCanvas.alphaMaskCount()).isPositive();
+        assertThat(secondCanvas.alphaMaskCount()).isGreaterThan(firstCanvas.alphaMaskCount());
+        assertThat(panel.update(pointer(520.0, 100.0), 800, 600)).isFalse();
+        assertThat(panel.capturesPointer()).isTrue();
+    }
+
+    @Test
     void hiddenPanelNeitherPaintsNorCapturesInput() {
         ControlPanel panel = new ControlPanel("Controls");
         panel.addSection("Camera").addFloat("speed", () -> 1.0f, ignored -> {}, 0.0f, 2.0f);
@@ -152,9 +171,18 @@ final class ControlPanelTest {
         assertThatNullPointerException().isThrownBy(() -> section.addFloat("speed", null, ignored -> {}, 0.0f, 1.0f));
         assertThatNullPointerException().isThrownBy(() -> section.addFloat("speed", () -> 0.0f, null, 0.0f, 1.0f));
         assertThatNullPointerException().isThrownBy(() -> section.addButton("reset", null));
+        assertThatNullPointerException().isThrownBy(() -> section.addText("selected", null));
         section.addFloat("invalid", () -> Float.NaN, ignored -> {}, 0.0f, 1.0f);
         RecordingGuiCanvas canvas = new RecordingGuiCanvas();
         assertThatIllegalArgumentException().isThrownBy(() -> panel.paint(canvas, 800, 600));
+    }
+
+    @Test
+    void rejectsNullTextValuesWhenPainted() {
+        ControlPanel panel = new ControlPanel("Controls");
+        panel.addSection("Selection").addText("selected", () -> null);
+
+        assertThatNullPointerException().isThrownBy(() -> panel.paint(new RecordingGuiCanvas(), 800, 600));
     }
 
     /** Creates one primary-button press retained as held for the frame. */

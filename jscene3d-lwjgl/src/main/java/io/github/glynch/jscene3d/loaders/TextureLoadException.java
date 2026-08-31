@@ -10,6 +10,7 @@ import java.nio.file.Path;
 public final class TextureLoadException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
+    /** Serializable representation of the failing image path. */
     private final String source;
 
     /** Retains the failing source and diagnostic message. */

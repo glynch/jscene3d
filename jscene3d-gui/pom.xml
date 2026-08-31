@@ -12,6 +12,11 @@
     <name>JScene3D GUI</name>
     <description>Optional controls, monitors, and themed overlays for JScene3D examples and tools.</description>
 
+    <properties>
+        <jscene3d.coverage.line.minimum>0.50</jscene3d.coverage.line.minimum>
+        <jscene3d.coverage.branch.minimum>0.40</jscene3d.coverage.branch.minimum>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>

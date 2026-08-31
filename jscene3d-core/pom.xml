@@ -12,6 +12,11 @@
     <name>JScene3D Core</name>
     <description>Renderer-independent scene, camera, geometry, material, and texture model.</description>
 
+    <properties>
+        <jscene3d.coverage.line.minimum>0.90</jscene3d.coverage.line.minimum>
+        <jscene3d.coverage.branch.minimum>0.75</jscene3d.coverage.branch.minimum>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.joml</groupId>

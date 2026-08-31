@@ -13,6 +13,7 @@
     <description>Runnable feature and integration examples for JScene3D.</description>
 
     <properties>
+        <jacoco.skip>true</jacoco.skip>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 

@@ -61,12 +61,13 @@ automatically.
 - Mark production packages `@NullMarked` with JSpecify.
 - Run Error Prone and NullAway in JSpecify mode over null-marked code, with
   their error diagnostics failing the build.
-- Compile with all Java compiler lint warnings enabled. Global `-Werror` is not
-  used while JOML's JPMS descriptor has an optional static dependency on the
-  JDK Vector incubator module: javac emits an unsuppressible mandatory warning
-  whenever that descriptor is resolved. The warning remains visible, and this
-  exception must be removed if JOML or javac makes the diagnostic individually
-  suppressible.
+- Request all Java compiler lint checks, excluding only class-file metadata
+  diagnostics produced by JOML's deliberately old bytecode level. Maven hides
+  javac warning output because JOML's JPMS descriptor also causes an
+  individually unsuppressible Vector incubator warning whenever it is resolved.
+  Error Prone, NullAway, Checkstyle, SpotBugs, and forbidden-API diagnostics
+  remain visible and build-enforced. Re-enable javac warning output when JOML or
+  javac provides a narrow suppression for the incubator diagnostic.
 - Runtime validation remains mandatory at public boundaries despite static
   nullness analysis.
 - Suppressions must be narrow and include a reason.
@@ -203,9 +204,25 @@ prior deprecation where practical.
   assertions.
 - Run the rendering profile locally for renderer changes and across every
   Provisional Platform during qualification.
-- Produce JaCoCo coverage reports without imposing a repository-wide percentage
-  gate in version 0.1. Require explicit branch coverage for hierarchy-cycle
-  rejection, lifecycle transitions, public validation, and renderer cleanup.
+- Generate JaCoCo line and branch reports and enforce these per-artifact minimums
+  during ordinary verification:
+
+  | Artifact | Line coverage | Branch coverage |
+  | --- | ---: | ---: |
+  | `jscene3d-core` | 90% | 75% |
+  | `jscene3d-lwjgl` | 25% | 18% |
+  | `jscene3d-lwjgl` with `render-integration` | 80% | 55% |
+  | `jscene3d-gui` | 50% | 40% |
+
+  `jscene3d-lwjgl` has a deliberately separate lower headless floor because
+  ordinary verification does not create an OpenGL context. The
+  `render-integration` profile adds its native integration coverage to the same
+  execution data. Raise each floor as coverage improves; never lower one merely
+  to make a change pass. Examples are compiled but excluded from percentage
+  gates because they are executable documentation rather than library code.
+- Require explicit branch coverage for hierarchy-cycle rejection, lifecycle
+  transitions, public validation, and renderer cleanup regardless of the
+  percentage floors.
 - Keep JMH benchmarks in a separate profile. Benchmarks do not run during
   ordinary verification.
 
@@ -286,6 +303,10 @@ The checked-in VS Code settings:
 
 - Every supported public capability has an automated contract or compatibility
   test.
+- Generate supported public and protected production Javadoc during
+  `./mvnw clean verify` with all doclint checks enabled. Javadoc errors and
+  warnings fail the build. Package-private production contracts remain required
+  in source even though they are not part of the generated caller reference.
 - Compile caller examples as tests. Derive README snippets from those examples
   so documentation cannot silently drift.
 - Keep `CONTEXT.md` focused on domain language and free of implementation

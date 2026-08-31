@@ -12,6 +12,11 @@
     <name>JScene3D LWJGL</name>
     <description>OpenGL renderer and GLFW platform integration for JScene3D.</description>
 
+    <properties>
+        <jscene3d.coverage.line.minimum>0.25</jscene3d.coverage.line.minimum>
+        <jscene3d.coverage.branch.minimum>0.18</jscene3d.coverage.branch.minimum>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
@@ -75,6 +80,19 @@
     </dependencies>
 
     <profiles>
+        <profile>
+            <id>enforce-render-integration-coverage</id>
+            <activation>
+                <property>
+                    <name>jscene3d.render-integration</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <properties>
+                <jscene3d.coverage.line.minimum>0.80</jscene3d.coverage.line.minimum>
+                <jscene3d.coverage.branch.minimum>0.55</jscene3d.coverage.branch.minimum>
+            </properties>
+        </profile>
         <profile>
             <id>run-window-smoke</id>
             <build>

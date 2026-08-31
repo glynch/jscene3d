@@ -46,6 +46,9 @@
         <maven.compiler.release>21</maven.compiler.release>
         <maven.compiler.parameters>true</maven.compiler.parameters>
 
+        <jscene3d.coverage.branch.minimum>0.00</jscene3d.coverage.branch.minimum>
+        <jscene3d.coverage.line.minimum>0.00</jscene3d.coverage.line.minimum>
+
         <assertj.version>3.27.7</assertj.version>
         <checkstyle.version>13.8.0</checkstyle.version>
         <error.prone.version>2.50.0</error.prone.version>
@@ -65,6 +68,7 @@
         <maven.enforcer.version>3.6.3</maven.enforcer.version>
         <maven.failsafe.version>3.5.6</maven.failsafe.version>
         <maven.install.version>3.1.4</maven.install.version>
+        <maven.javadoc.version>3.12.0</maven.javadoc.version>
         <maven.jar.version>3.5.1</maven.jar.version>
         <maven.resources.version>3.5.0</maven.resources.version>
         <maven.site.version>3.22.0</maven.site.version>
@@ -159,9 +163,16 @@
                     <configuration>
                         <release>${maven.compiler.release}</release>
                         <parameters>${maven.compiler.parameters}</parameters>
-                        <showWarnings>true</showWarnings>
+                        <!--
+                            JOML 1.10.9 has Java 1.2 class files containing newer annotation
+                            attributes and an unsuppressible static Vector incubator requirement.
+                            Error Prone, NullAway, Checkstyle, SpotBugs, and forbidden-API checks
+                            remain build-enforced diagnostics.
+                        -->
+                        <showWarnings>false</showWarnings>
                         <compilerArgs>
                             <arg>-Xlint:all</arg>
+                            <arg>-Xlint:-classfile</arg>
                             <arg>-XDcompilePolicy=simple</arg>
                             <arg>--should-stop=ifError=FLOW</arg>
                             <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true</arg>
@@ -221,6 +232,22 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-deploy-plugin</artifactId>
                     <version>${maven.deploy.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven.javadoc.version}</version>
+                    <configuration>
+                        <doclint>all</doclint>
+                        <disableSourcepathUsage>true</disableSourcepathUsage>
+                        <failOnError>true</failOnError>
+                        <failOnWarnings>true</failOnWarnings>
+                        <legacyMode>true</legacyMode>
+                        <show>protected</show>
+                        <sourceFileExcludes>
+                            <sourceFileExclude>**/module-info.java</sourceFileExclude>
+                        </sourceFileExcludes>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -308,6 +335,9 @@
                     <executions>
                         <execution>
                             <id>prepare-unit-test-coverage</id>
+                            <configuration>
+                                <append>true</append>
+                            </configuration>
                             <goals>
                                 <goal>prepare-agent</goal>
                             </goals>
@@ -318,6 +348,32 @@
                             <goals>
                                 <goal>report</goal>
                             </goals>
+                        </execution>
+                        <execution>
+                            <id>check-unit-test-coverage</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                            <configuration>
+                                <rules>
+                                    <rule>
+                                        <element>BUNDLE</element>
+                                        <limits>
+                                            <limit>
+                                                <counter>LINE</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>${jscene3d.coverage.line.minimum}</minimum>
+                                            </limit>
+                                            <limit>
+                                                <counter>BRANCH</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>${jscene3d.coverage.branch.minimum}</minimum>
+                                            </limit>
+                                        </limits>
+                                    </rule>
+                                </rules>
+                            </configuration>
                         </execution>
                     </executions>
                 </plugin>
@@ -414,6 +470,19 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>generate-strict-javadoc</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>javadoc</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -497,6 +566,9 @@
         </profile>
         <profile>
             <id>render-integration</id>
+            <properties>
+                <jscene3d.render-integration>true</jscene3d.render-integration>
+            </properties>
             <build>
                 <plugins>
                     <plugin>

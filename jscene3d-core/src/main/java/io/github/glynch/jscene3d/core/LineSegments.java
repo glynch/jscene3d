@@ -5,7 +5,7 @@
 package io.github.glynch.jscene3d.core;
 
 /** Independent line segments formed from successive pairs of geometry elements. */
-public final class LineSegments extends Line {
+public class LineSegments extends Line {
     /**
      * Creates independent line segments retaining shared geometry and material references.
      *
@@ -19,5 +19,10 @@ public final class LineSegments extends Line {
      */
     public LineSegments(BufferGeometry geometry, LineBasicMaterial material) {
         super(geometry, material);
+    }
+
+    /** Retains shared segment resources with a fixed replacement policy for library helpers. */
+    LineSegments(BufferGeometry geometry, LineBasicMaterial material, boolean resourceReplacementAllowed) {
+        super(geometry, material, resourceReplacementAllowed);
     }
 }

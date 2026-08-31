@@ -59,8 +59,8 @@ example without running tests or the full verification lifecycle.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
-`TransparencyExample`, `ShaderMaterialExample`, `LightingExample`, and
-`LineRenderingExample`, and `OrbitControlsExample` are also available using the
+`TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
+`LineRenderingExample`, `HelpersExample`, and `OrbitControlsExample` are also available using the
 same command. `LineRenderingExample` demonstrates a connected `Line`, indexed
 `LineSegments`, vertex colors, transforms, and orbit controls. In
 `OrbitControlsExample`, drag with the left mouse button to orbit; drag with the
@@ -121,6 +121,12 @@ instead of silently dropping excess lights. Shadows are not yet supported.
 culling, transparency, and depth state through `LineBasicMaterial`. An odd
 `LineSegments` draw-range count fails clearly because it leaves an unpaired
 element. Portable line width is fixed to one framebuffer pixel.
+
+`AxesHelper` supplies red, green, and blue positive X, Y, and Z axes.
+`GridHelper` supplies a configurable XZ reference grid with optional distinct
+center-line and grid colors. Both are ordinary `LineSegments` scene objects and
+own their generated geometry and material, so close the helper itself when it
+is no longer needed. Their generated resources cannot be replaced.
 
 ## Project structure
 

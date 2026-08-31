@@ -14,10 +14,12 @@ import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL11.glReadPixels;
 
 import io.github.glynch.jscene3d.core.AmbientLight;
+import io.github.glynch.jscene3d.core.AxesHelper;
 import io.github.glynch.jscene3d.core.BasicMaterial;
 import io.github.glynch.jscene3d.core.BufferAttribute;
 import io.github.glynch.jscene3d.core.BufferGeometry;
 import io.github.glynch.jscene3d.core.Color;
+import io.github.glynch.jscene3d.core.GridHelper;
 import io.github.glynch.jscene3d.core.Group;
 import io.github.glynch.jscene3d.core.IndexBuffer;
 import io.github.glynch.jscene3d.core.LambertMaterial;
@@ -745,6 +747,32 @@ final class RendererIT {
             assertThat(statistics.visibleLines()).isOne();
             assertThat(renderer.info().resources().programCount()).isOne();
             assertNeighborhoodContainsGreen(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+        }
+    }
+
+    @Test
+    void rendersGeneratedLineHelpers() {
+        try (Window window = Window.create(320, 240, "Line helpers integration test");
+                AxesHelper axes = new AxesHelper();
+                GridHelper grid = new GridHelper(2.0f, 2);
+                Renderer renderer = Renderer.create(window)) {
+            Scene scene = new Scene();
+            scene.add(grid);
+            scene.add(axes);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 10.0f);
+            camera.setPosition(2.0f, 2.0f, 2.0f);
+            camera.lookAt(0.0f, 0.0f, 0.0f);
+
+            renderer.render(scene, camera);
+
+            RenderStatistics statistics = renderer.info().statistics();
+            assertThat(statistics.drawCalls()).isEqualTo(2);
+            assertThat(statistics.lineSegments()).isEqualTo(9L);
+            assertThat(statistics.visibleLines()).isEqualTo(2);
+            assertThat(statistics.triangles()).isZero();
+            assertThat(renderer.info().resources().activeGeometryResources()).isEqualTo(2);
+            assertThat(renderer.info().resources().programCount()).isOne();
         }
     }
 

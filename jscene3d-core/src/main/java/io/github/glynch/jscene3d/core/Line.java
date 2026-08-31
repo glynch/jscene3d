@@ -8,6 +8,7 @@ package io.github.glynch.jscene3d.core;
 public class Line extends Object3D {
     private BufferGeometry geometry;
     private LineBasicMaterial material;
+    private final boolean resourceReplacementAllowed;
 
     /**
      * Creates a connected line strip retaining shared geometry and material references.
@@ -21,8 +22,14 @@ public class Line extends Object3D {
      * @throws IllegalArgumentException if an argument is already closed
      */
     public Line(BufferGeometry geometry, LineBasicMaterial material) {
+        this(geometry, material, true);
+    }
+
+    /** Retains shared line resources with a fixed replacement policy for library specializations. */
+    Line(BufferGeometry geometry, LineBasicMaterial material, boolean resourceReplacementAllowed) {
         this.geometry = Preconditions.requireOpen(geometry, "geometry");
         this.material = Preconditions.requireOpen(material, "material");
+        this.resourceReplacementAllowed = resourceReplacementAllowed;
     }
 
     /**
@@ -44,8 +51,10 @@ public class Line extends Object3D {
      * @param geometry open line geometry
      * @throws NullPointerException if {@code geometry} is {@code null}
      * @throws IllegalArgumentException if {@code geometry} is closed
+     * @throws UnsupportedOperationException if this line specialization owns its geometry
      */
     public final void setGeometry(BufferGeometry geometry) {
+        requireResourceReplacementAllowed("geometry");
         this.geometry = Preconditions.requireOpen(geometry, "geometry");
     }
 
@@ -68,8 +77,18 @@ public class Line extends Object3D {
      * @param material open line material
      * @throws NullPointerException if {@code material} is {@code null}
      * @throws IllegalArgumentException if {@code material} is closed
+     * @throws UnsupportedOperationException if this line specialization owns its material
      */
     public final void setMaterial(LineBasicMaterial material) {
+        requireResourceReplacementAllowed("material");
         this.material = Preconditions.requireOpen(material, "material");
+    }
+
+    /** Rejects replacement for specialized line objects that own their generated resources. */
+    private void requireResourceReplacementAllowed(String resourceName) {
+        if (!resourceReplacementAllowed) {
+            throw new UnsupportedOperationException(
+                    getClass().getSimpleName() + " owns its " + resourceName + "; replacement is unsupported");
+        }
     }
 }

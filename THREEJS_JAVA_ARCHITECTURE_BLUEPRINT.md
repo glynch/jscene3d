@@ -415,7 +415,10 @@ io.github.glynch.jscene3d
 ├── objects
 │   ├── Mesh
 │   ├── Line
-│   └── LineSegments
+│   ├── LineSegments
+│   └── helpers
+│       ├── AxesHelper
+│       └── GridHelper
 ├── render
 │   ├── Renderer
 │   ├── RendererOptions
@@ -1259,6 +1262,13 @@ lifecycle. Multiple meshes may share them.
 odd draw-range counts. Both retain `LineBasicMaterial`, support indexed and
 non-indexed geometry, and participate in transforms, visibility, frustum
 culling, opaque or transparent ordering, and depth state.
+
+`AxesHelper` and `GridHelper` are renderer-independent `LineSegments` scene
+objects. `AxesHelper` generates red, green, and blue positive coordinate axes;
+`GridHelper` generates a configurable XZ reference grid. Unlike ordinary lines,
+each helper owns and closes its generated geometry and material. Replacing
+either resource is unsupported because doing so would make lifecycle ownership
+ambiguous.
 
 ---
 

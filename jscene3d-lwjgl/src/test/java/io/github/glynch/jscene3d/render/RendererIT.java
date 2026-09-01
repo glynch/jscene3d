@@ -49,6 +49,8 @@ import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.objects.RenderContext;
+import io.github.glynch.jscene3d.objects.RenderPass;
 import io.github.glynch.jscene3d.objects.Skeleton;
 import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.platform.VerticalSync;
@@ -62,6 +64,7 @@ import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.joml.Matrix3f;
@@ -389,6 +392,38 @@ final class RendererIT {
     }
 
     @Test
+    void restoresRendererStateAfterShadowCallbackFailure() {
+        try (Window window = Window.create("Shadow callback failure integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                LambertMaterial material = new LambertMaterial(Color.RED)) {
+            Mesh mesh = new Mesh(geometry, material);
+            mesh.setShadowCastingEnabled(true);
+            mesh.setBeforeShadowRenderCallback(ignored -> {
+                throw new IllegalStateException("shadow callback failed");
+            });
+            DirectionalLight light = new DirectionalLight(Color.WHITE);
+            light.setPosition(0.0f, 0.0f, 2.0f);
+            light.setShadowCastingEnabled(true);
+            light.shadow().setMapSize(128, 128);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            scene.add(light);
+            PerspectiveCamera camera = shadowTestCamera(window);
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("shadow callback failed");
+
+            mesh.clearBeforeShadowRenderCallback();
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsRed(window);
+            assertShadowActivity(renderer, 1, 1, 1, 1L);
+        }
+    }
+
+    @Test
     void rendersStableSolidDirectionalShadowDepth() {
         WindowOptions windowOptions = WindowOptions.builder()
                 .size(320, 320)
@@ -462,7 +497,7 @@ final class RendererIT {
     }
 
     @Test
-    void rendersPointShadowsOnStandardMaterials() {
+    void rendersPointShadowsOnStandardMaterialsAndInvokesCallbacksForEveryCubeFace() {
         try (Window window = Window.create("Point shadow integration test");
                 Renderer renderer = Renderer.create(window);
                 BufferGeometry geometry = createLitTriangle();
@@ -470,6 +505,10 @@ final class RendererIT {
             Mesh mesh = new Mesh(geometry, material);
             mesh.setShadowCastingEnabled(true);
             mesh.setShadowReceivingEnabled(true);
+            List<RenderContext> beforeContexts = new ArrayList<>();
+            List<RenderContext> afterContexts = new ArrayList<>();
+            mesh.setBeforeShadowRenderCallback(beforeContexts::add);
+            mesh.setAfterShadowRenderCallback(afterContexts::add);
             PointLight light = new PointLight(Color.WHITE, 10.0f);
             light.setPosition(0.0f, 0.0f, 2.0f);
             light.setDecay(0.0f);
@@ -483,6 +522,18 @@ final class RendererIT {
             renderer.render(scene, camera);
 
             assertShadowActivity(renderer, 1, 6, 6, 6L);
+            assertThat(beforeContexts).hasSize(6).allSatisfy(context -> {
+                assertThat(context.scene()).isSameAs(scene);
+                assertThat(context.camera()).isSameAs(camera);
+                assertThat(context.object()).isSameAs(mesh);
+                assertThat(context.geometry()).isSameAs(geometry);
+                assertThat(context.material()).isSameAs(material);
+                assertThat(context.pass()).isEqualTo(RenderPass.SHADOW);
+            });
+            assertThat(afterContexts).hasSize(6);
+            for (int index = 0; index < beforeContexts.size(); index++) {
+                assertThat(afterContexts.get(index)).isSameAs(beforeContexts.get(index));
+            }
         }
     }
 
@@ -1341,6 +1392,101 @@ final class RendererIT {
             assertThat(renderer.info().statistics().textureUploads()).isEqualTo(2);
             assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(4);
             assertThat(renderer.info().resources().programCount()).isEqualTo(3);
+        }
+    }
+
+    @Test
+    void invokesMainCallbacksOnlyForDrawnObjectsAndAppliesMaterialChangesToTheSelectedDraw() {
+        try (Window window = Window.create(320, 240, "Main render callback integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry meshGeometry = createTriangle();
+                BufferGeometry lineGeometry = BufferGeometry.builder()
+                        .positions(-0.8f, 0.7f, 0.0f, 0.8f, 0.7f, 0.0f)
+                        .build();
+                BasicMaterial meshMaterial = new BasicMaterial(Color.BLUE);
+                LineBasicMaterial lineMaterial = new LineBasicMaterial(Color.WHITE)) {
+            List<String> events = new ArrayList<>();
+            List<RenderContext> contexts = new ArrayList<>();
+            Mesh mesh = new Mesh(meshGeometry, meshMaterial);
+            mesh.setBeforeRenderCallback(context -> {
+                events.add("mesh-before");
+                contexts.add(context);
+                meshMaterial.setColor(Color.RED);
+            });
+            mesh.setAfterRenderCallback(context -> {
+                events.add("mesh-after");
+                contexts.add(context);
+                meshMaterial.setColor(Color.BLUE);
+            });
+            LineSegments line = new LineSegments(lineGeometry, lineMaterial);
+            line.setRenderOrder(1);
+            line.setBeforeRenderCallback(context -> {
+                events.add("line-before");
+                contexts.add(context);
+            });
+            line.setAfterRenderCallback(context -> {
+                events.add("line-after");
+                contexts.add(context);
+            });
+            Mesh culled = new Mesh(meshGeometry, meshMaterial);
+            culled.setPosition(100.0f, 0.0f, 0.0f);
+            culled.setBeforeRenderCallback(ignored -> events.add("culled-before"));
+            Scene scene = new Scene();
+            scene.add(mesh);
+            scene.add(line);
+            scene.add(culled);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertThat(events).containsExactly("mesh-before", "mesh-after", "line-before", "line-after");
+            assertThat(contexts).allSatisfy(context -> {
+                assertThat(context.scene()).isSameAs(scene);
+                assertThat(context.camera()).isSameAs(camera);
+                assertThat(context.pass()).isEqualTo(RenderPass.MAIN);
+            });
+            assertThat(contexts.get(0).object()).isSameAs(mesh);
+            assertThat(contexts.get(0).geometry()).isSameAs(meshGeometry);
+            assertThat(contexts.get(0).material()).isSameAs(meshMaterial);
+            assertThat(contexts.get(0)).isSameAs(contexts.get(1));
+            assertThat(contexts.get(2).object()).isSameAs(line);
+            assertThat(contexts.get(2)).isSameAs(contexts.get(3));
+            assertCenterPixelIsRed(window);
+            assertThat(meshMaterial.color()).isEqualTo(Color.BLUE);
+        }
+    }
+
+    @Test
+    void propagatesCallbackFailuresAndDoesNotInvokeAfterRenderForAnUnsuccessfulDraw() {
+        try (Window window = Window.create(320, 240, "Render callback failure integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            List<String> events = new ArrayList<>();
+            Mesh mesh = new Mesh(geometry, material);
+            mesh.setBeforeRenderCallback(ignored -> {
+                events.add("before");
+                throw new IllegalStateException("callback failed");
+            });
+            mesh.setAfterRenderCallback(ignored -> events.add("after"));
+            Scene scene = new Scene();
+            scene.add(mesh);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage("callback failed");
+            assertThat(events).containsExactly("before");
+
+            mesh.clearBeforeRenderCallback();
+            renderer.render(scene, camera);
+
+            assertThat(events).containsExactly("before", "after");
+            assertCenterPixelIsRed(window);
         }
     }
 

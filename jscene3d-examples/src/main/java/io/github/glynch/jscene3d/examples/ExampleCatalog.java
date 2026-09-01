@@ -281,6 +281,13 @@ final class ExampleCatalog {
                         List.of("alpha", "blend", "sorting", "depth"),
                         TransparencyExample::create),
                 definition(
+                        "render-callbacks",
+                        "Render callbacks",
+                        "Rendering",
+                        "Per-draw customization of one material shared by three animated meshes.",
+                        List.of("callback", "before render", "after render", "material", "lifecycle"),
+                        RenderCallbacksExample::create),
+                definition(
                         "solar-system",
                         "Solar System Viewer",
                         "Showcases",

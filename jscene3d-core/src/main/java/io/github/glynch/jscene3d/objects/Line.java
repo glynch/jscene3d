@@ -9,7 +9,7 @@ import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 
 /** A connected line strip that binds shared geometry to one line material. */
-public class Line extends Object3D {
+public class Line extends RenderableObject {
     private BufferGeometry geometry;
     private LineBasicMaterial material;
     private final boolean resourceReplacementAllowed;

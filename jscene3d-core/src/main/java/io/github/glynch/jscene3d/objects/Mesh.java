@@ -7,6 +7,9 @@ package io.github.glynch.jscene3d.objects;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.Material;
+import java.util.Objects;
+import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A triangular scene object that binds one buffer geometry to one material.
@@ -14,11 +17,13 @@ import io.github.glynch.jscene3d.materials.Material;
  * <p>The class is extensible only for scene-object specializations that preserve this resource
  * binding contract, such as {@link SkinnedMesh}.
  */
-public class Mesh extends Object3D {
+public class Mesh extends RenderableObject {
     private BufferGeometry geometry;
     private Material material;
     private boolean shadowCastingEnabled;
     private boolean shadowReceivingEnabled;
+    private @Nullable RenderCallback beforeShadowRenderCallback;
+    private @Nullable RenderCallback afterShadowRenderCallback;
 
     /**
      * Creates a mesh retaining shared geometry and material references.
@@ -115,5 +120,58 @@ public class Mesh extends Object3D {
      */
     public void setShadowReceivingEnabled(boolean enabled) {
         shadowReceivingEnabled = enabled;
+    }
+
+    /**
+     * Returns the callback invoked immediately before each selected shadow-depth draw.
+     *
+     * @return configured callback, or an empty value
+     */
+    public final Optional<RenderCallback> beforeShadowRenderCallback() {
+        return Optional.ofNullable(beforeShadowRenderCallback);
+    }
+
+    /**
+     * Replaces the callback invoked immediately before each selected shadow-depth draw.
+     *
+     * <p>Directional and spot lights draw a caster once per shadow map. Point lights draw it once
+     * for each of the six cube-map faces. Material changes that affect shadow face orientation can
+     * affect the selected draw; scene-graph and resource-binding changes take effect in a later
+     * frame.
+     *
+     * @param callback callback to retain
+     * @throws NullPointerException if {@code callback} is {@code null}
+     */
+    public final void setBeforeShadowRenderCallback(RenderCallback callback) {
+        beforeShadowRenderCallback = Objects.requireNonNull(callback, "callback");
+    }
+
+    /** Removes the shadow-depth callback without invoking it. */
+    public final void clearBeforeShadowRenderCallback() {
+        beforeShadowRenderCallback = null;
+    }
+
+    /**
+     * Returns the callback invoked immediately after each successful shadow-depth draw.
+     *
+     * @return configured callback, or an empty value
+     */
+    public final Optional<RenderCallback> afterShadowRenderCallback() {
+        return Optional.ofNullable(afterShadowRenderCallback);
+    }
+
+    /**
+     * Replaces the callback invoked immediately after each successful shadow-depth draw.
+     *
+     * @param callback callback to retain
+     * @throws NullPointerException if {@code callback} is {@code null}
+     */
+    public final void setAfterShadowRenderCallback(RenderCallback callback) {
+        afterShadowRenderCallback = Objects.requireNonNull(callback, "callback");
+    }
+
+    /** Removes the shadow-depth callback without invoking it. */
+    public final void clearAfterShadowRenderCallback() {
+        afterShadowRenderCallback = null;
     }
 }

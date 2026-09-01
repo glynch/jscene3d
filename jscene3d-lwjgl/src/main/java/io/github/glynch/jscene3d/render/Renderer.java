@@ -75,6 +75,10 @@ import io.github.glynch.jscene3d.materials.ShaderUniformType;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.objects.RenderCallback;
+import io.github.glynch.jscene3d.objects.RenderContext;
+import io.github.glynch.jscene3d.objects.RenderPass;
+import io.github.glynch.jscene3d.objects.RenderableObject;
 import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.internal.Frustum;
@@ -111,6 +115,7 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -291,8 +296,8 @@ public final class Renderer implements AutoCloseable {
                 prepareEnvironmentMatrices(validScene, viewMatrix);
                 frustum.update(viewMatrix, projectionMatrix);
                 renderList.build(validScene, viewMatrix, frustum);
-                activeShadowFrame =
-                        shadowRenderer.render(validScene, renderList.lights(), viewMatrix, geometryResources);
+                activeShadowFrame = shadowRenderer.render(
+                        validScene, validCamera, renderList.lights(), viewMatrix, geometryResources);
                 recordShadowWork(activeShadowFrame);
                 updateProgramCount();
                 updateShadowResourceCount();
@@ -308,7 +313,7 @@ public final class Renderer implements AutoCloseable {
                 renderEnvironmentBackground(validScene, projectionMatrix);
                 statistics.recordCulledMeshes(renderList.culledMeshes());
                 statistics.recordCulledLines(renderList.culledLines());
-                renderItems(viewMatrix, projectionMatrix, validScene);
+                renderItems(viewMatrix, projectionMatrix, validScene, validCamera);
             }
             statistics.completeFrame();
             rendered = true;
@@ -318,12 +323,12 @@ public final class Renderer implements AutoCloseable {
     }
 
     /** Draws the prepared opaque and transparent submissions in their established order. */
-    private void renderItems(Matrix4fc viewMatrix, Matrix4fc projectionMatrix, Scene scene) {
+    private void renderItems(Matrix4fc viewMatrix, Matrix4fc projectionMatrix, Scene scene, Camera camera) {
         for (int index = 0; index < renderList.opaqueCount(); index++) {
-            renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix, scene);
+            renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix, scene, camera);
         }
         for (int index = 0; index < renderList.transparentCount(); index++) {
-            renderItem(renderList.transparentItem(index), viewMatrix, projectionMatrix, scene);
+            renderItem(renderList.transparentItem(index), viewMatrix, projectionMatrix, scene, camera);
         }
     }
 
@@ -652,7 +657,24 @@ public final class Renderer implements AutoCloseable {
     }
 
     /** Synchronizes and submits one prepared scene-object draw. */
-    private void renderItem(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix, Scene scene) {
+    private void renderItem(
+            RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix, Scene scene, Camera camera) {
+        RenderableObject object = item.object();
+        Optional<RenderCallback> beforeCallback = object.beforeRenderCallback();
+        Optional<RenderCallback> afterCallback = object.afterRenderCallback();
+        if (beforeCallback.isEmpty() && afterCallback.isEmpty()) {
+            drawRenderItem(item, viewMatrix, projectionMatrix, scene);
+            return;
+        }
+        RenderContext callbackContext =
+                RenderContext.of(scene, camera, object, item.geometry(), item.material(), RenderPass.MAIN);
+        beforeCallback.ifPresent(callback -> callback.invoke(callbackContext));
+        drawRenderItem(item, viewMatrix, projectionMatrix, scene);
+        afterCallback.ifPresent(callback -> callback.invoke(callbackContext));
+    }
+
+    /** Synchronizes material and geometry state before issuing one prepared draw. */
+    private void drawRenderItem(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix, Scene scene) {
         BufferGeometry geometry = item.geometry();
         Material material = item.material();
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());

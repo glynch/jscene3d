@@ -6,14 +6,14 @@ package io.github.glynch.jscene3d.render.internal;
 
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.Material;
-import io.github.glynch.jscene3d.objects.Object3D;
+import io.github.glynch.jscene3d.objects.RenderableObject;
 import java.util.Objects;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 
 /** Reusable renderer-internal description of one scene-object submission. */
 public final class RenderItem {
-    private @Nullable Object3D object;
+    private @Nullable RenderableObject object;
     private @Nullable BufferGeometry geometry;
     private @Nullable Material material;
     private @Nullable Matrix4fc worldMatrix;
@@ -78,7 +78,7 @@ public final class RenderItem {
      * @param traversalOrder stable scene traversal position
      */
     public void assign(
-            Object3D object,
+            RenderableObject object,
             BufferGeometry geometry,
             Material material,
             PrimitiveTopology topology,
@@ -108,7 +108,7 @@ public final class RenderItem {
      *
      * @return active scene object
      */
-    public Object3D object() {
+    public RenderableObject object() {
         return Objects.requireNonNull(object, "Inactive render item has no scene object");
     }
 

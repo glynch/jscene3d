@@ -19,6 +19,7 @@ import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
+import io.github.glynch.jscene3d.objects.RenderableObject;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -205,7 +206,7 @@ public final class RenderList {
 
     /** Classifies one visible renderable scene object, including optional frustum rejection. */
     private void collect(
-            Object3D object,
+            RenderableObject object,
             BufferGeometry geometry,
             Material material,
             PrimitiveTopology topology,

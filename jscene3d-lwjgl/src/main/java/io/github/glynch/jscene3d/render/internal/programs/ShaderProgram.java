@@ -30,6 +30,8 @@ import io.github.glynch.jscene3d.materials.ShaderUniformType;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +48,9 @@ public final class ShaderProgram implements AutoCloseable {
             ShaderAttribute.NORMAL.shaderName(), 1,
             ShaderAttribute.UV.shaderName(), 2,
             ShaderAttribute.COLOR.shaderName(), 3);
+    private static final int INSTANCE_MATRIX_LOCATION = 7;
+    private static final int INSTANCE_COLOR_LOCATION = 11;
+    private static final int CUSTOM_INSTANCE_LOCATION = 12;
 
     private final int id;
     private final List<ActiveUniform> applicationUniforms;
@@ -64,7 +69,7 @@ public final class ShaderProgram implements AutoCloseable {
     private ShaderProgram(int id, ShaderProgramKey key) {
         this.id = id;
         applicationUniforms = inspectUniforms();
-        validateAttributes(key.requiredAttributes());
+        validateAttributes(key);
         modelViewMatrix = new Matrix4f();
         normalMatrix = new Matrix3f();
         matrix4Values = new float[16];
@@ -80,8 +85,8 @@ public final class ShaderProgram implements AutoCloseable {
     public static ShaderProgram create(ShaderProgramKey key) {
         String vertexSource = preprocess(key.vertexShader(), key.definitions());
         String fragmentSource = preprocess(key.fragmentShader(), key.definitions());
-        int program =
-                ProgramSupport.createLinkedProgram("ShaderMaterial", vertexSource, fragmentSource, ATTRIBUTE_BINDINGS);
+        int program = ProgramSupport.createLinkedProgram(
+                "ShaderMaterial", vertexSource, fragmentSource, attributeBindings(key));
         try {
             return new ShaderProgram(program, key);
         } catch (RuntimeException exception) {
@@ -163,9 +168,10 @@ public final class ShaderProgram implements AutoCloseable {
     }
 
     /** Validates active mesh inputs against supported names, types, bindings, and declarations. */
-    private void validateAttributes(Set<ShaderAttribute> requiredAttributes) {
+    private void validateAttributes(ShaderProgramKey key) {
         int attributeCount = glGetProgrami(id, GL_ACTIVE_ATTRIBUTES);
         EnumSet<ShaderAttribute> activeAttributes = EnumSet.noneOf(ShaderAttribute.class);
+        Set<String> activeInstanceAttributes = new HashSet<>();
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer size = stack.mallocInt(1);
             IntBuffer type = stack.mallocInt(1);
@@ -178,28 +184,68 @@ public final class ShaderProgram implements AutoCloseable {
                             "ShaderMaterial attribute arrays are unsupported in version 0.1: " + name);
                 }
                 ShaderAttribute attribute = findAttribute(name);
-                if (attribute == null) {
-                    throw new IllegalStateException("Unsupported ShaderMaterial attribute: " + name);
+                if (attribute != null) {
+                    validateStandardAttribute(name, type.get(0), attribute, activeAttributes);
+                } else {
+                    validateInstanceAttribute(name, type.get(0), key, activeInstanceAttributes);
                 }
-                requireAttributeType(attribute, type.get(0));
-                int actualLocation = glGetAttribLocation(id, name);
-                int expectedLocation = attributeLocation(attribute);
-                if (actualLocation != expectedLocation) {
-                    throw new IllegalStateException("ShaderMaterial attribute "
-                            + name
-                            + " must use renderer location "
-                            + expectedLocation
-                            + ", but linked at "
-                            + actualLocation);
-                }
-                activeAttributes.add(attribute);
             }
         }
         activeAttributes.remove(ShaderAttribute.POSITION);
-        if (!requiredAttributes.containsAll(activeAttributes)) {
-            activeAttributes.removeAll(requiredAttributes);
+        if (!key.requiredAttributes().containsAll(activeAttributes)) {
+            activeAttributes.removeAll(key.requiredAttributes());
             throw new IllegalStateException(
                     "ShaderMaterial active attributes were not declared as required: " + activeAttributes);
+        }
+        requireInstanceInputs(key, activeInstanceAttributes);
+    }
+
+    /** Validates one active standard geometry attribute. */
+    private void validateStandardAttribute(
+            String name, int type, ShaderAttribute attribute, Set<ShaderAttribute> activeAttributes) {
+        requireAttributeType(attribute, type);
+        requireAttributeLocation(name, attributeLocation(attribute));
+        activeAttributes.add(attribute);
+    }
+
+    /** Validates one renderer-managed or application-defined instance attribute. */
+    private void validateInstanceAttribute(
+            String name, int type, ShaderProgramKey key, Set<String> activeInstanceAttributes) {
+        @Nullable Integer location = instanceAttributeLocation(name, key);
+        if (location == null) {
+            throw new IllegalStateException("Unsupported ShaderMaterial attribute: " + name);
+        }
+        int itemSize = instanceAttributeItemSize(name, key);
+        if (type != vectorType(itemSize)) {
+            throw new IllegalStateException(
+                    "ShaderMaterial instance attribute " + name + " must be declared as " + vectorTypeName(itemSize));
+        }
+        requireAttributeLocation(name, location);
+        activeInstanceAttributes.add(name);
+    }
+
+    /** Requires every structurally declared instance input to survive shader linking. */
+    private static void requireInstanceInputs(ShaderProgramKey key, Set<String> activeAttributes) {
+        if (!key.instancingEnabled()) {
+            return;
+        }
+        Set<String> missing = new HashSet<>(requiredInstanceInputs(key));
+        missing.removeAll(activeAttributes);
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException("ShaderMaterial required instance attributes are inactive: " + missing);
+        }
+    }
+
+    /** Requires the renderer-owned location assigned before program linking. */
+    private void requireAttributeLocation(String name, int expectedLocation) {
+        int actualLocation = glGetAttribLocation(id, name);
+        if (actualLocation != expectedLocation) {
+            throw new IllegalStateException("ShaderMaterial attribute "
+                    + name
+                    + " must use renderer location "
+                    + expectedLocation
+                    + ", but linked at "
+                    + actualLocation);
         }
     }
 
@@ -290,6 +336,91 @@ public final class ShaderProgram implements AutoCloseable {
             case UV -> 2;
             case COLOR -> 3;
         };
+    }
+
+    /** Builds deterministic link-time bindings for standard and declared instance inputs. */
+    private static Map<String, Integer> attributeBindings(ShaderProgramKey key) {
+        Map<String, Integer> bindings = new LinkedHashMap<>(ATTRIBUTE_BINDINGS);
+        if (key.instancingEnabled()) {
+            bindings.put(ShaderMaterial.INSTANCE_MATRIX_COLUMN_0, INSTANCE_MATRIX_LOCATION);
+            bindings.put(ShaderMaterial.INSTANCE_MATRIX_COLUMN_1, INSTANCE_MATRIX_LOCATION + 1);
+            bindings.put(ShaderMaterial.INSTANCE_MATRIX_COLUMN_2, INSTANCE_MATRIX_LOCATION + 2);
+            bindings.put(ShaderMaterial.INSTANCE_MATRIX_COLUMN_3, INSTANCE_MATRIX_LOCATION + 3);
+            bindings.put(ShaderMaterial.INSTANCE_COLOR, INSTANCE_COLOR_LOCATION);
+            int location = CUSTOM_INSTANCE_LOCATION;
+            for (String name : key.instanceAttributes().keySet()) {
+                bindings.put(name, location++);
+            }
+        }
+        return bindings;
+    }
+
+    /** Returns the linked location for one recognized instance input. */
+    private static @Nullable Integer instanceAttributeLocation(String name, ShaderProgramKey key) {
+        if (!key.instancingEnabled()) {
+            return null;
+        }
+        return switch (name) {
+            case ShaderMaterial.INSTANCE_MATRIX_COLUMN_0 -> INSTANCE_MATRIX_LOCATION;
+            case ShaderMaterial.INSTANCE_MATRIX_COLUMN_1 -> INSTANCE_MATRIX_LOCATION + 1;
+            case ShaderMaterial.INSTANCE_MATRIX_COLUMN_2 -> INSTANCE_MATRIX_LOCATION + 2;
+            case ShaderMaterial.INSTANCE_MATRIX_COLUMN_3 -> INSTANCE_MATRIX_LOCATION + 3;
+            case ShaderMaterial.INSTANCE_COLOR -> INSTANCE_COLOR_LOCATION;
+            default -> customInstanceAttributeLocation(name, key);
+        };
+    }
+
+    /** Returns one custom instance location in declaration order. */
+    private static @Nullable Integer customInstanceAttributeLocation(String name, ShaderProgramKey key) {
+        int location = CUSTOM_INSTANCE_LOCATION;
+        for (String candidate : key.instanceAttributes().keySet()) {
+            if (candidate.equals(name)) {
+                return location;
+            }
+            location++;
+        }
+        return null;
+    }
+
+    /** Returns the scalar component count for one recognized instance input. */
+    private static int instanceAttributeItemSize(String name, ShaderProgramKey key) {
+        if (name.startsWith("instanceMatrixColumn")) {
+            return 4;
+        }
+        if (name.equals(ShaderMaterial.INSTANCE_COLOR)) {
+            return 3;
+        }
+        Integer itemSize = key.instanceAttributes().get(name);
+        if (itemSize == null) {
+            throw new IllegalStateException("Unsupported ShaderMaterial instance attribute: " + name);
+        }
+        return itemSize;
+    }
+
+    /** Returns all mandatory instance inputs for one structural key. */
+    private static Set<String> requiredInstanceInputs(ShaderProgramKey key) {
+        Set<String> required = new HashSet<>(key.instanceAttributes().keySet());
+        required.add(ShaderMaterial.INSTANCE_MATRIX_COLUMN_0);
+        required.add(ShaderMaterial.INSTANCE_MATRIX_COLUMN_1);
+        required.add(ShaderMaterial.INSTANCE_MATRIX_COLUMN_2);
+        required.add(ShaderMaterial.INSTANCE_MATRIX_COLUMN_3);
+        return required;
+    }
+
+    /** Maps a scalar component count to its exact OpenGL floating-point attribute type. */
+    private static int vectorType(int itemSize) {
+        return switch (itemSize) {
+            case 1 -> GL_FLOAT;
+            case 2 -> GL_FLOAT_VEC2;
+            case 3 -> GL_FLOAT_VEC3;
+            case 4 -> GL_FLOAT_VEC4;
+            default -> throw new IllegalArgumentException("itemSize must be in [1, 4]: " + itemSize);
+        };
+    }
+
+    /** Returns the GLSL spelling for one supported scalar component count. */
+    private static String vectorTypeName(int itemSize) {
+        return itemSize == 1 ? "float" : "vec" + itemSize;
     }
 
     /** Adds deterministic definitions after an optional supported version directive. */

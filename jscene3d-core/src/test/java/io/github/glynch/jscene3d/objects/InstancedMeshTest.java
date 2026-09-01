@@ -10,10 +10,12 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
+import io.github.glynch.jscene3d.geometries.BufferUsage;
 import io.github.glynch.jscene3d.geometries.MorphTarget;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.math.Color;
+import java.util.Map;
 import org.joml.Matrix4f;
 import org.junit.jupiter.api.Test;
 
@@ -78,6 +80,28 @@ final class InstancedMeshTest {
     }
 
     @Test
+    void sharesValidatedApplicationDefinedInstanceAttributes() {
+        try (var geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
+                var material = new BasicMaterial()) {
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 2);
+            BufferAttribute phases = BufferAttribute.of(new float[] {0.0f, 1.0f}, 1, BufferUsage.DYNAMIC);
+
+            mesh.setInstanceAttribute("phase", phases);
+            phases.setX(1, 2.0f);
+
+            assertThat(mesh.instanceAttribute("phase")).isSameAs(phases);
+            assertThat(mesh.instanceAttributes()).containsExactly(Map.entry("phase", phases));
+            assertThatIllegalArgumentException()
+                    .isThrownBy(
+                            () -> mesh.setInstanceAttribute("wrongCount", BufferAttribute.of(new float[] {1.0f}, 1)));
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> mesh.setInstanceAttribute("wrongSize", BufferAttribute.of(new float[10], 5)));
+            assertThat(mesh.removeInstanceAttribute("phase")).isTrue();
+            assertThat(mesh.instanceAttributes()).isEmpty();
+        }
+    }
+
+    @Test
     void expandsSharedMorphWeightsOnlyWhenAnInstanceDiverges() {
         try (var geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
                 var material = new BasicMaterial()) {
@@ -94,6 +118,31 @@ final class InstancedMeshTest {
             assertThat(mesh.hasInstanceMorphTargetInfluences()).isTrue();
             assertThat(mesh.morphTargetInfluenceAt(0, 0)).isEqualTo(0.25f);
             assertThat(mesh.morphTargetInfluenceAt(1, 0)).isEqualTo(0.8f);
+        }
+    }
+
+    @Test
+    void cachesIndependentMorphedBoundsAndUsesThemForAggregateBounds() {
+        try (var geometry = BoxGeometry.create(2.0f, 2.0f, 2.0f);
+                var material = new BasicMaterial()) {
+            float[] shifts = new float[geometry.vertexCount() * 3];
+            for (int index = 0; index < shifts.length; index += 3) {
+                shifts[index] = 4.0f;
+            }
+            geometry.addMorphTarget(new MorphTarget("shift", BufferAttribute.of(shifts, 3)));
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 2);
+            mesh.setMorphTargetInfluenceAt(0, 0, 0.0f);
+            mesh.setMorphTargetInfluenceAt(1, 0, 1.0f);
+
+            BoundingSphere first = mesh.boundingSphereAt(0);
+            BoundingSphere second = mesh.boundingSphereAt(1);
+
+            assertThat(mesh.boundingSphereAt(0)).isSameAs(first);
+            assertThat(second.center().x() - first.center().x()).isEqualTo(4.0f);
+            assertThat(mesh.boundingSphere().radius()).isGreaterThan(first.radius());
+
+            mesh.setMorphTargetInfluenceAt(1, 0, -1.0f);
+            assertThat(mesh.boundingSphereAt(1).center().x()).isEqualTo(-4.0f);
         }
     }
 }

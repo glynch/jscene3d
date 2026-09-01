@@ -100,6 +100,21 @@ final class ExampleCatalog {
                                 URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
                         GltfAnimationExample::create),
                 definition(
+                        "gltf-morph-animation",
+                        "glTF morph animation",
+                        "Animation",
+                        "An official glTF stress asset driving eight imported position-and-normal morph targets.",
+                        List.of("animation", "gltf", "morph", "blend shape", "weights", "loading"),
+                        List.of(new GalleryAttribution(
+                                "Morph Stress Test glTF model",
+                                "Analytical Graphics, Inc. / Ed Mackey",
+                                "Khronos glTF Sample Assets — Morph Stress Test",
+                                URI.create(
+                                        "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MorphStressTest"),
+                                "CC-BY-4.0",
+                                URI.create("https://creativecommons.org/licenses/by/4.0/"))),
+                        GltfMorphAnimationExample::create),
+                definition(
                         "skeletal-animation",
                         "Skeletal animation",
                         "Animation",
@@ -324,6 +339,20 @@ final class ExampleCatalog {
                                 "MIT",
                                 URI.create("https://github.com/mrdoob/three.js/blob/dev/LICENSE"))),
                         InstancingExample::create),
+                definition(
+                        "instance-attributes",
+                        "Custom instance attributes",
+                        "Rendering",
+                        "Scalar and vector material data vary hundreds of objects in one GPU draw call.",
+                        List.of("instancing", "shader", "attributes", "performance", "animation"),
+                        List.of(new GalleryAttribution(
+                                "Instance attribute example concept",
+                                "Three.js Authors",
+                                "Three.js WebGPU Instance Uniform Example",
+                                URI.create("https://threejs.org/examples/webgpu_instance_uniform.html"),
+                                "MIT",
+                                URI.create("https://github.com/mrdoob/three.js/blob/dev/LICENSE"))),
+                        InstanceAttributesExample::create),
                 definition(
                         "morph-targets",
                         "Morph targets",

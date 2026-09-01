@@ -16,12 +16,32 @@ import java.util.Set;
  * @param fragmentShader fragment-shader source
  * @param definitions immutable preprocessor definitions
  * @param requiredAttributes immutable required vertex attributes
+ * @param instancingEnabled whether renderer-managed instance inputs are enabled
+ * @param instanceAttributes immutable custom instance input declarations
  */
 public record ShaderProgramKey(
         String vertexShader,
         String fragmentShader,
         Map<String, String> definitions,
-        Set<ShaderAttribute> requiredAttributes) {
+        Set<ShaderAttribute> requiredAttributes,
+        boolean instancingEnabled,
+        Map<String, Integer> instanceAttributes) {
+    /**
+     * Creates a non-instanced shader key.
+     *
+     * @param vertexShader vertex-shader source
+     * @param fragmentShader fragment-shader source
+     * @param definitions immutable preprocessor definitions
+     * @param requiredAttributes immutable required vertex attributes
+     */
+    public ShaderProgramKey(
+            String vertexShader,
+            String fragmentShader,
+            Map<String, String> definitions,
+            Set<ShaderAttribute> requiredAttributes) {
+        this(vertexShader, fragmentShader, definitions, requiredAttributes, false, Map.of());
+    }
+
     /**
      * Captures the immutable program structure of one open shader material.
      *
@@ -33,6 +53,8 @@ public record ShaderProgramKey(
                 material.vertexShader(),
                 material.fragmentShader(),
                 material.definitions(),
-                material.requiredAttributes());
+                material.requiredAttributes(),
+                material.instancingEnabled(),
+                material.instanceAttributes());
     }
 }

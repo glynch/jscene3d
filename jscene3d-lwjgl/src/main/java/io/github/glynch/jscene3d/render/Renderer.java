@@ -718,10 +718,8 @@ public final class Renderer implements AutoCloseable {
             throw new IllegalStateException("SkinnedMesh currently requires StandardMaterial: "
                     + material.getClass().getName());
         }
-        if (item.object() instanceof InstancedMesh && material instanceof ShaderMaterial) {
-            throw new IllegalStateException("InstancedMesh does not support ShaderMaterial without explicit "
-                    + "instance attributes: "
-                    + material.getClass().getName());
+        if (material instanceof ShaderMaterial shaderMaterial) {
+            requireCompatibleShaderObject(item, shaderMaterial);
         }
         if (item.object() instanceof Mesh mesh && mesh.morphTargetCount() > 0 && material instanceof ShaderMaterial) {
             throw new IllegalStateException("Morph-target meshes do not support ShaderMaterial without explicit "
@@ -1113,8 +1111,22 @@ public final class Renderer implements AutoCloseable {
                 instanceResources.computeIfAbsent(mesh, ignored -> new InstanceResource(mesh.capacity()));
         activeInstancedMeshes.add(mesh);
         resources.setActiveInstanceResources(instanceResources.size());
-        InstanceResource.UploadResult result = resource.synchronizeAndBind(mesh);
+        Map<String, Integer> customAttributes = item.material() instanceof ShaderMaterial shaderMaterial
+                ? shaderMaterial.instanceAttributes()
+                : Map.of();
+        InstanceResource.UploadResult result = resource.synchronizeAndBind(mesh, customAttributes);
         statistics.recordUploads(result.count(), result.byteCount());
+    }
+
+    /** Requires a custom shader's declared instance contract to match its renderable object. */
+    private static void requireCompatibleShaderObject(RenderItem item, ShaderMaterial material) {
+        boolean instanced = item.object() instanceof InstancedMesh;
+        if (instanced && !material.instancingEnabled()) {
+            throw new IllegalStateException("InstancedMesh requires ShaderMaterial.Builder.enableInstancing()");
+        }
+        if (!instanced && material.instancingEnabled()) {
+            throw new IllegalStateException("Instancing-enabled ShaderMaterial requires an InstancedMesh");
+        }
     }
 
     /** Issues one indexed or non-indexed primitive draw and records its statistics. */

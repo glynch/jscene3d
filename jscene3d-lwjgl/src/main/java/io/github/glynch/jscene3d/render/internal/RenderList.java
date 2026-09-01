@@ -226,10 +226,7 @@ public final class RenderList {
         }
 
         Matrix4fc worldMatrix = object.matrixWorld();
-        boolean hasDynamicMorphBounds = object instanceof Mesh mesh && mesh.morphTargetCount() > 0;
-        if (object.isFrustumCullingEnabled()
-                && !hasDynamicMorphBounds
-                && isOutsideFrustum(object, geometry, worldMatrix, frustum)) {
+        if (object.isFrustumCullingEnabled() && isOutsideFrustum(object, geometry, worldMatrix, frustum)) {
             if (topology.isLine()) {
                 culledLines++;
             } else {
@@ -247,16 +244,20 @@ public final class RenderList {
         }
     }
 
-    /** Resolves one object's current static bounds and tests them against the camera frustum. */
+    /** Resolves one object's current bounds and tests them against the camera frustum. */
     private static boolean isOutsideFrustum(
             RenderableObject object, BufferGeometry geometry, Matrix4fc worldMatrix, Frustum frustum) {
-        BoundingSphere boundingSphere = object instanceof InstancedMesh instancedMesh
-                ? instancedMesh.boundingSphere()
-                : geometry.boundingSphere();
+        BoundingSphere boundingSphere = object instanceof Mesh mesh ? mesh.boundingSphere() : lineBounds(geometry);
         if (boundingSphere == null) {
-            boundingSphere = geometry.computeBoundingSphere();
+            return true;
         }
         return !frustum.intersects(boundingSphere, worldMatrix);
+    }
+
+    /** Preserves explicit line bounds and computes them only when absent. */
+    private static BoundingSphere lineBounds(BufferGeometry geometry) {
+        BoundingSphere boundingSphere = geometry.boundingSphere();
+        return boundingSphere == null ? geometry.computeBoundingSphere() : boundingSphere;
     }
 
     /** Acquires one active item while growing retained pool capacity only when necessary. */

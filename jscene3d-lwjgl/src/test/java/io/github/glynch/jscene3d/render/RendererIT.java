@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.fogs.LinearFog;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.BufferUsage;
 import io.github.glynch.jscene3d.geometries.CircleGeometry;
 import io.github.glynch.jscene3d.geometries.ConeGeometry;
 import io.github.glynch.jscene3d.geometries.CylinderGeometry;
@@ -104,6 +105,69 @@ final class RendererIT {
             #endif
             }
             """;
+
+    @Test
+    void rendersAndIncrementallyUploadsCustomInstanceAttributes() {
+        String vertexShader = """
+                in vec3 position;
+                in vec4 instanceMatrixColumn0;
+                in vec4 instanceMatrixColumn1;
+                in vec4 instanceMatrixColumn2;
+                in vec4 instanceMatrixColumn3;
+                in vec3 tint;
+                uniform mat4 modelViewMatrix;
+                uniform mat4 projectionMatrix;
+                out vec3 vertexTint;
+                void main() {
+                    mat4 instanceMatrix = mat4(
+                            instanceMatrixColumn0,
+                            instanceMatrixColumn1,
+                            instanceMatrixColumn2,
+                            instanceMatrixColumn3);
+                    vertexTint = tint;
+                    gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+                }
+                """;
+        String fragmentShader = """
+                in vec3 vertexTint;
+                out vec4 fragmentColor;
+                void main() {
+                    fragmentColor = vec4(vertexTint, 1.0);
+                }
+                """;
+        try (Window window = Window.create("Custom instance attribute integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                ShaderMaterial material = ShaderMaterial.builder(vertexShader, fragmentShader)
+                        .requireInstanceAttribute("tint", 3)
+                        .build()) {
+            BufferAttribute tints =
+                    BufferAttribute.of(new float[] {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f}, 3, BufferUsage.DYNAMIC);
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 2);
+            mesh.setMatrixAt(0, new Matrix4f().translation(-0.6f, 0.0f, 0.0f));
+            mesh.setMatrixAt(1, new Matrix4f().translation(0.6f, 0.0f, 0.0f));
+            mesh.setInstanceAttribute("tint", tints);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            OrthographicCamera camera = new OrthographicCamera(-1.5f, 1.5f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertPixelIsRed(Math.round(window.framebufferWidth() * 0.30f), window.framebufferHeight() / 2);
+            assertPixelIsBlue(Math.round(window.framebufferWidth() * 0.70f), window.framebufferHeight() / 2);
+            assertThat(renderer.info().statistics().drawCalls()).isOne();
+
+            renderer.render(scene, camera);
+            assertThat(renderer.info().statistics().bufferUploads()).isZero();
+
+            tints.setXYZ(1, 1.0f, 0.0f, 0.0f);
+            renderer.render(scene, camera);
+            assertPixelIsRed(Math.round(window.framebufferWidth() * 0.70f), window.framebufferHeight() / 2);
+            assertThat(renderer.info().statistics().bufferUploads()).isOne();
+            assertThat(renderer.info().statistics().bufferUploadBytes()).isEqualTo(3L * Float.BYTES);
+        }
+    }
 
     @Test
     void rendersIndependentMorphWeightsAcrossOneInstancedDraw() {

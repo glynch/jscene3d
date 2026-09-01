@@ -78,7 +78,7 @@ final class MeshIntersector {
     private void intersectSingle(IntersectionContext context, Matrix4fc worldMatrix, int instanceIndex) {
         transformRayToLocal(worldMatrix, context.ray());
         BufferGeometry geometry = context.mesh().geometry();
-        if (context.mesh().morphTargetCount() == 0 && !intersectsBounds(geometry)) {
+        if (!intersectsBounds(context.mesh(), instanceIndex)) {
             return;
         }
         MaterialSide side = effectiveSide(context.mesh().material().side(), worldMatrix.determinant3x3());
@@ -110,16 +110,14 @@ final class MeshIntersector {
     }
 
     /** Returns whether the local ray reaches the geometry's available bounds. */
-    private boolean intersectsBounds(BufferGeometry geometry) {
-        BoundingSphere sphere = geometry.boundingSphere();
-        if (sphere == null) {
-            sphere = geometry.computeBoundingSphere();
-        }
+    private boolean intersectsBounds(Mesh mesh, int instanceIndex) {
+        BoundingSphere sphere =
+                instanceIndex < 0 ? mesh.boundingSphere() : ((InstancedMesh) mesh).boundingSphereAt(instanceIndex);
         if (!intersectsSphere(sphere)) {
             return false;
         }
-        BoundingBox box = geometry.boundingBox();
-        return box == null || intersectsBox(box);
+        BoundingBox box = instanceIndex < 0 ? mesh.boundingBox() : ((InstancedMesh) mesh).boundingBoxAt(instanceIndex);
+        return intersectsBox(box);
     }
 
     /** Intersects every selected triangle after broad-phase bounds acceptance. */

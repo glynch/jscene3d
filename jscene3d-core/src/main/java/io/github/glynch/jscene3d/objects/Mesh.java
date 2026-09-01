@@ -4,10 +4,16 @@
  */
 package io.github.glynch.jscene3d.objects;
 
+import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.MorphTarget;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.Material;
+import io.github.glynch.jscene3d.math.BoundingBox;
+import io.github.glynch.jscene3d.math.BoundingSphere;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -23,6 +29,15 @@ public class Mesh extends RenderableObject {
     private BufferGeometry geometry;
     private Material material;
     private float[] morphTargetInfluences;
+    private final List<BufferAttribute> cachedBoundsMorphPositions = new ArrayList<>();
+    private final List<Long> cachedBoundsMorphPositionVersions = new ArrayList<>();
+    private @Nullable BufferGeometry cachedBoundsGeometry;
+    private @Nullable BufferAttribute cachedBoundsPositions;
+    private @Nullable MeshBounds cachedLocalBounds;
+    private long cachedBoundsGeometryVersion = -1L;
+    private long cachedBoundsPositionVersion = -1L;
+    private long cachedBoundsInfluenceVersion = -1L;
+    private long boundsVersion;
     private long morphTargetInfluenceVersion;
     private boolean shadowCastingEnabled;
     private boolean shadowReceivingEnabled;
@@ -190,6 +205,92 @@ public class Mesh extends RenderableObject {
                     + morphTargetInfluences.length);
         }
         System.arraycopy(morphTargetInfluences, 0, validDestination, 0, morphTargetInfluences.length);
+    }
+
+    /**
+     * Returns cached exact local-space bounds for the current morph influences.
+     *
+     * <p>Base positions, morph-position deltas, geometry structure, and influences are all
+     * versioned inputs. Mutating any of them invalidates the cache automatically.
+     *
+     * @return current local-space box
+     */
+    public BoundingBox boundingBox() {
+        return currentLocalBounds().box();
+    }
+
+    /**
+     * Returns cached exact local-space spherical bounds for the current morph influences.
+     *
+     * @return current local-space sphere
+     */
+    public @Nullable BoundingSphere boundingSphere() {
+        return currentLocalBounds().sphere();
+    }
+
+    /** Returns a monotonically increasing revision for current geometry and shared morph bounds. */
+    final long boundsVersion() {
+        currentLocalBounds();
+        return boundsVersion;
+    }
+
+    /** Computes exact local bounds using one instance's independent morph influences. */
+    final MeshBounds computeBoundsAt(int instanceIndex) {
+        return MeshBounds.compute(this, instanceIndex);
+    }
+
+    /** Refreshes and returns exact local bounds when any contributing input changed. */
+    private MeshBounds currentLocalBounds() {
+        if (!hasCurrentBoundsInputs()) {
+            cachedLocalBounds = MeshBounds.compute(this, -1);
+            captureBoundsInputs();
+            boundsVersion++;
+        }
+        return Objects.requireNonNull(cachedLocalBounds, "cachedLocalBounds");
+    }
+
+    /** Returns whether every identity and version contributing to cached bounds still matches. */
+    private boolean hasCurrentBoundsInputs() {
+        BufferGeometry currentGeometry = geometry();
+        BufferAttribute positions = currentGeometry.attribute(BufferGeometry.POSITION);
+        List<MorphTarget> targets = currentGeometry.morphTargets();
+        if (cachedLocalBounds == null
+                || cachedBoundsGeometry != currentGeometry
+                || cachedBoundsGeometryVersion != currentGeometry.version()
+                || cachedBoundsPositions != positions
+                || positions == null
+                || cachedBoundsPositionVersion != positions.version()
+                || cachedBoundsInfluenceVersion != morphTargetInfluenceVersion
+                || cachedBoundsMorphPositions.size() != targets.size()) {
+            return false;
+        }
+        for (int index = 0; index < targets.size(); index++) {
+            BufferAttribute targetPositions = targets.get(index).positions();
+            if (cachedBoundsMorphPositions.get(index) != targetPositions
+                    || cachedBoundsMorphPositionVersions.get(index) != targetPositions.version()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Captures every bounds input after a complete calculation. */
+    private void captureBoundsInputs() {
+        BufferGeometry currentGeometry = geometry();
+        BufferAttribute positions =
+                Objects.requireNonNull(currentGeometry.attribute(BufferGeometry.POSITION), "position attribute");
+        cachedBoundsGeometry = currentGeometry;
+        cachedBoundsGeometryVersion = currentGeometry.version();
+        cachedBoundsPositions = positions;
+        cachedBoundsPositionVersion = positions.version();
+        cachedBoundsInfluenceVersion = morphTargetInfluenceVersion;
+        cachedBoundsMorphPositions.clear();
+        cachedBoundsMorphPositionVersions.clear();
+        for (MorphTarget target : currentGeometry.morphTargets()) {
+            BufferAttribute targetPositions = target.positions();
+            cachedBoundsMorphPositions.add(targetPositions);
+            cachedBoundsMorphPositionVersions.add(targetPositions.version());
+        }
     }
 
     /**

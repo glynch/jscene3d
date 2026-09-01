@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Morph Stress Test glTF model
+
+- Asset: Morph Stress Test binary glTF model
+- Creator: Analytical Graphics, Inc. / Ed Mackey
+- Source: [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MorphStressTest)
+- License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Bundled file: `jscene3d-examples/src/main/resources/io/github/glynch/jscene3d/examples/morph-stress-test/MorphStressTest.glb`
+
+The model exercises eight simultaneous position-and-normal morph targets and
+three weight-animation clips. Detailed provenance and the downloaded file
+checksum are stored beside the bundled asset.
+
 ## Littlest Tokyo glTF model
 
 - Asset: Littlest Tokyo binary glTF model

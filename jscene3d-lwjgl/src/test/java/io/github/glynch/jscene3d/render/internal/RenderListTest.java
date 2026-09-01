@@ -7,12 +7,15 @@ package io.github.glynch.jscene3d.render.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
+import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.MorphTarget;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.materials.NormalMaterial;
 import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
+import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.InstancedMesh;
@@ -236,6 +239,30 @@ final class RenderListTest {
     }
 
     @Test
+    void cullsAndRestoresMeshesUsingCurrentMorphedBounds() {
+        try (BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial()) {
+            geometry.addMorphTarget(new MorphTarget(
+                    "shift",
+                    BufferAttribute.of(new float[] {-3.0f, 0.0f, 0.0f, -3.0f, 0.0f, 0.0f, -3.0f, 0.0f, 0.0f}, 3)));
+            Mesh mesh = new Mesh(geometry, material);
+            mesh.setPosition(3.0f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            RenderList renderList = newRenderList();
+
+            build(renderList, scene);
+            assertThat(renderList.opaqueCount()).isZero();
+            assertThat(renderList.culledMeshes()).isOne();
+
+            mesh.setMorphTargetInfluence(0, 1.0f);
+            build(renderList, scene);
+            assertThat(renderList.opaqueCount()).isOne();
+            assertThat(renderList.culledMeshes()).isZero();
+        }
+    }
+
+    @Test
     void collectsLineStripsAndSegmentsWithTheirPrimitiveTopologies() {
         try (BufferGeometry stripGeometry = createLineStrip();
                 BufferGeometry segmentsGeometry = createLineSegments();
@@ -289,6 +316,25 @@ final class RenderListTest {
             assertThat(renderList.opaqueCount()).isZero();
             assertThat(renderList.culledLines()).isOne();
             assertThat(renderList.culledMeshes()).isZero();
+        }
+    }
+
+    @Test
+    void preservesExplicitLineBoundsDuringFrustumCulling() {
+        try (BufferGeometry geometry = createLineSegments();
+                LineBasicMaterial material = new LineBasicMaterial()) {
+            geometry.setBoundingSphere(new BoundingSphere(-3.0f, 0.0f, 0.0f, 0.5f));
+            Line line = new Line(geometry, material);
+            line.setPosition(3.0f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(line);
+            RenderList renderList = newRenderList();
+
+            build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isOne();
+            assertThat(renderList.culledLines()).isZero();
+            assertThat(geometry.boundingSphere()).isEqualTo(new BoundingSphere(-3.0f, 0.0f, 0.0f, 0.5f));
         }
     }
 

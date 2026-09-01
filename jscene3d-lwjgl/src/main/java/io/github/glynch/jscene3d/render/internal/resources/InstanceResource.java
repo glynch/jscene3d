@@ -6,6 +6,8 @@ package io.github.glynch.jscene3d.render.internal.resources;
 
 import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.GL_DYNAMIC_DRAW;
+import static org.lwjgl.opengl.GL15.GL_STATIC_DRAW;
+import static org.lwjgl.opengl.GL15.GL_STREAM_DRAW;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL15.glBufferData;
 import static org.lwjgl.opengl.GL15.glBufferSubData;
@@ -14,11 +16,18 @@ import static org.lwjgl.opengl.GL15.glGenBuffers;
 import static org.lwjgl.opengl.GL20.GL_FLOAT;
 import static org.lwjgl.opengl.GL20.glDisableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
+import static org.lwjgl.opengl.GL20.glVertexAttrib3f;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
 
+import io.github.glynch.jscene3d.geometries.BufferAttribute;
+import io.github.glynch.jscene3d.geometries.BufferUsage;
 import io.github.glynch.jscene3d.objects.InstancedMesh;
 import java.nio.FloatBuffer;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import org.lwjgl.system.MemoryStack;
 
 /** Context-local GPU transform and color buffers for one instanced mesh. */
@@ -29,10 +38,14 @@ public final class InstanceResource implements AutoCloseable {
     /** Optional linear RGB instance-color attribute location. */
     public static final int COLOR_LOCATION = 11;
 
+    /** First application-defined per-instance attribute location. */
+    public static final int CUSTOM_LOCATION = 12;
+
     private static final int MATRIX_STRIDE_BYTES = InstancedMesh.MATRIX_COMPONENTS * Float.BYTES;
     private static final int COLOR_STRIDE_BYTES = InstancedMesh.COLOR_COMPONENTS * Float.BYTES;
 
     private final int matrixBuffer;
+    private final Map<String, CustomAttributeResource> customAttributes;
     private float[] matrixStaging;
     private float[] matrixIncoming;
     private float[] colorStaging;
@@ -51,6 +64,7 @@ public final class InstanceResource implements AutoCloseable {
      */
     public InstanceResource(int capacity) {
         matrixBuffer = glGenBuffers();
+        customAttributes = new LinkedHashMap<>();
         matrixStaging = new float[Math.multiplyExact(capacity, InstancedMesh.MATRIX_COMPONENTS)];
         matrixIncoming = new float[matrixStaging.length];
         colorStaging = new float[Math.multiplyExact(capacity, InstancedMesh.COLOR_COMPONENTS)];
@@ -65,10 +79,22 @@ public final class InstanceResource implements AutoCloseable {
      * @return upload activity produced by this synchronization
      */
     public UploadResult synchronizeAndBind(InstancedMesh mesh) {
+        return synchronizeAndBind(mesh, Map.of());
+    }
+
+    /**
+     * Synchronizes changed built-in and application-defined instance data.
+     *
+     * @param mesh source batch
+     * @param requiredAttributes custom input names and required item sizes in binding order
+     * @return upload activity produced by this synchronization
+     */
+    public UploadResult synchronizeAndBind(InstancedMesh mesh, Map<String, Integer> requiredAttributes) {
         UploadCounter uploads = new UploadCounter();
         synchronizeMatrices(mesh, uploads);
         bindMatrices();
         synchronizeColors(mesh, uploads);
+        synchronizeCustomAttributes(mesh, requiredAttributes, uploads);
         return uploads.result();
     }
 
@@ -108,6 +134,7 @@ public final class InstanceResource implements AutoCloseable {
         if (!mesh.hasInstanceColors()) {
             glDisableVertexAttribArray(COLOR_LOCATION);
             glVertexAttribDivisor(COLOR_LOCATION, 0);
+            glVertexAttrib3f(COLOR_LOCATION, 1.0f, 1.0f, 1.0f);
             uploadedColorVersion = mesh.colorVersion();
             return;
         }
@@ -133,6 +160,59 @@ public final class InstanceResource implements AutoCloseable {
         glEnableVertexAttribArray(COLOR_LOCATION);
         glVertexAttribPointer(COLOR_LOCATION, 3, GL_FLOAT, false, COLOR_STRIDE_BYTES, 0L);
         glVertexAttribDivisor(COLOR_LOCATION, 1);
+    }
+
+    /** Reconciles, uploads, and binds the custom inputs selected by the current material. */
+    private void synchronizeCustomAttributes(
+            InstancedMesh mesh, Map<String, Integer> requiredAttributes, UploadCounter uploads) {
+        disableCustomAttributeLocations();
+        removeInactiveCustomAttributes(requiredAttributes);
+        int location = CUSTOM_LOCATION;
+        for (Map.Entry<String, Integer> requirement : requiredAttributes.entrySet()) {
+            String name = requirement.getKey();
+            BufferAttribute attribute = mesh.instanceAttribute(name);
+            if (attribute == null) {
+                throw new IllegalStateException("InstancedMesh has no required instance attribute: " + name);
+            }
+            if (attribute.itemSize() != requirement.getValue()) {
+                throw new IllegalStateException("InstancedMesh instance attribute "
+                        + name
+                        + " has itemSize "
+                        + attribute.itemSize()
+                        + ", expected "
+                        + requirement.getValue());
+            }
+            CustomAttributeResource resource = customAttributes.get(name);
+            if (resource == null || resource.source() != attribute) {
+                if (resource != null) {
+                    resource.close();
+                }
+                resource = new CustomAttributeResource(attribute);
+                customAttributes.put(name, resource);
+            }
+            resource.synchronizeAndBind(location++, uploads);
+        }
+    }
+
+    /** Removes GPU buffers and vertex-array bindings no longer selected by the current material. */
+    private void removeInactiveCustomAttributes(Map<String, Integer> requiredAttributes) {
+        Iterator<Map.Entry<String, CustomAttributeResource>> iterator =
+                customAttributes.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, CustomAttributeResource> entry = iterator.next();
+            if (!requiredAttributes.containsKey(entry.getKey())) {
+                entry.getValue().close();
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Clears the portable four-location custom range before rebinding current declarations. */
+    private static void disableCustomAttributeLocations() {
+        for (int location = CUSTOM_LOCATION; location < CUSTOM_LOCATION + 4; location++) {
+            glDisableVertexAttribArray(location);
+            glVertexAttribDivisor(location, 0);
+        }
     }
 
     /** Finds and uploads the smallest contiguous scalar range containing every changed value. */
@@ -165,6 +245,8 @@ public final class InstanceResource implements AutoCloseable {
             glDeleteBuffers(colorBuffer);
             colorBuffer = 0;
         }
+        customAttributes.values().forEach(CustomAttributeResource::close);
+        customAttributes.clear();
     }
 
     /**
@@ -187,6 +269,63 @@ public final class InstanceResource implements AutoCloseable {
 
         private UploadResult result() {
             return new UploadResult(count, byteCount);
+        }
+    }
+
+    /** Context-local buffer and retained comparison data for one custom instance input. */
+    private static final class CustomAttributeResource implements AutoCloseable {
+        private final BufferAttribute source;
+        private final int buffer;
+        private float[] staging;
+        private float[] incoming;
+
+        private long uploadedVersion = -1L;
+        private boolean storageAllocated;
+
+        private CustomAttributeResource(BufferAttribute source) {
+            this.source = Objects.requireNonNull(source, "source");
+            buffer = glGenBuffers();
+            staging = new float[Math.multiplyExact(source.count(), source.itemSize())];
+            incoming = new float[staging.length];
+        }
+
+        private BufferAttribute source() {
+            return source;
+        }
+
+        private void synchronizeAndBind(int location, UploadCounter uploads) {
+            glBindBuffer(GL_ARRAY_BUFFER, buffer);
+            if (uploadedVersion != source.version()) {
+                source.copyTo(incoming);
+                if (!storageAllocated) {
+                    glBufferData(GL_ARRAY_BUFFER, incoming, toOpenGlUsage(source.usage()));
+                    storageAllocated = true;
+                    uploads.noteUpload(incoming.length * (long) Float.BYTES);
+                } else {
+                    uploadChangedRange(staging, incoming, uploads);
+                }
+                float[] previous = staging;
+                staging = incoming;
+                incoming = previous;
+                uploadedVersion = source.version();
+            }
+            glEnableVertexAttribArray(location);
+            glVertexAttribPointer(location, source.itemSize(), GL_FLOAT, false, 0, 0L);
+            glVertexAttribDivisor(location, 1);
+        }
+
+        @Override
+        public void close() {
+            glDeleteBuffers(buffer);
+        }
+
+        /** Maps the public mutation-frequency hint to its OpenGL allocation hint. */
+        private static int toOpenGlUsage(BufferUsage usage) {
+            return switch (usage) {
+                case STATIC -> GL_STATIC_DRAW;
+                case DYNAMIC -> GL_DYNAMIC_DRAW;
+                case STREAM -> GL_STREAM_DRAW;
+            };
         }
     }
 }

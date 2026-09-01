@@ -11,6 +11,7 @@ import static org.lwjgl.opengl.GL20.glDeleteProgram;
 
 import io.github.glynch.jscene3d.materials.ShaderAttribute;
 import io.github.glynch.jscene3d.platform.Window;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -244,6 +245,46 @@ final class ShaderProgramIT {
                     .isThrownBy(() -> ShaderProgram.create(key(vertexShader, FRAGMENT_SHADER)))
                     .withMessageContaining("active attributes were not declared as required")
                     .withMessageContaining("NORMAL");
+        }
+    }
+
+    @Test
+    void validatesRendererManagedAndCustomInstanceInputs() {
+        String vertexShader = """
+                in vec3 position;
+                in vec4 instanceMatrixColumn0;
+                in vec4 instanceMatrixColumn1;
+                in vec4 instanceMatrixColumn2;
+                in vec4 instanceMatrixColumn3;
+                in float phase;
+                in vec3 tint;
+                out vec3 vertexTint;
+                void main() {
+                    mat4 instanceMatrix = mat4(
+                            instanceMatrixColumn0,
+                            instanceMatrixColumn1,
+                            instanceMatrixColumn2,
+                            instanceMatrixColumn3);
+                    vertexTint = tint;
+                    gl_Position = instanceMatrix * vec4(position + vec3(phase * 0.001), 1.0);
+                }
+                """;
+        String fragmentShader = """
+                in vec3 vertexTint;
+                out vec4 fragmentColor;
+                void main() {
+                    fragmentColor = vec4(vertexTint, 1.0);
+                }
+                """;
+        Map<String, Integer> instanceAttributes = new LinkedHashMap<>();
+        instanceAttributes.put("phase", 1);
+        instanceAttributes.put("tint", 3);
+        ShaderProgramKey instanced = new ShaderProgramKey(
+                vertexShader, fragmentShader, Map.of(), Set.of(ShaderAttribute.POSITION), true, instanceAttributes);
+
+        try (Window ignored = Window.create("Shader instance attribute validation test");
+                ShaderProgram program = ShaderProgram.create(instanced)) {
+            assertThat(program.id()).isPositive();
         }
     }
 

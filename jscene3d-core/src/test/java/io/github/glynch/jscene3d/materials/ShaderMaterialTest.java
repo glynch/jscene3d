@@ -40,6 +40,28 @@ final class ShaderMaterialTest {
     }
 
     @Test
+    void declaresPortableCustomInstanceInputsInBindingOrder() {
+        ShaderMaterial.Builder builder = ShaderMaterial.builder(VERTEX_SHADER, FRAGMENT_SHADER)
+                .enableInstancing()
+                .requireInstanceAttribute("phase", 1)
+                .requireInstanceAttribute("tint", 3);
+
+        try (ShaderMaterial material = builder.build()) {
+            assertThat(material.instancingEnabled()).isTrue();
+            assertThat(material.instanceAttributes()).containsExactly(Map.entry("phase", 1), Map.entry("tint", 3));
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> ShaderMaterial.builder(VERTEX_SHADER, FRAGMENT_SHADER)
+                            .requireInstanceAttribute(ShaderMaterial.INSTANCE_COLOR, 3));
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> ShaderMaterial.builder(VERTEX_SHADER, FRAGMENT_SHADER)
+                            .requireInstanceAttribute("position", 3));
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> ShaderMaterial.builder(VERTEX_SHADER, FRAGMENT_SHADER)
+                            .requireInstanceAttribute("oversized", 5));
+        }
+    }
+
+    @Test
     void storesAllSupportedUniformTypesAndVersionsOnlyChanges() {
         try (Texture texture = Texture.baseColor(1, 1, new byte[4]);
                 ShaderMaterial material = new ShaderMaterial(VERTEX_SHADER, FRAGMENT_SHADER)) {

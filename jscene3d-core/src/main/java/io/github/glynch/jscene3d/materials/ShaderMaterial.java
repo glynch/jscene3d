@@ -34,6 +34,21 @@ import org.jspecify.annotations.Nullable;
  * shared application-owned descriptions. Instances are mutable, shareable, and not thread-safe.
  */
 public final class ShaderMaterial extends Material {
+    /** First renderer-managed column of an instanced object's local transform. */
+    public static final String INSTANCE_MATRIX_COLUMN_0 = "instanceMatrixColumn0";
+
+    /** Second renderer-managed column of an instanced object's local transform. */
+    public static final String INSTANCE_MATRIX_COLUMN_1 = "instanceMatrixColumn1";
+
+    /** Third renderer-managed column of an instanced object's local transform. */
+    public static final String INSTANCE_MATRIX_COLUMN_2 = "instanceMatrixColumn2";
+
+    /** Fourth renderer-managed column of an instanced object's local transform. */
+    public static final String INSTANCE_MATRIX_COLUMN_3 = "instanceMatrixColumn3";
+
+    /** Optional renderer-managed linear RGB instance color. */
+    public static final String INSTANCE_COLOR = "instanceColor";
+
     /** Automatic local-to-world transform uniform. */
     public static final String MODEL_MATRIX = "modelMatrix";
 
@@ -56,6 +71,8 @@ public final class ShaderMaterial extends Material {
     private final String fragmentShader;
     private final Map<String, String> definitions;
     private final Set<ShaderAttribute> requiredAttributes;
+    private final boolean instancingEnabled;
+    private final Map<String, Integer> instanceAttributes;
     private final Map<String, ShaderUniform> uniforms;
     private final Map<String, ShaderUniform> uniformsView;
 
@@ -68,7 +85,7 @@ public final class ShaderMaterial extends Material {
      * @throws IllegalArgumentException if a source is blank
      */
     public ShaderMaterial(String vertexShader, String fragmentShader) {
-        this(vertexShader, fragmentShader, Map.of(), EnumSet.of(ShaderAttribute.POSITION));
+        this(vertexShader, fragmentShader, Map.of(), EnumSet.of(ShaderAttribute.POSITION), false, Map.of());
     }
 
     /** Builds one material from validated immutable program structure. */
@@ -76,11 +93,15 @@ public final class ShaderMaterial extends Material {
             String vertexShader,
             String fragmentShader,
             Map<String, String> definitions,
-            Set<ShaderAttribute> requiredAttributes) {
+            Set<ShaderAttribute> requiredAttributes,
+            boolean instancingEnabled,
+            Map<String, Integer> instanceAttributes) {
         this.vertexShader = Preconditions.requireNonBlank(vertexShader, "vertexShader");
         this.fragmentShader = Preconditions.requireNonBlank(fragmentShader, "fragmentShader");
         this.definitions = Collections.unmodifiableMap(new LinkedHashMap<>(definitions));
         this.requiredAttributes = Collections.unmodifiableSet(EnumSet.copyOf(requiredAttributes));
+        this.instancingEnabled = instancingEnabled;
+        this.instanceAttributes = Collections.unmodifiableMap(new LinkedHashMap<>(instanceAttributes));
         uniforms = new LinkedHashMap<>();
         uniformsView = Collections.unmodifiableMap(uniforms);
     }
@@ -142,6 +163,31 @@ public final class ShaderMaterial extends Material {
     public Set<ShaderAttribute> requiredAttributes() {
         requireOpen();
         return requiredAttributes;
+    }
+
+    /**
+     * Returns whether this shader explicitly consumes renderer-managed instance transforms.
+     *
+     * @return whether the material may be used by an instanced mesh
+     * @throws IllegalStateException if this material is closed
+     */
+    public boolean instancingEnabled() {
+        requireOpen();
+        return instancingEnabled;
+    }
+
+    /**
+     * Returns custom per-instance attribute names and their required scalar component counts.
+     *
+     * <p>Entries preserve builder declaration order. Each name must be declared as a matching
+     * {@code float}, {@code vec2}, {@code vec3}, or {@code vec4} input in the vertex shader.
+     *
+     * @return immutable name-to-item-size mapping
+     * @throws IllegalStateException if this material is closed
+     */
+    public Map<String, Integer> instanceAttributes() {
+        requireOpen();
+        return instanceAttributes;
     }
 
     /**
@@ -460,8 +506,10 @@ public final class ShaderMaterial extends Material {
         private final String fragmentShader;
         private final Map<String, String> definitions = new LinkedHashMap<>();
         private final EnumSet<ShaderAttribute> requiredAttributes = EnumSet.of(ShaderAttribute.POSITION);
+        private final Map<String, Integer> instanceAttributes = new LinkedHashMap<>();
 
         private boolean built;
+        private boolean instancingEnabled;
 
         /** Restricts builder creation to {@link ShaderMaterial#builder(String, String)}. */
         private Builder(String vertexShader, String fragmentShader) {
@@ -518,6 +566,51 @@ public final class ShaderMaterial extends Material {
         }
 
         /**
+         * Enables renderer-managed instance transforms for this shader.
+         *
+         * <p>The vertex shader must consume all four {@code vec4} inputs named by the
+         * {@code INSTANCE_MATRIX_COLUMN_*} constants and construct its instance matrix from them.
+         * The optional {@link ShaderMaterial#INSTANCE_COLOR} {@code vec3} input may also be used;
+         * it resolves to white when the mesh has no instance-color buffer.
+         *
+         * @return this builder
+         * @throws IllegalStateException if this builder has already built a material
+         */
+        public Builder enableInstancing() {
+            requireNotBuilt();
+            instancingEnabled = true;
+            return this;
+        }
+
+        /**
+         * Requires one application-defined per-instance floating-point input.
+         *
+         * <p>Declaring an attribute also enables instancing. Up to four custom inputs are supported
+         * so the contract remains portable across OpenGL 3.3 implementations.
+         *
+         * @param name valid non-reserved GLSL input name
+         * @param itemSize scalar component count from one through four
+         * @return this builder
+         * @throws NullPointerException if {@code name} is {@code null}
+         * @throws IllegalArgumentException if the name or item size is invalid, reserved, or more
+         *     than four custom inputs are declared
+         * @throws IllegalStateException if this builder has already built a material
+         */
+        public Builder requireInstanceAttribute(String name, int itemSize) {
+            requireNotBuilt();
+            String validName = requireInstanceAttributeName(name);
+            if (itemSize < 1 || itemSize > 4) {
+                throw new IllegalArgumentException("itemSize must be in [1, 4]: " + itemSize);
+            }
+            if (!instanceAttributes.containsKey(validName) && instanceAttributes.size() == 4) {
+                throw new IllegalArgumentException("ShaderMaterial supports at most four custom instance attributes");
+            }
+            instanceAttributes.put(validName, itemSize);
+            instancingEnabled = true;
+            return this;
+        }
+
+        /**
          * Builds the configured open material and prevents builder reuse.
          *
          * @return new custom shader material
@@ -526,7 +619,13 @@ public final class ShaderMaterial extends Material {
         public ShaderMaterial build() {
             requireNotBuilt();
             built = true;
-            return new ShaderMaterial(vertexShader, fragmentShader, definitions, requiredAttributes);
+            return new ShaderMaterial(
+                    vertexShader,
+                    fragmentShader,
+                    definitions,
+                    requiredAttributes,
+                    instancingEnabled,
+                    instanceAttributes);
         }
 
         /** Rejects reuse after one material has been built. */
@@ -534,6 +633,27 @@ public final class ShaderMaterial extends Material {
             if (built) {
                 throw new IllegalStateException("ShaderMaterial.Builder has already built a material");
             }
+        }
+
+        /** Validates an application-defined instance input name against renderer-owned inputs. */
+        private static String requireInstanceAttributeName(String name) {
+            String validName = Preconditions.requireIdentifier(name, "name");
+            if (Set.of(
+                            INSTANCE_MATRIX_COLUMN_0,
+                            INSTANCE_MATRIX_COLUMN_1,
+                            INSTANCE_MATRIX_COLUMN_2,
+                            INSTANCE_MATRIX_COLUMN_3,
+                            INSTANCE_COLOR)
+                    .contains(validName)) {
+                throw new IllegalArgumentException("Instance attribute name is reserved by the renderer: " + validName);
+            }
+            for (ShaderAttribute attribute : ShaderAttribute.values()) {
+                if (attribute.shaderName().equals(validName)) {
+                    throw new IllegalArgumentException(
+                            "Instance attribute name is reserved for geometry: " + validName);
+                }
+            }
+            return validName;
         }
     }
 }

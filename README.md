@@ -88,9 +88,10 @@ when a clean build is required.
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
 `KeyframeAnimationExample`, `AnimationBlendingExample`, `SoldierAnimationBlendingExample`,
-`GltfAnimationExample`, `GltfLoadingExample`,
-`SpotAndHemisphereLightsExample`, `ShadowsExample`, `FogExample`, `OrbitControlsExample`, and
-`ObjectSelectionExample` are also
+`GltfAnimationExample`, `GltfMorphAnimationExample`, `GltfLoadingExample`,
+`SpotAndHemisphereLightsExample`, `ShadowsExample`, `FogExample`, `OrbitControlsExample`,
+`ObjectSelectionExample`, `InstancingExample`, `InstanceAttributesExample`, and
+`InstancedMorphTargetsExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
 connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
 controls. In
@@ -125,13 +126,13 @@ The current capability profile supports selected-scene hierarchies, TRS
 and decomposable matrix transforms, triangle primitives, indices, positions,
 normals, two texture-coordinate sets, RGB/RGBA vertex colours,
 metallic-roughness materials, PNG/JPEG images, alpha modes, double-sided
-materials, core sampler state, skeletal skinning, Draco-compressed mesh
-primitives, and translation, rotation, and scale animation channels using step,
-linear, or cubic-spline interpolation. Imported textures retain glTF's top-left
-texture-coordinate convention rather than rewriting geometry UVs. Unsupported
-required extensions, morph targets, animation weight channels, embedded
-cameras, texture-coordinate sets beyond one, and non-triangle primitives fail
-with a source-aware diagnostic.
+materials, core sampler state, skeletal skinning, relative position and normal
+morph targets, Draco-compressed mesh primitives, and translation, rotation,
+scale, and morph-weight animation channels using step, linear, or cubic-spline
+interpolation. Imported textures retain glTF's top-left texture-coordinate
+convention rather than rewriting geometry UVs. Unsupported required extensions,
+embedded cameras, texture-coordinate sets beyond one, and non-triangle
+primitives fail with a source-aware diagnostic.
 JglTF performs container and reference parsing internally; no JglTF type is
 part of the public JScene3D API.
 
@@ -182,6 +183,8 @@ completion.
 `KeyframeAnimationExample` compares step, linear, and cubic-spline interpolation
 with live playback controls. `GltfAnimationExample` imports and synchronously
 plays the nine transform clips in Khronos's CC0 Interpolation Test asset.
+`GltfMorphAnimationExample` loads Khronos's Morph Stress Test and plays its
+eight-target morph-weight animation while exposing the live target influences.
 `SkeletalAnimationExample` constructs and animates a two-joint skinned mesh,
 `AnimationBlendingExample` cross-fades the Khronos Fox model between idle,
 walking, and running clips. `SoldierAnimationBlendingExample` follows the
@@ -240,8 +243,13 @@ copied, while textures remain shared and application-owned.
 The renderer supplies any active `modelMatrix`, `viewMatrix`,
 `projectionMatrix`, `modelViewMatrix`, and `normalMatrix` uniforms. Version 0.1
 supports scalar, boolean, vector, matrix, `Color`, and two-dimensional `Texture`
-uniforms. Uniform and attribute arrays, custom vertex attributes, uniform
-blocks, and raw OpenGL access are not supported.
+uniforms. A custom shader may explicitly opt into renderer-managed instancing,
+consume the instance transform and optional instance color, and declare up to
+four application-defined floating-point per-instance inputs. The renderer
+uploads only changed attribute ranges and advances those inputs once per
+instance. `InstanceAttributesExample` animates a grid from custom phase, scale,
+and tint inputs in one draw call. Uniform arrays, custom per-vertex attributes,
+uniform blocks, and raw OpenGL access are not supported.
 
 ## Lighting
 
@@ -361,9 +369,11 @@ orbit controls.
 and orthographic camera coordinates. It intersects visible triangle meshes on
 the CPU, returning immutable `RaycastHit` values ordered nearest-first. Mesh
 queries respect hierarchy transforms, material visibility and side selection,
-indexed or non-indexed draw ranges, and optional texture coordinates. Cached
-bounding spheres and supplied bounding boxes provide broad-phase rejection
-before individual triangles are tested.
+indexed or non-indexed draw ranges, morph-target influences, instanced
+transforms, and optional texture coordinates. Mesh and per-instance morph-aware
+bounds are cached and invalidated by the geometry, morph attributes, or
+influences that affect them, providing exact broad-phase rejection before
+individual triangles are tested.
 
 Line picking is not included in version 0.1 because it requires an explicit
 world- or screen-space distance tolerance rather than exact triangle

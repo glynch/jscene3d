@@ -4,12 +4,17 @@
  */
 package io.github.glynch.jscene3d.objects;
 
+import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.Material;
+import io.github.glynch.jscene3d.math.BoundingBox;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.math.Color;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -41,12 +46,17 @@ public final class InstancedMesh extends Mesh {
     private final Matrix4f matrixScratch;
     private final Vector3f centerScratch;
     private final Vector3f scaleScratch;
+    private final Map<String, BufferAttribute> instanceAttributes;
+    private final Map<String, BufferAttribute> instanceAttributesView;
 
     private @Nullable float[] colors;
     private @Nullable float[] instanceMorphTargetInfluences;
     private @Nullable BoundingSphere cachedBoundingSphere;
     private @Nullable BufferGeometry cachedBoundsGeometry;
     private long cachedBoundsMatrixVersion = -1L;
+    private long cachedBoundsMeshVersion = -1L;
+    private long cachedBoundsMorphInfluenceVersion = -1L;
+    private final @Nullable MeshBounds[] instanceBounds;
     private long matrixVersion;
     private long colorVersion;
     private long instanceMorphTargetInfluenceVersion;
@@ -74,6 +84,9 @@ public final class InstancedMesh extends Mesh {
         matrixScratch = new Matrix4f();
         centerScratch = new Vector3f();
         scaleScratch = new Vector3f();
+        instanceAttributes = new LinkedHashMap<>();
+        instanceAttributesView = Collections.unmodifiableMap(instanceAttributes);
+        instanceBounds = new MeshBounds[capacity];
         for (int index = 0; index < capacity; index++) {
             writeIdentity(index);
         }
@@ -95,6 +108,62 @@ public final class InstancedMesh extends Mesh {
      */
     public int count() {
         return count;
+    }
+
+    /**
+     * Assigns an application-defined per-instance floating-point attribute.
+     *
+     * <p>The attribute is shared rather than copied so later controlled edits are visible to the
+     * renderer through {@link BufferAttribute#version()}. Its item count must equal this batch's
+     * fixed capacity even when {@link #count()} selects a smaller active prefix.
+     *
+     * @param name valid non-reserved GLSL input name
+     * @param attribute shared attribute containing one item per instance
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalArgumentException if the name is invalid, the item size is outside one through
+     *     four, or the item count differs from capacity
+     */
+    public void setInstanceAttribute(String name, BufferAttribute attribute) {
+        String validName = Preconditions.requireIdentifier(name, "name");
+        BufferAttribute validAttribute = Objects.requireNonNull(attribute, "attribute");
+        if (validAttribute.itemSize() > 4) {
+            throw new IllegalArgumentException(
+                    "instance attribute itemSize must be in [1, 4]: " + validAttribute.itemSize());
+        }
+        if (validAttribute.count() != capacity) {
+            throw new IllegalArgumentException(
+                    "instance attribute count must equal capacity: " + validAttribute.count() + " != " + capacity);
+        }
+        instanceAttributes.put(validName, validAttribute);
+    }
+
+    /**
+     * Returns one application-defined per-instance attribute.
+     *
+     * @param name valid GLSL input name
+     * @return shared attribute, or {@code null} when absent
+     */
+    public @Nullable BufferAttribute instanceAttribute(String name) {
+        return instanceAttributes.get(Preconditions.requireIdentifier(name, "name"));
+    }
+
+    /**
+     * Returns a stable unmodifiable live view of application-defined instance attributes.
+     *
+     * @return attributes in deterministic assignment order
+     */
+    public Map<String, BufferAttribute> instanceAttributes() {
+        return instanceAttributesView;
+    }
+
+    /**
+     * Removes one application-defined per-instance attribute.
+     *
+     * @param name valid GLSL input name
+     * @return whether an attribute was removed
+     */
+    public boolean removeInstanceAttribute(String name) {
+        return instanceAttributes.remove(Preconditions.requireIdentifier(name, "name")) != null;
     }
 
     /**
@@ -424,24 +493,72 @@ public final class InstancedMesh extends Mesh {
             return null;
         }
         BufferGeometry geometry = geometry();
+        refreshInstanceBounds();
         if (cachedBoundingSphere == null
                 || cachedBoundsGeometry != geometry
                 || cachedBoundsCount != count
-                || cachedBoundsMatrixVersion != matrixVersion) {
-            cachedBoundingSphere = computeBoundingSphere(geometry);
+                || cachedBoundsMatrixVersion != matrixVersion
+                || cachedBoundsMeshVersion != boundsVersion()
+                || cachedBoundsMorphInfluenceVersion != instanceMorphTargetInfluenceVersion) {
+            cachedBoundingSphere = computeBoundingSphere();
             cachedBoundsGeometry = geometry;
             cachedBoundsCount = count;
             cachedBoundsMatrixVersion = matrixVersion;
+            cachedBoundsMeshVersion = boundsVersion();
+            cachedBoundsMorphInfluenceVersion = instanceMorphTargetInfluenceVersion;
         }
         return cachedBoundingSphere;
     }
 
-    /** Computes conservative aggregate bounds from each transformed geometry sphere. */
-    private BoundingSphere computeBoundingSphere(BufferGeometry geometry) {
-        BoundingSphere geometrySphere = geometry.boundingSphere();
-        if (geometrySphere == null) {
-            geometrySphere = geometry.computeBoundingSphere();
+    /**
+     * Returns cached exact local geometry bounds for one independently morphed instance.
+     *
+     * <p>The returned bounds precede that instance's matrix. They are suitable for raycasting after
+     * transforming a ray into instance-local space.
+     *
+     * @param index zero-based instance index within capacity
+     * @return current deformed local-space box
+     */
+    public BoundingBox boundingBoxAt(int index) {
+        return boundsAt(index).box();
+    }
+
+    /**
+     * Returns cached exact local geometry spherical bounds for one independently morphed instance.
+     *
+     * @param index zero-based instance index within capacity
+     * @return current deformed local-space sphere
+     */
+    public BoundingSphere boundingSphereAt(int index) {
+        return boundsAt(index).sphere();
+    }
+
+    /** Invalidates all per-instance bounds when shared data or independent influences changed. */
+    private void refreshInstanceBounds() {
+        long meshBoundsVersion = boundsVersion();
+        if (cachedBoundsMeshVersion != meshBoundsVersion
+                || cachedBoundsMorphInfluenceVersion != instanceMorphTargetInfluenceVersion) {
+            Arrays.fill(instanceBounds, null);
+            cachedBoundingSphere = null;
+            cachedBoundsMeshVersion = meshBoundsVersion;
+            cachedBoundsMorphInfluenceVersion = instanceMorphTargetInfluenceVersion;
         }
+    }
+
+    /** Lazily computes one exact per-instance local bound. */
+    private MeshBounds boundsAt(int index) {
+        int validIndex = Objects.checkIndex(index, capacity);
+        refreshInstanceBounds();
+        MeshBounds bounds = instanceBounds[validIndex];
+        if (bounds == null) {
+            bounds = computeBoundsAt(validIndex);
+            instanceBounds[validIndex] = bounds;
+        }
+        return bounds;
+    }
+
+    /** Computes conservative aggregate bounds from each transformed geometry sphere. */
+    private BoundingSphere computeBoundingSphere() {
         float minimumX = Float.POSITIVE_INFINITY;
         float minimumY = Float.POSITIVE_INFINITY;
         float minimumZ = Float.POSITIVE_INFINITY;
@@ -449,6 +566,7 @@ public final class InstancedMesh extends Mesh {
         float maximumY = Float.NEGATIVE_INFINITY;
         float maximumZ = Float.NEGATIVE_INFINITY;
         for (int index = 0; index < count; index++) {
+            BoundingSphere geometrySphere = boundingSphereAt(index);
             matrixAt(index, matrixScratch);
             matrixScratch.transformPosition(geometrySphere.center(), centerScratch);
             matrixScratch.getScale(scaleScratch);
@@ -465,6 +583,7 @@ public final class InstancedMesh extends Mesh {
         float centerZ = (minimumZ + maximumZ) * 0.5f;
         float radius = 0.0f;
         for (int index = 0; index < count; index++) {
+            BoundingSphere geometrySphere = boundingSphereAt(index);
             matrixAt(index, matrixScratch);
             matrixScratch.transformPosition(geometrySphere.center(), centerScratch);
             matrixScratch.getScale(scaleScratch);

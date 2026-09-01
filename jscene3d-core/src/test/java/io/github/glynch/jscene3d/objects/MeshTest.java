@@ -71,6 +71,32 @@ final class MeshTest {
     }
 
     @Test
+    void cachesAndInvalidatesExactMorphedBounds() {
+        try (BufferGeometry geometry = BufferGeometry.builder()
+                        .positions(-1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f)
+                        .build();
+                BasicMaterial material = new BasicMaterial()) {
+            BufferAttribute shift =
+                    BufferAttribute.of(new float[] {2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f}, 3);
+            geometry.addMorphTarget(new MorphTarget("shift", shift));
+            Mesh mesh = new Mesh(geometry, material);
+
+            var initialSphere = mesh.boundingSphere();
+            assertThat(mesh.boundingSphere()).isSameAs(initialSphere);
+
+            mesh.setMorphTargetInfluence(0, 1.5f);
+            var shiftedSphere = mesh.boundingSphere();
+            assertThat(shiftedSphere).isNotSameAs(initialSphere);
+            assertThat(shiftedSphere.center().x()).isEqualTo(3.0f);
+            assertThat(mesh.boundingBox().minimum().x()).isEqualTo(2.0f);
+
+            shift.setXYZ(0, 4.0f, 0.0f, 0.0f);
+            assertThat(mesh.boundingBox().maximum().x()).isEqualTo(5.0f);
+            assertThat(mesh.boundingSphere().center().x()).isNotEqualTo(3.0f);
+        }
+    }
+
+    @Test
     void replacesGeometryAndMaterialReferences() {
         try (BufferGeometry firstGeometry = geometry();
                 BufferGeometry secondGeometry = geometry();

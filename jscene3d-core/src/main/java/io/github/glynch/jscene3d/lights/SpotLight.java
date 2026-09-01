@@ -18,11 +18,11 @@ import org.joml.Vector3fc;
  *
  * <p>The target is copied rather than retained as another scene object. A default light starts at
  * {@code (0, 1, 0)}, targets the origin, has a 60-degree outer angle, a hard cone edge, unlimited
- * distance, and inverse-square decay. Spotlight shadows and projected texture maps are not
- * supported in version 0.1.
+ * distance, and inverse-square decay. Projected texture maps are not supported.
  */
-public final class SpotLight extends Light {
+public final class SpotLight extends ShadowCastingLight {
     private final Vector3f target;
+    private final SpotLightShadow shadow;
 
     private float distance;
     private float decay;
@@ -55,9 +55,20 @@ public final class SpotLight extends Light {
     public SpotLight(Color color, float intensity) {
         super(color, intensity);
         target = new Vector3f();
+        shadow = new SpotLightShadow();
         decay = 2.0f;
         angle = PI_OVER_THREE;
         setPosition(0.0f, 1.0f, 0.0f);
+    }
+
+    /**
+     * Returns this light's stable perspective shadow description.
+     *
+     * @return owned spotlight shadow configuration
+     */
+    @Override
+    public SpotLightShadow shadow() {
+        return shadow;
     }
 
     /**

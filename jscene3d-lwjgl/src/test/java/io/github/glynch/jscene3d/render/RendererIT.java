@@ -22,6 +22,7 @@ import io.github.glynch.jscene3d.geometries.CircleGeometry;
 import io.github.glynch.jscene3d.geometries.ConeGeometry;
 import io.github.glynch.jscene3d.geometries.CylinderGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
+import io.github.glynch.jscene3d.geometries.PlaneGeometry;
 import io.github.glynch.jscene3d.geometries.TorusGeometry;
 import io.github.glynch.jscene3d.helpers.AxesHelper;
 import io.github.glynch.jscene3d.helpers.BoxHelper;
@@ -354,6 +355,147 @@ final class RendererIT {
             assertThatIllegalStateException()
                     .isThrownBy(() -> renderer.render(scene, camera))
                     .withMessageContaining("SpotLight position must differ from its target");
+        }
+    }
+
+    @Test
+    void rendersDirectionalShadowsOnLambertMaterials() {
+        try (Window window = Window.create("Directional shadow integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                LambertMaterial material = new LambertMaterial(Color.RED)) {
+            Mesh mesh = new Mesh(geometry, material);
+            mesh.setShadowCastingEnabled(true);
+            mesh.setShadowReceivingEnabled(true);
+            DirectionalLight light = new DirectionalLight(Color.WHITE);
+            light.setPosition(0.0f, 0.0f, 2.0f);
+            light.setShadowCastingEnabled(true);
+            light.shadow().setMapSize(128, 128);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            scene.add(light);
+            PerspectiveCamera camera = shadowTestCamera(window);
+
+            renderer.render(scene, camera);
+
+            assertShadowActivity(renderer, 1, 1, 1, 1L);
+        }
+    }
+
+    @Test
+    void rendersStableSolidDirectionalShadowDepth() {
+        WindowOptions windowOptions = WindowOptions.builder()
+                .size(160, 160)
+                .title("Directional shadow depth regression test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+        try (Window window = Window.create(windowOptions);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry receiverGeometry = PlaneGeometry.create(1.4f, 1.4f);
+                BufferGeometry casterGeometry = PlaneGeometry.create(0.4f, 0.4f);
+                LambertMaterial receiverMaterial = new LambertMaterial(Color.WHITE);
+                LambertMaterial casterMaterial = new LambertMaterial(Color.WHITE)) {
+            Mesh receiver = new Mesh(receiverGeometry, receiverMaterial);
+            receiver.setShadowReceivingEnabled(true);
+            Mesh caster = new Mesh(casterGeometry, casterMaterial);
+            caster.setPosition(-1.0f, 0.0f, 1.0f);
+            caster.setShadowCastingEnabled(true);
+            DirectionalLight light = new DirectionalLight(Color.WHITE);
+            light.setPosition(-4.0f, 0.0f, 4.0f);
+            light.setTarget(0.0f, 0.0f, 0.0f);
+            light.setShadowCastingEnabled(true);
+            light.shadow().setMapSize(128, 128);
+            light.shadow().setCameraBounds(-2.0f, 2.0f, -2.0f, 2.0f);
+            light.shadow().setCameraRange(0.1f, 10.0f);
+            light.shadow().setBias(0.001f);
+            Scene scene = new Scene();
+            scene.add(new AmbientLight(Color.WHITE, 0.1f));
+            scene.add(receiver);
+            scene.add(caster);
+            scene.add(light);
+            OrthographicCamera camera = new OrthographicCamera(-0.7f, 0.7f, 0.7f, -0.7f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 5.0f);
+
+            renderer.render(scene, camera);
+            OverlayImage baseline = renderer.captureViewport();
+
+            assertSolidShadowCore(baseline);
+            for (int frame = 0; frame < 8; frame++) {
+                renderer.render(scene, camera);
+                assertThat(renderer.captureViewport().pixels()).isEqualTo(baseline.pixels());
+            }
+        }
+    }
+
+    @Test
+    void rendersSpotShadowsOnPhongMaterials() {
+        try (Window window = Window.create("Spot shadow integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                PhongMaterial material = new PhongMaterial(Color.RED)) {
+            material.setSpecular(Color.BLACK);
+            Mesh mesh = new Mesh(geometry, material);
+            mesh.setShadowCastingEnabled(true);
+            mesh.setShadowReceivingEnabled(true);
+            SpotLight light = new SpotLight(Color.WHITE);
+            light.setPosition(0.0f, 0.0f, 2.0f);
+            light.setTarget(0.0f, 0.0f, 0.0f);
+            light.setDecay(0.0f);
+            light.setShadowCastingEnabled(true);
+            light.shadow().setMapSize(128, 128);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            scene.add(light);
+            PerspectiveCamera camera = shadowTestCamera(window);
+
+            renderer.render(scene, camera);
+
+            assertShadowActivity(renderer, 1, 1, 1, 1L);
+        }
+    }
+
+    @Test
+    void rendersPointShadowsOnStandardMaterials() {
+        try (Window window = Window.create("Point shadow integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTriangle();
+                StandardMaterial material = new StandardMaterial(Color.RED)) {
+            Mesh mesh = new Mesh(geometry, material);
+            mesh.setShadowCastingEnabled(true);
+            mesh.setShadowReceivingEnabled(true);
+            PointLight light = new PointLight(Color.WHITE, 10.0f);
+            light.setPosition(0.0f, 0.0f, 2.0f);
+            light.setDecay(0.0f);
+            light.setShadowCastingEnabled(true);
+            light.shadow().setMapSize(128, 128);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            scene.add(light);
+            PerspectiveCamera camera = shadowTestCamera(window);
+
+            renderer.render(scene, camera);
+
+            assertShadowActivity(renderer, 1, 6, 6, 6L);
+        }
+    }
+
+    @Test
+    void rejectsMoreEnabledShadowMapsThanBuiltInShadersCanSample() {
+        try (Window window = Window.create("Shadow limit integration test");
+                Renderer renderer = Renderer.create(window)) {
+            Scene scene = new Scene();
+            for (int index = 0; index < 5; index++) {
+                DirectionalLight light = new DirectionalLight();
+                light.setPosition(index + 1.0f, 2.0f, 3.0f);
+                light.setShadowCastingEnabled(true);
+                scene.add(light);
+            }
+            PerspectiveCamera camera = shadowTestCamera(window);
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> renderer.render(scene, camera))
+                    .withMessage(
+                            "Scene has more visible directional and spot shadow maps than Renderer supports: 5 > 4");
         }
     }
 
@@ -1309,6 +1451,44 @@ final class RendererIT {
                 BufferGeometry.POSITION,
                 BufferAttribute.of(new float[] {-0.8f, -0.8f, 0.0f, 0.8f, -0.8f, 0.0f, 0.0f, 0.8f, 0.0f}, 3));
         return geometry;
+    }
+
+    /** Creates the shared camera used by focused shadow-map integration tests. */
+    private static PerspectiveCamera shadowTestCamera(Window window) {
+        PerspectiveCamera camera =
+                new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+        camera.setPosition(0.0f, 0.0f, 2.0f);
+        return camera;
+    }
+
+    /** Checks both current-frame shadow work and retained per-light resources. */
+    private static void assertShadowActivity(Renderer renderer, int maps, int passes, int drawCalls, long triangles) {
+        RenderStatistics statistics = renderer.info().statistics();
+        assertThat(statistics.shadowMaps()).isEqualTo(maps);
+        assertThat(statistics.shadowPasses()).isEqualTo(passes);
+        assertThat(statistics.shadowDrawCalls()).isEqualTo(drawCalls);
+        assertThat(statistics.shadowTriangles()).isEqualTo(triangles);
+        assertThat(renderer.info().resources().activeShadowMaps()).isEqualTo(maps);
+    }
+
+    /** Checks that the center of a deliberately oversized projected shadow contains no lit holes. */
+    private static void assertSolidShadowCore(OverlayImage image) {
+        byte[] pixels = image.pixels();
+        int darkPixels = 0;
+        int minimum = image.width() / 2 - 10;
+        int maximum = image.width() / 2 + 10;
+        for (int y = minimum; y < maximum; y++) {
+            for (int x = minimum; x < maximum; x++) {
+                int offset = (y * image.width() + x) * 4;
+                int brightness = Byte.toUnsignedInt(pixels[offset])
+                        + Byte.toUnsignedInt(pixels[offset + 1])
+                        + Byte.toUnsignedInt(pixels[offset + 2]);
+                if (brightness < 360) {
+                    darkPixels++;
+                }
+            }
+        }
+        assertThat(darkPixels).isEqualTo((maximum - minimum) * (maximum - minimum));
     }
 
     /** Renders one depth comparison against the cleared depth buffer and checks its result. */

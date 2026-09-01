@@ -16,8 +16,7 @@ import java.util.Objects;
  * not require closure. Their color is expressed in JScene3D's linear-sRGB working space, while
  * intensity is a practical linear multiplier rather than a physically calibrated unit.
  */
-public abstract sealed class Light extends Object3D
-        permits AmbientLight, DirectionalLight, HemisphereLight, PointLight, SpotLight {
+public abstract sealed class Light extends Object3D permits AmbientLight, HemisphereLight, ShadowCastingLight {
     private Color color;
     private float intensity;
 

@@ -9,6 +9,7 @@ import static org.lwjgl.opengl.GL20.glUniformMatrix3fv;
 
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
+import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import org.joml.Matrix3fc;
 import org.joml.Matrix4fc;
 
@@ -112,6 +113,8 @@ public final class StandardProgram implements AutoCloseable {
             uniform vec3 hemisphereLightDirections[MAX_HEMISPHERE_LIGHTS];
             uniform vec3 hemisphereLightSkyColors[MAX_HEMISPHERE_LIGHTS];
             uniform vec3 hemisphereLightGroundColors[MAX_HEMISPHERE_LIGHTS];
+
+            SHADOW_SOURCE
 
             out vec4 fragmentColor;
 
@@ -263,6 +266,8 @@ public final class StandardProgram implements AutoCloseable {
                             lightDistance,
                             pointLightDistances[index],
                             pointLightDecays[index]);
+                    radiance *= pointShadow(
+                            pointShadowIndices[index], resolvedViewPosition, surfaceNormal);
                     reflected += directContribution(
                             surfaceNormal,
                             viewDirection,
@@ -276,11 +281,13 @@ public final class StandardProgram implements AutoCloseable {
                     if (index >= directionalLightCount) {
                         break;
                     }
+                    float visibility = twoDimensionalShadow(
+                            directionalShadowIndices[index], resolvedViewPosition, surfaceNormal);
                     reflected += directContribution(
                             surfaceNormal,
                             viewDirection,
                             directionalLightDirections[index],
-                            directionalLightColors[index],
+                            directionalLightColors[index] * visibility,
                             diffuseColor,
                             reflectance,
                             resolvedRoughness);
@@ -300,6 +307,8 @@ public final class StandardProgram implements AutoCloseable {
                             lightDistance,
                             spotLightDistances[index],
                             spotLightDecays[index]);
+                    radiance *= twoDimensionalShadow(
+                            spotShadowIndices[index], resolvedViewPosition, surfaceNormal);
                     reflected += directContribution(
                             surfaceNormal,
                             viewDirection,
@@ -369,8 +378,8 @@ public final class StandardProgram implements AutoCloseable {
                 reflected += emissiveColor * emissiveSample;
                 fragmentColor = vec4(reflected, surfaceColor.a);
             }
-            """.replace(
-                    "POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
+            """.replace("SHADOW_SOURCE", ShadowShaderSource.source())
+            .replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
             .replace("DIRECTIONAL_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_DIRECTIONAL_LIGHTS))
             .replace("SPOT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_SPOT_LIGHTS))
             .replace("HEMISPHERE_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_HEMISPHERE_LIGHTS));
@@ -471,6 +480,18 @@ public final class StandardProgram implements AutoCloseable {
      */
     public void uploadLights(LightCollection lights, Matrix4fc viewMatrix) {
         litState.uploadLights(lights, viewMatrix);
+    }
+
+    /**
+     * Uploads shadow maps and the current mesh receiver switch.
+     *
+     * @param receiveShadow whether the current mesh receives shadows
+     * @param frame completed shadow frame
+     * @param lights ordered visible lights
+     * @param viewMatrix current camera view matrix
+     */
+    public void uploadShadows(boolean receiveShadow, ShadowFrame frame, LightCollection lights, Matrix4fc viewMatrix) {
+        litState.uploadShadows(receiveShadow, frame, lights, viewMatrix);
     }
 
     /**

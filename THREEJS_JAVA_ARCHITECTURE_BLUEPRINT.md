@@ -1126,9 +1126,13 @@ at a copied target and add a bounded cone angle, penumbra, distance, and decay.
 Hemisphere lights blend sky and ground colors according to the surface normal
 and the light's world-space direction. The renderer supports eight visible
 lights of each positional or directional type, aggregates ambient
-contributions, and fails rather than silently dropping excess lights. This
-initial path excludes shadows, calibrated physical units, normal maps,
-environment lighting, and PBR behavior.
+contributions, and fails rather than silently dropping excess lights.
+Directional, point, and spot lights can generate renderer-owned shadow maps for
+explicitly participating meshes. Shadow configuration includes map size,
+camera range, depth bias, and normal bias; directional shadows additionally
+define orthographic camera bounds. Lambert, Phong, and Standard materials can
+receive filtered shadows. Calibrated physical light units remain outside the
+version 0.1 contract.
 
 ### 13.6 `LineBasicMaterial`
 

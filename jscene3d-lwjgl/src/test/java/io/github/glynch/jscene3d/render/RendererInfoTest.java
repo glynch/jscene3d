@@ -30,9 +30,14 @@ final class RendererInfoTest {
         assertThat(statistics.bufferUploadBytes()).isZero();
         assertThat(statistics.textureUploads()).isZero();
         assertThat(statistics.textureUploadBytes()).isZero();
+        assertThat(statistics.shadowMaps()).isZero();
+        assertThat(statistics.shadowPasses()).isZero();
+        assertThat(statistics.shadowDrawCalls()).isZero();
+        assertThat(statistics.shadowTriangles()).isZero();
         assertThat(resources.activeGeometryResources()).isZero();
         assertThat(resources.activeTextureResources()).isZero();
         assertThat(resources.programCount()).isZero();
+        assertThat(resources.activeShadowMaps()).isZero();
     }
 
     @Test
@@ -46,10 +51,12 @@ final class RendererInfoTest {
         statistics.recordCulledLine();
         statistics.recordUpload(24L);
         statistics.recordTextureUpload(16L);
+        statistics.recordShadowWork(1, 6, 12, 24L);
         statistics.completeFrame();
         resources.setActiveGeometryResources(2);
         resources.setActiveTextureResources(3);
         resources.setProgramCount(1);
+        resources.setActiveShadowMaps(4);
 
         statistics.beginFrame();
 
@@ -65,8 +72,13 @@ final class RendererInfoTest {
         assertThat(statistics.bufferUploadBytes()).isZero();
         assertThat(statistics.textureUploads()).isZero();
         assertThat(statistics.textureUploadBytes()).isZero();
+        assertThat(statistics.shadowMaps()).isZero();
+        assertThat(statistics.shadowPasses()).isZero();
+        assertThat(statistics.shadowDrawCalls()).isZero();
+        assertThat(statistics.shadowTriangles()).isZero();
         assertThat(resources.activeGeometryResources()).isEqualTo(2);
         assertThat(resources.activeTextureResources()).isEqualTo(3);
         assertThat(resources.programCount()).isEqualTo(1);
+        assertThat(resources.activeShadowMaps()).isEqualTo(4);
     }
 }

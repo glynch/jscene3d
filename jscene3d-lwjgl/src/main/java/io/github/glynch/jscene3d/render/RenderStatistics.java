@@ -18,6 +18,10 @@ public final class RenderStatistics {
     private long bufferUploadBytes;
     private int textureUploads;
     private long textureUploadBytes;
+    private int shadowMaps;
+    private int shadowPasses;
+    private int shadowDrawCalls;
+    private long shadowTriangles;
 
     /** Creates zero-valued frame statistics for one renderer. */
     RenderStatistics() {
@@ -132,6 +136,42 @@ public final class RenderStatistics {
         return textureUploadBytes;
     }
 
+    /**
+     * Returns shadow maps generated during the most recent frame.
+     *
+     * @return generated shadow-map count
+     */
+    public int shadowMaps() {
+        return shadowMaps;
+    }
+
+    /**
+     * Returns shadow depth passes generated during the most recent frame.
+     *
+     * @return generated shadow-pass count, including six passes per point light
+     */
+    public int shadowPasses() {
+        return shadowPasses;
+    }
+
+    /**
+     * Returns shadow-caster draw calls issued during the most recent frame.
+     *
+     * @return shadow draw-call count
+     */
+    public int shadowDrawCalls() {
+        return shadowDrawCalls;
+    }
+
+    /**
+     * Returns triangles submitted to shadow depth passes during the most recent frame.
+     *
+     * @return shadow triangle count
+     */
+    public long shadowTriangles() {
+        return shadowTriangles;
+    }
+
     /** Clears per-frame counters while retaining the completed-frame number. */
     void beginFrame() {
         drawCalls = 0;
@@ -145,6 +185,10 @@ public final class RenderStatistics {
         bufferUploadBytes = 0L;
         textureUploads = 0;
         textureUploadBytes = 0L;
+        shadowMaps = 0;
+        shadowPasses = 0;
+        shadowDrawCalls = 0;
+        shadowTriangles = 0L;
     }
 
     /** Records successful completion of the current render call. */
@@ -202,5 +246,13 @@ public final class RenderStatistics {
     void recordTextureUpload(long byteCount) {
         textureUploads++;
         textureUploadBytes += byteCount;
+    }
+
+    /** Records aggregate shadow-map generation work for the current frame. */
+    void recordShadowWork(int maps, int passes, int drawCalls, long triangles) {
+        shadowMaps += maps;
+        shadowPasses += passes;
+        shadowDrawCalls += drawCalls;
+        shadowTriangles += triangles;
     }
 }

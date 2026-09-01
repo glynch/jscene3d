@@ -8,6 +8,7 @@ import static org.lwjgl.opengl.GL20.glDeleteProgram;
 
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
+import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import org.joml.Matrix4fc;
 
 /** Compiled built-in diffuse Lambert mesh program. */
@@ -88,6 +89,8 @@ public final class LambertProgram implements AutoCloseable {
             uniform vec3 hemisphereLightSkyColors[MAX_HEMISPHERE_LIGHTS];
             uniform vec3 hemisphereLightGroundColors[MAX_HEMISPHERE_LIGHTS];
 
+            SHADOW_SOURCE
+
             out vec4 fragmentColor;
 
             float distanceAttenuation(float lightDistance, float cutoffDistance, float decay) {
@@ -122,14 +125,18 @@ public final class LambertProgram implements AutoCloseable {
                             lightDistance,
                             pointLightDistances[index],
                             pointLightDecays[index]);
-                    illumination += pointLightColors[index] * diffuse * attenuation;
+                    float visibility = pointShadow(
+                            pointShadowIndices[index], resolvedViewPosition, surfaceNormal);
+                    illumination += pointLightColors[index] * diffuse * attenuation * visibility;
                 }
                 for (int index = 0; index < MAX_DIRECTIONAL_LIGHTS; index++) {
                     if (index >= directionalLightCount) {
                         break;
                     }
                     float diffuse = max(dot(surfaceNormal, directionalLightDirections[index]), 0.0);
-                    illumination += directionalLightColors[index] * diffuse;
+                    float visibility = twoDimensionalShadow(
+                            directionalShadowIndices[index], resolvedViewPosition, surfaceNormal);
+                    illumination += directionalLightColors[index] * diffuse * visibility;
                 }
                 for (int index = 0; index < MAX_SPOT_LIGHTS; index++) {
                     if (index >= spotLightCount) {
@@ -148,7 +155,13 @@ public final class LambertProgram implements AutoCloseable {
                             spotLightDistances[index],
                             spotLightDecays[index]);
                     float diffuse = max(dot(surfaceNormal, lightDirection), 0.0);
-                    illumination += spotLightColors[index] * diffuse * distanceFalloff * coneAttenuation;
+                    float visibility = twoDimensionalShadow(
+                            spotShadowIndices[index], resolvedViewPosition, surfaceNormal);
+                    illumination += spotLightColors[index]
+                            * diffuse
+                            * distanceFalloff
+                            * coneAttenuation
+                            * visibility;
                 }
                 for (int index = 0; index < MAX_HEMISPHERE_LIGHTS; index++) {
                     if (index >= hemisphereLightCount) {
@@ -168,8 +181,8 @@ public final class LambertProgram implements AutoCloseable {
                 }
                 fragmentColor = vec4(surfaceColor.rgb * illumination, surfaceColor.a);
             }
-            """.replace(
-                    "POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
+            """.replace("SHADOW_SOURCE", ShadowShaderSource.source())
+            .replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
             .replace("DIRECTIONAL_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_DIRECTIONAL_LIGHTS))
             .replace("SPOT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_SPOT_LIGHTS))
             .replace("HEMISPHERE_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_HEMISPHERE_LIGHTS));
@@ -304,6 +317,18 @@ public final class LambertProgram implements AutoCloseable {
      */
     public void uploadLights(LightCollection lights, Matrix4fc viewMatrix) {
         litState.uploadLights(lights, viewMatrix);
+    }
+
+    /**
+     * Uploads shadow maps and the current mesh receiver switch.
+     *
+     * @param receiveShadow whether the current mesh receives shadows
+     * @param frame completed shadow frame
+     * @param lights ordered visible lights
+     * @param viewMatrix current camera view matrix
+     */
+    public void uploadShadows(boolean receiveShadow, ShadowFrame frame, LightCollection lights, Matrix4fc viewMatrix) {
+        litState.uploadShadows(receiveShadow, frame, lights, viewMatrix);
     }
 
     /** Deletes the linked context-local program. */

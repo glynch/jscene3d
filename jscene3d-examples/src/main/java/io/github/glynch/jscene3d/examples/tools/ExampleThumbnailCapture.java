@@ -6,9 +6,11 @@ package io.github.glynch.jscene3d.examples.tools;
 
 import io.github.glynch.jscene3d.examples.ThumbnailCaptureSupport;
 import java.nio.file.Path;
+import java.util.List;
 
 /** Command-line developer utility that refreshes example-browser thumbnail images. */
 public final class ExampleThumbnailCapture {
+    private static final String SELECTION_PROPERTY = "jscene3d.thumbnailSelection";
     private static final Path DEFAULT_DIRECTORY =
             Path.of("src", "main", "resources", "META-INF", "jscene3d", "examples", "thumbnails");
 
@@ -18,15 +20,20 @@ public final class ExampleThumbnailCapture {
     }
 
     /**
-     * Renders all catalogue entries into the optional output directory.
+     * Renders the requested catalogue entries into the source-resource directory.
      *
-     * @param arguments zero arguments for the source-resource directory, or one explicit directory
+     * <p>Supplying no identifiers captures every catalogue entry.
+     *
+     * @param arguments zero or more example catalogue identifiers
      */
     public static void main(String[] arguments) {
-        if (arguments.length > 1) {
-            throw new IllegalArgumentException("Expected zero or one thumbnail output directory argument");
-        }
-        Path destination = arguments.length == 0 ? DEFAULT_DIRECTORY : Path.of(arguments[0]);
-        ThumbnailCaptureSupport.capture(destination);
+        List<String> exampleIds = arguments.length == 0 ? configuredExampleIds() : List.of(arguments);
+        ThumbnailCaptureSupport.capture(DEFAULT_DIRECTORY, exampleIds);
+    }
+
+    /** Reads the Maven-launched comma-separated catalogue selection. */
+    private static List<String> configuredExampleIds() {
+        String selection = System.getProperty(SELECTION_PROPERTY, "");
+        return selection.isBlank() ? List.of() : List.of(selection.split(","));
     }
 }

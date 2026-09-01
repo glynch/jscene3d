@@ -93,6 +93,7 @@
                                     <executable>${java.home}/bin/java</executable>
                                     <arguments>
                                         <argument>${jscene3d.example.firstThreadArgument}</argument>
+                                        <argument>-Djscene3d.thumbnailSelection=${jscene3d.thumbnailSelection}</argument>
                                         <argument>-classpath</argument>
                                         <classpath />
                                         <argument>${jscene3d.exampleMainClass}</argument>

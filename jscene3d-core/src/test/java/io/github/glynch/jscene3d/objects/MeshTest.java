@@ -28,6 +28,22 @@ final class MeshTest {
             assertThat(second.geometry()).isSameAs(geometry);
             assertThat(second.material()).isSameAs(material);
             assertThat(first.parent()).isNull();
+            assertThat(first.isShadowCastingEnabled()).isFalse();
+            assertThat(first.isShadowReceivingEnabled()).isFalse();
+        }
+    }
+
+    @Test
+    void controlsShadowParticipationIndependently() {
+        try (BufferGeometry geometry = geometry();
+                BasicMaterial material = new BasicMaterial()) {
+            Mesh mesh = new Mesh(geometry, material);
+
+            mesh.setShadowCastingEnabled(true);
+            mesh.setShadowReceivingEnabled(true);
+
+            assertThat(mesh.isShadowCastingEnabled()).isTrue();
+            assertThat(mesh.isShadowReceivingEnabled()).isTrue();
         }
     }
 

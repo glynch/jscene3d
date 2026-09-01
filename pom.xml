@@ -81,6 +81,7 @@
         <spotless.maven.version>3.8.0</spotless.maven.version>
 
         <jscene3d.example.firstThreadArgument>-Djscene3d.firstThreadRequired=false</jscene3d.example.firstThreadArgument>
+        <jscene3d.thumbnailSelection />
     </properties>
 
     <dependencyManagement>

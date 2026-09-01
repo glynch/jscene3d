@@ -76,6 +76,11 @@ Maintainers can regenerate every browser thumbnail from the examples' own
 OpenGL framebuffers with `./tools/scripts/capture-example-thumbnails.sh`. The
 capture process creates one hidden shared window, renders every catalogued
 scene without its large control overlays, and replaces the checked-in PNGs.
+Pass one or more catalogue IDs to capture only those examples, for example
+`./tools/scripts/capture-example-thumbnails.sh shadows` or
+`./tools/scripts/capture-example-thumbnails.sh shadows basic-triangle`. The
+capture command compiles incrementally; use the normal verification command
+when a clean build is required.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
@@ -83,7 +88,7 @@ scene without its large control overlays, and replaces the checked-in PNGs.
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
 `GltfLoadingExample`,
-`SpotAndHemisphereLightsExample`, `OrbitControlsExample`, and
+`SpotAndHemisphereLightsExample`, `ShadowsExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
 connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
@@ -225,7 +230,15 @@ provide distance, decay, cone-angle, and penumbra controls. Hemisphere lights
 blend their sky and ground colors using the surface normal and the light's
 world-space direction. The corresponding limits are
 `Renderer.MAX_SPOT_LIGHTS` and `Renderer.MAX_HEMISPHERE_LIGHTS`. Shadows are
-not yet supported.
+supported for directional, spot, and point lights. Shadow-map generation is
+opt-in on each light and each casting mesh, while receiving is enabled
+independently on each mesh. Directional lights expose orthographic shadow-camera
+bounds; all shadow-capable lights expose map dimensions, camera range, depth
+bias, and normal bias. Lambert, Phong, and Standard materials receive filtered
+shadows. A draw supports at most `Renderer.MAX_TWO_DIMENSIONAL_SHADOW_MAPS`
+combined directional and spot maps plus `Renderer.MAX_POINT_SHADOW_MAPS` point
+maps; excess enabled maps fail clearly. `ShadowsExample` demonstrates all three
+light types and exposes these settings through live controls.
 
 ## Environment lighting
 

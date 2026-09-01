@@ -11,16 +11,18 @@ import io.github.glynch.jscene3d.math.Color;
  * Omnidirectional light emitted from this scene node's world position.
  *
  * <p>Intensity attenuates according to the configured decay. A distance of zero leaves the light
- * unbounded; a positive distance establishes its maximum influence. Point-light shadows are not
- * supported in version 0.1.
+ * unbounded; a positive distance establishes its maximum influence.
  */
-public final class PointLight extends Light {
+public final class PointLight extends ShadowCastingLight {
+    private final PointLightShadow shadow;
+
     private float distance;
     private float decay;
 
     /** Creates an unbounded white point light with unit intensity and inverse-square decay. */
     public PointLight() {
         super();
+        shadow = new PointLightShadow();
         decay = 2.0f;
     }
 
@@ -32,6 +34,7 @@ public final class PointLight extends Light {
      */
     public PointLight(Color color) {
         super(color);
+        shadow = new PointLightShadow();
         decay = 2.0f;
     }
 
@@ -45,7 +48,18 @@ public final class PointLight extends Light {
      */
     public PointLight(Color color, float intensity) {
         super(color, intensity);
+        shadow = new PointLightShadow();
         decay = 2.0f;
+    }
+
+    /**
+     * Returns this light's stable cube shadow description.
+     *
+     * @return owned point-light shadow configuration
+     */
+    @Override
+    public PointLightShadow shadow() {
+        return shadow;
     }
 
     /**

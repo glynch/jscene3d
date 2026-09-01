@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.lights.PointLight;
 import io.github.glynch.jscene3d.lights.SpotLight;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
+import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -24,6 +25,7 @@ import org.joml.Vector3f;
 
 /** Shared transform and light-uniform staging for built-in lit mesh programs. */
 final class LitProgramState {
+    private final ShadowProgramState shadowState;
     private final int modelMatrixLocation;
     private final int viewMatrixLocation;
     private final int projectionMatrixLocation;
@@ -83,6 +85,7 @@ final class LitProgramState {
 
     /** Resolves common uniform locations and allocates reusable upload staging. */
     LitProgramState(int program, String label) {
+        shadowState = new ShadowProgramState(program, label);
         modelMatrixLocation = ProgramSupport.requiredUniform(program, label, "modelMatrix");
         viewMatrixLocation = ProgramSupport.requiredUniform(program, label, "viewMatrix");
         projectionMatrixLocation = ProgramSupport.requiredUniform(program, label, "projectionMatrix");
@@ -182,6 +185,11 @@ final class LitProgramState {
         uploadDirectionalLights(lights, viewMatrix);
         uploadSpotLights(lights, viewMatrix);
         uploadHemisphereLights(lights, viewMatrix);
+    }
+
+    /** Uploads receiver-specific shadow state and the completed frame's maps. */
+    void uploadShadows(boolean receiveShadow, ShadowFrame frame, LightCollection lights, Matrix4fc viewMatrix) {
+        shadowState.upload(receiveShadow, frame, lights, viewMatrix);
     }
 
     /** Uploads ordered directional-light state without allocating. */

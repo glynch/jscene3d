@@ -9,6 +9,7 @@ public final class ResourceStatistics {
     private int activeGeometryResources;
     private int activeTextureResources;
     private int programCount;
+    private int activeShadowMaps;
 
     /** Creates zero-valued resource statistics for one renderer. */
     ResourceStatistics() {
@@ -42,6 +43,15 @@ public final class ResourceStatistics {
         return programCount;
     }
 
+    /**
+     * Returns retained per-light shadow maps.
+     *
+     * @return active shadow-map count
+     */
+    public int activeShadowMaps() {
+        return activeShadowMaps;
+    }
+
     /** Replaces the current context-local geometry-resource count. */
     void setActiveGeometryResources(int activeGeometryResources) {
         this.activeGeometryResources = activeGeometryResources;
@@ -55,5 +65,10 @@ public final class ResourceStatistics {
     /** Replaces the current context-local shader-program count. */
     void setProgramCount(int programCount) {
         this.programCount = programCount;
+    }
+
+    /** Replaces the retained per-light shadow-map count. */
+    void setActiveShadowMaps(int activeShadowMaps) {
+        this.activeShadowMaps = activeShadowMaps;
     }
 }

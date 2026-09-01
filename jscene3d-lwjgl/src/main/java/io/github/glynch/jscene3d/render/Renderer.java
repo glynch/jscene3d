@@ -43,6 +43,7 @@ import static org.lwjgl.opengl.GL13.GL_SAMPLES;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS;
+import static org.lwjgl.opengl.GL20.GL_MAX_TEXTURE_IMAGE_UNITS;
 import static org.lwjgl.opengl.GL20.glUniform1f;
 import static org.lwjgl.opengl.GL20.glUniform1i;
 import static org.lwjgl.opengl.GL20.glUniform2f;
@@ -73,11 +74,14 @@ import io.github.glynch.jscene3d.materials.ShaderUniform;
 import io.github.glynch.jscene3d.materials.ShaderUniformType;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.internal.Frustum;
 import io.github.glynch.jscene3d.render.internal.PrimitiveTopology;
 import io.github.glynch.jscene3d.render.internal.RenderItem;
 import io.github.glynch.jscene3d.render.internal.RenderList;
+import io.github.glynch.jscene3d.render.internal.ShadowFrame;
+import io.github.glynch.jscene3d.render.internal.ShadowRenderer;
 import io.github.glynch.jscene3d.render.internal.programs.BasicProgram;
 import io.github.glynch.jscene3d.render.internal.programs.EnvironmentBackgroundProgram;
 import io.github.glynch.jscene3d.render.internal.programs.LambertProgram;
@@ -89,6 +93,7 @@ import io.github.glynch.jscene3d.render.internal.programs.ShaderProgramKey;
 import io.github.glynch.jscene3d.render.internal.programs.StandardProgram;
 import io.github.glynch.jscene3d.render.internal.programs.ToneMappingProgram;
 import io.github.glynch.jscene3d.render.internal.resources.BrdfLookupResource;
+import io.github.glynch.jscene3d.render.internal.resources.DefaultShadowMaps;
 import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
 import io.github.glynch.jscene3d.render.internal.resources.EnvironmentResource;
 import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
@@ -126,6 +131,12 @@ public final class Renderer implements AutoCloseable {
     /** Maximum number of visible hemisphere lights supported by one rendered scene in version 0.1. */
     public static final int MAX_HEMISPHERE_LIGHTS = 8;
 
+    /** Maximum combined number of directional and spot shadow maps sampled by one draw. */
+    public static final int MAX_TWO_DIMENSIONAL_SHADOW_MAPS = ShadowFrame.MAX_TWO_DIMENSIONAL_SHADOWS;
+
+    /** Maximum number of point-light cube shadow maps sampled by one draw. */
+    public static final int MAX_POINT_SHADOW_MAPS = ShadowFrame.MAX_POINT_SHADOWS;
+
     private final Window window;
     private final WindowContextRegistry.Access context;
     private final boolean automaticClear;
@@ -148,6 +159,8 @@ public final class Renderer implements AutoCloseable {
     private final Vector2f normalScale;
     private final OverlayCanvas overlayCanvas;
     private final int maxTextureUnits;
+    private final int maxFragmentTextureUnits;
+    private final ShadowRenderer shadowRenderer;
 
     private Color clearColor;
     private float clearAlpha;
@@ -165,6 +178,8 @@ public final class Renderer implements AutoCloseable {
     private @Nullable OverlayRenderer overlayRenderer;
     private @Nullable DefaultTexture defaultTexture;
     private @Nullable BrdfLookupResource brdfLookupResource;
+    private @Nullable DefaultShadowMaps defaultShadowMaps;
+    private @Nullable ShadowFrame activeShadowFrame;
     private boolean customViewport;
     private int viewportX;
     private int viewportY;
@@ -201,6 +216,8 @@ public final class Renderer implements AutoCloseable {
         normalScale = new Vector2f();
         overlayCanvas = new OverlayCanvas();
         maxTextureUnits = glGetInteger(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+        maxFragmentTextureUnits = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
+        shadowRenderer = new ShadowRenderer();
     }
 
     /**
@@ -260,44 +277,63 @@ public final class Renderer implements AutoCloseable {
         int framebufferWidth = context.framebufferWidth();
         int framebufferHeight = context.framebufferHeight();
         boolean usesToneMapping = toneMapping != ToneMapping.NONE && framebufferWidth > 0 && framebufferHeight > 0;
-        if (usesToneMapping) {
-            toneMappingTarget().begin(framebufferWidth, framebufferHeight, glGetInteger(GL_SAMPLES));
-        }
-        applyViewport(framebufferWidth, framebufferHeight);
-        if (automaticClear) {
-            Color background = validScene.background();
-            clearBuffers(background == null ? clearColor : background);
-        }
+        boolean mainTargetStarted = false;
         boolean rendered = false;
         try {
             if (framebufferWidth > 0 && framebufferHeight > 0) {
                 Matrix4fc viewMatrix = validCamera.viewMatrix();
                 Matrix4fc projectionMatrix = validCamera.projectionMatrix();
                 prepareEnvironmentMatrices(validScene, viewMatrix);
-                renderEnvironmentBackground(validScene, projectionMatrix);
                 frustum.update(viewMatrix, projectionMatrix);
                 renderList.build(validScene, viewMatrix, frustum);
+                activeShadowFrame =
+                        shadowRenderer.render(validScene, renderList.lights(), viewMatrix, geometryResources);
+                recordShadowWork(activeShadowFrame);
+                updateProgramCount();
+                updateShadowResourceCount();
+                if (usesToneMapping) {
+                    toneMappingTarget().begin(framebufferWidth, framebufferHeight, glGetInteger(GL_SAMPLES));
+                    mainTargetStarted = true;
+                }
+                applyViewport(framebufferWidth, framebufferHeight);
+                if (automaticClear) {
+                    Color background = validScene.background();
+                    clearBuffers(background == null ? clearColor : background);
+                }
+                renderEnvironmentBackground(validScene, projectionMatrix);
                 statistics.recordCulledMeshes(renderList.culledMeshes());
                 statistics.recordCulledLines(renderList.culledLines());
-                for (int index = 0; index < renderList.opaqueCount(); index++) {
-                    renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix, validScene);
-                }
-                for (int index = 0; index < renderList.transparentCount(); index++) {
-                    renderItem(renderList.transparentItem(index), viewMatrix, projectionMatrix, validScene);
-                }
+                renderItems(viewMatrix, projectionMatrix, validScene);
             }
             statistics.completeFrame();
             rendered = true;
         } finally {
-            renderList.clear();
-            glBindVertexArray(0);
-            if (usesToneMapping) {
-                if (rendered) {
-                    toneMappingTarget().present(toneMappingProgram(), exposure);
-                } else {
-                    toneMappingTarget().cancel();
-                }
-            }
+            finishSceneFrame(mainTargetStarted, rendered);
+        }
+    }
+
+    /** Draws the prepared opaque and transparent submissions in their established order. */
+    private void renderItems(Matrix4fc viewMatrix, Matrix4fc projectionMatrix, Scene scene) {
+        for (int index = 0; index < renderList.opaqueCount(); index++) {
+            renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix, scene);
+        }
+        for (int index = 0; index < renderList.transparentCount(); index++) {
+            renderItem(renderList.transparentItem(index), viewMatrix, projectionMatrix, scene);
+        }
+    }
+
+    /** Releases per-frame state and resolves or abandons an active tone-mapping target. */
+    private void finishSceneFrame(boolean mainTargetStarted, boolean rendered) {
+        renderList.clear();
+        activeShadowFrame = null;
+        glBindVertexArray(0);
+        if (!mainTargetStarted) {
+            return;
+        }
+        if (rendered) {
+            toneMappingTarget().present(toneMappingProgram(), exposure);
+        } else {
+            toneMappingTarget().cancel();
         }
     }
 
@@ -500,11 +536,13 @@ public final class Renderer implements AutoCloseable {
             closeCachedResources();
             closeBuiltInPrograms();
             closeRenderTargets();
+            shadowRenderer.close();
             glBindVertexArray(0);
             glUseProgram(0);
             renderList.clear();
             resources.setActiveGeometryResources(0);
             resources.setActiveTextureResources(0);
+            resources.setActiveShadowMaps(0);
             resources.setProgramCount(0);
             closed = true;
         } finally {
@@ -577,6 +615,10 @@ public final class Renderer implements AutoCloseable {
         if (brdfLookupResource != null) {
             brdfLookupResource.close();
             brdfLookupResource = null;
+        }
+        if (defaultShadowMaps != null) {
+            defaultShadowMaps.close();
+            defaultShadowMaps = null;
         }
     }
 
@@ -723,6 +765,12 @@ public final class Renderer implements AutoCloseable {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
         }
         program.uploadLights(renderList.lights(), viewMatrix);
+        bindShadowMaps();
+        program.uploadShadows(
+                ((Mesh) item.object()).isShadowReceivingEnabled(),
+                requireActiveShadowFrame(),
+                renderList.lights(),
+                viewMatrix);
         Color color = material.color();
         float alpha = resolvedAlpha(material);
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
@@ -781,6 +829,12 @@ public final class Renderer implements AutoCloseable {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
         }
         program.uploadLights(renderList.lights(), viewMatrix);
+        bindShadowMaps();
+        program.uploadShadows(
+                ((Mesh) item.object()).isShadowReceivingEnabled(),
+                requireActiveShadowFrame(),
+                renderList.lights(),
+                viewMatrix);
         Color color = material.color();
         float alpha = resolvedAlpha(material);
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), alpha);
@@ -843,6 +897,12 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         program.uploadLights(renderList.lights(), viewMatrix);
+        bindShadowMaps();
+        program.uploadShadows(
+                ((Mesh) item.object()).isShadowReceivingEnabled(),
+                requireActiveShadowFrame(),
+                renderList.lights(),
+                viewMatrix);
         Color color = material.color();
         glUniform4f(program.baseColorLocation(), color.red(), color.green(), color.blue(), resolvedAlpha(material));
         glUniform1f(program.metalnessLocation(), material.metalness());
@@ -1101,6 +1161,30 @@ public final class Renderer implements AutoCloseable {
         statistics.recordUploads(uploads.count(), uploads.byteCount());
     }
 
+    /** Records work completed by the renderer-owned shadow subsystem. */
+    private void recordShadowWork(ShadowFrame frame) {
+        ShadowFrame.ShadowRenderMetrics metrics = frame.metrics();
+        statistics.recordShadowWork(metrics.maps(), metrics.passes(), metrics.drawCalls(), metrics.triangles());
+        statistics.recordUploads(metrics.bufferUploads(), metrics.uploadedBytes());
+        resources.setActiveGeometryResources(geometryResources.size());
+    }
+
+    /** Binds active and fallback shadow maps to the built-in fixed sampler units. */
+    private void bindShadowMaps() {
+        if (maxFragmentTextureUnits < DefaultShadowMaps.REQUIRED_TEXTURE_UNITS) {
+            throw new IllegalStateException("Built-in lit materials with shadows require at least "
+                    + DefaultShadowMaps.REQUIRED_TEXTURE_UNITS
+                    + " fragment texture units: "
+                    + maxFragmentTextureUnits);
+        }
+        defaultShadowMaps().bind(requireActiveShadowFrame());
+    }
+
+    /** Returns the shadow frame while scene rendering is active. */
+    private ShadowFrame requireActiveShadowFrame() {
+        return Objects.requireNonNull(activeShadowFrame, "No active scene shadow frame");
+    }
+
     /** Synchronizes one texture and records an image upload when one occurred. */
     private void synchronizeTexture(TextureResource resource, Texture texture) {
         long uploadedBytes = resource.synchronize(texture);
@@ -1206,6 +1290,14 @@ public final class Renderer implements AutoCloseable {
         return defaultTexture;
     }
 
+    /** Lazily creates complete fallback maps required by built-in shadow samplers. */
+    private DefaultShadowMaps defaultShadowMaps() {
+        if (defaultShadowMaps == null) {
+            defaultShadowMaps = new DefaultShadowMaps();
+        }
+        return defaultShadowMaps;
+    }
+
     /** Lazily computes and uploads the shared split-sum BRDF integration lookup. */
     private BrdfLookupResource brdfLookupResource() {
         if (brdfLookupResource == null) {
@@ -1239,6 +1331,7 @@ public final class Renderer implements AutoCloseable {
                 + (standardProgram == null ? 0 : 1)
                 + (toneMappingProgram == null ? 0 : 1)
                 + (overlayRenderer == null ? 0 : 1)
+                + shadowRenderer.programCount()
                 + shaderPrograms.size());
     }
 
@@ -1246,6 +1339,11 @@ public final class Renderer implements AutoCloseable {
     private void updateTextureResourceCount() {
         resources.setActiveTextureResources(
                 textureResources.size() + environmentResources.size() * 3 + (brdfLookupResource == null ? 0 : 1));
+    }
+
+    /** Synchronizes diagnostics with retained per-light shadow maps. */
+    private void updateShadowResourceCount() {
+        resources.setActiveShadowMaps(shadowRenderer.resourceCount());
     }
 
     /** Applies depth, blending, and face-culling state for one material. */

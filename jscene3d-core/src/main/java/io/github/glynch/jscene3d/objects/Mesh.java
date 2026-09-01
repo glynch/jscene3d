@@ -12,6 +12,8 @@ import io.github.glynch.jscene3d.materials.Material;
 public final class Mesh extends Object3D {
     private BufferGeometry geometry;
     private Material material;
+    private boolean shadowCastingEnabled;
+    private boolean shadowReceivingEnabled;
 
     /**
      * Creates a mesh retaining shared geometry and material references.
@@ -72,5 +74,41 @@ public final class Mesh extends Object3D {
      */
     public void setMaterial(Material material) {
         this.material = Preconditions.requireOpen(material, "material");
+    }
+
+    /**
+     * Returns whether this mesh participates in shadow-map depth passes.
+     *
+     * @return {@code false} by default
+     */
+    public boolean isShadowCastingEnabled() {
+        return shadowCastingEnabled;
+    }
+
+    /**
+     * Changes whether this mesh participates in shadow-map depth passes.
+     *
+     * @param enabled whether this mesh casts shadows from shadow-enabled lights
+     */
+    public void setShadowCastingEnabled(boolean enabled) {
+        shadowCastingEnabled = enabled;
+    }
+
+    /**
+     * Returns whether lit materials on this mesh sample generated shadow maps.
+     *
+     * @return {@code false} by default
+     */
+    public boolean isShadowReceivingEnabled() {
+        return shadowReceivingEnabled;
+    }
+
+    /**
+     * Changes whether lit materials on this mesh sample generated shadow maps.
+     *
+     * @param enabled whether this mesh receives shadows from shadow-enabled lights
+     */
+    public void setShadowReceivingEnabled(boolean enabled) {
+        shadowReceivingEnabled = enabled;
     }
 }

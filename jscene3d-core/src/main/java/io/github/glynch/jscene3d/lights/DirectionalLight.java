@@ -15,16 +15,17 @@ import org.joml.Vector3fc;
  *
  * <p>The target is a copied point rather than another scene object. Moving or parenting the light
  * changes its world position while leaving the target fixed in world space. A default light starts
- * at {@code (0, 1, 0)} and targets the origin. Directional-light shadows are not supported in
- * version 0.1.
+ * at {@code (0, 1, 0)} and targets the origin.
  */
-public final class DirectionalLight extends Light {
+public final class DirectionalLight extends ShadowCastingLight {
     private final Vector3f target;
+    private final DirectionalLightShadow shadow;
 
     /** Creates a white directional light with unit intensity targeting the origin. */
     public DirectionalLight() {
         super();
         target = new Vector3f();
+        shadow = new DirectionalLightShadow();
         setPosition(0.0f, 1.0f, 0.0f);
     }
 
@@ -37,6 +38,7 @@ public final class DirectionalLight extends Light {
     public DirectionalLight(Color color) {
         super(color);
         target = new Vector3f();
+        shadow = new DirectionalLightShadow();
         setPosition(0.0f, 1.0f, 0.0f);
     }
 
@@ -51,7 +53,18 @@ public final class DirectionalLight extends Light {
     public DirectionalLight(Color color, float intensity) {
         super(color, intensity);
         target = new Vector3f();
+        shadow = new DirectionalLightShadow();
         setPosition(0.0f, 1.0f, 0.0f);
+    }
+
+    /**
+     * Returns this light's stable orthographic shadow description.
+     *
+     * @return owned directional-light shadow configuration
+     */
+    @Override
+    public DirectionalLightShadow shadow() {
+        return shadow;
     }
 
     /**

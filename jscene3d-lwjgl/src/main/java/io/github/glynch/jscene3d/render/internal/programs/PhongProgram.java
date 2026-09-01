@@ -8,6 +8,7 @@ import static org.lwjgl.opengl.GL20.glDeleteProgram;
 
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
+import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import org.joml.Matrix4fc;
 
 /** Compiled built-in Blinn-Phong mesh program. */
@@ -91,6 +92,8 @@ public final class PhongProgram implements AutoCloseable {
             uniform vec3 hemisphereLightSkyColors[MAX_HEMISPHERE_LIGHTS];
             uniform vec3 hemisphereLightGroundColors[MAX_HEMISPHERE_LIGHTS];
 
+            SHADOW_SOURCE
+
             out vec4 fragmentColor;
 
             float distanceAttenuation(float lightDistance, float cutoffDistance, float decay) {
@@ -136,7 +139,9 @@ public final class PhongProgram implements AutoCloseable {
                             lightDistance,
                             pointLightDistances[index],
                             pointLightDecays[index]);
-                    vec3 radiance = pointLightColors[index] * attenuation;
+                    float visibility = pointShadow(
+                            pointShadowIndices[index], resolvedViewPosition, surfaceNormal);
+                    vec3 radiance = pointLightColors[index] * attenuation * visibility;
                     diffuseIllumination += radiance * max(dot(surfaceNormal, lightDirection), 0.0);
                     specularIllumination += radiance
                             * specularStrength(surfaceNormal, lightDirection, viewDirection);
@@ -146,7 +151,9 @@ public final class PhongProgram implements AutoCloseable {
                         break;
                     }
                     vec3 lightDirection = directionalLightDirections[index];
-                    vec3 radiance = directionalLightColors[index];
+                    float visibility = twoDimensionalShadow(
+                            directionalShadowIndices[index], resolvedViewPosition, surfaceNormal);
+                    vec3 radiance = directionalLightColors[index] * visibility;
                     diffuseIllumination += radiance * max(dot(surfaceNormal, lightDirection), 0.0);
                     specularIllumination += radiance
                             * specularStrength(surfaceNormal, lightDirection, viewDirection);
@@ -167,7 +174,12 @@ public final class PhongProgram implements AutoCloseable {
                             lightDistance,
                             spotLightDistances[index],
                             spotLightDecays[index]);
-                    vec3 radiance = spotLightColors[index] * distanceFalloff * coneAttenuation;
+                    float visibility = twoDimensionalShadow(
+                            spotShadowIndices[index], resolvedViewPosition, surfaceNormal);
+                    vec3 radiance = spotLightColors[index]
+                            * distanceFalloff
+                            * coneAttenuation
+                            * visibility;
                     diffuseIllumination += radiance * max(dot(surfaceNormal, lightDirection), 0.0);
                     specularIllumination += radiance
                             * specularStrength(surfaceNormal, lightDirection, viewDirection);
@@ -193,8 +205,8 @@ public final class PhongProgram implements AutoCloseable {
                         + emissiveColor;
                 fragmentColor = vec4(reflected, surfaceColor.a);
             }
-            """.replace(
-                    "POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
+            """.replace("SHADOW_SOURCE", ShadowShaderSource.source())
+            .replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
             .replace("DIRECTIONAL_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_DIRECTIONAL_LIGHTS))
             .replace("SPOT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_SPOT_LIGHTS))
             .replace("HEMISPHERE_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_HEMISPHERE_LIGHTS));
@@ -361,6 +373,18 @@ public final class PhongProgram implements AutoCloseable {
      */
     public void uploadLights(LightCollection lights, Matrix4fc viewMatrix) {
         litState.uploadLights(lights, viewMatrix);
+    }
+
+    /**
+     * Uploads shadow maps and the current mesh receiver switch.
+     *
+     * @param receiveShadow whether the current mesh receives shadows
+     * @param frame completed shadow frame
+     * @param lights ordered visible lights
+     * @param viewMatrix current camera view matrix
+     */
+    public void uploadShadows(boolean receiveShadow, ShadowFrame frame, LightCollection lights, Matrix4fc viewMatrix) {
+        litState.uploadShadows(receiveShadow, frame, lights, viewMatrix);
     }
 
     /** Deletes the linked context-local program. */

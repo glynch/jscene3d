@@ -99,6 +99,13 @@ final class ExampleCatalog {
                         List.of("ambient", "directional", "point", "lambert"),
                         LightingExample::create),
                 definition(
+                        "shadows",
+                        "Shadow mapping",
+                        "Lighting",
+                        "Directional, spot, and point shadows with live map controls.",
+                        List.of("shadow", "directional", "spot", "point", "bias", "pcf"),
+                        ShadowsExample::create),
+                definition(
                         "spot-hemisphere-lights",
                         "Spot and hemisphere lights",
                         "Lighting",

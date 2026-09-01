@@ -188,6 +188,36 @@ time. Until weighted blending is supported, concurrent actions must target
 distinct object properties.
 _Avoid_: Animation thread
 
+**Physics World**:
+A renderer-independent simulation containing Rigid Bodies and advancing them
+through explicit Fixed Updates.
+_Avoid_: Scene, render world
+
+**Rigid Body**:
+A simulated body's motion state, mass properties, forces, and Collision Shape.
+It does not own or directly mutate a scene object.
+_Avoid_: Mesh, Object3D
+
+**Collision Shape**:
+A physics-specific description used for collision detection independently of
+rendered geometry.
+_Avoid_: BufferGeometry, visible mesh
+
+**Fixed Update**:
+One deterministic-duration advancement of a Physics World, independent of
+render-frame timing.
+_Avoid_: Render frame, variable update
+
+**Physics Binding**:
+A game-layer association that synchronizes a Rigid Body with a scene object and
+may interpolate between Fixed Updates for presentation.
+_Avoid_: Physics-owned Object3D
+
+**Game Engine**:
+The optional higher-level runtime that coordinates application lifecycle, game
+states, input, assets, physics, animation, and rendering through JScene3D.
+_Avoid_: Renderer, Physics World
+
 **Scene Persistence**:
 Future saving and restoration of JScene3D-specific scene state, identities, and
 resource sharing through a versioned native format. It is separate from Asset

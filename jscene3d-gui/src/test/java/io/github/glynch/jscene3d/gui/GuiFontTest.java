@@ -29,4 +29,15 @@ final class GuiFontTest {
         assertThat(canvas.alphaMaskCount()).isEqualTo(2);
         assertThat(font.width("\u2603", 14.0f)).isEqualTo(font.width("?", 14.0f));
     }
+
+    @Test
+    void paintsBundledUnicodePunctuationWithoutUsingFallbackGlyph() {
+        GuiFont font = GuiFont.defaultFont();
+        RecordingGuiCanvas canvas = new RecordingGuiCanvas();
+
+        font.text(canvas, 10.0f, 20.0f, "\u2014", 14.0f, Color.WHITE);
+
+        assertThat(canvas.alphaMaskCount()).isEqualTo(1);
+        assertThat(font.width("\u2014", 14.0f)).isNotEqualTo(font.width("?", 14.0f));
+    }
 }

@@ -11,25 +11,31 @@ import io.github.glynch.jscene3d.render.OverlayImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Locale;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBTTBakedChar;
 
-/** Baked Inter atlas and retained Java glyph metrics for dependency-free GUI text. */
+/** Baked Inter atlases and retained Java glyph metrics for dependency-free GUI text. */
 public final class GuiFont {
     private static final String RESOURCE = "/io/github/glynch/jscene3d/gui/font/Inter.ttf";
-    private static final int FIRST_CHARACTER = 32;
-    private static final int CHARACTER_COUNT = 95;
+    private static final int ASCII_FIRST_CHARACTER = 32;
+    private static final int ASCII_CHARACTER_COUNT = 95;
+    private static final int PUNCTUATION_FIRST_CHARACTER = 0x2010;
+    private static final int PUNCTUATION_CHARACTER_COUNT = 0x2026 - PUNCTUATION_FIRST_CHARACTER + 1;
     private static final int FALLBACK_CHARACTER = '?';
     private static final int ATLAS_WIDTH = 512;
     private static final int ATLAS_HEIGHT = 512;
     private static final float BAKED_SIZE = 28.0f;
     private static final GuiFont DEFAULT = load();
 
-    private final Glyph[] glyphs;
+    private final List<GlyphRange> glyphRanges;
+    private final Glyph fallbackGlyph;
 
     /** Retains copied glyph metrics and reusable atlas regions. */
-    private GuiFont(Glyph[] glyphs) {
-        this.glyphs = glyphs;
+    private GuiFont(List<GlyphRange> glyphRanges) {
+        this.glyphRanges = List.copyOf(glyphRanges);
+        this.fallbackGlyph = glyph(FALLBACK_CHARACTER, false);
     }
 
     /**
@@ -55,8 +61,10 @@ public final class GuiFont {
         float scale = size / BAKED_SIZE;
         float cursor = x;
         float baseline = y + size;
-        for (int index = 0; index < text.length(); index++) {
-            Glyph glyph = glyph(text.charAt(index));
+        int index = 0;
+        while (index < text.length()) {
+            int codePoint = text.codePointAt(index);
+            Glyph glyph = glyph(codePoint);
             float width = glyph.width * scale;
             float height = glyph.height * scale;
             if (width > 0.0f && height > 0.0f) {
@@ -70,6 +78,7 @@ public final class GuiFont {
                         1.0f);
             }
             cursor += glyph.advance * scale;
+            index += Character.charCount(codePoint);
         }
     }
 
@@ -82,32 +91,52 @@ public final class GuiFont {
      */
     public float width(String text, float size) {
         float advance = 0.0f;
-        for (int index = 0; index < text.length(); index++) {
-            advance += glyph(text.charAt(index)).advance;
+        int index = 0;
+        while (index < text.length()) {
+            int codePoint = text.codePointAt(index);
+            advance += glyph(codePoint).advance;
+            index += Character.charCount(codePoint);
         }
         return advance * size / BAKED_SIZE;
     }
 
     /** Returns a supported glyph or the question-mark fallback. */
-    private Glyph glyph(char character) {
-        int index = character - FIRST_CHARACTER;
-        if (index < 0 || index >= glyphs.length) {
-            index = FALLBACK_CHARACTER - FIRST_CHARACTER;
+    private Glyph glyph(int codePoint) {
+        return glyph(codePoint, true);
+    }
+
+    /** Resolves a glyph from the baked ranges, optionally using the fallback. */
+    private Glyph glyph(int codePoint, boolean useFallback) {
+        for (GlyphRange range : glyphRanges) {
+            if (range.contains(codePoint)) {
+                return range.glyph(codePoint);
+            }
         }
-        return glyphs[index];
+        if (useFallback) {
+            return fallbackGlyph;
+        }
+        throw new IllegalStateException("Bundled GUI font does not contain the fallback glyph");
     }
 
     /** Loads, bakes, and copies the bundled font without retaining native allocations. */
     private static GuiFont load() {
         ByteBuffer fontData = loadResource();
+        return new GuiFont(List.of(
+                bakeRange(fontData, ASCII_FIRST_CHARACTER, ASCII_CHARACTER_COUNT),
+                bakeRange(fontData, PUNCTUATION_FIRST_CHARACTER, PUNCTUATION_CHARACTER_COUNT)));
+    }
+
+    /** Bakes and copies one contiguous Unicode range into a retained atlas. */
+    private static GlyphRange bakeRange(ByteBuffer fontData, int firstCodePoint, int characterCount) {
         ByteBuffer bitmap = BufferUtils.createByteBuffer(ATLAS_WIDTH * ATLAS_HEIGHT);
-        try (STBTTBakedChar.Buffer bakedCharacters = STBTTBakedChar.malloc(CHARACTER_COUNT)) {
+        try (STBTTBakedChar.Buffer bakedCharacters = STBTTBakedChar.malloc(characterCount)) {
             int result = stbtt_BakeFontBitmap(
-                    fontData, BAKED_SIZE, bitmap, ATLAS_WIDTH, ATLAS_HEIGHT, FIRST_CHARACTER, bakedCharacters);
+                    fontData, BAKED_SIZE, bitmap, ATLAS_WIDTH, ATLAS_HEIGHT, firstCodePoint, bakedCharacters);
             if (result <= 0) {
-                throw new IllegalStateException("Bundled Inter font does not fit the GUI atlas");
+                String rangeStart = Integer.toHexString(firstCodePoint).toUpperCase(Locale.ROOT);
+                throw new IllegalStateException("Bundled Inter font range does not fit the GUI atlas: U+" + rangeStart);
             }
-            BakedGlyph[] bakedGlyphs = new BakedGlyph[CHARACTER_COUNT];
+            BakedGlyph[] bakedGlyphs = new BakedGlyph[characterCount];
             for (int index = 0; index < bakedGlyphs.length; index++) {
                 STBTTBakedChar baked = bakedCharacters.get(index);
                 bakedGlyphs[index] = new BakedGlyph(
@@ -137,7 +166,7 @@ public final class GuiFont {
                         baked.offsetY,
                         baked.advance);
             }
-            return new GuiFont(glyphs);
+            return new GlyphRange(firstCodePoint, glyphs);
         }
     }
 
@@ -162,4 +191,27 @@ public final class GuiFont {
     /** One glyph's reusable atlas region and baseline-relative metrics. */
     private record Glyph(
             OverlayImage.Region region, float width, float height, float offsetX, float offsetY, float advance) {}
+
+    /** One contiguous baked Unicode range. */
+    private static final class GlyphRange {
+        private final int firstCodePoint;
+        private final Glyph[] glyphs;
+
+        /** Retains the first code point and its sequential glyphs. */
+        private GlyphRange(int firstCodePoint, Glyph[] glyphs) {
+            this.firstCodePoint = firstCodePoint;
+            this.glyphs = glyphs;
+        }
+
+        /** Returns whether this range contains the code point. */
+        private boolean contains(int codePoint) {
+            int index = codePoint - firstCodePoint;
+            return index >= 0 && index < glyphs.length;
+        }
+
+        /** Returns the glyph for a code point known to be in this range. */
+        private Glyph glyph(int codePoint) {
+            return glyphs[codePoint - firstCodePoint];
+        }
+    }
 }

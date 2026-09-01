@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.scenes;
 
+import io.github.glynch.jscene3d.fogs.Fog;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Object3D;
@@ -20,6 +21,7 @@ public final class Scene extends Object3D {
     private @Nullable Color background;
     private @Nullable EnvironmentMap backgroundEnvironment;
     private @Nullable EnvironmentMap environment;
+    private @Nullable Fog fog;
     private float backgroundIntensity = 1.0f;
     private float environmentIntensity = 1.0f;
 
@@ -120,6 +122,33 @@ public final class Scene extends Object3D {
     /** Disables image-based lighting without closing the previously shared environment map. */
     public void clearEnvironment() {
         environment = null;
+    }
+
+    /**
+     * Returns the optional scene-wide distance fog.
+     *
+     * @return shared fog description, or {@code null} when fog is disabled
+     */
+    public @Nullable Fog fog() {
+        return fog;
+    }
+
+    /**
+     * Selects scene-wide distance fog for built-in mesh and line materials.
+     *
+     * <p>The scene shares the mutable fog description without taking ownership. Custom shader
+     * materials remain responsible for their own fog calculations.
+     *
+     * @param fog shared fog description
+     * @throws NullPointerException if {@code fog} is {@code null}
+     */
+    public void setFog(Fog fog) {
+        this.fog = Objects.requireNonNull(fog, "fog");
+    }
+
+    /** Disables scene-wide distance fog without modifying the previously shared description. */
+    public void clearFog() {
+        fog = null;
     }
 
     /**

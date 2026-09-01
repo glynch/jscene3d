@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import io.github.glynch.jscene3d.fogs.LinearFog;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Object3D;
@@ -28,6 +29,28 @@ final class SceneTest {
 
         scene.clearBackground();
         assertThat(scene.background()).isNull();
+    }
+
+    @Test
+    void sceneSharesOptionalFog() {
+        Scene scene = new Scene();
+        LinearFog fog = new LinearFog(Color.GRAY, 2.0f, 20.0f);
+
+        assertThat(scene.fog()).isNull();
+
+        scene.setFog(fog);
+        assertThat(scene.fog()).isSameAs(fog);
+
+        scene.clearFog();
+        assertThat(scene.fog()).isNull();
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void sceneRejectsANullFogAssignment() {
+        Scene scene = new Scene();
+
+        assertThatNullPointerException().isThrownBy(() -> scene.setFog(null)).withMessage("fog");
     }
 
     @Test

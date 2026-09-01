@@ -58,6 +58,29 @@ final class ControlPanelTest {
     }
 
     @Test
+    void preventsInteractionWithConditionallyDisabledSections() {
+        ControlPanel panel = new ControlPanel("Controls");
+        AtomicBoolean enabled = new AtomicBoolean();
+        float[] density = {0.025f};
+        ControlPanel.Section section = panel.addSection("Exponential squared");
+        section.setEnabled(enabled::get);
+        section.addFloat("density", () -> density[0], value -> density[0] = value, 0.0f, 0.08f);
+
+        assertThat(panel.update(pointer(685.0, 100.0), 800, 600)).isFalse();
+        assertThat(density[0]).isEqualTo(0.025f);
+
+        RecordingGuiCanvas disabledCanvas = new RecordingGuiCanvas();
+        panel.paint(disabledCanvas, 800, 600);
+        enabled.set(true);
+        RecordingGuiCanvas enabledCanvas = new RecordingGuiCanvas();
+        panel.paint(enabledCanvas, 800, 600);
+
+        assertThat(disabledCanvas.rectangleCount()).isEqualTo(enabledCanvas.rectangleCount() + 1);
+        assertThat(panel.update(pointer(685.0, 100.0), 800, 600)).isTrue();
+        assertThat(density[0]).isEqualTo(0.04f);
+    }
+
+    @Test
     void appliesExplicitIntegerAndChoiceBindings() {
         ControlPanel panel = new ControlPanel("Controls");
         ControlPanel.Section section = panel.addSection("Geometry");
@@ -222,6 +245,7 @@ final class ControlPanelTest {
         ControlPanel panel = new ControlPanel("Controls");
         ControlPanel.Section section = panel.addSection("Camera");
 
+        assertThatNullPointerException().isThrownBy(() -> section.setEnabled(null));
         assertThatNullPointerException().isThrownBy(() -> section.addBoolean("enabled", null, ignored -> {}));
         assertThatNullPointerException().isThrownBy(() -> section.addBoolean("enabled", () -> true, null));
         assertThatNullPointerException().isThrownBy(() -> section.addFloat("speed", null, ignored -> {}, 0.0f, 1.0f));

@@ -8,9 +8,11 @@ import static org.lwjgl.opengl.GL20.glDeleteProgram;
 import static org.lwjgl.opengl.GL20.glUniformMatrix3fv;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 
+import io.github.glynch.jscene3d.fogs.Fog;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.jspecify.annotations.Nullable;
 
 /** Compiled built-in normal-visualization mesh program. */
 public final class NormalProgram implements AutoCloseable {
@@ -25,19 +27,24 @@ public final class NormalProgram implements AutoCloseable {
             uniform mat3 normalMatrix;
 
             out vec3 resolvedViewNormal;
+            out float resolvedFogDepth;
 
             void main() {
                 vec4 viewPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
                 resolvedViewNormal = normalize(normalMatrix * normal);
+                resolvedFogDepth = -viewPosition.z;
                 gl_Position = projectionMatrix * viewPosition;
             }
             """;
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             in vec3 resolvedViewNormal;
+            in float resolvedFogDepth;
 
             uniform float opacity;
             uniform float alphaCutoff;
+
+            FOG_SOURCE
 
             out vec4 fragmentColor;
 
@@ -46,9 +53,10 @@ public final class NormalProgram implements AutoCloseable {
                     discard;
                 }
                 vec3 surfaceNormal = gl_FrontFacing ? resolvedViewNormal : -resolvedViewNormal;
-                fragmentColor = vec4(normalize(surfaceNormal) * 0.5 + 0.5, opacity);
+                vec3 normalColor = normalize(surfaceNormal) * 0.5 + 0.5;
+                fragmentColor = vec4(applyFog(normalColor, resolvedFogDepth), opacity);
             }
-            """;
+            """.replace("FOG_SOURCE", FogShaderSource.source());
 
     private final int id;
     private final int modelMatrixLocation;
@@ -57,6 +65,7 @@ public final class NormalProgram implements AutoCloseable {
     private final int normalMatrixLocation;
     private final int opacityLocation;
     private final int alphaCutoffLocation;
+    private final FogProgramState fogState;
     private final Matrix4f modelViewMatrix;
     private final Matrix3f normalMatrix;
     private final float[] matrix4Values;
@@ -71,6 +80,7 @@ public final class NormalProgram implements AutoCloseable {
         normalMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "normalMatrix");
         opacityLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "opacity");
         alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "alphaCutoff");
+        fogState = new FogProgramState(id, "Built-in Normal");
         modelViewMatrix = new Matrix4f();
         normalMatrix = new Matrix3f();
         matrix4Values = new float[16];
@@ -117,6 +127,15 @@ public final class NormalProgram implements AutoCloseable {
      */
     public int alphaCutoffLocation() {
         return alphaCutoffLocation;
+    }
+
+    /**
+     * Uploads the current optional scene fog.
+     *
+     * @param fog scene fog, or {@code null} when disabled
+     */
+    public void uploadFog(@Nullable Fog fog) {
+        fogState.upload(fog);
     }
 
     /**

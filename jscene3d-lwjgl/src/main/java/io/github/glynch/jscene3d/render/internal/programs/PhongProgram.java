@@ -6,10 +6,12 @@ package io.github.glynch.jscene3d.render.internal.programs;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 
+import io.github.glynch.jscene3d.fogs.Fog;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import org.joml.Matrix4fc;
+import org.jspecify.annotations.Nullable;
 
 /** Compiled built-in Blinn-Phong mesh program. */
 public final class PhongProgram implements AutoCloseable {
@@ -94,6 +96,7 @@ public final class PhongProgram implements AutoCloseable {
             uniform vec3 hemisphereLightGroundColors[MAX_HEMISPHERE_LIGHTS];
 
             SHADOW_SOURCE
+            FOG_SOURCE
 
             out vec4 fragmentColor;
 
@@ -204,9 +207,12 @@ public final class PhongProgram implements AutoCloseable {
                 vec3 reflected = surfaceColor.rgb * diffuseIllumination * RECIPROCAL_PI
                         + specularColor * specularIllumination
                         + emissiveColor;
-                fragmentColor = vec4(reflected, surfaceColor.a);
+                fragmentColor = vec4(
+                        applyFog(reflected, -resolvedViewPosition.z),
+                        surfaceColor.a);
             }
             """.replace("SHADOW_SOURCE", ShadowShaderSource.source())
+            .replace("FOG_SOURCE", FogShaderSource.source())
             .replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
             .replace("DIRECTIONAL_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_DIRECTIONAL_LIGHTS))
             .replace("SPOT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_SPOT_LIGHTS))
@@ -214,6 +220,7 @@ public final class PhongProgram implements AutoCloseable {
 
     private final int id;
     private final LitProgramState litState;
+    private final FogProgramState fogState;
     private final int colorMapTransformLocation;
     private final int flipColorMapVerticallyLocation;
     private final int baseColorLocation;
@@ -229,6 +236,7 @@ public final class PhongProgram implements AutoCloseable {
     private PhongProgram(int id) {
         this.id = id;
         litState = new LitProgramState(id, "Built-in Phong");
+        fogState = new FogProgramState(id, "Built-in Phong");
         colorMapTransformLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "colorMapTransform");
         flipColorMapVerticallyLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "flipColorMapVertically");
         baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "baseColor");
@@ -386,6 +394,15 @@ public final class PhongProgram implements AutoCloseable {
      */
     public void uploadShadows(boolean receiveShadow, ShadowFrame frame, LightCollection lights, Matrix4fc viewMatrix) {
         litState.uploadShadows(receiveShadow, frame, lights, viewMatrix);
+    }
+
+    /**
+     * Uploads the current optional scene fog.
+     *
+     * @param fog scene fog, or {@code null} when disabled
+     */
+    public void uploadFog(@Nullable Fog fog) {
+        fogState.upload(fog);
     }
 
     /** Deletes the linked context-local program. */

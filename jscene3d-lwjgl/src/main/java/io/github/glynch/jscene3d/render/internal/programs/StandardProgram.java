@@ -7,12 +7,14 @@ package io.github.glynch.jscene3d.render.internal.programs;
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 import static org.lwjgl.opengl.GL20.glUniformMatrix3fv;
 
+import io.github.glynch.jscene3d.fogs.Fog;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import org.joml.Matrix3fc;
 import org.joml.Matrix4fc;
+import org.jspecify.annotations.Nullable;
 
 /** Compiled built-in metallic-roughness physically based mesh program. */
 public final class StandardProgram implements AutoCloseable {
@@ -139,6 +141,7 @@ public final class StandardProgram implements AutoCloseable {
             uniform vec3 hemisphereLightGroundColors[MAX_HEMISPHERE_LIGHTS];
 
             SHADOW_SOURCE
+            FOG_SOURCE
 
             out vec4 fragmentColor;
 
@@ -416,9 +419,12 @@ public final class StandardProgram implements AutoCloseable {
                                         emissiveMapCoordinateSet)).rgb
                         : vec3(1.0);
                 reflected += emissiveColor * emissiveSample;
-                fragmentColor = vec4(reflected, surfaceColor.a);
+                fragmentColor = vec4(
+                        applyFog(reflected, -resolvedViewPosition.z),
+                        surfaceColor.a);
             }
             """.replace("SHADOW_SOURCE", ShadowShaderSource.source())
+            .replace("FOG_SOURCE", FogShaderSource.source())
             .replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
             .replace("DIRECTIONAL_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_DIRECTIONAL_LIGHTS))
             .replace("SPOT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_SPOT_LIGHTS))
@@ -426,6 +432,7 @@ public final class StandardProgram implements AutoCloseable {
 
     private final int id;
     private final LitProgramState litState;
+    private final FogProgramState fogState;
     private final SkinningProgramState skinningState;
     private final int baseColorLocation;
     private final int metalnessLocation;
@@ -455,6 +462,7 @@ public final class StandardProgram implements AutoCloseable {
         this.id = id;
         String label = "Built-in standard";
         litState = new LitProgramState(id, label);
+        fogState = new FogProgramState(id, label);
         skinningState = new SkinningProgramState(id, label);
         baseColorLocation = ProgramSupport.requiredUniform(id, label, "baseColor");
         metalnessLocation = ProgramSupport.requiredUniform(id, label, "metalness");
@@ -544,6 +552,15 @@ public final class StandardProgram implements AutoCloseable {
      */
     public void uploadShadows(boolean receiveShadow, ShadowFrame frame, LightCollection lights, Matrix4fc viewMatrix) {
         litState.uploadShadows(receiveShadow, frame, lights, viewMatrix);
+    }
+
+    /**
+     * Uploads the current optional scene fog.
+     *
+     * @param fog scene fog, or {@code null} when disabled
+     */
+    public void uploadFog(@Nullable Fog fog) {
+        fogState.upload(fog);
     }
 
     /**

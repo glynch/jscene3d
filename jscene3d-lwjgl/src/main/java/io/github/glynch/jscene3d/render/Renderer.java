@@ -56,6 +56,7 @@ import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_SRGB;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 
 import io.github.glynch.jscene3d.cameras.Camera;
+import io.github.glynch.jscene3d.fogs.Fog;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
 import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
@@ -194,6 +195,7 @@ public final class Renderer implements AutoCloseable {
     private @Nullable BrdfLookupResource brdfLookupResource;
     private @Nullable DefaultShadowMaps defaultShadowMaps;
     private @Nullable ShadowFrame activeShadowFrame;
+    private @Nullable Fog activeFog;
     private boolean customViewport;
     private int viewportX;
     private int viewportY;
@@ -286,6 +288,7 @@ public final class Renderer implements AutoCloseable {
         releaseClosedTextureResources();
         releaseClosedEnvironmentResources();
         standardTextureUnitsPrimed = false;
+        activeFog = validScene.fog();
         statistics.beginFrame();
 
         int framebufferWidth = context.framebufferWidth();
@@ -340,6 +343,7 @@ public final class Renderer implements AutoCloseable {
     private void finishSceneFrame(boolean mainTargetStarted, boolean rendered) {
         renderList.clear();
         activeShadowFrame = null;
+        activeFog = null;
         glBindVertexArray(0);
         if (!mainTargetStarted) {
             return;
@@ -726,6 +730,7 @@ public final class Renderer implements AutoCloseable {
         LineProgram program = lineProgram();
         recordUploads(resource.synchronize(geometry, false, material.usesVertexColors(), false, "LineBasicMaterial"));
         glUseProgram(program.id());
+        program.uploadFog(activeFog);
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
@@ -753,6 +758,7 @@ public final class Renderer implements AutoCloseable {
                 resource.synchronize(geometry, false, material.usesVertexColors(), colorMap != null, "BasicMaterial"));
 
         glUseProgram(program.id());
+        program.uploadFog(activeFog);
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
@@ -795,6 +801,7 @@ public final class Renderer implements AutoCloseable {
                 resource.synchronize(geometry, true, material.usesVertexColors(), colorMap != null, "LambertMaterial"));
 
         glUseProgram(program.id());
+        program.uploadFog(activeFog);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
@@ -837,6 +844,7 @@ public final class Renderer implements AutoCloseable {
         recordUploads(resource.synchronize(geometry, true, false, false, "NormalMaterial"));
 
         glUseProgram(program.id());
+        program.uploadFog(activeFog);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         glUniform1f(program.opacityLocation(), resolvedAlpha(material));
         glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
@@ -859,6 +867,7 @@ public final class Renderer implements AutoCloseable {
                 resource.synchronize(geometry, true, material.usesVertexColors(), colorMap != null, "PhongMaterial"));
 
         glUseProgram(program.id());
+        program.uploadFog(activeFog);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
@@ -952,6 +961,7 @@ public final class Renderer implements AutoCloseable {
 
         primeStandardTextureUnits();
         glUseProgram(program.id());
+        program.uploadFog(activeFog);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         program.uploadSkinning(item.object(), item.worldMatrix());
         program.uploadLights(renderList.lights(), viewMatrix);

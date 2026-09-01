@@ -9,6 +9,7 @@ module io.github.glynch.jscene3d.core {
 
     exports io.github.glynch.jscene3d.animation;
     exports io.github.glynch.jscene3d.cameras;
+    exports io.github.glynch.jscene3d.fogs;
     exports io.github.glynch.jscene3d.geometries;
     exports io.github.glynch.jscene3d.helpers;
     exports io.github.glynch.jscene3d.lights;

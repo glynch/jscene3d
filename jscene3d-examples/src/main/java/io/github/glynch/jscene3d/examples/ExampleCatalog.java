@@ -179,6 +179,20 @@ final class ExampleCatalog {
                         List.of("spot", "hemisphere", "phong", "gui"),
                         SpotAndHemisphereLightsExample::create),
                 definition(
+                        "fog",
+                        "Distance fog",
+                        "Scenes",
+                        "Linear and exponential-squared fog across a deterministic field of meshes and lines.",
+                        List.of("fog", "linear", "exponential", "distance", "atmosphere"),
+                        List.of(new GalleryAttribution(
+                                "Fog example design",
+                                "Three.js Authors",
+                                "Three.js Fog Manual and OrbitControls Example",
+                                URI.create("https://threejs.org/manual/en/fog.html"),
+                                "MIT",
+                                URI.create("https://github.com/mrdoob/three.js/blob/dev/LICENSE"))),
+                        FogExample::create),
+                definition(
                         "materials",
                         "Mesh materials",
                         "Materials",

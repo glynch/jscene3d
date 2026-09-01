@@ -204,11 +204,15 @@ public final class ControlPanel implements Overlay {
             if (!section.expanded) {
                 continue;
             }
+            boolean enabled = section.isEnabled();
             for (Item item : section.items) {
-                boolean hovered = contains(pointerX, pointerY, x, y, WIDTH, ITEM_HEIGHT);
+                boolean hovered = enabled && contains(pointerX, pointerY, x, y, WIDTH, ITEM_HEIGHT);
                 canvas.rectangle(
                         x + 1.0f, y, WIDTH - 2.0f, ITEM_HEIGHT, hovered ? theme.rowHover() : theme.row(), 0.97f);
                 item.paint(canvas, x, y, hovered, theme);
+                if (!enabled) {
+                    canvas.rectangle(x + 1.0f, y, WIDTH - 2.0f, ITEM_HEIGHT, theme.panel(), 0.58f);
+                }
                 canvas.rectangle(x + 1.0f, y + ITEM_HEIGHT - 1.0f, WIDTH - 2.0f, 1.0f, theme.border(), 0.45f);
                 y += ITEM_HEIGHT;
             }
@@ -251,6 +255,9 @@ public final class ControlPanel implements Overlay {
             ownsPointerPress = false;
             return false;
         }
+        if (activeSlider != null && !isEnabled(activeSlider)) {
+            activeSlider = null;
+        }
 
         float panelX = panelX(windowWidth);
         boolean pointerOverPanel = contains(pointerX, pointerY, panelX, MARGIN, WIDTH, height());
@@ -288,9 +295,22 @@ public final class ControlPanel implements Overlay {
             }
             for (Item item : section.items) {
                 if (contains(x, y, panelX, rowY, WIDTH, ITEM_HEIGHT)) {
+                    if (!section.isEnabled()) {
+                        return false;
+                    }
                     return activateItem(item, x, panelX);
                 }
                 rowY += ITEM_HEIGHT;
+            }
+        }
+        return false;
+    }
+
+    /** Returns whether the section containing an active item currently accepts input. */
+    private boolean isEnabled(Item item) {
+        for (Section section : sections) {
+            if (section.items.contains(item)) {
+                return section.isEnabled();
             }
         }
         return false;
@@ -421,6 +441,7 @@ public final class ControlPanel implements Overlay {
         private final String title;
         private final List<Item> items = new ArrayList<>();
 
+        private BooleanSupplier enabled = () -> true;
         private boolean expanded = true;
 
         /** Retains the owning panel and validated title. */
@@ -446,6 +467,31 @@ public final class ControlPanel implements Overlay {
         public void setExpanded(boolean expanded) {
             this.expanded = expanded;
             if (!expanded && panel.activeSlider != null && items.contains(panel.activeSlider)) {
+                panel.activeSlider = null;
+            }
+        }
+
+        /**
+         * Returns whether this section's controls currently accept input.
+         *
+         * @return current value supplied by the enabled-state binding
+         */
+        public boolean isEnabled() {
+            return enabled.getAsBoolean();
+        }
+
+        /**
+         * Binds this section's enabled state to application state.
+         *
+         * <p>Disabled controls remain visible but are dimmed and ignore pointer input. The section
+         * header remains available so the section can still be expanded or collapsed.
+         *
+         * @param enabled current enabled-state supplier
+         * @throws NullPointerException if {@code enabled} is {@code null}
+         */
+        public void setEnabled(BooleanSupplier enabled) {
+            this.enabled = Objects.requireNonNull(enabled, "enabled");
+            if (!isEnabled() && panel.activeSlider != null && items.contains(panel.activeSlider)) {
                 panel.activeSlider = null;
             }
         }

@@ -89,7 +89,7 @@ when a clean build is required.
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
 `KeyframeAnimationExample`, `AnimationBlendingExample`, `SoldierAnimationBlendingExample`,
 `GltfAnimationExample`, `GltfLoadingExample`,
-`SpotAndHemisphereLightsExample`, `ShadowsExample`, `OrbitControlsExample`, and
+`SpotAndHemisphereLightsExample`, `ShadowsExample`, `FogExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
 connected `Line`, indexed `LineSegments`, vertex colors, transforms, and orbit
@@ -296,6 +296,19 @@ shadows. A draw supports at most `Renderer.MAX_TWO_DIMENSIONAL_SHADOW_MAPS`
 combined directional and spot maps plus `Renderer.MAX_POINT_SHADOW_MAPS` point
 maps; excess enabled maps fail clearly. `ShadowsExample` demonstrates all three
 light types and exposes these settings through live controls.
+
+## Fog
+
+A scene can use either `LinearFog`, with explicit near and far distances, or
+`ExponentialSquaredFog`, with a density that increases the fog continuously
+with view-space distance. Fog affects the built-in mesh and line materials;
+custom `ShaderMaterial` shaders remain responsible for their own fog logic.
+Clearing a scene's fog disables the effect without changing its background.
+
+`FogExample` compares both fog models across every built-in mesh material and
+line-rendered grid geometry. Its controls change the fog model, colour, range,
+and density live. `SoldierAnimationBlendingExample` uses linear fog with a
+matching background to blend its large ground plane into the distance.
 
 ## Environment lighting
 

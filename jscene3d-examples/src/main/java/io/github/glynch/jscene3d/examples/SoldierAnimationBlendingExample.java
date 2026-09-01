@@ -18,6 +18,7 @@ import io.github.glynch.jscene3d.examples.framework.ExampleContext;
 import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
 import io.github.glynch.jscene3d.examples.framework.HostedExample;
 import io.github.glynch.jscene3d.examples.framework.SceneExample;
+import io.github.glynch.jscene3d.fogs.LinearFog;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.PlaneGeometry;
 import io.github.glynch.jscene3d.gltf.GltfLoader;
@@ -60,10 +61,11 @@ public final class SoldierAnimationBlendingExample {
         LoadedGltf loaded = GltfLoader.load(path(SoldierAnimationBlendingExample.class, MODEL_RESOURCE));
         Scene scene = loaded.scene();
         scene.setBackground(BACKGROUND);
+        scene.setFog(new LinearFog(BACKGROUND, 10.0f, 50.0f));
         Object3D model = scene.children().getFirst();
         configureModel(model);
 
-        BufferGeometry groundGeometry = PlaneGeometry.create(40.0f, 40.0f);
+        BufferGeometry groundGeometry = PlaneGeometry.create(2000.0f, 2000.0f);
         LambertMaterial groundMaterial = new LambertMaterial(Color.srgb(0xcbcbcb));
         groundMaterial.setSide(MaterialSide.DOUBLE);
         Mesh ground = new Mesh(groundGeometry, groundMaterial);

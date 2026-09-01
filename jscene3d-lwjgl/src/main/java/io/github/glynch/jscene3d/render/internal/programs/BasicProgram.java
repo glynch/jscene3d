@@ -6,6 +6,9 @@ package io.github.glynch.jscene3d.render.internal.programs;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 
+import io.github.glynch.jscene3d.fogs.Fog;
+import org.jspecify.annotations.Nullable;
+
 /** Compiled built-in unlit mesh program. */
 public final class BasicProgram implements AutoCloseable {
     private static final String VERTEX_SOURCE = """
@@ -24,6 +27,7 @@ public final class BasicProgram implements AutoCloseable {
 
             out vec4 resolvedVertexColor;
             out vec2 resolvedTextureCoordinate;
+            out float resolvedFogDepth;
 
             void main() {
                 resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
@@ -36,18 +40,23 @@ public final class BasicProgram implements AutoCloseable {
                 } else {
                     resolvedTextureCoordinate = vec2(0.0);
                 }
-                gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+                vec4 viewPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+                resolvedFogDepth = -viewPosition.z;
+                gl_Position = projectionMatrix * viewPosition;
             }
             """;
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             in vec4 resolvedVertexColor;
             in vec2 resolvedTextureCoordinate;
+            in float resolvedFogDepth;
 
             uniform vec4 baseColor;
             uniform sampler2D colorMap;
             uniform bool useColorMap;
             uniform float alphaCutoff;
+
+            FOG_SOURCE
 
             out vec4 fragmentColor;
 
@@ -57,9 +66,9 @@ public final class BasicProgram implements AutoCloseable {
                 if (alphaCutoff >= 0.0 && resolvedColor.a < alphaCutoff) {
                     discard;
                 }
-                fragmentColor = resolvedColor;
+                fragmentColor = vec4(applyFog(resolvedColor.rgb, resolvedFogDepth), resolvedColor.a);
             }
-            """;
+            """.replace("FOG_SOURCE", FogShaderSource.source());
 
     private final int id;
     private final int modelMatrixLocation;
@@ -72,6 +81,7 @@ public final class BasicProgram implements AutoCloseable {
     private final int colorMapLocation;
     private final int useColorMapLocation;
     private final int alphaCutoffLocation;
+    private final FogProgramState fogState;
 
     /** Retains a linked program and its required uniform locations. */
     private BasicProgram(int id) {
@@ -86,6 +96,7 @@ public final class BasicProgram implements AutoCloseable {
         colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "colorMap");
         useColorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "useColorMap");
         alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "alphaCutoff");
+        fogState = new FogProgramState(id, "Built-in basic");
     }
 
     /**
@@ -200,6 +211,15 @@ public final class BasicProgram implements AutoCloseable {
      */
     public int alphaCutoffLocation() {
         return alphaCutoffLocation;
+    }
+
+    /**
+     * Uploads the current optional scene fog.
+     *
+     * @param fog scene fog, or {@code null} when disabled
+     */
+    public void uploadFog(@Nullable Fog fog) {
+        fogState.upload(fog);
     }
 
     @Override

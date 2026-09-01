@@ -6,10 +6,12 @@ package io.github.glynch.jscene3d.render.internal.programs;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 
+import io.github.glynch.jscene3d.fogs.Fog;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import org.joml.Matrix4fc;
+import org.jspecify.annotations.Nullable;
 
 /** Compiled built-in diffuse Lambert mesh program. */
 public final class LambertProgram implements AutoCloseable {
@@ -91,6 +93,7 @@ public final class LambertProgram implements AutoCloseable {
             uniform vec3 hemisphereLightGroundColors[MAX_HEMISPHERE_LIGHTS];
 
             SHADOW_SOURCE
+            FOG_SOURCE
 
             out vec4 fragmentColor;
 
@@ -180,11 +183,13 @@ public final class LambertProgram implements AutoCloseable {
                 if (alphaCutoff >= 0.0 && surfaceColor.a < alphaCutoff) {
                     discard;
                 }
+                vec3 reflected = surfaceColor.rgb * diffuseIrradiance * RECIPROCAL_PI;
                 fragmentColor = vec4(
-                        surfaceColor.rgb * diffuseIrradiance * RECIPROCAL_PI,
+                        applyFog(reflected, -resolvedViewPosition.z),
                         surfaceColor.a);
             }
             """.replace("SHADOW_SOURCE", ShadowShaderSource.source())
+            .replace("FOG_SOURCE", FogShaderSource.source())
             .replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))
             .replace("DIRECTIONAL_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_DIRECTIONAL_LIGHTS))
             .replace("SPOT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_SPOT_LIGHTS))
@@ -192,6 +197,7 @@ public final class LambertProgram implements AutoCloseable {
 
     private final int id;
     private final LitProgramState litState;
+    private final FogProgramState fogState;
     private final int colorMapTransformLocation;
     private final int flipColorMapVerticallyLocation;
     private final int baseColorLocation;
@@ -204,6 +210,7 @@ public final class LambertProgram implements AutoCloseable {
     private LambertProgram(int id) {
         this.id = id;
         litState = new LitProgramState(id, "Built-in Lambert");
+        fogState = new FogProgramState(id, "Built-in Lambert");
         colorMapTransformLocation = ProgramSupport.requiredUniform(id, "Built-in Lambert", "colorMapTransform");
         flipColorMapVerticallyLocation =
                 ProgramSupport.requiredUniform(id, "Built-in Lambert", "flipColorMapVertically");
@@ -332,6 +339,15 @@ public final class LambertProgram implements AutoCloseable {
      */
     public void uploadShadows(boolean receiveShadow, ShadowFrame frame, LightCollection lights, Matrix4fc viewMatrix) {
         litState.uploadShadows(receiveShadow, frame, lights, viewMatrix);
+    }
+
+    /**
+     * Uploads the current optional scene fog.
+     *
+     * @param fog scene fog, or {@code null} when disabled
+     */
+    public void uploadFog(@Nullable Fog fog) {
+        fogState.upload(fog);
     }
 
     /** Deletes the linked context-local program. */

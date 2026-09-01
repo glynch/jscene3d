@@ -15,6 +15,8 @@ import static org.lwjgl.opengl.GL11.glReadPixels;
 
 import io.github.glynch.jscene3d.cameras.OrthographicCamera;
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.fogs.ExponentialSquaredFog;
+import io.github.glynch.jscene3d.fogs.LinearFog;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
@@ -154,6 +156,32 @@ final class RendererIT {
             assertThat(statistics.frame()).isEqualTo(4L);
             assertThat(statistics.drawCalls()).isEqualTo(1);
             assertThat(statistics.bufferUploads()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void appliesAndClearsSupportedSceneFog() {
+        try (Window window = Window.create("Fog integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            scene.setFog(new LinearFog(Color.BLUE, 0.1f, 1.0f));
+            renderer.render(scene, camera);
+            assertPixelIsBlue(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            scene.setFog(new ExponentialSquaredFog(Color.BLUE, 4.0f));
+            renderer.render(scene, camera);
+            assertPixelIsBlue(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            scene.clearFog();
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
         }
     }
 

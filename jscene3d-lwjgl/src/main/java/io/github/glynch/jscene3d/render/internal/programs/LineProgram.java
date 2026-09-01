@@ -6,6 +6,9 @@ package io.github.glynch.jscene3d.render.internal.programs;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 
+import io.github.glynch.jscene3d.fogs.Fog;
+import org.jspecify.annotations.Nullable;
+
 /** Compiled built-in unlit line program. */
 public final class LineProgram implements AutoCloseable {
     private static final String VERTEX_SOURCE = """
@@ -19,18 +22,24 @@ public final class LineProgram implements AutoCloseable {
             uniform bool useVertexColor;
 
             out vec4 resolvedVertexColor;
+            out float resolvedFogDepth;
 
             void main() {
                 resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
-                gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+                vec4 viewPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+                resolvedFogDepth = -viewPosition.z;
+                gl_Position = projectionMatrix * viewPosition;
             }
             """;
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             in vec4 resolvedVertexColor;
+            in float resolvedFogDepth;
 
             uniform vec4 baseColor;
             uniform float alphaCutoff;
+
+            FOG_SOURCE
 
             out vec4 fragmentColor;
 
@@ -39,9 +48,9 @@ public final class LineProgram implements AutoCloseable {
                 if (alphaCutoff >= 0.0 && resolvedColor.a < alphaCutoff) {
                     discard;
                 }
-                fragmentColor = resolvedColor;
+                fragmentColor = vec4(applyFog(resolvedColor.rgb, resolvedFogDepth), resolvedColor.a);
             }
-            """;
+            """.replace("FOG_SOURCE", FogShaderSource.source());
 
     private final int id;
     private final int modelMatrixLocation;
@@ -50,6 +59,7 @@ public final class LineProgram implements AutoCloseable {
     private final int baseColorLocation;
     private final int useVertexColorLocation;
     private final int alphaCutoffLocation;
+    private final FogProgramState fogState;
 
     /** Retains a linked program and its required uniform locations. */
     private LineProgram(int id) {
@@ -60,6 +70,7 @@ public final class LineProgram implements AutoCloseable {
         baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in line", "baseColor");
         useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in line", "useVertexColor");
         alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in line", "alphaCutoff");
+        fogState = new FogProgramState(id, "Built-in line");
     }
 
     /**
@@ -138,6 +149,15 @@ public final class LineProgram implements AutoCloseable {
      */
     public int alphaCutoffLocation() {
         return alphaCutoffLocation;
+    }
+
+    /**
+     * Uploads the current optional scene fog.
+     *
+     * @param fog scene fog, or {@code null} when disabled
+     */
+    public void uploadFog(@Nullable Fog fog) {
+        fogState.upload(fog);
     }
 
     @Override

@@ -15,12 +15,16 @@ public final class RendererOptions {
     private final boolean automaticClear;
     private final Color clearColor;
     private final float clearAlpha;
+    private final ToneMapping toneMapping;
+    private final float exposure;
 
     /** Copies a validated builder snapshot into immutable options. */
     private RendererOptions(Builder builder) {
         automaticClear = builder.automaticClear;
         clearColor = builder.clearColor;
         clearAlpha = builder.clearAlpha;
+        toneMapping = builder.toneMapping;
+        exposure = builder.exposure;
     }
 
     /**
@@ -68,11 +72,31 @@ public final class RendererOptions {
         return clearAlpha;
     }
 
+    /**
+     * Returns the initial high-dynamic-range tone mapping mode.
+     *
+     * @return initial mode, {@link ToneMapping#NONE} by default
+     */
+    public ToneMapping toneMapping() {
+        return toneMapping;
+    }
+
+    /**
+     * Returns the initial linear exposure multiplier.
+     *
+     * @return finite positive multiplier, initially one
+     */
+    public float exposure() {
+        return exposure;
+    }
+
     /** Builds immutable {@link RendererOptions} values. */
     public static final class Builder {
         private boolean automaticClear = true;
         private Color clearColor = Color.BLACK;
         private float clearAlpha = 1.0f;
+        private ToneMapping toneMapping = ToneMapping.NONE;
+        private float exposure = 1.0f;
 
         /** Restricts builder creation to {@link RendererOptions#builder()}. */
         private Builder() {}
@@ -109,6 +133,30 @@ public final class RendererOptions {
          */
         public Builder clearAlpha(float clearAlpha) {
             this.clearAlpha = Preconditions.requireUnitInterval(clearAlpha, "clearAlpha");
+            return this;
+        }
+
+        /**
+         * Selects the initial high-dynamic-range tone mapping mode.
+         *
+         * @param toneMapping initial mode
+         * @return this builder
+         * @throws NullPointerException if {@code toneMapping} is {@code null}
+         */
+        public Builder toneMapping(ToneMapping toneMapping) {
+            this.toneMapping = Objects.requireNonNull(toneMapping, "toneMapping");
+            return this;
+        }
+
+        /**
+         * Sets the initial linear exposure multiplier.
+         *
+         * @param exposure finite positive multiplier
+         * @return this builder
+         * @throws IllegalArgumentException if {@code exposure} is non-positive or non-finite
+         */
+        public Builder exposure(float exposure) {
+            this.exposure = Preconditions.requirePositive(exposure, "exposure");
             return this;
         }
 

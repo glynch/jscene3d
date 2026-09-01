@@ -20,6 +20,7 @@ public final class BasicProgram implements AutoCloseable {
             uniform mat3 colorMapTransform;
             uniform bool useVertexColor;
             uniform bool useColorMap;
+            uniform bool flipColorMapVertically;
 
             out vec4 resolvedVertexColor;
             out vec2 resolvedTextureCoordinate;
@@ -29,8 +30,9 @@ public final class BasicProgram implements AutoCloseable {
                 if (useColorMap) {
                     vec2 transformedTextureCoordinate =
                             (colorMapTransform * vec3(textureCoordinate, 1.0)).xy;
-                    resolvedTextureCoordinate =
-                            vec2(transformedTextureCoordinate.x, 1.0 - transformedTextureCoordinate.y);
+                    resolvedTextureCoordinate = flipColorMapVertically
+                            ? vec2(transformedTextureCoordinate.x, 1.0 - transformedTextureCoordinate.y)
+                            : transformedTextureCoordinate;
                 } else {
                     resolvedTextureCoordinate = vec2(0.0);
                 }
@@ -64,6 +66,7 @@ public final class BasicProgram implements AutoCloseable {
     private final int viewMatrixLocation;
     private final int projectionMatrixLocation;
     private final int colorMapTransformLocation;
+    private final int flipColorMapVerticallyLocation;
     private final int baseColorLocation;
     private final int useVertexColorLocation;
     private final int colorMapLocation;
@@ -77,6 +80,7 @@ public final class BasicProgram implements AutoCloseable {
         viewMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "viewMatrix");
         projectionMatrixLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "projectionMatrix");
         colorMapTransformLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "colorMapTransform");
+        flipColorMapVerticallyLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "flipColorMapVertically");
         baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "baseColor");
         useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "useVertexColor");
         colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "colorMap");
@@ -142,6 +146,15 @@ public final class BasicProgram implements AutoCloseable {
      */
     public int colorMapTransformLocation() {
         return colorMapTransformLocation;
+    }
+
+    /**
+     * Returns the required color-map vertical-orientation switch uniform location.
+     *
+     * @return uniform location
+     */
+    public int flipColorMapVerticallyLocation() {
+        return flipColorMapVerticallyLocation;
     }
 
     /**

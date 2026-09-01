@@ -49,15 +49,15 @@ public final class ThumbnailCaptureSupport {
         try (Window window = Window.create(options);
                 Renderer renderer = Renderer.create(window)) {
             ExampleContext context = new ExampleContext(window, renderer);
-            for (ExampleDefinition definition : ExampleCatalog.definitions()) {
-                capture(definition, context, validDirectory);
+            for (ExampleCatalogEntry entry : ExampleCatalog.entries()) {
+                capture(entry, context, validDirectory);
             }
         }
     }
 
     /** Captures one settled frame and closes its independently owned resources. */
-    private static void capture(ExampleDefinition definition, ExampleContext context, Path directory) {
-        try (HostedExample example = definition.factory().create(context)) {
+    private static void capture(ExampleCatalogEntry entry, ExampleContext context, Path directory) {
+        try (HostedExample example = entry.factory().create(context)) {
             example.resize();
             for (int frame = 0; frame < 3; frame++) {
                 example.update(new ExampleFrame(1.0f / 60.0f, true));
@@ -65,7 +65,7 @@ public final class ThumbnailCaptureSupport {
                 example.renderThumbnail();
             }
             OverlayImage image = context.renderer().captureViewport();
-            OverlayImageWriter.writePng(directory.resolve(definition.id() + ".png"), image);
+            OverlayImageWriter.writePng(directory.resolve(entry.id() + ".png"), image);
         }
     }
 }

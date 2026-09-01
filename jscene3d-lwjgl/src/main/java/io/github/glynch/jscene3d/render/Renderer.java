@@ -39,6 +39,7 @@ import static org.lwjgl.opengl.GL11.glFrontFace;
 import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL11.glReadPixels;
 import static org.lwjgl.opengl.GL11.glViewport;
+import static org.lwjgl.opengl.GL13.GL_SAMPLES;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS;
@@ -78,6 +79,7 @@ import io.github.glynch.jscene3d.render.internal.PrimitiveTopology;
 import io.github.glynch.jscene3d.render.internal.RenderItem;
 import io.github.glynch.jscene3d.render.internal.RenderList;
 import io.github.glynch.jscene3d.render.internal.programs.BasicProgram;
+import io.github.glynch.jscene3d.render.internal.programs.EnvironmentBackgroundProgram;
 import io.github.glynch.jscene3d.render.internal.programs.LambertProgram;
 import io.github.glynch.jscene3d.render.internal.programs.LineProgram;
 import io.github.glynch.jscene3d.render.internal.programs.NormalProgram;
@@ -85,11 +87,17 @@ import io.github.glynch.jscene3d.render.internal.programs.PhongProgram;
 import io.github.glynch.jscene3d.render.internal.programs.ShaderProgram;
 import io.github.glynch.jscene3d.render.internal.programs.ShaderProgramKey;
 import io.github.glynch.jscene3d.render.internal.programs.StandardProgram;
+import io.github.glynch.jscene3d.render.internal.programs.ToneMappingProgram;
+import io.github.glynch.jscene3d.render.internal.resources.BrdfLookupResource;
 import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
+import io.github.glynch.jscene3d.render.internal.resources.EnvironmentResource;
 import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
 import io.github.glynch.jscene3d.render.internal.resources.TextureResource;
+import io.github.glynch.jscene3d.render.internal.resources.ToneMappingTarget;
 import io.github.glynch.jscene3d.scenes.Scene;
+import io.github.glynch.jscene3d.textures.EnvironmentMap;
 import io.github.glynch.jscene3d.textures.Texture;
+import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -98,7 +106,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.joml.Matrix3f;
+import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Quaternionf;
 import org.joml.Vector2f;
 import org.jspecify.annotations.Nullable;
 
@@ -124,31 +134,43 @@ public final class Renderer implements AutoCloseable {
     private final ResourceStatistics resources;
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
     private final IdentityHashMap<Texture, TextureResource> textureResources;
+    private final IdentityHashMap<EnvironmentMap, EnvironmentResource> environmentResources;
     private final Map<ShaderProgramKey, ShaderProgram> shaderPrograms;
     private final RenderList renderList;
     private final Frustum frustum;
     private final float[] matrixValues;
     private final float[] matrix3Values;
     private final Matrix3f textureTransformMatrix;
+    private final Matrix3f viewToWorldMatrix;
+    private final Matrix3f environmentRotationMatrix;
+    private final Matrix4f inverseProjectionMatrix;
+    private final Quaternionf environmentRotation;
     private final Vector2f normalScale;
     private final OverlayCanvas overlayCanvas;
     private final int maxTextureUnits;
 
     private Color clearColor;
     private float clearAlpha;
+    private ToneMapping toneMapping;
+    private float exposure;
     private @Nullable BasicProgram basicProgram;
+    private @Nullable EnvironmentBackgroundProgram environmentBackgroundProgram;
     private @Nullable LambertProgram lambertProgram;
     private @Nullable LineProgram lineProgram;
     private @Nullable NormalProgram normalProgram;
     private @Nullable PhongProgram phongProgram;
     private @Nullable StandardProgram standardProgram;
+    private @Nullable ToneMappingProgram toneMappingProgram;
+    private @Nullable ToneMappingTarget toneMappingTarget;
     private @Nullable OverlayRenderer overlayRenderer;
     private @Nullable DefaultTexture defaultTexture;
+    private @Nullable BrdfLookupResource brdfLookupResource;
     private boolean customViewport;
     private int viewportX;
     private int viewportY;
     private int viewportWidth;
     private int viewportHeight;
+    private boolean standardTextureUnitsPrimed;
     private boolean closed;
 
     /** Initializes context-local renderer state after the window context is exclusively claimed. */
@@ -158,17 +180,24 @@ public final class Renderer implements AutoCloseable {
         automaticClear = options.automaticClear();
         clearColor = options.clearColor();
         clearAlpha = options.clearAlpha();
+        toneMapping = options.toneMapping();
+        exposure = options.exposure();
         info = new RendererInfo();
         statistics = info.statistics();
         resources = info.resources();
         geometryResources = new IdentityHashMap<>();
         textureResources = new IdentityHashMap<>();
+        environmentResources = new IdentityHashMap<>();
         shaderPrograms = new HashMap<>();
         renderList = new RenderList(MAX_POINT_LIGHTS, MAX_DIRECTIONAL_LIGHTS, MAX_SPOT_LIGHTS, MAX_HEMISPHERE_LIGHTS);
         frustum = new Frustum();
         matrixValues = new float[16];
         matrix3Values = new float[9];
         textureTransformMatrix = new Matrix3f();
+        viewToWorldMatrix = new Matrix3f();
+        environmentRotationMatrix = new Matrix3f();
+        inverseProjectionMatrix = new Matrix4f();
+        environmentRotation = new Quaternionf();
         normalScale = new Vector2f();
         overlayCanvas = new OverlayCanvas();
         maxTextureUnits = glGetInteger(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
@@ -224,34 +253,51 @@ public final class Renderer implements AutoCloseable {
         context.makeCurrent();
         releaseClosedGeometryResources();
         releaseClosedTextureResources();
+        releaseClosedEnvironmentResources();
+        standardTextureUnitsPrimed = false;
         statistics.beginFrame();
 
         int framebufferWidth = context.framebufferWidth();
         int framebufferHeight = context.framebufferHeight();
+        boolean usesToneMapping = toneMapping != ToneMapping.NONE && framebufferWidth > 0 && framebufferHeight > 0;
+        if (usesToneMapping) {
+            toneMappingTarget().begin(framebufferWidth, framebufferHeight, glGetInteger(GL_SAMPLES));
+        }
         applyViewport(framebufferWidth, framebufferHeight);
         if (automaticClear) {
             Color background = validScene.background();
             clearBuffers(background == null ? clearColor : background);
         }
+        boolean rendered = false;
         try {
             if (framebufferWidth > 0 && framebufferHeight > 0) {
                 Matrix4fc viewMatrix = validCamera.viewMatrix();
                 Matrix4fc projectionMatrix = validCamera.projectionMatrix();
+                prepareEnvironmentMatrices(validScene, viewMatrix);
+                renderEnvironmentBackground(validScene, projectionMatrix);
                 frustum.update(viewMatrix, projectionMatrix);
                 renderList.build(validScene, viewMatrix, frustum);
                 statistics.recordCulledMeshes(renderList.culledMeshes());
                 statistics.recordCulledLines(renderList.culledLines());
                 for (int index = 0; index < renderList.opaqueCount(); index++) {
-                    renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix);
+                    renderItem(renderList.opaqueItem(index), viewMatrix, projectionMatrix, validScene);
                 }
                 for (int index = 0; index < renderList.transparentCount(); index++) {
-                    renderItem(renderList.transparentItem(index), viewMatrix, projectionMatrix);
+                    renderItem(renderList.transparentItem(index), viewMatrix, projectionMatrix, validScene);
                 }
             }
             statistics.completeFrame();
+            rendered = true;
         } finally {
             renderList.clear();
             glBindVertexArray(0);
+            if (usesToneMapping) {
+                if (rendered) {
+                    toneMappingTarget().present(toneMappingProgram(), exposure);
+                } else {
+                    toneMappingTarget().cancel();
+                }
+            }
         }
     }
 
@@ -377,6 +423,52 @@ public final class Renderer implements AutoCloseable {
     }
 
     /**
+     * Returns the current high-dynamic-range tone mapping mode.
+     *
+     * @return current mode
+     * @throws IllegalStateException if this renderer is closed
+     */
+    public ToneMapping toneMapping() {
+        requireOpen();
+        return toneMapping;
+    }
+
+    /**
+     * Changes the high-dynamic-range tone mapping mode for subsequent scene frames.
+     *
+     * @param toneMapping new mode
+     * @throws NullPointerException if {@code toneMapping} is {@code null}
+     * @throws IllegalStateException if this renderer is closed
+     */
+    public void setToneMapping(ToneMapping toneMapping) {
+        requireOpen();
+        this.toneMapping = Objects.requireNonNull(toneMapping, "toneMapping");
+    }
+
+    /**
+     * Returns the current linear exposure multiplier.
+     *
+     * @return finite positive multiplier
+     * @throws IllegalStateException if this renderer is closed
+     */
+    public float exposure() {
+        requireOpen();
+        return exposure;
+    }
+
+    /**
+     * Changes the linear exposure multiplier used during tone mapping.
+     *
+     * @param exposure finite positive multiplier
+     * @throws IllegalArgumentException if {@code exposure} is non-positive or non-finite
+     * @throws IllegalStateException if this renderer is closed
+     */
+    public void setExposure(float exposure) {
+        requireOpen();
+        this.exposure = Preconditions.requirePositive(exposure, "exposure");
+    }
+
+    /**
      * Returns this renderer's stable diagnostic container.
      *
      * @return renderer-owned diagnostics updated in place
@@ -405,50 +497,9 @@ public final class Renderer implements AutoCloseable {
         }
         context.makeCurrent();
         try {
-            for (GeometryResource resource : geometryResources.values()) {
-                resource.close();
-            }
-            geometryResources.clear();
-            for (TextureResource resource : textureResources.values()) {
-                resource.close();
-            }
-            textureResources.clear();
-            for (ShaderProgram program : shaderPrograms.values()) {
-                program.close();
-            }
-            shaderPrograms.clear();
-            if (basicProgram != null) {
-                basicProgram.close();
-                basicProgram = null;
-            }
-            if (lambertProgram != null) {
-                lambertProgram.close();
-                lambertProgram = null;
-            }
-            if (lineProgram != null) {
-                lineProgram.close();
-                lineProgram = null;
-            }
-            if (normalProgram != null) {
-                normalProgram.close();
-                normalProgram = null;
-            }
-            if (phongProgram != null) {
-                phongProgram.close();
-                phongProgram = null;
-            }
-            if (standardProgram != null) {
-                standardProgram.close();
-                standardProgram = null;
-            }
-            if (overlayRenderer != null) {
-                overlayRenderer.close();
-                overlayRenderer = null;
-            }
-            if (defaultTexture != null) {
-                defaultTexture.close();
-                defaultTexture = null;
-            }
+            closeCachedResources();
+            closeBuiltInPrograms();
+            closeRenderTargets();
             glBindVertexArray(0);
             glUseProgram(0);
             renderList.clear();
@@ -461,8 +512,100 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
+    /** Releases resources cached by scene object identity. */
+    private void closeCachedResources() {
+        geometryResources.values().forEach(GeometryResource::close);
+        geometryResources.clear();
+        textureResources.values().forEach(TextureResource::close);
+        textureResources.clear();
+        environmentResources.values().forEach(EnvironmentResource::close);
+        environmentResources.clear();
+        shaderPrograms.values().forEach(ShaderProgram::close);
+        shaderPrograms.clear();
+    }
+
+    /** Releases lazily created built-in shader programs. */
+    private void closeBuiltInPrograms() {
+        if (basicProgram != null) {
+            basicProgram.close();
+            basicProgram = null;
+        }
+        if (environmentBackgroundProgram != null) {
+            environmentBackgroundProgram.close();
+            environmentBackgroundProgram = null;
+        }
+        if (lambertProgram != null) {
+            lambertProgram.close();
+            lambertProgram = null;
+        }
+        if (lineProgram != null) {
+            lineProgram.close();
+            lineProgram = null;
+        }
+        if (normalProgram != null) {
+            normalProgram.close();
+            normalProgram = null;
+        }
+        if (phongProgram != null) {
+            phongProgram.close();
+            phongProgram = null;
+        }
+        if (standardProgram != null) {
+            standardProgram.close();
+            standardProgram = null;
+        }
+        if (toneMappingProgram != null) {
+            toneMappingProgram.close();
+            toneMappingProgram = null;
+        }
+    }
+
+    /** Releases lazily created framebuffer and overlay resources. */
+    private void closeRenderTargets() {
+        if (toneMappingTarget != null) {
+            toneMappingTarget.close();
+            toneMappingTarget = null;
+        }
+        if (overlayRenderer != null) {
+            overlayRenderer.close();
+            overlayRenderer = null;
+        }
+        if (defaultTexture != null) {
+            defaultTexture.close();
+            defaultTexture = null;
+        }
+        if (brdfLookupResource != null) {
+            brdfLookupResource.close();
+            brdfLookupResource = null;
+        }
+    }
+
+    /** Resolves the camera-to-world and inverse environment rotations for one scene frame. */
+    private void prepareEnvironmentMatrices(Scene scene, Matrix4fc viewMatrix) {
+        viewToWorldMatrix.set(viewMatrix).invert();
+        scene.environmentRotation(environmentRotation);
+        environmentRotationMatrix.rotation(environmentRotation).transpose();
+    }
+
+    /** Draws a selected HDR environment background before scene geometry. */
+    private void renderEnvironmentBackground(Scene scene, Matrix4fc projectionMatrix) {
+        @Nullable EnvironmentMap background = scene.backgroundEnvironment();
+        if (background == null) {
+            return;
+        }
+        requireOpenEnvironment(background, "Scene background environment");
+        inverseProjectionMatrix.set(projectionMatrix).invert();
+        environmentBackgroundProgram()
+                .render(
+                        environmentResource(background),
+                        inverseProjectionMatrix,
+                        viewToWorldMatrix,
+                        environmentRotationMatrix,
+                        scene.backgroundIntensity());
+    }
+
     /** Synchronizes and submits one prepared scene-object draw. */
-    private void renderItem(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
+    private void renderItem(RenderItem item, Matrix4fc viewMatrix, Matrix4fc projectionMatrix, Scene scene) {
         BufferGeometry geometry = item.geometry();
         Material material = item.material();
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
@@ -484,7 +627,7 @@ public final class Renderer implements AutoCloseable {
                 case ShaderMaterial shaderMaterial ->
                     renderShaderMesh(item, geometry, shaderMaterial, resource, viewMatrix, projectionMatrix);
                 case StandardMaterial standardMaterial ->
-                    renderStandardMesh(item, geometry, standardMaterial, resource, viewMatrix, projectionMatrix);
+                    renderStandardMesh(item, geometry, standardMaterial, resource, viewMatrix, projectionMatrix, scene);
                 default ->
                     throw new IllegalStateException("Unsupported mesh material type: "
                             + material.getClass().getName());
@@ -537,7 +680,7 @@ public final class Renderer implements AutoCloseable {
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
         if (colorMap != null) {
-            uploadTextureTransform(program.colorMapTransformLocation(), colorMap);
+            uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
         }
         Color color = material.color();
         float alpha = resolvedAlpha(material);
@@ -551,7 +694,7 @@ public final class Renderer implements AutoCloseable {
         } else {
             TextureResource textureResource =
                     textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
-            resources.setActiveTextureResources(textureResources.size());
+            updateTextureResourceCount();
             synchronizeTexture(textureResource, colorMap);
             glUniform1i(program.colorMapLocation(), 0);
             glUniform1i(program.useColorMapLocation(), 1);
@@ -577,7 +720,7 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
-            uploadTextureTransform(program.colorMapTransformLocation(), colorMap);
+            uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
         }
         program.uploadLights(renderList.lights(), viewMatrix);
         Color color = material.color();
@@ -592,7 +735,7 @@ public final class Renderer implements AutoCloseable {
         } else {
             TextureResource textureResource =
                     textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
-            resources.setActiveTextureResources(textureResources.size());
+            updateTextureResourceCount();
             synchronizeTexture(textureResource, colorMap);
             glUniform1i(program.colorMapLocation(), 0);
             glUniform1i(program.useColorMapLocation(), 1);
@@ -635,7 +778,7 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
-            uploadTextureTransform(program.colorMapTransformLocation(), colorMap);
+            uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
         }
         program.uploadLights(renderList.lights(), viewMatrix);
         Color color = material.color();
@@ -660,7 +803,7 @@ public final class Renderer implements AutoCloseable {
         } else {
             TextureResource textureResource =
                     textureResources.computeIfAbsent(colorMap, ignored -> new TextureResource());
-            resources.setActiveTextureResources(textureResources.size());
+            updateTextureResourceCount();
             synchronizeTexture(textureResource, colorMap);
             glUniform1i(program.colorMapLocation(), 0);
             glUniform1i(program.useColorMapLocation(), 1);
@@ -674,7 +817,8 @@ public final class Renderer implements AutoCloseable {
             StandardMaterial material,
             GeometryResource resource,
             Matrix4fc viewMatrix,
-            Matrix4fc projectionMatrix) {
+            Matrix4fc projectionMatrix,
+            Scene scene) {
         StandardProgram program = standardProgram();
         @Nullable Texture colorMap = material.colorMap().orElse(null);
         @Nullable
@@ -695,6 +839,7 @@ public final class Renderer implements AutoCloseable {
         recordUploads(resource.synchronize(
                 geometry, true, material.usesVertexColors(), requiresTextureCoordinates, "StandardMaterial"));
 
+        primeStandardTextureUnits();
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         program.uploadLights(renderList.lights(), viewMatrix);
@@ -720,6 +865,38 @@ public final class Renderer implements AutoCloseable {
         bindStandardTexture(normalMap, program.normalMap(), 2);
         bindStandardTexture(occlusionMap, program.occlusionMap(), 3);
         bindStandardTexture(emissiveMap, program.emissiveMap(), 4);
+        bindEnvironment(program, scene, material);
+    }
+
+    /** Binds optional scene-wide image-based-lighting textures and uniforms. */
+    private void bindEnvironment(StandardProgram program, Scene scene, StandardMaterial material) {
+        program.uploadEnvironmentMatrices(viewToWorldMatrix, environmentRotationMatrix);
+        @Nullable EnvironmentMap environmentMap = scene.environment();
+        if (environmentMap == null) {
+            glUniform1i(program.useEnvironmentMapLocation(), 0);
+            glUniform1f(program.environmentIntensityLocation(), 0.0f);
+            glUniform1f(program.maximumReflectionLevelLocation(), 0.0f);
+            return;
+        }
+        requireOpenEnvironment(environmentMap, "Scene environment");
+        if (maxTextureUnits < 8) {
+            throw new IllegalStateException(
+                    "StandardMaterial environment lighting requires at least 8 texture units: " + maxTextureUnits);
+        }
+        EnvironmentResource environment = environmentResource(environmentMap);
+        glActiveTexture(GL_TEXTURE0 + 5);
+        environment.bindIrradiance();
+        glUniform1i(program.environmentIrradianceMapLocation(), 5);
+        glActiveTexture(GL_TEXTURE0 + 6);
+        environment.bindReflections();
+        glUniform1i(program.environmentReflectionMapLocation(), 6);
+        glActiveTexture(GL_TEXTURE0 + 7);
+        brdfLookupResource().bind();
+        glUniform1i(program.environmentBrdfMapLocation(), 7);
+        glUniform1f(
+                program.environmentIntensityLocation(), scene.environmentIntensity() * material.environmentIntensity());
+        glUniform1f(program.maximumReflectionLevelLocation(), environment.maximumReflectionLevel());
+        glUniform1i(program.useEnvironmentMapLocation(), 1);
     }
 
     /** Synchronizes and binds one custom shader-material draw. */
@@ -844,11 +1021,12 @@ public final class Renderer implements AutoCloseable {
         glUniformMatrix4fv(location, false, matrixValues);
     }
 
-    /** Uploads one built-in color-map UV transform without allocating. */
-    private void uploadTextureTransform(int location, Texture texture) {
+    /** Uploads one built-in texture's UV transform and coordinate origin without allocating. */
+    private void uploadTextureState(int transformLocation, int verticalFlipLocation, Texture texture) {
         texture.transformMatrix(textureTransformMatrix);
         textureTransformMatrix.get(matrix3Values);
-        glUniformMatrix3fv(location, false, matrix3Values);
+        glUniformMatrix3fv(transformLocation, false, matrix3Values);
+        glUniform1i(verticalFlipLocation, texture.coordinateOrigin() == TextureCoordinateOrigin.BOTTOM_LEFT ? 1 : 0);
     }
 
     /** Synchronizes and binds one active texture uniform to a consecutive texture unit. */
@@ -862,7 +1040,7 @@ public final class Renderer implements AutoCloseable {
         }
         glActiveTexture(GL_TEXTURE0 + textureUnit);
         TextureResource textureResource = textureResources.computeIfAbsent(texture, ignored -> new TextureResource());
-        resources.setActiveTextureResources(textureResources.size());
+        updateTextureResourceCount();
         synchronizeTexture(textureResource, texture);
         glUniform1i(location, textureUnit);
     }
@@ -882,10 +1060,23 @@ public final class Renderer implements AutoCloseable {
             return;
         }
         TextureResource textureResource = textureResources.computeIfAbsent(texture, ignored -> new TextureResource());
-        resources.setActiveTextureResources(textureResources.size());
+        updateTextureResourceCount();
         synchronizeTexture(textureResource, texture);
-        uploadTextureTransform(locations.transform(), texture);
+        uploadTextureState(locations.transform(), locations.verticalFlip(), texture);
         glUniform1i(locations.enabled(), 1);
+    }
+
+    /** Ensures every fixed standard-program sampler is complete before the program becomes active. */
+    private void primeStandardTextureUnits() {
+        if (standardTextureUnitsPrimed) {
+            return;
+        }
+        int fixedUnitCount = Math.min(8, maxTextureUnits);
+        for (int textureUnit = 0; textureUnit < fixedUnitCount; textureUnit++) {
+            glActiveTexture(GL_TEXTURE0 + textureUnit);
+            defaultTexture().bind();
+        }
+        standardTextureUnitsPrimed = true;
     }
 
     /** Rejects a closed optional texture while allowing an absent role. */
@@ -925,6 +1116,15 @@ public final class Renderer implements AutoCloseable {
             updateProgramCount();
         }
         return basicProgram;
+    }
+
+    /** Lazily creates the fullscreen environment-background program. */
+    private EnvironmentBackgroundProgram environmentBackgroundProgram() {
+        if (environmentBackgroundProgram == null) {
+            environmentBackgroundProgram = EnvironmentBackgroundProgram.create();
+            updateProgramCount();
+        }
+        return environmentBackgroundProgram;
     }
 
     /** Lazily creates and returns the context-local built-in Lambert program. */
@@ -972,6 +1172,23 @@ public final class Renderer implements AutoCloseable {
         return standardProgram;
     }
 
+    /** Lazily creates the fullscreen ACES tone mapping program. */
+    private ToneMappingProgram toneMappingProgram() {
+        if (toneMappingProgram == null) {
+            toneMappingProgram = ToneMappingProgram.create();
+            updateProgramCount();
+        }
+        return toneMappingProgram;
+    }
+
+    /** Lazily creates resizable HDR framebuffer storage. */
+    private ToneMappingTarget toneMappingTarget() {
+        if (toneMappingTarget == null) {
+            toneMappingTarget = new ToneMappingTarget();
+        }
+        return toneMappingTarget;
+    }
+
     /** Lazily creates and returns context-local overlay drawing resources. */
     private OverlayRenderer overlayRenderer() {
         if (overlayRenderer == null) {
@@ -989,16 +1206,46 @@ public final class Renderer implements AutoCloseable {
         return defaultTexture;
     }
 
+    /** Lazily computes and uploads the shared split-sum BRDF integration lookup. */
+    private BrdfLookupResource brdfLookupResource() {
+        if (brdfLookupResource == null) {
+            brdfLookupResource = new BrdfLookupResource();
+            statistics.recordTextureUpload(brdfLookupResource.uploadedBytes());
+            updateTextureResourceCount();
+        }
+        return brdfLookupResource;
+    }
+
+    /** Resolves or realizes all context-local maps derived from one environment. */
+    private EnvironmentResource environmentResource(EnvironmentMap environmentMap) {
+        EnvironmentResource resource = environmentResources.get(environmentMap);
+        if (resource == null) {
+            resource = new EnvironmentResource(environmentMap);
+            environmentResources.put(environmentMap, resource);
+            statistics.recordTextureUpload(resource.uploadedBytes());
+            updateTextureResourceCount();
+        }
+        return resource;
+    }
+
     /** Synchronizes the diagnostic program count with realized built-in programs. */
     private void updateProgramCount() {
         resources.setProgramCount((basicProgram == null ? 0 : 1)
+                + (environmentBackgroundProgram == null ? 0 : 1)
                 + (lambertProgram == null ? 0 : 1)
                 + (lineProgram == null ? 0 : 1)
                 + (normalProgram == null ? 0 : 1)
                 + (phongProgram == null ? 0 : 1)
                 + (standardProgram == null ? 0 : 1)
+                + (toneMappingProgram == null ? 0 : 1)
                 + (overlayRenderer == null ? 0 : 1)
                 + shaderPrograms.size());
+    }
+
+    /** Synchronizes diagnostics with ordinary, environment, and shared lookup textures. */
+    private void updateTextureResourceCount() {
+        resources.setActiveTextureResources(
+                textureResources.size() + environmentResources.size() * 3 + (brdfLookupResource == null ? 0 : 1));
     }
 
     /** Applies depth, blending, and face-culling state for one material. */
@@ -1086,7 +1333,28 @@ public final class Renderer implements AutoCloseable {
                 iterator.remove();
             }
         }
-        resources.setActiveTextureResources(textureResources.size());
+        updateTextureResourceCount();
+    }
+
+    /** Releases derived GPU resources whose environment descriptions were closed. */
+    private void releaseClosedEnvironmentResources() {
+        Iterator<Map.Entry<EnvironmentMap, EnvironmentResource>> iterator =
+                environmentResources.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<EnvironmentMap, EnvironmentResource> entry = iterator.next();
+            if (entry.getKey().isClosed()) {
+                entry.getValue().close();
+                iterator.remove();
+            }
+        }
+        updateTextureResourceCount();
+    }
+
+    /** Requires one shared environment description to remain open for rendering. */
+    private static void requireOpenEnvironment(EnvironmentMap environmentMap, String label) {
+        if (environmentMap.isClosed()) {
+            throw new IllegalStateException(label + " is closed");
+        }
     }
 
     /** Rejects renderer use after close. */

@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureColorSpace;
+import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.io.IOException;
@@ -267,6 +268,8 @@ final class GltfLoaderTest {
         assertThat(material.side()).isEqualTo(MaterialSide.DOUBLE);
         assertThat(color.colorSpace()).isEqualTo(TextureColorSpace.SRGB);
         assertThat(data.colorSpace()).isEqualTo(TextureColorSpace.LINEAR);
+        assertThat(color.coordinateOrigin()).isEqualTo(TextureCoordinateOrigin.TOP_LEFT);
+        assertThat(data.coordinateOrigin()).isEqualTo(TextureCoordinateOrigin.TOP_LEFT);
         assertThat(material.emissiveMap()).containsSame(color);
         assertThat(material.metalnessRoughnessMap()).containsSame(data);
         assertThat(material.occlusionMap()).containsSame(data);

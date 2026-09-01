@@ -51,7 +51,9 @@ import io.github.glynch.jscene3d.platform.VerticalSync;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.platform.WindowOptions;
 import io.github.glynch.jscene3d.scenes.Scene;
+import io.github.glynch.jscene3d.textures.EnvironmentMap;
 import io.github.glynch.jscene3d.textures.Texture;
+import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.nio.ByteBuffer;
@@ -755,6 +757,54 @@ final class RendererIT {
     }
 
     @Test
+    void honorsTopLeftCoordinatesAcrossBuiltInTextureMaterials() {
+        byte[] pixels = {(byte) 0xff, 0, 0, (byte) 0xff, 0, 0, (byte) 0xff, (byte) 0xff};
+        try (Window window = Window.create("Texture coordinate origin integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTexturedTriangle();
+                Texture texture = Texture.baseColor(1, 2, pixels);
+                BasicMaterial basic = new BasicMaterial();
+                LambertMaterial lambert = new LambertMaterial();
+                PhongMaterial phong = new PhongMaterial();
+                StandardMaterial standard = new StandardMaterial()) {
+            texture.setMinificationFilter(TextureFilter.NEAREST);
+            texture.setMagnificationFilter(TextureFilter.NEAREST);
+            texture.setCoordinateOrigin(TextureCoordinateOrigin.TOP_LEFT);
+            basic.setColorMap(texture);
+            lambert.setColorMap(texture);
+            phong.setColorMap(texture);
+            phong.setSpecular(Color.BLACK);
+            standard.setColorMap(texture);
+            Mesh basicMesh = new Mesh(geometry, basic);
+            basicMesh.setPosition(-0.6f, 0.0f, 0.0f);
+            Mesh lambertMesh = new Mesh(geometry, lambert);
+            lambertMesh.setPosition(-0.2f, 0.0f, 0.0f);
+            Mesh phongMesh = new Mesh(geometry, phong);
+            phongMesh.setPosition(0.2f, 0.0f, 0.0f);
+            Mesh standardMesh = new Mesh(geometry, standard);
+            standardMesh.setPosition(0.6f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(basicMesh);
+            scene.add(lambertMesh);
+            scene.add(phongMesh);
+            scene.add(standardMesh);
+            scene.add(new AmbientLight(Color.WHITE));
+            OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            int upperY = Math.round(window.framebufferHeight() * 0.56f);
+            int lowerY = Math.round(window.framebufferHeight() * 0.44f);
+            for (float horizontalPosition : new float[] {0.2f, 0.4f, 0.6f, 0.8f}) {
+                int x = Math.round(window.framebufferWidth() * horizontalPosition);
+                assertPixelIsBlue(x, upperY);
+                assertPixelIsRed(x, lowerY);
+            }
+        }
+    }
+
+    @Test
     void rendersTypedCustomUniformsAndReusesTheStructuralProgram() {
         WindowOptions windowOptions = WindowOptions.builder()
                 .size(320, 240)
@@ -1059,6 +1109,38 @@ final class RendererIT {
             material.setAlphaCutoff(0.0f);
             renderer.render(scene, camera);
             assertCenterPixelIsRed(window);
+        }
+    }
+
+    @Test
+    void rendersHdrEnvironmentLightingBackgroundAndToneMapping() {
+        RendererOptions options = RendererOptions.builder()
+                .toneMapping(ToneMapping.ACES_FILMIC)
+                .exposure(0.8f)
+                .build();
+        float[] radiance = {4.0f, 2.0f, 1.0f, 4.0f, 2.0f, 1.0f};
+        try (Window window = Window.create(320, 240, "Environment lighting integration test");
+                Renderer renderer = Renderer.create(window, options);
+                EnvironmentMap environment = EnvironmentMap.equirectangular(2, 1, radiance);
+                BufferGeometry geometry = createLitTriangle();
+                StandardMaterial material = new StandardMaterial(Color.WHITE)) {
+            material.setMetalness(1.0f);
+            material.setRoughness(0.25f);
+            Scene scene = new Scene();
+            scene.setEnvironment(environment);
+            scene.setBackgroundEnvironment(environment);
+            scene.add(new Mesh(geometry, material));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertPixelIsNotBlack(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+            assertPixelIsNotBlack(8, 8);
+            assertThat(renderer.info().statistics().textureUploads()).isEqualTo(2);
+            assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(4);
+            assertThat(renderer.info().resources().programCount()).isEqualTo(3);
         }
     }
 

@@ -26,6 +26,7 @@ public final class PhongProgram implements AutoCloseable {
             uniform mat3 colorMapTransform;
             uniform bool useVertexColor;
             uniform bool useColorMap;
+            uniform bool flipColorMapVertically;
 
             out vec3 resolvedViewPosition;
             out vec3 resolvedViewNormal;
@@ -40,8 +41,9 @@ public final class PhongProgram implements AutoCloseable {
                 if (useColorMap) {
                     vec2 transformedTextureCoordinate =
                             (colorMapTransform * vec3(textureCoordinate, 1.0)).xy;
-                    resolvedTextureCoordinate =
-                            vec2(transformedTextureCoordinate.x, 1.0 - transformedTextureCoordinate.y);
+                    resolvedTextureCoordinate = flipColorMapVertically
+                            ? vec2(transformedTextureCoordinate.x, 1.0 - transformedTextureCoordinate.y)
+                            : transformedTextureCoordinate;
                 } else {
                     resolvedTextureCoordinate = vec2(0.0);
                 }
@@ -200,6 +202,7 @@ public final class PhongProgram implements AutoCloseable {
     private final int id;
     private final LitProgramState litState;
     private final int colorMapTransformLocation;
+    private final int flipColorMapVerticallyLocation;
     private final int baseColorLocation;
     private final int useVertexColorLocation;
     private final int colorMapLocation;
@@ -214,6 +217,7 @@ public final class PhongProgram implements AutoCloseable {
         this.id = id;
         litState = new LitProgramState(id, "Built-in Phong");
         colorMapTransformLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "colorMapTransform");
+        flipColorMapVerticallyLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "flipColorMapVertically");
         baseColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "baseColor");
         useVertexColorLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "useVertexColor");
         colorMapLocation = ProgramSupport.requiredUniform(id, "Built-in Phong", "colorMap");
@@ -291,6 +295,15 @@ public final class PhongProgram implements AutoCloseable {
      */
     public int colorMapTransformLocation() {
         return colorMapTransformLocation;
+    }
+
+    /**
+     * Returns the color-map vertical-orientation switch uniform location.
+     *
+     * @return uniform location
+     */
+    public int flipColorMapVerticallyLocation() {
+        return flipColorMapVerticallyLocation;
     }
 
     /**

@@ -25,6 +25,7 @@ final class StandardMaterialTest {
             assertThat(material.emissive()).isEqualTo(Color.BLACK);
             assertThat(material.emissiveIntensity()).isOne();
             assertThat(material.occlusionStrength()).isOne();
+            assertThat(material.environmentIntensity()).isOne();
             assertThat(material.normalScale(new Vector2f())).isEqualTo(new Vector2f(1.0f));
             assertThat(material.usesVertexColors()).isFalse();
             assertThat(material.colorMap()).isEmpty();
@@ -45,9 +46,10 @@ final class StandardMaterialTest {
             material.setEmissive(Color.BLUE);
             material.setEmissiveIntensity(2.0f);
             material.setOcclusionStrength(0.5f);
+            material.setEnvironmentIntensity(1.5f);
             material.setNormalScale(0.75f, -0.5f);
             material.setUsesVertexColors(true);
-            assertThat(material.version()).isEqualTo(8L);
+            assertThat(material.version()).isEqualTo(9L);
 
             material.setColor(Color.RED);
             material.setMetalness(0.8f);
@@ -55,9 +57,10 @@ final class StandardMaterialTest {
             material.setEmissive(Color.BLUE);
             material.setEmissiveIntensity(2.0f);
             material.setOcclusionStrength(0.5f);
+            material.setEnvironmentIntensity(1.5f);
             material.setNormalScale(new Vector2f(0.75f, -0.5f));
             material.setUsesVertexColors(true);
-            assertThat(material.version()).isEqualTo(8L);
+            assertThat(material.version()).isEqualTo(9L);
         }
     }
 
@@ -105,6 +108,7 @@ final class StandardMaterialTest {
             assertThatIllegalArgumentException().isThrownBy(() -> material.setRoughness(1.1f));
             assertThatIllegalArgumentException().isThrownBy(() -> material.setEmissiveIntensity(Float.NaN));
             assertThatIllegalArgumentException().isThrownBy(() -> material.setOcclusionStrength(-0.1f));
+            assertThatIllegalArgumentException().isThrownBy(() -> material.setEnvironmentIntensity(Float.NaN));
             assertThatIllegalArgumentException().isThrownBy(() -> material.setNormalScale(Float.NaN, 1.0f));
             assertThatNullPointerException().isThrownBy(() -> material.setNormalScale(null));
 
@@ -131,6 +135,7 @@ final class StandardMaterialTest {
         assertThatIllegalStateException().isThrownBy(material::metalness);
         assertThatIllegalStateException().isThrownBy(material::roughness);
         assertThatIllegalStateException().isThrownBy(material::emissive);
+        assertThatIllegalStateException().isThrownBy(material::environmentIntensity);
         assertThatIllegalStateException().isThrownBy(material::colorMap);
         texture.close();
     }

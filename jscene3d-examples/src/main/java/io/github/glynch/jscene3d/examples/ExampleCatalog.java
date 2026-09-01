@@ -5,8 +5,10 @@
 package io.github.glynch.jscene3d.examples;
 
 import io.github.glynch.jscene3d.examples.framework.ExampleFactory;
+import io.github.glynch.jscene3d.gui.GalleryAttribution;
 import io.github.glynch.jscene3d.loaders.OverlayImageLoader;
 import io.github.glynch.jscene3d.render.OverlayImage;
+import java.net.URI;
 import java.util.List;
 
 /** Declares the stable ordered catalogue rendered by {@link ExampleBrowser}. */
@@ -16,8 +18,13 @@ final class ExampleCatalog {
         throw new AssertionError("ExampleCatalog cannot be instantiated");
     }
 
-    /** Returns all live examples in their display order. */
+    /** Returns all browser definitions after loading every required captured thumbnail. */
     static List<ExampleDefinition> definitions() {
+        return entries().stream().map(ExampleCatalog::definition).toList();
+    }
+
+    /** Returns all thumbnail-independent catalogue entries in display order. */
+    static List<ExampleCatalogEntry> entries() {
         return List.of(
                 definition(
                         "basic-triangle",
@@ -90,6 +97,43 @@ final class ExampleCatalog {
                         List.of("pbr", "metalness", "roughness", "standard"),
                         StandardMaterialExample::create),
                 definition(
+                        "environment-lighting",
+                        "Environment lighting",
+                        "Lighting",
+                        "HDR image-based lighting across metallic and rough surfaces.",
+                        List.of("pbr", "ibl", "hdr", "environment", "metalness", "roughness"),
+                        List.of(new GalleryAttribution(
+                                "Studio Small 08 HDRI",
+                                "Sergej Majboroda",
+                                "Poly Haven — polyhaven.com/a/studio_small_08",
+                                URI.create("https://polyhaven.com/a/studio_small_08"),
+                                "CC0-1.0",
+                                URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        EnvironmentLightingExample::create),
+                definition(
+                        "avocado-model",
+                        "Avocado glTF model",
+                        "Loading",
+                        "A realistic CC0 glTF asset rendered with HDR image-based lighting.",
+                        List.of("gltf", "glb", "pbr", "ibl", "environment", "realistic"),
+                        List.of(
+                                new GalleryAttribution(
+                                        "Avocado glTF model",
+                                        "Microsoft",
+                                        "Khronos glTF Sample Assets — Avocado",
+                                        URI.create(
+                                                "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Avocado"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/")),
+                                new GalleryAttribution(
+                                        "Studio Small 08 HDRI",
+                                        "Sergej Majboroda",
+                                        "Poly Haven — polyhaven.com/a/studio_small_08",
+                                        URI.create("https://polyhaven.com/a/studio_small_08"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        AvocadoModelExample::create),
+                definition(
                         "gltf-loading",
                         "glTF loading",
                         "Loading",
@@ -141,9 +185,34 @@ final class ExampleCatalog {
     }
 
     /** Creates one definition and loads its required captured thumbnail. */
-    private static ExampleDefinition definition(
+    private static ExampleCatalogEntry definition(
             String id, String title, String category, String description, List<String> tags, ExampleFactory factory) {
-        return new ExampleDefinition(id, title, category, description, tags, thumbnail(id), factory);
+        return definition(id, title, category, description, tags, List.of(), factory);
+    }
+
+    /** Creates one definition with explicit third-party asset provenance. */
+    private static ExampleCatalogEntry definition(
+            String id,
+            String title,
+            String category,
+            String description,
+            List<String> tags,
+            List<GalleryAttribution> attributions,
+            ExampleFactory factory) {
+        return new ExampleCatalogEntry(id, title, category, description, tags, attributions, factory);
+    }
+
+    /** Loads the captured thumbnail required to promote one entry into a browser definition. */
+    private static ExampleDefinition definition(ExampleCatalogEntry entry) {
+        return new ExampleDefinition(
+                entry.id(),
+                entry.title(),
+                entry.category(),
+                entry.description(),
+                entry.tags(),
+                thumbnail(entry.id()),
+                entry.attributions(),
+                entry.factory());
     }
 
     /** Loads the captured classpath thumbnail, failing if it is absent or invalid. */

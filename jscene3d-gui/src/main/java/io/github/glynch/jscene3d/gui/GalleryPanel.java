@@ -37,6 +37,9 @@ public final class GalleryPanel implements Overlay {
     private static final float TITLE_FONT_SIZE = 19.0f;
     private static final float BODY_FONT_SIZE = 13.0f;
     private static final float SMALL_FONT_SIZE = 11.0f;
+    private static final float ATTRIBUTION_WIDTH = 410.0f;
+    private static final float ATTRIBUTION_PADDING = 10.0f;
+    private static final float ATTRIBUTION_ROW_HEIGHT = 72.0f;
     private static final double SCROLL_UNITS_PER_CARD = 3.0;
     private static final int MAXIMUM_QUERY_CODE_POINTS = 80;
     private static final GuiFont FONT = GuiFont.defaultFont();
@@ -204,6 +207,64 @@ public final class GalleryPanel implements Overlay {
         paintSearch(canvas);
         paintStatus(canvas);
         paintCards(canvas, height);
+        paintAttribution(canvas, width, height);
+    }
+
+    /** Paints selected third-party provenance without crowding the thumbnail cards. */
+    private void paintAttribution(GuiCanvas canvas, int width, int height) {
+        List<GalleryAttribution> attributions = selectedItem().attributions();
+        int maximumRows = (int) ((height - 32.0f - ATTRIBUTION_PADDING * 2.0f) / ATTRIBUTION_ROW_HEIGHT);
+        int visibleRows = Math.clamp(maximumRows, 0, attributions.size());
+        if (visibleRows == 0 || width <= WIDTH + 40) {
+            return;
+        }
+        float panelHeight = ATTRIBUTION_PADDING * 2.0f + visibleRows * ATTRIBUTION_ROW_HEIGHT;
+        float panelWidth = Math.min(ATTRIBUTION_WIDTH, width - WIDTH - 32.0f);
+        float x = WIDTH + 16.0f;
+        float y = height - panelHeight - 16.0f;
+        canvas.roundedRectangle(x + 3.0f, y + 4.0f, panelWidth, panelHeight, 8.0f, theme.shadow(), 0.35f);
+        canvas.roundedRectangle(x, y, panelWidth, panelHeight, 8.0f, theme.border(), 0.96f);
+        canvas.roundedRectangle(x + 1.0f, y + 1.0f, panelWidth - 2.0f, panelHeight - 2.0f, 7.0f, theme.panel(), 0.92f);
+        for (int index = 0; index < visibleRows; index++) {
+            float rowY = y + ATTRIBUTION_PADDING + index * ATTRIBUTION_ROW_HEIGHT;
+            paintAttribution(canvas, attributions.get(index), x, rowY);
+            if (index + 1 < visibleRows) {
+                canvas.rectangle(
+                        x + 10.0f,
+                        rowY + ATTRIBUTION_ROW_HEIGHT - 1.0f,
+                        panelWidth - 20.0f,
+                        1.0f,
+                        theme.border(),
+                        0.8f);
+            }
+        }
+        int hiddenRows = attributions.size() - visibleRows;
+        if (hiddenRows > 0) {
+            String additional = "+" + hiddenRows + " more asset sources";
+            float textX = x + panelWidth - 12.0f - FONT.width(additional, SMALL_FONT_SIZE);
+            FONT.text(canvas, textX, y + panelHeight - 18.0f, additional, SMALL_FONT_SIZE, theme.mutedText());
+        }
+    }
+
+    /** Paints complete compact provenance for one selected example asset. */
+    private void paintAttribution(GuiCanvas canvas, GalleryAttribution attribution, float x, float y) {
+        FONT.text(canvas, x + 12.0f, y + 4.0f, attribution.assetName(), BODY_FONT_SIZE, theme.text());
+        FONT.text(
+                canvas,
+                x + 12.0f,
+                y + 26.0f,
+                "Creator: " + attribution.creator(),
+                SMALL_FONT_SIZE,
+                theme.secondaryText());
+        FONT.text(
+                canvas,
+                x + 12.0f,
+                y + 43.0f,
+                "Source: " + attribution.sourceName(),
+                SMALL_FONT_SIZE,
+                theme.secondaryText());
+        FONT.text(
+                canvas, x + 12.0f, y + 60.0f, "License: " + attribution.licenseName(), SMALL_FONT_SIZE, theme.accent());
     }
 
     /** Paints the gallery title bar. */
@@ -472,14 +533,25 @@ public final class GalleryPanel implements Overlay {
         if (normalizedQuery.isEmpty()) {
             return true;
         }
-        String searchable = (item.title()
-                        + ' '
-                        + item.category()
-                        + ' '
-                        + item.description()
-                        + ' '
-                        + String.join(" ", item.tags()))
-                .toLowerCase(Locale.ROOT);
+        StringBuilder searchableMetadata = new StringBuilder(item.title())
+                .append(' ')
+                .append(item.category())
+                .append(' ')
+                .append(item.description())
+                .append(' ')
+                .append(String.join(" ", item.tags()));
+        for (GalleryAttribution attribution : item.attributions()) {
+            searchableMetadata
+                    .append(' ')
+                    .append(attribution.assetName())
+                    .append(' ')
+                    .append(attribution.creator())
+                    .append(' ')
+                    .append(attribution.sourceName())
+                    .append(' ')
+                    .append(attribution.licenseName());
+        }
+        String searchable = searchableMetadata.toString().toLowerCase(Locale.ROOT);
         for (String term : normalizedQuery.split("\\s+")) {
             if (!searchable.contains(term)) {
                 return false;

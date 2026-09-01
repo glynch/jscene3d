@@ -33,6 +33,7 @@ public final class Texture implements AutoCloseable {
     private TextureFilter magnificationFilter = TextureFilter.LINEAR;
     private TextureWrap horizontalWrap = TextureWrap.CLAMP_TO_EDGE;
     private TextureWrap verticalWrap = TextureWrap.CLAMP_TO_EDGE;
+    private TextureCoordinateOrigin coordinateOrigin = TextureCoordinateOrigin.BOTTOM_LEFT;
     private MipmapMode mipmapMode = MipmapMode.GENERATE;
     private final Matrix3f transformMatrix = new Matrix3f();
     private float offsetU;
@@ -613,6 +614,36 @@ public final class Texture implements AutoCloseable {
     public void setCenter(Vector2fc center) {
         Vector2fc validCenter = Preconditions.requireFinite(center, "center");
         setCenter(validCenter.x(), validCenter.y());
+    }
+
+    /**
+     * Returns the image corner represented by texture coordinate {@code (0, 0)}.
+     *
+     * @return current coordinate origin, initially {@link TextureCoordinateOrigin#BOTTOM_LEFT}
+     * @throws IllegalStateException if this texture is closed
+     */
+    public TextureCoordinateOrigin coordinateOrigin() {
+        requireOpen();
+        return coordinateOrigin;
+    }
+
+    /**
+     * Changes the image corner represented by texture coordinate {@code (0, 0)}.
+     *
+     * <p>This changes only built-in material sampling and does not upload the image again. Custom
+     * shader materials remain responsible for applying their chosen coordinate convention.
+     *
+     * @param coordinateOrigin new coordinate origin
+     * @throws NullPointerException if {@code coordinateOrigin} is {@code null}
+     * @throws IllegalStateException if this texture is closed
+     */
+    public void setCoordinateOrigin(TextureCoordinateOrigin coordinateOrigin) {
+        requireOpen();
+        TextureCoordinateOrigin validOrigin = Objects.requireNonNull(coordinateOrigin, "coordinateOrigin");
+        if (this.coordinateOrigin != validOrigin) {
+            this.coordinateOrigin = validOrigin;
+            markTransformChanged();
+        }
     }
 
     /**

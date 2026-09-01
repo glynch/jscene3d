@@ -19,6 +19,8 @@ final class RendererOptionsTest {
         assertThat(options.automaticClear()).isTrue();
         assertThat(options.clearColor()).isEqualTo(Color.BLACK);
         assertThat(options.clearAlpha()).isEqualTo(1.0f);
+        assertThat(options.toneMapping()).isEqualTo(ToneMapping.NONE);
+        assertThat(options.exposure()).isOne();
     }
 
     @Test
@@ -27,11 +29,15 @@ final class RendererOptionsTest {
                 .automaticClear(false)
                 .clearColor(Color.BLUE)
                 .clearAlpha(0.5f)
+                .toneMapping(ToneMapping.ACES_FILMIC)
+                .exposure(1.25f)
                 .build();
 
         assertThat(options.automaticClear()).isFalse();
         assertThat(options.clearColor()).isEqualTo(Color.BLUE);
         assertThat(options.clearAlpha()).isEqualTo(0.5f);
+        assertThat(options.toneMapping()).isEqualTo(ToneMapping.ACES_FILMIC);
+        assertThat(options.exposure()).isEqualTo(1.25f);
     }
 
     @Test
@@ -40,8 +46,11 @@ final class RendererOptionsTest {
         RendererOptions.Builder builder = RendererOptions.builder();
 
         assertThatNullPointerException().isThrownBy(() -> builder.clearColor(null));
+        assertThatNullPointerException().isThrownBy(() -> builder.toneMapping(null));
         assertThatIllegalArgumentException().isThrownBy(() -> builder.clearAlpha(Float.NaN));
         assertThatIllegalArgumentException().isThrownBy(() -> builder.clearAlpha(-0.1f));
         assertThatIllegalArgumentException().isThrownBy(() -> builder.clearAlpha(1.1f));
+        assertThatIllegalArgumentException().isThrownBy(() -> builder.exposure(0.0f));
+        assertThatIllegalArgumentException().isThrownBy(() -> builder.exposure(Float.NaN));
     }
 }

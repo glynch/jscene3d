@@ -32,3 +32,9 @@ offline asset processing.
 JglTF is the internal parser and reference resolver. Its types are not exposed
 through JScene3D interfaces; callers receive one `LoadedGltf` owner containing
 the converted JScene3D scene and close its resources through that owner.
+
+glTF textures retain the format's top-left texture-coordinate origin. The
+loader records that origin on each converted `Texture`, and built-in materials
+resolve it during sampling. Geometry UV attributes remain unchanged so normal
+maps, shared accessors, and future `KHR_texture_transform` support preserve
+their glTF-defined coordinate semantics.

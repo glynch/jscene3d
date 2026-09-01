@@ -37,6 +37,7 @@ import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureColorSpace;
+import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.io.IOException;
@@ -393,6 +394,7 @@ final class GltfConverter {
         Texture texture = colorSpace == TextureColorSpace.SRGB
                 ? Texture.baseColor(image.width(), image.height(), image.pixels())
                 : Texture.data(image.width(), image.height(), image.pixels());
+        texture.setCoordinateOrigin(TextureCoordinateOrigin.TOP_LEFT);
         textures.add(texture);
         configureSampler(texture, textureModel);
         variants.put(colorSpace, texture);

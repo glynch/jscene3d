@@ -18,9 +18,31 @@ import java.util.Objects;
  * @param description non-blank searchable description
  * @param tags non-null searchable non-blank tags
  * @param thumbnail immutable full-colour thumbnail
+ * @param attributions immutable third-party asset attributions
  */
 public record GalleryItem(
-        String id, String title, String category, String description, List<String> tags, OverlayImage thumbnail) {
+        String id,
+        String title,
+        String category,
+        String description,
+        List<String> tags,
+        OverlayImage thumbnail,
+        List<GalleryAttribution> attributions) {
+    /**
+     * Creates an item without third-party asset attribution.
+     *
+     * @param id stable non-blank selection identifier
+     * @param title non-blank display title
+     * @param category non-blank category label
+     * @param description non-blank searchable description
+     * @param tags non-null searchable non-blank tags
+     * @param thumbnail immutable full-colour thumbnail
+     */
+    public GalleryItem(
+            String id, String title, String category, String description, List<String> tags, OverlayImage thumbnail) {
+        this(id, title, category, description, tags, thumbnail, List.of());
+    }
+
     /**
      * Validates text, copies tags, and retains the immutable thumbnail.
      *
@@ -38,5 +60,9 @@ public record GalleryItem(
             Preconditions.requireNonBlank(tag, "tag");
         }
         Objects.requireNonNull(thumbnail, "thumbnail");
+        attributions = List.copyOf(Objects.requireNonNull(attributions, "attributions"));
+        for (GalleryAttribution attribution : attributions) {
+            Objects.requireNonNull(attribution, "attribution");
+        }
     }
 }

@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.glynch.jscene3d.render.OverlayImage;
+import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -91,6 +92,34 @@ final class GalleryPanelTest {
         assertThat(canvas.roundedRectangleCount()).isGreaterThan(1);
         assertThat(canvas.imageCount()).isGreaterThan(0);
         assertThat(canvas.alphaMaskCount()).isGreaterThan(0);
+    }
+
+    @Test
+    void searchesAndPaintsStructuredAttribution() {
+        GalleryAttribution attribution = new GalleryAttribution(
+                "Studio Small 08",
+                "Sergej Majboroda",
+                "Poly Haven",
+                URI.create("https://polyhaven.com/a/studio_small_08"),
+                "CC0-1.0",
+                URI.create("https://creativecommons.org/publicdomain/zero/1.0/"));
+        GalleryItem item = new GalleryItem(
+                "environment",
+                "Environment lighting",
+                "Lighting",
+                "PBR image-based lighting",
+                List.of("ibl"),
+                THUMBNAIL,
+                List.of(attribution));
+        GalleryPanel panel = new GalleryPanel("JScene3D", List.of(item));
+        RecordingGuiCanvas canvas = new RecordingGuiCanvas();
+
+        panel.update(new GalleryPanel.GalleryInput(20.0, 75.0, true, 0.0, false, ""), 1000, 720);
+        panel.update(new GalleryPanel.GalleryInput(20.0, 75.0, false, 0.0, false, "majboroda"), 1000, 720);
+        panel.paint(canvas, 1000, 720);
+
+        assertThat(panel.matchingItemCount()).isOne();
+        assertThat(canvas.roundedRectangleCount()).isGreaterThan(4);
     }
 
     @Test

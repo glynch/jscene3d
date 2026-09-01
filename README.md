@@ -116,7 +116,9 @@ The initial capability profile supports static selected-scene hierarchies, TRS
 and decomposable matrix transforms, triangle primitives, indices, positions,
 normals, primary texture coordinates, RGB/RGBA vertex colours,
 metallic-roughness materials, PNG/JPEG images, alpha modes, double-sided
-materials, and core sampler state. Unsupported required extensions, animation,
+materials, and core sampler state. Imported textures retain glTF's top-left
+texture-coordinate convention rather than rewriting geometry UVs. Unsupported
+required extensions, animation,
 skinning, morph targets, embedded cameras, secondary texture-coordinate
 selection, and non-triangle primitives fail with a source-aware diagnostic.
 JglTF performs container and reference parsing internally; no JglTF type is
@@ -154,8 +156,10 @@ replace equal-depth fragments while remaining occluded by closer geometry.
 repeat, and rotation center, plus a radians-based rotation setter. Corresponding
 copy-out methods never expose mutable internal vectors or matrices. The cached
 homogeneous transform is applied automatically by `BasicMaterial` and
-`LambertMaterial` and `PhongMaterial` color maps without modifying geometry UV
-attributes.
+`LambertMaterial`, `PhongMaterial`, and every `StandardMaterial` texture role
+without modifying geometry UV attributes. `TextureCoordinateOrigin` explicitly
+selects bottom-left or top-left UV orientation; ordinary textures default to
+bottom-left, while the glTF loader marks imported images as top-left.
 
 Image, sampler, and transform changes have independent versions. Updating a
 texture transform therefore uploads only a small matrix uniform during a draw;
@@ -195,7 +199,12 @@ normals.
 `MaterialsExample` compares Basic, Lambert, Normal, and Phong spheres side by
 side. Its control panel changes Phong shininess and emissive intensity live.
 `StandardMaterialExample` presents a metalness-by-roughness grid under direct
-lighting.
+lighting. `EnvironmentLightingExample` presents the same material dimensions
+under HDR image-based lighting, while `AvocadoModelExample` combines the glTF
+loader, a realistic CC0 model, environment lighting, and ACES filmic tone
+mapping. The browser displays source and licence metadata for bundled
+third-party assets; complete notices are collected in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 `SpotAndHemisphereLightsExample` demonstrates the two directional-area light
 models with live controls for intensity, range, cone angle, penumbra, and decay.
 
@@ -213,6 +222,23 @@ blend their sky and ground colors using the surface normal and the light's
 world-space direction. The corresponding limits are
 `Renderer.MAX_SPOT_LIGHTS` and `Renderer.MAX_HEMISPHERE_LIGHTS`. Shadows are
 not yet supported.
+
+## Environment lighting
+
+`EnvironmentMapLoader` decodes Radiance HDR equirectangular images into
+application-owned `EnvironmentMap` values. Assign a map to a scene with
+`setEnvironment` to illuminate `StandardMaterial` objects, and independently
+use `setBackgroundEnvironment` when the same or another map should be visible.
+Scene-level intensity and rotation apply to all environment-lit materials;
+each `StandardMaterial` also has its own environment-intensity multiplier.
+
+The renderer derives and caches diffuse irradiance, GGX-prefiltered reflection
+levels, and a split-sum BRDF lookup. Enable high-dynamic-range output explicitly
+with `renderer.setToneMapping(ToneMapping.ACES_FILMIC)` and adjust exposure with
+`setExposure`. Tone mapping defaults to `NONE`, preserving the established
+linear-sRGB rendering path for applications that do not request HDR output.
+Close an `EnvironmentMap` only after every scene using it has stopped
+rendering.
 
 ## Lines
 

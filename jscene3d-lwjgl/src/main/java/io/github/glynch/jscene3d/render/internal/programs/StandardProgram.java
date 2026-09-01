@@ -5,9 +5,11 @@
 package io.github.glynch.jscene3d.render.internal.programs;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
+import static org.lwjgl.opengl.GL20.glUniformMatrix3fv;
 
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
+import org.joml.Matrix3fc;
 import org.joml.Matrix4fc;
 
 /** Compiled built-in metallic-roughness physically based mesh program. */
@@ -59,6 +61,11 @@ public final class StandardProgram implements AutoCloseable {
             uniform vec2 normalScale;
             uniform float occlusionStrength;
             uniform float alphaCutoff;
+            uniform float environmentIntensity;
+            uniform float maximumReflectionLevel;
+            uniform bool useEnvironmentMap;
+            uniform mat3 viewToWorldMatrix;
+            uniform mat3 environmentRotationMatrix;
 
             uniform sampler2D colorMap;
             uniform sampler2D metalnessRoughnessMap;
@@ -75,6 +82,14 @@ public final class StandardProgram implements AutoCloseable {
             uniform mat3 normalMapTransform;
             uniform mat3 occlusionMapTransform;
             uniform mat3 emissiveMapTransform;
+            uniform bool flipColorMapVertically;
+            uniform bool flipMetalnessRoughnessMapVertically;
+            uniform bool flipNormalMapVertically;
+            uniform bool flipOcclusionMapVertically;
+            uniform bool flipEmissiveMapVertically;
+            uniform sampler2D environmentIrradianceMap;
+            uniform sampler2D environmentReflectionMap;
+            uniform sampler2D environmentBrdfMap;
 
             uniform vec3 ambientLightColor;
             uniform int pointLightCount;
@@ -100,9 +115,11 @@ public final class StandardProgram implements AutoCloseable {
 
             out vec4 fragmentColor;
 
-            vec2 transformedCoordinate(mat3 transform) {
+            vec2 transformedCoordinate(mat3 transform, bool flipVertically) {
                 vec2 transformed = (transform * vec3(resolvedTextureCoordinate, 1.0)).xy;
-                return vec2(transformed.x, 1.0 - transformed.y);
+                return flipVertically
+                        ? vec2(transformed.x, 1.0 - transformed.y)
+                        : transformed;
             }
 
             float distanceAttenuation(float lightDistance, float cutoffDistance, float decay) {
@@ -142,7 +159,7 @@ public final class StandardProgram implements AutoCloseable {
                 if (!useNormalMap) {
                     return surfaceNormal;
                 }
-                vec2 coordinate = transformedCoordinate(normalMapTransform);
+                vec2 coordinate = transformedCoordinate(normalMapTransform, flipNormalMapVertically);
                 vec3 sampledNormal = texture(normalMap, coordinate).xyz * 2.0 - 1.0;
                 sampledNormal.xy *= normalScale;
                 return normalize(cotangentFrame(surfaceNormal, resolvedViewPosition, coordinate) * sampledNormal);
@@ -164,6 +181,19 @@ public final class StandardProgram implements AutoCloseable {
             vec3 fresnelSchlick(float directionDotHalf, vec3 reflectance) {
                 return reflectance + (vec3(1.0) - reflectance)
                         * pow(clamp(1.0 - directionDotHalf, 0.0, 1.0), 5.0);
+            }
+
+            vec3 fresnelSchlickRoughness(float normalDotView, vec3 reflectance, float roughnessValue) {
+                vec3 grazing = max(vec3(1.0 - roughnessValue), reflectance);
+                return reflectance + (grazing - reflectance)
+                        * pow(clamp(1.0 - normalDotView, 0.0, 1.0), 5.0);
+            }
+
+            vec2 equirectangularCoordinate(vec3 direction) {
+                vec3 normalizedDirection = normalize(direction);
+                float u = atan(normalizedDirection.z, normalizedDirection.x) / (2.0 * PI) + 0.5;
+                float v = acos(clamp(normalizedDirection.y, -1.0, 1.0)) / PI;
+                return vec2(u, v);
             }
 
             vec3 directContribution(
@@ -195,7 +225,7 @@ public final class StandardProgram implements AutoCloseable {
 
             void main() {
                 vec4 sampledBaseColor = useColorMap
-                        ? texture(colorMap, transformedCoordinate(colorMapTransform))
+                        ? texture(colorMap, transformedCoordinate(colorMapTransform, flipColorMapVertically))
                         : vec4(1.0);
                 vec4 surfaceColor = baseColor * resolvedVertexColor * sampledBaseColor;
                 if (alphaCutoff >= 0.0 && surfaceColor.a < alphaCutoff) {
@@ -207,7 +237,9 @@ public final class StandardProgram implements AutoCloseable {
                 if (useMetalnessRoughnessMap) {
                     vec4 sampledProperties = texture(
                             metalnessRoughnessMap,
-                            transformedCoordinate(metalnessRoughnessMapTransform));
+                            transformedCoordinate(
+                                    metalnessRoughnessMapTransform,
+                                    flipMetalnessRoughnessMapVertically));
                     resolvedRoughness *= sampledProperties.g;
                     resolvedMetalness *= sampledProperties.b;
                 }
@@ -293,13 +325,46 @@ public final class StandardProgram implements AutoCloseable {
                 if (useOcclusionMap) {
                     float sampledOcclusion = texture(
                             occlusionMap,
-                            transformedCoordinate(occlusionMapTransform)).r;
+                            transformedCoordinate(occlusionMapTransform, flipOcclusionMapVertically)).r;
                     occlusion = mix(1.0, sampledOcclusion, occlusionStrength);
                 }
                 reflected += indirectLight * diffuseColor * occlusion;
 
+                if (useEnvironmentMap) {
+                    vec3 worldNormal = normalize(viewToWorldMatrix * surfaceNormal);
+                    vec3 worldViewDirection = normalize(viewToWorldMatrix * viewDirection);
+                    float normalDotView = max(dot(surfaceNormal, viewDirection), 0.0);
+                    vec3 environmentNormal = environmentRotationMatrix * worldNormal;
+                    vec3 reflectionDirection = reflect(-worldViewDirection, worldNormal);
+                    vec3 environmentReflection = environmentRotationMatrix * reflectionDirection;
+                    vec3 irradiance = texture(
+                            environmentIrradianceMap,
+                            equirectangularCoordinate(environmentNormal)).rgb;
+                    vec3 prefilteredRadiance = textureLod(
+                            environmentReflectionMap,
+                            equirectangularCoordinate(environmentReflection),
+                            resolvedRoughness * maximumReflectionLevel).rgb;
+                    vec2 integratedBrdf = texture(
+                            environmentBrdfMap,
+                            vec2(normalDotView, resolvedRoughness)).rg;
+                    vec3 environmentFresnel = fresnelSchlickRoughness(
+                            normalDotView,
+                            reflectance,
+                            resolvedRoughness);
+                    vec3 environmentDiffuse = (vec3(1.0) - environmentFresnel)
+                            * diffuseColor
+                            * irradiance;
+                    vec3 environmentSpecular = prefilteredRadiance
+                            * (reflectance * integratedBrdf.x + integratedBrdf.y);
+                    reflected += (environmentDiffuse + environmentSpecular)
+                            * environmentIntensity
+                            * occlusion;
+                }
+
                 vec3 emissiveSample = useEmissiveMap
-                        ? texture(emissiveMap, transformedCoordinate(emissiveMapTransform)).rgb
+                        ? texture(
+                                emissiveMap,
+                                transformedCoordinate(emissiveMapTransform, flipEmissiveMapVertically)).rgb
                         : vec3(1.0);
                 reflected += emissiveColor * emissiveSample;
                 fragmentColor = vec4(reflected, surfaceColor.a);
@@ -320,6 +385,15 @@ public final class StandardProgram implements AutoCloseable {
     private final int occlusionStrengthLocation;
     private final int alphaCutoffLocation;
     private final int useVertexColorLocation;
+    private final int environmentIntensityLocation;
+    private final int maximumReflectionLevelLocation;
+    private final int useEnvironmentMapLocation;
+    private final int viewToWorldMatrixLocation;
+    private final int environmentRotationMatrixLocation;
+    private final int environmentIrradianceMapLocation;
+    private final int environmentReflectionMapLocation;
+    private final int environmentBrdfMapLocation;
+    private final float[] matrix3Values = new float[9];
     private final TextureLocations colorMap;
     private final TextureLocations metalnessRoughnessMap;
     private final TextureLocations normalMap;
@@ -339,6 +413,14 @@ public final class StandardProgram implements AutoCloseable {
         occlusionStrengthLocation = ProgramSupport.requiredUniform(id, label, "occlusionStrength");
         alphaCutoffLocation = ProgramSupport.requiredUniform(id, label, "alphaCutoff");
         useVertexColorLocation = ProgramSupport.requiredUniform(id, label, "useVertexColor");
+        environmentIntensityLocation = ProgramSupport.requiredUniform(id, label, "environmentIntensity");
+        maximumReflectionLevelLocation = ProgramSupport.requiredUniform(id, label, "maximumReflectionLevel");
+        useEnvironmentMapLocation = ProgramSupport.requiredUniform(id, label, "useEnvironmentMap");
+        viewToWorldMatrixLocation = ProgramSupport.requiredUniform(id, label, "viewToWorldMatrix");
+        environmentRotationMatrixLocation = ProgramSupport.requiredUniform(id, label, "environmentRotationMatrix");
+        environmentIrradianceMapLocation = ProgramSupport.requiredUniform(id, label, "environmentIrradianceMap");
+        environmentReflectionMapLocation = ProgramSupport.requiredUniform(id, label, "environmentReflectionMap");
+        environmentBrdfMapLocation = ProgramSupport.requiredUniform(id, label, "environmentBrdfMap");
         colorMap = TextureLocations.resolve(id, label, "colorMap");
         metalnessRoughnessMap = TextureLocations.resolve(id, label, "metalnessRoughnessMap");
         normalMap = TextureLocations.resolve(id, label, "normalMap");
@@ -464,6 +546,73 @@ public final class StandardProgram implements AutoCloseable {
     }
 
     /**
+     * Returns the combined scene/material environment-intensity uniform location.
+     *
+     * @return uniform location
+     */
+    public int environmentIntensityLocation() {
+        return environmentIntensityLocation;
+    }
+
+    /**
+     * Returns the largest prefiltered-reflection mip uniform location.
+     *
+     * @return uniform location
+     */
+    public int maximumReflectionLevelLocation() {
+        return maximumReflectionLevelLocation;
+    }
+
+    /**
+     * Returns the image-based-lighting enable-switch uniform location.
+     *
+     * @return uniform location
+     */
+    public int useEnvironmentMapLocation() {
+        return useEnvironmentMapLocation;
+    }
+
+    /**
+     * Returns the diffuse irradiance sampler location.
+     *
+     * @return sampler location
+     */
+    public int environmentIrradianceMapLocation() {
+        return environmentIrradianceMapLocation;
+    }
+
+    /**
+     * Returns the prefiltered reflection sampler location.
+     *
+     * @return sampler location
+     */
+    public int environmentReflectionMapLocation() {
+        return environmentReflectionMapLocation;
+    }
+
+    /**
+     * Returns the integrated BRDF sampler location.
+     *
+     * @return sampler location
+     */
+    public int environmentBrdfMapLocation() {
+        return environmentBrdfMapLocation;
+    }
+
+    /**
+     * Uploads current camera and environment rotations without allocation.
+     *
+     * @param viewToWorld camera-view to world-space rotation
+     * @param environmentRotation world-to-environment rotation
+     */
+    public void uploadEnvironmentMatrices(Matrix3fc viewToWorld, Matrix3fc environmentRotation) {
+        viewToWorld.get(matrix3Values);
+        glUniformMatrix3fv(viewToWorldMatrixLocation, false, matrix3Values);
+        environmentRotation.get(matrix3Values);
+        glUniformMatrix3fv(environmentRotationMatrixLocation, false, matrix3Values);
+    }
+
+    /**
      * Returns the base-color map locations.
      *
      * @return sampler, enable switch, and transform locations
@@ -520,14 +669,16 @@ public final class StandardProgram implements AutoCloseable {
      * @param sampler sampler uniform location
      * @param enabled texture-role enable-switch uniform location
      * @param transform texture-coordinate transform uniform location
+     * @param verticalFlip vertical-orientation switch uniform location
      */
-    public record TextureLocations(int sampler, int enabled, int transform) {
+    public record TextureLocations(int sampler, int enabled, int transform, int verticalFlip) {
         /** Resolves one texture role's required uniforms. */
         private static TextureLocations resolve(int program, String label, String name) {
             return new TextureLocations(
                     ProgramSupport.requiredUniform(program, label, name),
                     ProgramSupport.requiredUniform(program, label, "use" + capitalize(name)),
-                    ProgramSupport.requiredUniform(program, label, name + "Transform"));
+                    ProgramSupport.requiredUniform(program, label, name + "Transform"),
+                    ProgramSupport.requiredUniform(program, label, "flip" + capitalize(name) + "Vertically"));
         }
 
         /** Converts the first ASCII character of a fixed shader identifier to uppercase. */

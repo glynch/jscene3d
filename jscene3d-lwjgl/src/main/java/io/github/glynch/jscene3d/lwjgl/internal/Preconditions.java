@@ -42,6 +42,21 @@ public final class Preconditions {
     }
 
     /**
+     * Requires a finite positive floating-point value.
+     *
+     * @param value value to validate
+     * @param name parameter name used in diagnostics
+     * @return validated value
+     * @throws IllegalArgumentException if the value is non-positive or non-finite
+     */
+    public static float requirePositive(float value, String name) {
+        if (!Float.isFinite(value) || value <= 0.0f) {
+            throw new IllegalArgumentException(name + " must be finite and positive: " + value);
+        }
+        return value;
+    }
+
+    /**
      * Requires a non-negative finite floating-point argument.
      *
      * @param value value to validate

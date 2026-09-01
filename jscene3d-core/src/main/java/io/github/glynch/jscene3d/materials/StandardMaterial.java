@@ -33,6 +33,7 @@ public final class StandardMaterial extends Material {
     private Color emissive;
     private float emissiveIntensity;
     private float occlusionStrength;
+    private float environmentIntensity;
     private boolean usesVertexColors;
     private @Nullable Texture colorMap;
     private @Nullable Texture metalnessRoughnessMap;
@@ -58,6 +59,7 @@ public final class StandardMaterial extends Material {
         emissive = Color.BLACK;
         emissiveIntensity = 1.0f;
         occlusionStrength = 1.0f;
+        environmentIntensity = 1.0f;
         normalScale = new Vector2f(1.0f);
     }
 
@@ -219,6 +221,35 @@ public final class StandardMaterial extends Material {
         float validStrength = Preconditions.requireInRange(occlusionStrength, 0.0f, 1.0f, "occlusionStrength");
         if (this.occlusionStrength != validStrength) {
             this.occlusionStrength = validStrength;
+            markChanged();
+        }
+    }
+
+    /**
+     * Returns the material-specific image-based-lighting multiplier.
+     *
+     * @return finite non-negative multiplier, initially one
+     * @throws IllegalStateException if this material is closed
+     */
+    public float environmentIntensity() {
+        requireOpen();
+        return environmentIntensity;
+    }
+
+    /**
+     * Changes the material-specific image-based-lighting multiplier.
+     *
+     * <p>The renderer multiplies this value by the scene environment intensity.
+     *
+     * @param environmentIntensity finite non-negative multiplier
+     * @throws IllegalArgumentException if the value is negative or non-finite
+     * @throws IllegalStateException if this material is closed
+     */
+    public void setEnvironmentIntensity(float environmentIntensity) {
+        requireOpen();
+        float validIntensity = Preconditions.requireNonNegative(environmentIntensity, "environmentIntensity");
+        if (this.environmentIntensity != validIntensity) {
+            this.environmentIntensity = validIntensity;
             markChanged();
         }
     }

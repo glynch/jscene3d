@@ -36,6 +36,7 @@ final class TextureTest {
             assertThat(texture.magnificationFilter()).isEqualTo(TextureFilter.LINEAR);
             assertThat(texture.horizontalWrap()).isEqualTo(TextureWrap.CLAMP_TO_EDGE);
             assertThat(texture.verticalWrap()).isEqualTo(TextureWrap.CLAMP_TO_EDGE);
+            assertThat(texture.coordinateOrigin()).isEqualTo(TextureCoordinateOrigin.BOTTOM_LEFT);
             assertThat(texture.mipmapMode()).isEqualTo(MipmapMode.GENERATE);
             assertThat(copy.array()).containsExactly((byte) 0xff, 0, 0, (byte) 0xff, 0, (byte) 0xff, 0, (byte) 0xff);
         }
@@ -146,6 +147,23 @@ final class TextureTest {
     }
 
     @Test
+    void versionsCoordinateOriginAsTextureCoordinateState() {
+        try (Texture texture = Texture.baseColor(1, 1, new byte[4])) {
+            texture.setCoordinateOrigin(TextureCoordinateOrigin.TOP_LEFT);
+
+            assertThat(texture.coordinateOrigin()).isEqualTo(TextureCoordinateOrigin.TOP_LEFT);
+            assertThat(texture.version()).isOne();
+            assertThat(texture.transformVersion()).isOne();
+            assertThat(texture.imageVersion()).isZero();
+            assertThat(texture.samplerVersion()).isZero();
+
+            texture.setCoordinateOrigin(TextureCoordinateOrigin.TOP_LEFT);
+
+            assertThat(texture.version()).isOne();
+        }
+    }
+
+    @Test
     @SuppressWarnings("NullAway")
     void rejectsInvalidTextureTransformsAndCopyDestinations() {
         try (Texture texture = Texture.baseColor(1, 1, new byte[4])) {
@@ -156,6 +174,7 @@ final class TextureTest {
             assertThatNullPointerException().isThrownBy(() -> texture.setOffset(null));
             assertThatNullPointerException().isThrownBy(() -> texture.setRepeat(null));
             assertThatNullPointerException().isThrownBy(() -> texture.setCenter(null));
+            assertThatNullPointerException().isThrownBy(() -> texture.setCoordinateOrigin(null));
             assertThatNullPointerException().isThrownBy(() -> texture.offset(null));
             assertThatNullPointerException().isThrownBy(() -> texture.repeat(null));
             assertThatNullPointerException().isThrownBy(() -> texture.center(null));

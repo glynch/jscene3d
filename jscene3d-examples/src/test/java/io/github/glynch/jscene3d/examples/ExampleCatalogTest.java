@@ -24,4 +24,16 @@ final class ExampleCatalogTest {
             assertThat((long) width * MINIMUM_THUMBNAIL_HEIGHT).isEqualTo((long) height * MINIMUM_THUMBNAIL_WIDTH);
         });
     }
+
+    /** Ensures glTF model cards present a category rather than an apparent loading status. */
+    @Test
+    void gltfModelCardsUseAnUnambiguousCategory() {
+        assertThat(ExampleCatalog.entries())
+                .filteredOn(entry -> entry.category().equals("glTF Models"))
+                .extracting(ExampleCatalogEntry::id)
+                .containsExactly("avocado-model", "water-bottle-model", "boom-box-model", "gltf-loading");
+        assertThat(ExampleCatalog.entries())
+                .extracting(ExampleCatalogEntry::category)
+                .doesNotContain("Loading");
+    }
 }

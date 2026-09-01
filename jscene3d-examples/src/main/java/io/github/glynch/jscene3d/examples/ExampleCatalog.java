@@ -238,7 +238,7 @@ final class ExampleCatalog {
                 definition(
                         "avocado-model",
                         "Avocado glTF model",
-                        "Loading",
+                        "glTF Models",
                         "A realistic CC0 glTF asset rendered with HDR image-based lighting.",
                         List.of("gltf", "glb", "pbr", "ibl", "environment", "realistic"),
                         List.of(
@@ -261,7 +261,7 @@ final class ExampleCatalog {
                 definition(
                         "water-bottle-model",
                         "Water Bottle glTF model",
-                        "Loading",
+                        "glTF Models",
                         "A CC0 PBR asset exercising normal, occlusion, and emissive maps.",
                         List.of("gltf", "glb", "pbr", "normal map", "occlusion", "emissive", "ibl"),
                         List.of(
@@ -284,7 +284,7 @@ final class ExampleCatalog {
                 definition(
                         "boom-box-model",
                         "Boom Box glTF model",
-                        "Loading",
+                        "glTF Models",
                         "A CC0 portable radio with metallic surfaces and an emissive front panel.",
                         List.of("gltf", "glb", "pbr", "emissive", "metallic", "ibl"),
                         List.of(
@@ -307,7 +307,7 @@ final class ExampleCatalog {
                 definition(
                         "gltf-loading",
                         "glTF loading",
-                        "Loading",
+                        "glTF Models",
                         "A bundled glTF 2.0 scene loaded through the optional glTF artifact.",
                         List.of("gltf", "glb", "loader", "pbr"),
                         GltfLoadingExample::create),

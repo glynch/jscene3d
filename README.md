@@ -87,7 +87,7 @@ when a clean build is required.
 `TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
-`GltfLoadingExample`,
+`KeyframeAnimationExample`, `GltfAnimationExample`, `GltfLoadingExample`,
 `SpotAndHemisphereLightsExample`, `ShadowsExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
@@ -113,18 +113,22 @@ without requiring LWJGL, OpenGL, or a graphics context:
 ```java
 try (LoadedGltf loaded = GltfLoader.load(Path.of("scene.glb"))) {
     Scene scene = loaded.scene();
+    AnimationMixer mixer = new AnimationMixer();
+    loaded.animations().forEach(clip -> mixer.action(clip).play());
     // Render or process the scene while the loaded owner remains open.
+    // Advance the mixer explicitly once per frame with mixer.update(elapsedSeconds).
 }
 ```
 
-The initial capability profile supports static selected-scene hierarchies, TRS
+The current capability profile supports selected-scene hierarchies, TRS
 and decomposable matrix transforms, triangle primitives, indices, positions,
 normals, primary texture coordinates, RGB/RGBA vertex colours,
 metallic-roughness materials, PNG/JPEG images, alpha modes, double-sided
-materials, and core sampler state. Imported textures retain glTF's top-left
-texture-coordinate convention rather than rewriting geometry UVs. Unsupported
-required extensions, animation,
-skinning, morph targets, embedded cameras, secondary texture-coordinate
+materials, core sampler state, and translation, rotation, and scale animation
+channels using step, linear, or cubic-spline interpolation. Imported textures
+retain glTF's top-left texture-coordinate convention rather than rewriting
+geometry UVs. Unsupported required extensions, skinning, morph targets,
+animation weight channels, embedded cameras, secondary texture-coordinate
 selection, and non-triangle primitives fail with a source-aware diagnostic.
 JglTF performs container and reference parsing internally; no JglTF type is
 part of the public JScene3D API.
@@ -133,6 +137,24 @@ On macOS, the OS-activated Maven profile launches the new JVM with
 `-XstartOnFirstThread`. Other platforms use the same runner without that JVM
 option. The examples artifact is never deployed. Run `./mvnw clean verify`
 separately when the project needs complete verification.
+
+## Animation
+
+The renderer-independent `io.github.glynch.jscene3d.animation` package provides
+immutable `AnimationClip` objects, typed position, rotation, and scale tracks,
+and caller-driven `AnimationMixer` playback. Keyframe arrays are copied during
+construction. Track bindings retain their target `Object3D` and apply values
+through controlled transform setters; they do not expose mutable JOML state.
+
+`AnimationAction` supports explicit play, pause, stop, reset, seeking, positive
+or negative time scales, and once, repeat, or ping-pong looping. Applications
+advance a mixer with their frame delta; the animation package creates neither
+threads nor a hidden clock. Concurrent actions must currently target distinct
+object properties because weighted blending is not yet supported.
+
+`KeyframeAnimationExample` compares step, linear, and cubic-spline interpolation
+with live playback controls. `GltfAnimationExample` imports and synchronously
+plays the nine transform clips in Khronos's CC0 Interpolation Test asset.
 
 ## Transparency
 

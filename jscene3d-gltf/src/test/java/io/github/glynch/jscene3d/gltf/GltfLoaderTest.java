@@ -9,6 +9,10 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.animation.AnimationAction;
+import io.github.glynch.jscene3d.animation.AnimationClip;
+import io.github.glynch.jscene3d.animation.AnimationMixer;
+import io.github.glynch.jscene3d.animation.Interpolation;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.AlphaMode;
@@ -66,6 +70,33 @@ final class GltfLoaderTest {
         }
     }
 
+    /** Converts glTF transform channels into playable typed animation tracks. */
+    @Test
+    void loadsTransformAnimations() throws IOException {
+        Path source = GltfTestAssets.writeAnimatedTriangle(temporaryDirectory);
+
+        try (LoadedGltf loaded = GltfLoader.load(source)) {
+            Object3D target = loaded.scene().children().getFirst();
+            AnimationClip clip = loaded.animations().getFirst();
+            AnimationAction action = new AnimationMixer().action(clip);
+
+            action.setTime(0.5f);
+
+            assertThat(clip.name()).isEqualTo("Transform interpolation");
+            assertThat(clip.duration()).isEqualTo(2.0f);
+            assertThat(clip.tracks())
+                    .extracting(track -> track.interpolation())
+                    .containsExactly(Interpolation.LINEAR, Interpolation.STEP, Interpolation.CUBIC_SPLINE);
+            assertThat(target.position().x()).isEqualTo(1.0f);
+            assertThat(target.position().y()).isEqualTo(2.0f);
+            assertThat(target.position().z()).isEqualTo(3.0f);
+            assertThat(target.quaternion().w()).isEqualTo(1.0f);
+            assertThat(target.scale().x()).isEqualTo(2.0f);
+            assertThat(target.scale().y()).isEqualTo(2.0f);
+            assertThat(target.scale().z()).isEqualTo(2.0f);
+        }
+    }
+
     /** Makes loaded ownership terminal and idempotent. */
     @Test
     void closesOwnedResourcesExactlyOnce() throws IOException {
@@ -83,6 +114,7 @@ final class GltfLoaderTest {
         assertThat(material.isClosed()).isTrue();
         assertThat(texture.isClosed()).isTrue();
         assertThatIllegalStateException().isThrownBy(loaded::scene);
+        assertThatIllegalStateException().isThrownBy(loaded::animations);
     }
 
     /** Preserves source-aware diagnostics and validates the public null contract. */

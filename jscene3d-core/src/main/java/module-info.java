@@ -7,6 +7,7 @@ module io.github.glynch.jscene3d.core {
     requires transitive org.joml;
     requires static transitive org.jspecify;
 
+    exports io.github.glynch.jscene3d.animation;
     exports io.github.glynch.jscene3d.cameras;
     exports io.github.glynch.jscene3d.geometries;
     exports io.github.glynch.jscene3d.helpers;

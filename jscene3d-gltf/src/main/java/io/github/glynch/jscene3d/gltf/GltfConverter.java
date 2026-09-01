@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.gltf;
 
 import de.javagl.jgltf.impl.v2.GlTF;
 import de.javagl.jgltf.model.AccessorModel;
+import de.javagl.jgltf.model.AnimationModel;
 import de.javagl.jgltf.model.GltfConstants;
 import de.javagl.jgltf.model.GltfModel;
 import de.javagl.jgltf.model.ImageModel;
@@ -20,6 +21,11 @@ import de.javagl.jgltf.model.io.GltfAssetReader;
 import de.javagl.jgltf.model.io.v2.GltfAssetV2;
 import de.javagl.jgltf.model.v2.GltfModelCreatorV2;
 import de.javagl.jgltf.model.v2.MaterialModelV2;
+import io.github.glynch.jscene3d.animation.AnimationClip;
+import io.github.glynch.jscene3d.animation.AnimationTrack;
+import io.github.glynch.jscene3d.animation.Interpolation;
+import io.github.glynch.jscene3d.animation.QuaternionKeyframeTrack;
+import io.github.glynch.jscene3d.animation.Vector3KeyframeTrack;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
@@ -66,6 +72,7 @@ final class GltfConverter {
     private final Map<MaterialModel, StandardMaterial> materialCache = new IdentityHashMap<>();
     private final Map<TextureModel, EnumMap<TextureColorSpace, Texture>> textureCache = new IdentityHashMap<>();
     private final Map<ImageModel, DecodedImage> imageCache = new IdentityHashMap<>();
+    private final Map<NodeModel, Group> convertedNodes = new IdentityHashMap<>();
 
     private @Nullable StandardMaterial defaultMaterial;
 
@@ -93,7 +100,8 @@ final class GltfConverter {
     private LoadedGltf convert() {
         try {
             Scene scene = convertScene();
-            return new LoadedGltf(scene, geometries, materials, textures);
+            List<AnimationClip> animations = convertAnimations();
+            return new LoadedGltf(scene, animations, geometries, materials, textures);
         } catch (RuntimeException failure) {
             closePartialResources();
             throw failure;
@@ -103,7 +111,6 @@ final class GltfConverter {
     /** Rejects unsupported root features before JglTF constructs their specialized models. */
     private static void validateRootCapabilities(Path source, GlTF gltf) {
         rejectPresent(source, "required extensions " + gltf.getExtensionsRequired(), gltf.getExtensionsRequired());
-        rejectPresent(source, "animation", gltf.getAnimations());
         rejectPresent(source, "skinning", gltf.getSkins());
         rejectPresent(source, "embedded cameras", gltf.getCameras());
     }
@@ -126,20 +133,19 @@ final class GltfConverter {
             throw failure("Default scene index is outside the scene list: " + defaultSceneIndex, null);
         }
         List<NodeModel> roots = sceneModels.get(defaultSceneIndex).getNodeModels();
-        Map<NodeModel, Group> converted = new IdentityHashMap<>();
         ArrayDeque<NodeModel> pending = new ArrayDeque<>(roots);
         while (!pending.isEmpty()) {
             NodeModel node = pending.removeFirst();
-            if (converted.containsKey(node)) {
+            if (convertedNodes.containsKey(node)) {
                 continue;
             }
             Group group = convertNode(node);
-            converted.put(node, group);
+            convertedNodes.put(node, group);
             pending.addAll(node.getChildren());
         }
-        for (Map.Entry<NodeModel, Group> entry : converted.entrySet()) {
+        for (Map.Entry<NodeModel, Group> entry : convertedNodes.entrySet()) {
             for (NodeModel child : entry.getKey().getChildren()) {
-                Group convertedChild = converted.get(child);
+                Group convertedChild = convertedNodes.get(child);
                 if (convertedChild == null) {
                     throw failure("Scene hierarchy contains an unreachable child", null);
                 }
@@ -147,9 +153,94 @@ final class GltfConverter {
             }
         }
         for (NodeModel root : roots) {
-            scene.add(Objects.requireNonNull(converted.get(root), "converted root"));
+            scene.add(Objects.requireNonNull(convertedNodes.get(root), "converted root"));
         }
         return scene;
+    }
+
+    /** Converts source animation channels into renderer-independent typed transform tracks. */
+    private List<AnimationClip> convertAnimations() {
+        List<AnimationModel> sourceAnimations = model.getAnimationModels();
+        List<AnimationClip> animations = new ArrayList<>(sourceAnimations.size());
+        for (int animationIndex = 0; animationIndex < sourceAnimations.size(); animationIndex++) {
+            AnimationModel sourceAnimation = sourceAnimations.get(animationIndex);
+            List<AnimationTrack> tracks =
+                    new ArrayList<>(sourceAnimation.getChannels().size());
+            for (AnimationModel.Channel channel : sourceAnimation.getChannels()) {
+                tracks.add(convertAnimationChannel(channel));
+            }
+            String name = sourceAnimation.getName();
+            if (name == null || name.isBlank()) {
+                name = "Animation " + (animationIndex + 1);
+            }
+            animations.add(new AnimationClip(name, tracks));
+        }
+        return List.copyOf(animations);
+    }
+
+    /** Converts one channel after resolving its target in the selected scene. */
+    private AnimationTrack convertAnimationChannel(AnimationModel.Channel channel) {
+        NodeModel sourceTarget = channel.getNodeModel();
+        Group target = convertedNodes.get(sourceTarget);
+        if (target == null) {
+            throw failure("Animation targets a node outside the selected scene", null);
+        }
+        AnimationModel.Sampler sampler = channel.getSampler();
+        AccessorModel input = sampler.getInput();
+        AccessorModel output = sampler.getOutput();
+        requireAnimationFloatAccessor(input, "animation input");
+        requireAnimationFloatAccessor(output, "animation output");
+        float[] times = AccessorDecoder.floats(input, de.javagl.jgltf.model.ElementType.SCALAR, "animation input");
+        Interpolation interpolation = interpolation(sampler.getInterpolation());
+        return switch (channel.getPath()) {
+            case "translation" ->
+                Vector3KeyframeTrack.position(
+                        target,
+                        times,
+                        AccessorDecoder.floats(
+                                output, de.javagl.jgltf.model.ElementType.VEC3, "animation translation output"),
+                        interpolation);
+            case "rotation" ->
+                QuaternionKeyframeTrack.rotation(
+                        target,
+                        times,
+                        AccessorDecoder.floats(
+                                output, de.javagl.jgltf.model.ElementType.VEC4, "animation rotation output"),
+                        interpolation);
+            case "scale" ->
+                Vector3KeyframeTrack.scale(
+                        target,
+                        times,
+                        AccessorDecoder.floats(
+                                output, de.javagl.jgltf.model.ElementType.VEC3, "animation scale output"),
+                        interpolation);
+            case "weights" -> throw unsupportedFailure("animation morph weights");
+            default -> throw unsupportedFailure("animation target path " + channel.getPath());
+        };
+    }
+
+    /** Maps JglTF's interpolation vocabulary into the public animation vocabulary. */
+    private static Interpolation interpolation(AnimationModel.@Nullable Interpolation interpolation) {
+        if (interpolation == null) {
+            return Interpolation.LINEAR;
+        }
+        return switch (interpolation) {
+            case STEP -> Interpolation.STEP;
+            case LINEAR -> Interpolation.LINEAR;
+            case CUBICSPLINE -> Interpolation.CUBIC_SPLINE;
+        };
+    }
+
+    /** Requires animation scalar storage mandated by core glTF 2.0. */
+    private void requireAnimationFloatAccessor(AccessorModel accessor, String semantic) {
+        if (accessor.getComponentType() != GltfConstants.GL_FLOAT || accessor.isNormalized()) {
+            throw failure(semantic + " must contain non-normalized floating-point values", null);
+        }
+    }
+
+    /** Creates an unsupported-capability failure for use inside switch expressions. */
+    private GltfLoadException unsupportedFailure(String capability) {
+        return failure("Unsupported glTF capability: " + capability, null);
     }
 
     /** Converts one node's local transform and attached mesh primitives. */

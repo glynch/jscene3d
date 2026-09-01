@@ -536,6 +536,12 @@ Unsupported required extensions and unsupported representations fail with a
 diagnostic identifying the feature and source location; they are never silently
 discarded when that would change the represented scene.
 
+The current profile also imports translation, rotation, and scale animation
+channels using step, linear, and cubic-spline interpolation. Imported clips use
+the renderer-independent animation model from `jscene3d-core`; skinning, morph
+targets, and animation weight channels remain unsupported until their runtime
+features exist.
+
 The longer-term import tiers are:
 
 1. glTF 2.0 and GLB as the first and primary loader.
@@ -2735,29 +2741,27 @@ can be enabled when the repository becomes public and CI capacity is available.
 
 ---
 
-## 32. Post-0.1 Feature Sequence
+## 32. Feature Sequence
 
-The first major post-0.1 feature block is correctly rendered static glTF 2.0
-and GLB loading. It builds on the initial ambient and point lights, introduces
-metallic-roughness PBR material behavior, then loads static scene hierarchy,
-triangle meshes, textures, core PBR materials, and perspective or orthographic
-cameras. It excludes animation, skinning, morph targets, lights stored in the
-asset, and compression extensions until their corresponding runtime features
-and focused examples exist.
+Correctly rendered glTF 2.0 and GLB loading now builds on metallic-roughness PBR,
+environment lighting, and the existing scene hierarchy. Its current animation
+slice adds renderer-independent clips, typed transform tracks, explicit mixer
+playback, and glTF translation, rotation, and scale channels. Skinning, morph
+targets, lights stored in assets, and compression extensions remain deferred
+until their corresponding runtime features and focused examples exist.
 
 After that block, a plausible sequence is:
 
-1. Animation clips and mixers.
-2. Skinning.
-3. Morph targets.
-4. Render targets and framebuffer management.
-5. Shadow maps.
+1. Skinning.
+2. Morph targets.
+3. Weighted animation blending and cross-fading.
+4. Animation retargeting.
+5. Render targets and framebuffer management.
 6. Instanced meshes.
-7. Environment maps and image-based lighting.
-8. Additional glTF extensions and optional compression integrations.
-9. Additional material models when an example requires them.
-10. Post-processing graph.
-11. Additional renderer only if product requirements justify it.
+7. Additional glTF extensions and optional compression integrations.
+8. Additional material models when an example requires them.
+9. Post-processing graph.
+10. Additional renderer only if product requirements justify it.
 
 The sequence should be adjusted by real user needs. For example, a
 data-visualization library may prioritize lines, points, labels, and picking
@@ -2967,10 +2971,10 @@ context, choice, consequences, and alternatives.
 31. Use glTF 2.0 and GLB as the primary asset-import formats under an explicit
     capability profile; keep legacy and specialist loaders optional, and treat
     native JScene3D Scene Persistence as a separate future concern.
-32. Keep glTF loading out of version 0.1 and make correctly rendered static
-    glTF/GLB loading, together with its minimum PBR and lighting prerequisites,
-    the first major post-0.1 feature block.
-33. Publish glTF support post-0.1 as the renderer-independent artifact
+32. Include correctly rendered glTF/GLB loading and typed transform animation in
+    the expanded version 0.1 scope, together with their PBR and lighting
+    prerequisites; keep unsupported capabilities explicit.
+33. Publish glTF support as the renderer-independent artifact
     `io.github.glynch:jscene3d-gltf`, depending on `jscene3d-core` without
     requiring `jscene3d-lwjgl` or an active graphics context.
 34. Keep the repository private and macOS ARM64 as the sole Verified Platform
@@ -3150,6 +3154,7 @@ Central, and uses Apache-2.0.
 Version 0.1 includes custom GLSL through `ShaderMaterial`, Basic, Lambert,
 Normal, Phong, and line materials, ambient, point, directional, spot, and
 hemisphere lights, PNG and JPEG texture loading,
+renderer-independent transform animation and glTF animation import,
 genuine module-path and classpath use, multiple independent
 Window-Renderer Pairs on one render thread, and explicit idempotent terminal
 closure. It excludes raw OpenGL interoperability and shared contexts. The

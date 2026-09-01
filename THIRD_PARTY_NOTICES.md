@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Interpolation Test glTF model
+
+- Asset: Interpolation Test binary glTF model
+- Creator: Khronos Group
+- Source: [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/InterpolationTest)
+- License: [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)
+- Bundled file: `jscene3d-examples/src/main/resources/io/github/glynch/jscene3d/examples/interpolation-test/InterpolationTest.glb`
+
+The model compares step, linear, and cubic-spline interpolation for translation,
+rotation, and scale. Detailed provenance and the downloaded file checksum are
+stored beside the bundled asset.
+
 ## Utah Teapot geometry data
 
 - Asset: Bicubic patch indices and control points for the Utah Teapot

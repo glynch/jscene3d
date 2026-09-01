@@ -9,12 +9,13 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * Loads static glTF 2.0 JSON and GLB assets into JScene3D-owned scene resources.
+ * Loads glTF 2.0 JSON and GLB assets into JScene3D-owned scene resources.
  *
  * <p>The initial capability profile supports the selected scene, node TRS transforms, triangle
  * primitives, indices, positions, normals, primary texture coordinates, RGB/RGBA vertex colours,
- * metallic-roughness materials, PNG/JPEG images, and core glTF sampler state. Unsupported required
- * extensions, animation, skinning, morph targets, cameras, secondary texture-coordinate selection,
+ * metallic-roughness materials, PNG/JPEG images, core glTF sampler state, and node translation,
+ * rotation, and scale animation using step, linear, or cubic-spline interpolation. Unsupported
+ * required extensions, skinning, morph targets, cameras, secondary texture-coordinate selection,
  * and non-triangle primitives fail with a diagnostic {@link GltfLoadException}.
  */
 public final class GltfLoader {

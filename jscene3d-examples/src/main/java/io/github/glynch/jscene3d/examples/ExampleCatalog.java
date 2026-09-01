@@ -41,6 +41,28 @@ final class ExampleCatalog {
                         List.of("texture", "cube", "uv", "animation"),
                         TexturedCubeExample::create),
                 definition(
+                        "keyframe-animation",
+                        "Keyframe animation",
+                        "Animation",
+                        "Step, linear, and cubic-spline transform tracks with live playback controls.",
+                        List.of("animation", "keyframe", "step", "linear", "cubic spline", "mixer"),
+                        KeyframeAnimationExample::create),
+                definition(
+                        "gltf-animation",
+                        "glTF animation",
+                        "Animation",
+                        "Imported glTF transform clips comparing all three interpolation modes.",
+                        List.of("animation", "gltf", "keyframe", "step", "linear", "cubic spline"),
+                        List.of(new GalleryAttribution(
+                                "Interpolation Test glTF model",
+                                "Khronos Group",
+                                "Khronos glTF Sample Assets — Interpolation Test",
+                                URI.create(
+                                        "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/InterpolationTest"),
+                                "CC0-1.0",
+                                URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        GltfAnimationExample::create),
+                definition(
                         "generated-geometries",
                         "Generated geometries",
                         "Geometry",

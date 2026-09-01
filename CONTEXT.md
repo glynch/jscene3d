@@ -164,9 +164,29 @@ _Avoid_: Scene Persistence
 **glTF Support Profile**:
 The explicit, versioned list of glTF core capabilities and extensions that a
 JScene3D loader represents correctly. Unsupported required capabilities fail
-diagnostically instead of being silently discarded. The first profile is the
-first major post-0.1 feature block and covers correctly rendered static scenes.
+diagnostically instead of being silently discarded. The current profile covers
+correctly rendered scenes plus translation, rotation, and scale animation using
+step, linear, and cubic-spline interpolation; skinning and morph targets remain
+outside that profile.
 _Avoid_: Full glTF support
+
+**Animation Clip**:
+An immutable named collection of typed keyframe tracks sharing a playback
+timeline. A clip retains its target scene objects through its tracks but owns no
+clock or thread.
+_Avoid_: Animation sequence
+
+**Animation Action**:
+Mutable playback state for one Animation Clip, including local time, time scale,
+loop mode, and running or paused state. An Animation Mixer owns one stable action
+for each clip identity.
+_Avoid_: Animator
+
+**Animation Mixer**:
+A caller-driven owner that advances Animation Actions using an explicit elapsed
+time. Until weighted blending is supported, concurrent actions must target
+distinct object properties.
+_Avoid_: Animation thread
 
 **Scene Persistence**:
 Future saving and restoration of JScene3D-specific scene state, identities, and

@@ -124,6 +124,57 @@ final class GltfTestAssets {
         return source;
     }
 
+    /** Writes one triangle node with linear, step, and cubic-spline transform channels. */
+    static Path writeAnimatedTriangle(Path directory) throws IOException {
+        ByteBuffer data = ByteBuffer.allocate(240).order(ByteOrder.LITTLE_ENDIAN);
+        putFloats(data, -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        putFloats(data, 0.0f, 1.0f, 2.0f);
+        putFloats(data, 0.0f, 0.0f, 0.0f, 2.0f, 4.0f, 6.0f, 4.0f, 8.0f, 12.0f);
+        putFloats(data, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+        putFloats(
+                data, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 3.0f, 3.0f, 0.0f,
+                0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+        Files.write(directory.resolve("animated.bin"), data.array());
+        String json = """
+                {
+                  "asset":{"version":"2.0"},
+                  "scene":0,
+                  "scenes":[{"nodes":[0]}],
+                  "nodes":[{"mesh":0}],
+                  "meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}],
+                  "animations":[{
+                    "name":"Transform interpolation",
+                    "samplers":[
+                      {"input":1,"output":2,"interpolation":"LINEAR"},
+                      {"input":1,"output":3,"interpolation":"STEP"},
+                      {"input":1,"output":4,"interpolation":"CUBICSPLINE"}
+                    ],
+                    "channels":[
+                      {"sampler":0,"target":{"node":0,"path":"translation"}},
+                      {"sampler":1,"target":{"node":0,"path":"rotation"}},
+                      {"sampler":2,"target":{"node":0,"path":"scale"}}
+                    ]
+                  }],
+                  "buffers":[{"uri":"animated.bin","byteLength":240}],
+                  "bufferViews":[
+                    {"buffer":0,"byteOffset":0,"byteLength":36},
+                    {"buffer":0,"byteOffset":36,"byteLength":12},
+                    {"buffer":0,"byteOffset":48,"byteLength":36},
+                    {"buffer":0,"byteOffset":84,"byteLength":48},
+                    {"buffer":0,"byteOffset":132,"byteLength":108}
+                  ],
+                  "accessors":[
+                    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+                    {"bufferView":1,"componentType":5126,"count":3,"type":"SCALAR","min":[0],"max":[2]},
+                    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"},
+                    {"bufferView":3,"componentType":5126,"count":3,"type":"VEC4"},
+                    {"bufferView":4,"componentType":5126,"count":9,"type":"VEC3"}
+                  ]
+                }
+                """;
+        return writeJson(directory, "animated.gltf", json);
+    }
+
     /** Writes a one-primitive embedded-buffer triangle with caller-selected node and root features. */
     static Path writeSimpleTriangle(
             Path directory, String fileName, String node, String primitive, String additionalRootProperties)

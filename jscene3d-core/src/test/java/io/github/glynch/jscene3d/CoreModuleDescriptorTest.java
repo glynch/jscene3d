@@ -25,6 +25,7 @@ final class CoreModuleDescriptorTest {
 
         assertThat(exports)
                 .containsExactlyInAnyOrder(
+                        "io.github.glynch.jscene3d.animation",
                         "io.github.glynch.jscene3d.cameras",
                         "io.github.glynch.jscene3d.geometries",
                         "io.github.glynch.jscene3d.helpers",

@@ -17,16 +17,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Themed immediate control panel explicitly bound to application state.
  *
- * <p>Sections contain read-only text, checkboxes, floating-point sliders, and action buttons.
- * Bindings use Java method references or lambdas; the panel does not use reflection or direct
- * field access. Call {@link #update()} after {@link Window#pollEvents()}, then pass this overlay to
- * the renderer after drawing the scene.
+ * <p>Sections contain read-only text, checkboxes, floating-point and integer sliders, finite
+ * choices, and action buttons. Bindings use Java method references or lambdas; the panel does not
+ * use reflection or direct field access. Call {@link #update()} after {@link Window#pollEvents()},
+ * then pass this overlay to the renderer after drawing the scene.
  *
  * <p>The panel owns no native or GPU resources. It is mutable, not thread-safe, and subject to its
  * window's thread affinity.
@@ -308,6 +311,7 @@ public final class ControlPanel implements Overlay {
                 activeSlider = sliderItem;
                 yield applySlider(sliderItem, x, panelX);
             }
+            case ChoiceItem<?> choiceItem -> choiceItem.select(x >= panelX + WIDTH * 0.5f);
             case ButtonItem buttonItem -> {
                 buttonItem.action.run();
                 yield true;
@@ -319,8 +323,7 @@ public final class ControlPanel implements Overlay {
     /** Maps a pointer position to one slider's configured interval. */
     private static boolean applySlider(SliderItem slider, double x, float panelX) {
         float fraction = (float) Math.clamp((x - panelX - SLIDER_X_OFFSET) / SLIDER_WIDTH, 0.0, 1.0);
-        float value = slider.minimum + fraction * (slider.maximum - slider.minimum);
-        slider.setter.accept(value);
+        slider.apply(fraction);
         return true;
     }
 
@@ -387,6 +390,28 @@ public final class ControlPanel implements Overlay {
         void accept(boolean value);
     }
 
+    /**
+     * One labelled value offered by a finite choice control.
+     *
+     * @param <T> value type
+     * @param value value passed to the bound setter
+     * @param label non-blank display label
+     */
+    public record Choice<T>(T value, String label) {
+        /**
+         * Creates a non-null choice with a non-blank display label.
+         *
+         * @param value value passed to the bound setter
+         * @param label non-blank display label
+         * @throws NullPointerException if an argument is {@code null}
+         * @throws IllegalArgumentException if {@code label} is blank
+         */
+        public Choice {
+            Objects.requireNonNull(value, "value");
+            label = Preconditions.requireNonBlank(label, "label");
+        }
+    }
+
     /** A collapsible ordered group of related controls. */
     public static final class Section {
         private final ControlPanel panel;
@@ -447,12 +472,62 @@ public final class ControlPanel implements Overlay {
          */
         public void addFloat(String label, FloatSupplier getter, FloatConsumer setter, float minimum, float maximum) {
             Preconditions.requireOrdered(minimum, "minimum", maximum, "maximum");
-            items.add(new SliderItem(
+            items.add(new FloatSliderItem(
                     Preconditions.requireNonBlank(label, "label"),
                     Objects.requireNonNull(getter, "getter"),
                     Objects.requireNonNull(setter, "setter"),
                     minimum,
                     maximum));
+        }
+
+        /**
+         * Adds an integer slider explicitly bound to a getter and setter.
+         *
+         * @param label non-blank row label
+         * @param getter current-value supplier
+         * @param setter replacement-value consumer
+         * @param minimum inclusive lower endpoint
+         * @param maximum inclusive upper endpoint
+         * @throws NullPointerException if a binding is {@code null}
+         * @throws IllegalArgumentException if the label is blank or {@code minimum} is greater
+         *     than {@code maximum}
+         */
+        public void addInteger(String label, IntSupplier getter, IntConsumer setter, int minimum, int maximum) {
+            if (minimum > maximum) {
+                throw new IllegalArgumentException("minimum must not exceed maximum: " + minimum + " > " + maximum);
+            }
+            items.add(new IntegerSliderItem(
+                    Preconditions.requireNonBlank(label, "label"),
+                    Objects.requireNonNull(getter, "getter"),
+                    Objects.requireNonNull(setter, "setter"),
+                    minimum,
+                    maximum));
+        }
+
+        /**
+         * Adds a finite choice explicitly bound to a getter and setter.
+         *
+         * <p>Click the left or right half of the row to select the previous or next value. The
+         * current getter value must equal one of the supplied choices.
+         *
+         * @param <T> value type
+         * @param label non-blank row label
+         * @param getter current-value supplier
+         * @param setter replacement-value consumer
+         * @param choices ordered non-empty choices
+         * @throws NullPointerException if an argument or choice is {@code null}
+         * @throws IllegalArgumentException if the label is blank or choices are empty
+         */
+        public <T> void addChoice(String label, Supplier<T> getter, Consumer<T> setter, List<Choice<T>> choices) {
+            List<Choice<T>> validChoices = List.copyOf(Objects.requireNonNull(choices, "choices"));
+            if (validChoices.isEmpty()) {
+                throw new IllegalArgumentException("choices must not be empty");
+            }
+            items.add(new ChoiceItem<>(
+                    Preconditions.requireNonBlank(label, "label"),
+                    Objects.requireNonNull(getter, "getter"),
+                    Objects.requireNonNull(setter, "setter"),
+                    validChoices));
         }
 
         /**
@@ -482,9 +557,15 @@ public final class ControlPanel implements Overlay {
     record PointerFrame(double x, double y, boolean pressed, boolean down, boolean released) {}
 
     /** Shared paint contract for one panel row. */
-    private sealed interface Item permits BooleanItem, SliderItem, ButtonItem, TextItem {
+    private sealed interface Item permits BooleanItem, SliderItem, ChoiceItem, ButtonItem, TextItem {
         /** Paints row-specific visuals. */
         void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme);
+    }
+
+    /** Shared behavior of rows controlled by horizontal pointer dragging. */
+    private sealed interface SliderItem extends Item permits FloatSliderItem, IntegerSliderItem {
+        /** Applies a normalized position within the slider track. */
+        void apply(float fraction);
     }
 
     /** Explicitly bound checkbox row. */
@@ -511,8 +592,14 @@ public final class ControlPanel implements Overlay {
     }
 
     /** Explicitly bound floating-point slider row. */
-    private record SliderItem(String label, FloatSupplier getter, FloatConsumer setter, float minimum, float maximum)
-            implements Item {
+    private record FloatSliderItem(
+            String label, FloatSupplier getter, FloatConsumer setter, float minimum, float maximum)
+            implements SliderItem {
+        @Override
+        public void apply(float fraction) {
+            setter.accept(minimum + fraction * (maximum - minimum));
+        }
+
         @Override
         public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
             float value = Preconditions.requireFinite(getter.getAsFloat(), label);
@@ -534,6 +621,80 @@ public final class ControlPanel implements Overlay {
         private static String compact(float value) {
             float rounded = Math.round(value * 100.0f) / 100.0f;
             return Float.toString(rounded);
+        }
+    }
+
+    /** Explicitly bound integer slider row. */
+    private record IntegerSliderItem(String label, IntSupplier getter, IntConsumer setter, int minimum, int maximum)
+            implements SliderItem {
+        @Override
+        public void apply(float fraction) {
+            long range = (long) maximum - minimum;
+            long selectedValue = Math.round(minimum + (double) fraction * range);
+            setter.accept(Math.clamp(selectedValue, minimum, maximum));
+        }
+
+        @Override
+        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+            int value = getter.getAsInt();
+            long range = (long) maximum - minimum;
+            float fraction = maximum == minimum
+                    ? 1.0f
+                    : Math.clamp((float) (((long) value - minimum) / (double) range), 0.0f, 1.0f);
+            float sliderX = x + SLIDER_X_OFFSET;
+            float trackY = y + ITEM_HEIGHT * 0.5f - 2.0f;
+            FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
+            canvas.roundedRectangle(sliderX, trackY, SLIDER_WIDTH, 4.0f, 2.0f, theme.control(), 1.0f);
+            canvas.roundedRectangle(sliderX, trackY, SLIDER_WIDTH * fraction, 4.0f, 2.0f, theme.accent(), 1.0f);
+            float thumbX = sliderX + SLIDER_WIDTH * fraction - 6.0f;
+            canvas.roundedRectangle(thumbX, trackY - 4.0f, 12.0f, 12.0f, 6.0f, theme.accent(), 1.0f);
+            String valueText = Integer.toString(value);
+            float valueX = x + WIDTH - SLIDER_RIGHT_PADDING - FONT.width(valueText, VALUE_FONT_SIZE);
+            FONT.text(canvas, valueX, y + 11.5f, valueText, VALUE_FONT_SIZE, theme.text());
+        }
+    }
+
+    /** Explicitly bound finite-choice row. */
+    private record ChoiceItem<T>(String label, Supplier<T> getter, Consumer<T> setter, List<Choice<T>> choices)
+            implements Item {
+        /** Selects the adjacent choice, clamped at the corresponding endpoint. */
+        boolean select(boolean next) {
+            int currentIndex = currentIndex();
+            int selectedIndex = Math.clamp((long) currentIndex + (next ? 1 : -1), 0, choices.size() - 1);
+            if (selectedIndex == currentIndex) {
+                return false;
+            }
+            setter.accept(choices.get(selectedIndex).value());
+            return true;
+        }
+
+        @Override
+        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+            String value = choices.get(currentIndex()).label();
+            FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
+            float valueX = x + WIDTH - HORIZONTAL_PADDING - FONT.width(value, VALUE_FONT_SIZE);
+            FONT.text(canvas, valueX, y + 11.5f, value, VALUE_FONT_SIZE, theme.text());
+            paintChoiceChevron(canvas, x + SLIDER_X_OFFSET - 8.0f, y + ITEM_HEIGHT * 0.5f, false, theme);
+            paintChoiceChevron(canvas, x + WIDTH - 5.0f, y + ITEM_HEIGHT * 0.5f, true, theme);
+        }
+
+        /** Locates the bound value in the finite choice list. */
+        private int currentIndex() {
+            T currentValue = Objects.requireNonNull(getter.get(), label + " value");
+            for (int index = 0; index < choices.size(); index++) {
+                if (choices.get(index).value().equals(currentValue)) {
+                    return index;
+                }
+            }
+            throw new IllegalStateException(label + " value is not one of the configured choices: " + currentValue);
+        }
+
+        /** Paints one previous/next chevron. */
+        private static void paintChoiceChevron(
+                GuiCanvas canvas, float x, float y, boolean pointsRight, GuiTheme theme) {
+            float direction = pointsRight ? 1.0f : -1.0f;
+            canvas.line(x - 2.0f * direction, y - 3.0f, x + 2.0f * direction, y, 1.5f, theme.mutedText(), 1.0f);
+            canvas.line(x + 2.0f * direction, y, x - 2.0f * direction, y + 3.0f, 1.5f, theme.mutedText(), 1.0f);
         }
     }
 

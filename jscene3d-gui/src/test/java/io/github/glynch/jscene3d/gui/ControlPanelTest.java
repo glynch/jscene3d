@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import io.github.glynch.jscene3d.gui.internal.GuiCanvas;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -42,6 +43,42 @@ final class ControlPanelTest {
     }
 
     @Test
+    void appliesExplicitIntegerAndChoiceBindings() {
+        ControlPanel panel = new ControlPanel("Controls");
+        ControlPanel.Section section = panel.addSection("Geometry");
+        AtomicInteger segments = new AtomicInteger(2);
+        AtomicReference<String> shading = new AtomicReference<>("smooth");
+        section.addInteger("segments", segments::get, segments::set, 2, 50);
+        section.addChoice(
+                "shading",
+                shading::get,
+                shading::set,
+                List.of(
+                        new ControlPanel.Choice<>("wireframe", "wireframe"),
+                        new ControlPanel.Choice<>("smooth", "smooth"),
+                        new ControlPanel.Choice<>("reflective", "reflective")));
+
+        assertThat(panel.update(pointer(730.0, 100.0), 800, 600)).isTrue();
+        assertThat(segments).hasValue(50);
+        panel.update(new ControlPanel.PointerFrame(730.0, 100.0, false, false, true), 800, 600);
+
+        assertThat(panel.update(pointer(700.0, 140.0), 800, 600)).isTrue();
+        assertThat(shading).hasValue("reflective");
+        panel.update(new ControlPanel.PointerFrame(700.0, 140.0, false, false, true), 800, 600);
+
+        RecordingGuiCanvas canvas = new RecordingGuiCanvas();
+        panel.paint(canvas, 800, 600);
+        assertThat(canvas.roundedRectangleCount()).isGreaterThan(4);
+        assertThat(canvas.lineCount()).isGreaterThan(4);
+
+        assertThat(panel.update(pointer(700.0, 140.0), 800, 600)).isFalse();
+        panel.update(new ControlPanel.PointerFrame(700.0, 140.0, false, false, true), 800, 600);
+
+        assertThat(panel.update(pointer(520.0, 140.0), 800, 600)).isTrue();
+        assertThat(shading).hasValue("smooth");
+    }
+
+    @Test
     void collapsesSectionsAndReleasesPointerOutsideThePanel() {
         ControlPanel panel = new ControlPanel("Controls");
         ControlPanel.Section section = panel.addSection("Camera");
@@ -63,6 +100,10 @@ final class ControlPanelTest {
         assertThatIllegalArgumentException().isThrownBy(() -> panel.addSection(" "));
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> section.addFloat("speed", () -> 1.0f, ignored -> {}, 2.0f, 1.0f));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> section.addInteger("segments", () -> 2, ignored -> {}, 50, 2));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> section.addChoice("shading", () -> "smooth", ignored -> {}, List.of()));
     }
 
     @Test
@@ -172,6 +213,10 @@ final class ControlPanelTest {
         assertThatNullPointerException().isThrownBy(() -> section.addFloat("speed", () -> 0.0f, null, 0.0f, 1.0f));
         assertThatNullPointerException().isThrownBy(() -> section.addButton("reset", null));
         assertThatNullPointerException().isThrownBy(() -> section.addText("selected", null));
+        assertThatNullPointerException().isThrownBy(() -> section.addInteger("segments", null, ignored -> {}, 2, 50));
+        assertThatNullPointerException()
+                .isThrownBy(() -> section.addChoice(
+                        "shading", null, ignored -> {}, List.of(new ControlPanel.Choice<>("smooth", "smooth"))));
         section.addFloat("invalid", () -> Float.NaN, ignored -> {}, 0.0f, 1.0f);
         RecordingGuiCanvas canvas = new RecordingGuiCanvas();
         assertThatIllegalArgumentException().isThrownBy(() -> panel.paint(canvas, 800, 600));

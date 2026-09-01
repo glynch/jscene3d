@@ -48,6 +48,29 @@ final class ExampleCatalog {
                         List.of("circle", "cylinder", "cone", "torus"),
                         GeneratedGeometriesExample::create),
                 definition(
+                        "utah-teapot",
+                        "Utah teapot",
+                        "Geometry",
+                        "Interactive bicubic-patch tessellation with six rendering presentations.",
+                        List.of("teapot", "bezier", "patch", "tessellation", "wireframe", "pbr"),
+                        List.of(
+                                new GalleryAttribution(
+                                        "Utah Teapot geometry data",
+                                        "Martin Newell / Three.js Authors",
+                                        "Three.js TeapotGeometry",
+                                        URI.create(
+                                                "https://github.com/mrdoob/three.js/blob/dev/examples/jsm/geometries/TeapotGeometry.js"),
+                                        "MIT",
+                                        URI.create("https://github.com/mrdoob/three.js/blob/dev/LICENSE")),
+                                new GalleryAttribution(
+                                        "Studio Small 08 HDRI",
+                                        "Sergej Majboroda",
+                                        "Poly Haven — polyhaven.com/a/studio_small_08",
+                                        URI.create("https://polyhaven.com/a/studio_small_08"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        TeapotExample::create),
+                definition(
                         "line-rendering",
                         "Line rendering",
                         "Objects",

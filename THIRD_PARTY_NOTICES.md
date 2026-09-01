@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Utah Teapot geometry data
+
+- Asset: Bicubic patch indices and control points for the Utah Teapot
+- Original model: Martin Newell
+- Adapted source: [Three.js TeapotGeometry](https://github.com/mrdoob/three.js/blob/dev/examples/jsm/geometries/TeapotGeometry.js)
+- Copyright: Three.js Authors
+- License: [MIT](https://github.com/mrdoob/three.js/blob/dev/LICENSE)
+- Bundled file: `jscene3d-core/src/main/java/io/github/glynch/jscene3d/geometries/TeapotData.java`
+
+JScene3D uses the upstream patch data with an independently implemented Java
+tessellator. A copy of the Three.js MIT license is bundled in the core artifact.
+
 ## Boom Box glTF model
 
 - Asset: Boom Box binary glTF model

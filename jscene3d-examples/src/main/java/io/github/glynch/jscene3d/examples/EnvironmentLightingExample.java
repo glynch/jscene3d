@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.examples;
 
+import static io.github.glynch.jscene3d.math.Angles.PI;
 import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
@@ -124,7 +125,7 @@ public final class EnvironmentLightingExample {
                 "light intensity", settings::lightingIntensity, settings::setLightingIntensity, 0.0f, 3.0f);
         environment.addFloat(
                 "background level", settings::backgroundIntensity, settings::setBackgroundIntensity, 0.0f, 2.0f);
-        environment.addFloat("rotation", settings::rotation, settings::setRotation, -3.14f, 3.14f);
+        environment.addFloat("rotation", settings::rotation, settings::setRotation, -PI, PI);
         environment.addFloat("exposure", settings::exposure, settings::setExposure, 0.2f, 3.0f);
         ControlPanel.Section guide = panel.addSection("Grid");
         guide.addText("horizontal", () -> "metalness 0 to 1");

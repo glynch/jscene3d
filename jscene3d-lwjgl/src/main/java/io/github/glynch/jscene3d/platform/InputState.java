@@ -203,6 +203,13 @@ public final class InputState {
         pointerY = y;
     }
 
+    /** Establishes a new pointer origin and discards movement caused by a cursor-mode change. */
+    void resetPointer(double x, double y) {
+        initializePointer(x, y);
+        pointerDeltaX = 0.0;
+        pointerDeltaY = 0.0;
+    }
+
     /** Applies one GLFW key action, ignoring unsupported keys and repeat events. */
     void updateKey(@Nullable Key key, int action) {
         if (key == null || action == GLFW.GLFW_REPEAT) {

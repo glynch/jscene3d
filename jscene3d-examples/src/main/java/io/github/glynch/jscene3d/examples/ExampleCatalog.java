@@ -319,6 +319,13 @@ final class ExampleCatalog {
                         List.of("camera", "orbit", "pan", "zoom", "gui"),
                         OrbitControlsExample::create),
                 definition(
+                        "pointer-lock-controls",
+                        "Pointer-lock controls",
+                        "Interaction",
+                        "Captured relative mouse motion with yaw, pitch, focus release, and raw input.",
+                        List.of("camera", "pointer lock", "mouse", "first person", "raw input"),
+                        PointerLockControlsExample::create),
+                definition(
                         "object-selection",
                         "Object selection",
                         "Interaction",

@@ -68,6 +68,36 @@ final class WindowIT {
     }
 
     @Test
+    void controlsCursorAndRawMouseMotionModes() {
+        try (Window window = Window.create(320, 240, "Cursor mode integration test")) {
+            assertThat(window.cursorMode()).isEqualTo(CursorMode.NORMAL);
+            assertThat(window.isRawMouseMotionEnabled()).isFalse();
+
+            window.setCursorMode(CursorMode.DISABLED);
+
+            assertThat(window.cursorMode()).isEqualTo(CursorMode.DISABLED);
+            if (window.isRawMouseMotionSupported()) {
+                window.setRawMouseMotionEnabled(true);
+                assertThat(window.isRawMouseMotionEnabled()).isTrue();
+            }
+
+            window.setCursorMode(CursorMode.NORMAL);
+
+            assertThat(window.cursorMode()).isEqualTo(CursorMode.NORMAL);
+            assertThat(window.isRawMouseMotionEnabled()).isFalse();
+        }
+    }
+
+    @Test
+    void rejectsRawMouseMotionOutsideDisabledCursorMode() {
+        try (Window window = Window.create(320, 240, "Raw mouse validation test")) {
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> window.setRawMouseMotionEnabled(true))
+                    .withMessage("Raw mouse motion requires disabled cursor mode");
+        }
+    }
+
+    @Test
     void recordsAProgrammaticCloseRequest() {
         try (Window window = Window.create(WindowOptions.defaults())) {
             assertThat(window.shouldClose()).isFalse();

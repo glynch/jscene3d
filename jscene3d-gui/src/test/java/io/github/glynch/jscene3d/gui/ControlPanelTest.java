@@ -18,6 +18,23 @@ import org.junit.jupiter.api.Test;
 
 final class ControlPanelTest {
     @Test
+    void paintsFloatSlidersAtTheirConfiguredPrecision() {
+        ControlPanel roundedPanel = new ControlPanel("Controls");
+        roundedPanel.addSection("Orientation").addFloat("sensitivity", () -> 0.00525f, ignored -> {}, 0.0005f, 0.01f);
+        ControlPanel precisePanel = new ControlPanel("Controls");
+        precisePanel
+                .addSection("Orientation")
+                .addFloat("sensitivity", () -> 0.00525f, ignored -> {}, 0.0005f, 0.01f, 4);
+        RecordingGuiCanvas roundedCanvas = new RecordingGuiCanvas();
+        RecordingGuiCanvas preciseCanvas = new RecordingGuiCanvas();
+
+        roundedPanel.paint(roundedCanvas, 800, 600);
+        precisePanel.paint(preciseCanvas, 800, 600);
+
+        assertThat(preciseCanvas.alphaMaskCount()).isEqualTo(roundedCanvas.alphaMaskCount() + 2);
+    }
+
+    @Test
     void appliesExplicitBooleanSliderAndButtonBindings() {
         ControlPanel panel = new ControlPanel("Controls");
         ControlPanel.Section section = panel.addSection("Camera");
@@ -138,6 +155,10 @@ final class ControlPanelTest {
         assertThatIllegalArgumentException().isThrownBy(() -> panel.addSection(" "));
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> section.addFloat("speed", () -> 1.0f, ignored -> {}, 2.0f, 1.0f));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> section.addFloat("speed", () -> 1.0f, ignored -> {}, 0.0f, 1.0f, 0));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> section.addFloat("speed", () -> 1.0f, ignored -> {}, 0.0f, 1.0f, 5));
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> section.addInteger("segments", () -> 2, ignored -> {}, 50, 2));
         assertThatIllegalArgumentException()

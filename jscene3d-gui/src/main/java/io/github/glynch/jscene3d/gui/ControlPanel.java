@@ -13,6 +13,8 @@ import io.github.glynch.jscene3d.platform.MouseButton;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.Overlay;
 import io.github.glynch.jscene3d.render.OverlayCanvas;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -520,13 +522,44 @@ public final class ControlPanel implements Overlay {
          * @param maximum finite inclusive upper endpoint
          */
         public void addFloat(String label, FloatSupplier getter, FloatConsumer setter, float minimum, float maximum) {
+            addFloat(label, getter, setter, minimum, maximum, 2);
+        }
+
+        /**
+         * Adds a floating-point slider with explicit displayed decimal precision.
+         *
+         * <p>Trailing fractional zeroes are omitted, except that whole values retain one decimal
+         * place to distinguish them from integer controls.
+         *
+         * @param label non-blank row label
+         * @param getter current-value supplier
+         * @param setter replacement-value consumer
+         * @param minimum finite inclusive lower endpoint
+         * @param maximum finite inclusive upper endpoint
+         * @param decimalPlaces displayed decimal places before trailing-zero removal, from one to
+         *     four
+         * @throws NullPointerException if a binding is {@code null}
+         * @throws IllegalArgumentException if the label is blank, the interval is invalid, or the
+         *     precision is outside the supported range
+         */
+        public void addFloat(
+                String label,
+                FloatSupplier getter,
+                FloatConsumer setter,
+                float minimum,
+                float maximum,
+                int decimalPlaces) {
             Preconditions.requireOrdered(minimum, "minimum", maximum, "maximum");
+            if (decimalPlaces < 1 || decimalPlaces > 4) {
+                throw new IllegalArgumentException("decimalPlaces must be between 1 and 4: " + decimalPlaces);
+            }
             items.add(new FloatSliderItem(
                     Preconditions.requireNonBlank(label, "label"),
                     Objects.requireNonNull(getter, "getter"),
                     Objects.requireNonNull(setter, "setter"),
                     minimum,
-                    maximum));
+                    maximum,
+                    decimalPlaces));
         }
 
         /**
@@ -655,7 +688,7 @@ public final class ControlPanel implements Overlay {
 
     /** Explicitly bound floating-point slider row. */
     private record FloatSliderItem(
-            String label, FloatSupplier getter, FloatConsumer setter, float minimum, float maximum)
+            String label, FloatSupplier getter, FloatConsumer setter, float minimum, float maximum, int decimalPlaces)
             implements SliderItem {
         @Override
         public void apply(float fraction) {
@@ -674,15 +707,19 @@ public final class ControlPanel implements Overlay {
             canvas.roundedRectangle(sliderX, trackY, SLIDER_WIDTH * fraction, 4.0f, 2.0f, theme.accent(), 1.0f);
             float thumbX = sliderX + SLIDER_WIDTH * fraction - 6.0f;
             canvas.roundedRectangle(thumbX, trackY - 4.0f, 12.0f, 12.0f, 6.0f, theme.accent(), 1.0f);
-            String valueText = compact(value);
+            String valueText = compact(value, decimalPlaces);
             float valueX = x + WIDTH - SLIDER_RIGHT_PADDING - FONT.width(valueText, VALUE_FONT_SIZE);
             FONT.text(canvas, valueX, y + 11.5f, valueText, VALUE_FONT_SIZE, theme.text());
         }
 
-        /** Produces a compact two-decimal value without locale-sensitive formatting. */
-        private static String compact(float value) {
-            float rounded = Math.round(value * 100.0f) / 100.0f;
-            return Float.toString(rounded);
+        /** Produces a compact value at the requested precision without locale-sensitive formatting. */
+        private static String compact(float value, int decimalPlaces) {
+            BigDecimal rounded = new BigDecimal(Float.toString(value))
+                    .setScale(decimalPlaces, RoundingMode.HALF_UP)
+                    .stripTrailingZeros();
+            return rounded.scale() > 0
+                    ? rounded.toPlainString()
+                    : rounded.setScale(1).toPlainString();
         }
     }
 

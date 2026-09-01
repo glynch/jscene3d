@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.examples.framework.ExampleFrame;
 import io.github.glynch.jscene3d.examples.framework.HostedExample;
 import io.github.glynch.jscene3d.gui.GalleryItem;
 import io.github.glynch.jscene3d.gui.GalleryPanel;
+import io.github.glynch.jscene3d.platform.CursorMode;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.platform.WindowOptions;
@@ -58,7 +59,11 @@ public final class ExampleBrowser {
         while (!window.shouldClose()) {
             Window.pollEvents();
             if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                window.requestClose();
+                if (window.cursorMode() == CursorMode.DISABLED) {
+                    window.setCursorMode(CursorMode.NORMAL);
+                } else {
+                    window.requestClose();
+                }
             }
             if (window.framebufferSizeChanged()) {
                 context.refreshDimensions();

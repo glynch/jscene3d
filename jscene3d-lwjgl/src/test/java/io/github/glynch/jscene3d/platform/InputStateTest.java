@@ -82,6 +82,20 @@ final class InputStateTest {
     }
 
     @Test
+    void resetsPointerOriginWithoutReportingSyntheticMovement() {
+        InputState input = new InputState();
+        input.initializePointer(10.0, 20.0);
+        input.updatePointer(15.0, 25.0);
+
+        input.resetPointer(100.0, 200.0);
+
+        assertThat(input.pointerX()).isEqualTo(100.0);
+        assertThat(input.pointerY()).isEqualTo(200.0);
+        assertThat(input.pointerDeltaX()).isZero();
+        assertThat(input.pointerDeltaY()).isZero();
+    }
+
+    @Test
     void releasesEveryHeldKeyAndMouseButtonWhenFocusIsLost() {
         InputState input = new InputState();
         input.updateKey(Key.A, GLFW_PRESS);

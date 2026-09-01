@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.examples.framework;
 
+import io.github.glynch.jscene3d.platform.CursorMode;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.Renderer;
@@ -35,7 +36,11 @@ public final class ExampleLauncher {
                 while (!window.shouldClose()) {
                     Window.pollEvents();
                     if (window.input().wasKeyPressed(Key.ESCAPE)) {
-                        window.requestClose();
+                        if (window.cursorMode() == CursorMode.DISABLED) {
+                            window.setCursorMode(CursorMode.NORMAL);
+                        } else {
+                            window.requestClose();
+                        }
                     }
                     if (window.framebufferSizeChanged()) {
                         context.refreshDimensions();

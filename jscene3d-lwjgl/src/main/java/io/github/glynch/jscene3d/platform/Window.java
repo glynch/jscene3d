@@ -54,8 +54,11 @@ public final class Window implements AutoCloseable {
     private int framebufferHeight;
     private final int framebufferSampleCount;
     private VerticalSync verticalSync;
+    private CursorMode cursorMode = CursorMode.NORMAL;
 
     private boolean visible;
+    private boolean focused;
+    private boolean rawMouseMotionEnabled;
     private boolean framebufferSizeChanged;
     private boolean closed;
 
@@ -78,6 +81,7 @@ public final class Window implements AutoCloseable {
         framebufferWidth = pixelWidth[0];
         framebufferHeight = pixelHeight[0];
         framebufferSampleCount = GL11.glGetInteger(GL13.GL_SAMPLES);
+        focused = GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_FOCUSED) == GLFW_TRUE;
     }
 
     /**
@@ -334,6 +338,87 @@ public final class Window implements AutoCloseable {
     }
 
     /**
+     * Returns whether this window currently owns keyboard and pointer focus.
+     *
+     * @return {@code true} while the platform reports this window as focused
+     * @throws IllegalStateException if the window is closed or called from the wrong thread
+     */
+    public boolean isFocused() {
+        requireOpenOwnerThread();
+        return focused;
+    }
+
+    /**
+     * Returns the current cursor mode.
+     *
+     * @return the current mode, initially {@link CursorMode#NORMAL}
+     * @throws IllegalStateException if the window is closed or called from the wrong thread
+     */
+    public CursorMode cursorMode() {
+        requireOpenOwnerThread();
+        return cursorMode;
+    }
+
+    /**
+     * Changes cursor visibility and confinement immediately.
+     *
+     * <p>Returning to {@link CursorMode#NORMAL} also disables raw mouse motion. Changing modes
+     * establishes a new pointer origin so platform repositioning does not appear as user motion.
+     * Losing window focus also restores the normal mode.
+     *
+     * @param cursorMode the new cursor mode
+     * @throws NullPointerException if {@code cursorMode} is {@code null}
+     * @throws IllegalStateException if the window is closed or called from the wrong thread
+     */
+    public void setCursorMode(CursorMode cursorMode) {
+        requireOpenOwnerThread();
+        applyCursorMode(Objects.requireNonNull(cursorMode, "cursorMode"));
+    }
+
+    /**
+     * Returns whether this platform supports unaccelerated raw mouse motion.
+     *
+     * @return {@code true} when raw motion can be enabled
+     * @throws IllegalStateException if the window is closed or called from the wrong thread
+     */
+    public boolean isRawMouseMotionSupported() {
+        requireOpenOwnerThread();
+        return GLFW.glfwRawMouseMotionSupported();
+    }
+
+    /**
+     * Returns whether raw mouse motion is currently enabled for this window.
+     *
+     * @return {@code true} only while enabled in disabled cursor mode
+     * @throws IllegalStateException if the window is closed or called from the wrong thread
+     */
+    public boolean isRawMouseMotionEnabled() {
+        requireOpenOwnerThread();
+        return rawMouseMotionEnabled;
+    }
+
+    /**
+     * Enables or disables unaccelerated raw mouse motion.
+     *
+     * <p>Raw motion can be enabled only while the cursor is disabled and only on a supporting
+     * platform. It is disabled automatically when the cursor returns to normal.
+     *
+     * @param enabled whether raw mouse motion should be enabled
+     * @throws IllegalStateException if enabling is requested in normal cursor mode, raw motion is
+     *     unsupported, the window is closed, or the method is called from the wrong thread
+     */
+    public void setRawMouseMotionEnabled(boolean enabled) {
+        requireOpenOwnerThread();
+        if (enabled && cursorMode != CursorMode.DISABLED) {
+            throw new IllegalStateException("Raw mouse motion requires disabled cursor mode");
+        }
+        if (enabled && !GLFW.glfwRawMouseMotionSupported()) {
+            throw new IllegalStateException("Raw mouse motion is not supported on this platform");
+        }
+        applyRawMouseMotion(enabled);
+    }
+
+    /**
      * Returns the current vertical-synchronization mode.
      *
      * @return the current mode
@@ -480,11 +565,41 @@ public final class Window implements AutoCloseable {
                         input.updateMouseButton(MouseButton.fromPlatformCode(buttonCode), action));
         GLFW.glfwSetCursorPosCallback(handle, (ignored, x, y) -> input.updatePointer(x, y));
         GLFW.glfwSetScrollCallback(handle, (ignored, xOffset, yOffset) -> input.updateScroll(xOffset, yOffset));
-        GLFW.glfwSetWindowFocusCallback(handle, (ignored, focused) -> {
-            if (!focused) {
+        GLFW.glfwSetWindowFocusCallback(handle, (ignored, hasFocus) -> {
+            focused = hasFocus;
+            if (!hasFocus) {
                 input.releaseHeldButtons();
+                applyCursorMode(CursorMode.NORMAL);
             }
         });
+    }
+
+    /** Applies cursor state and resets the input origin after platform cursor repositioning. */
+    private void applyCursorMode(CursorMode newCursorMode) {
+        if (newCursorMode == CursorMode.NORMAL) {
+            applyRawMouseMotion(false);
+        }
+        if (cursorMode != newCursorMode) {
+            GLFW.glfwSetInputMode(handle, GLFW.GLFW_CURSOR, newCursorMode.platformValue());
+            cursorMode = newCursorMode;
+            resetPointerOrigin();
+        }
+    }
+
+    /** Applies raw mouse input only when its cached state changes. */
+    private void applyRawMouseMotion(boolean enabled) {
+        if (rawMouseMotionEnabled != enabled) {
+            GLFW.glfwSetInputMode(handle, GLFW.GLFW_RAW_MOUSE_MOTION, enabled ? GLFW_TRUE : GLFW.GLFW_FALSE);
+            rawMouseMotionEnabled = enabled;
+        }
+    }
+
+    /** Synchronizes input position with GLFW without reporting a synthetic delta. */
+    private void resetPointerOrigin() {
+        double[] pointerX = new double[1];
+        double[] pointerY = new double[1];
+        GLFW.glfwGetCursorPos(handle, pointerX, pointerY);
+        input.resetPointer(pointerX[0], pointerY[0]);
     }
 
     /** Clears per-poll window and input transitions before GLFW dispatch. */

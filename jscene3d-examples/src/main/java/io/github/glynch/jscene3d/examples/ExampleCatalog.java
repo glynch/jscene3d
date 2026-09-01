@@ -71,6 +71,20 @@ final class ExampleCatalog {
                                         URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
                         AnimationBlendingExample::create),
                 definition(
+                        "soldier-animation-blending",
+                        "Soldier animation blending",
+                        "Animation",
+                        "Three.js-style skeletal blending with activation, stepping, cross-fades, and live weights.",
+                        List.of("animation", "blending", "cross-fade", "skinning", "gltf", "soldier", "mixamo"),
+                        List.of(new GalleryAttribution(
+                                "Soldier (Vanguard) model and animations",
+                                "T. Choonyung / Mixamo",
+                                "Three.js — Skeletal Animation Blending",
+                                URI.create("https://threejs.org/examples/webgl_animation_skinning_blending.html"),
+                                "Mixamo Content Terms",
+                                URI.create("https://www.adobe.com/legal/terms.html"))),
+                        SoldierAnimationBlendingExample::create),
+                definition(
                         "gltf-animation",
                         "glTF animation",
                         "Animation",

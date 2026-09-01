@@ -144,8 +144,12 @@ public final class Renderer implements AutoCloseable {
     /** Maximum number of point-light cube shadow maps sampled by one draw. */
     public static final int MAX_POINT_SHADOW_MAPS = ShadowFrame.MAX_POINT_SHADOWS;
 
-    /** Maximum joints addressable by one GPU-skinned mesh in version 0.1. */
-    public static final int MAX_SKIN_JOINTS = 48;
+    /**
+     * Maximum joints addressable by one GPU-skinned mesh in version 0.1. The capacity leaves room
+     * for the built-in vertex program's other uniforms within the OpenGL 3.3 minimum uniform
+     * budget.
+     */
+    public static final int MAX_SKIN_JOINTS = 56;
 
     private final Window window;
     private final WindowContextRegistry.Access context;

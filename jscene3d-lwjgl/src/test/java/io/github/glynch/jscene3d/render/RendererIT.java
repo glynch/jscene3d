@@ -248,7 +248,7 @@ final class RendererIT {
             AmbientLight ambientLight = new AmbientLight(Color.WHITE);
             scene.add(ambientLight);
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
 
             ambientLight.setVisible(false);
             Group lightParent = new Group();
@@ -258,7 +258,7 @@ final class RendererIT {
             lightParent.add(pointLight);
             scene.add(lightParent);
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
 
             lightParent.setPosition(0.0f, 0.0f, -1.0f);
             renderer.render(scene, camera);
@@ -292,7 +292,7 @@ final class RendererIT {
             camera.setPosition(0.0f, 0.0f, 2.0f);
 
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
 
             light.setTarget(0.0f, 0.0f, 2.0f);
             renderer.render(scene, camera);
@@ -321,11 +321,11 @@ final class RendererIT {
             camera.setPosition(0.0f, 0.0f, 2.0f);
 
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
 
             light.setPosition(0.0f, 0.0f, -1.0f);
             renderer.render(scene, camera);
-            assertPixelIsBlue(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+            assertPixelIsNormalizedBlue(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
 
             light.setPosition(0.0f, 0.0f, 0.0f);
             assertThatIllegalStateException()
@@ -354,7 +354,7 @@ final class RendererIT {
             camera.setPosition(0.0f, 0.0f, 2.0f);
 
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
 
             light.setTarget(2.0f, 0.0f, 0.0f);
             renderer.render(scene, camera);
@@ -418,7 +418,7 @@ final class RendererIT {
             mesh.clearBeforeShadowRenderCallback();
             renderer.render(scene, camera);
 
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
             assertShadowActivity(renderer, 1, 1, 1, 1L);
         }
     }
@@ -573,12 +573,12 @@ final class RendererIT {
             camera.setPosition(0.0f, 0.0f, 2.0f);
 
             renderer.render(scene, camera);
-            assertCenterPixelIsGreen(window);
+            assertCenterPixelIsNormalizedGreen(window);
 
             material.setUsesVertexColors(false);
             material.setColorMap(texture);
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
             assertThat(renderer.info().statistics().textureUploads()).isEqualTo(1);
             assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(1);
 
@@ -654,12 +654,12 @@ final class RendererIT {
             camera.setPosition(0.0f, 0.0f, 2.0f);
 
             renderer.render(scene, camera);
-            assertCenterPixelIsGreen(window);
+            assertCenterPixelIsNormalizedGreen(window);
 
             material.setUsesVertexColors(false);
             material.setColorMap(texture);
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
 
             texture.close();
             assertThatIllegalStateException()
@@ -933,15 +933,15 @@ final class RendererIT {
             renderer.render(scene, camera);
             assertPixelIsRed(leftX, upperY);
             assertPixelIsBlue(leftX, lowerY);
-            assertPixelIsRed(rightX, upperY);
-            assertPixelIsBlue(rightX, lowerY);
+            assertPixelIsNormalizedRed(rightX, upperY);
+            assertPixelIsNormalizedBlue(rightX, lowerY);
 
             texture.setOffset(0.0f, -0.5f);
             renderer.render(scene, camera);
             assertPixelIsBlue(leftX, upperY);
             assertPixelIsBlue(leftX, lowerY);
-            assertPixelIsBlue(rightX, upperY);
-            assertPixelIsBlue(rightX, lowerY);
+            assertPixelIsNormalizedBlue(rightX, upperY);
+            assertPixelIsNormalizedBlue(rightX, lowerY);
             assertThat(renderer.info().statistics().textureUploads()).isZero();
 
             texture.setOffset(0.0f, 0.0f);
@@ -950,8 +950,8 @@ final class RendererIT {
             renderer.render(scene, camera);
             assertPixelIsBlue(leftX, upperY);
             assertPixelIsRed(leftX, lowerY);
-            assertPixelIsBlue(rightX, upperY);
-            assertPixelIsRed(rightX, lowerY);
+            assertPixelIsNormalizedBlue(rightX, upperY);
+            assertPixelIsNormalizedRed(rightX, lowerY);
             assertThat(renderer.info().statistics().textureUploads()).isZero();
         }
     }
@@ -996,10 +996,12 @@ final class RendererIT {
 
             int upperY = Math.round(window.framebufferHeight() * 0.56f);
             int lowerY = Math.round(window.framebufferHeight() * 0.44f);
-            for (float horizontalPosition : new float[] {0.2f, 0.4f, 0.6f, 0.8f}) {
-                int x = Math.round(window.framebufferWidth() * horizontalPosition);
-                assertPixelIsBlue(x, upperY);
-                assertPixelIsRed(x, lowerY);
+            assertPixelIsBlue(Math.round(window.framebufferWidth() * 0.2f), upperY);
+            assertPixelIsRed(Math.round(window.framebufferWidth() * 0.2f), lowerY);
+            for (float horizontalPosition : new float[] {0.4f, 0.6f, 0.8f}) {
+                int horizontalPixel = Math.round(window.framebufferWidth() * horizontalPosition);
+                assertPixelIsNormalizedBlue(horizontalPixel, upperY);
+                assertPixelIsNormalizedRed(horizontalPixel, lowerY);
             }
         }
     }
@@ -1297,7 +1299,7 @@ final class RendererIT {
 
             renderer.render(scene, camera);
 
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
             assertThat(renderer.info().resources().activeTextureResources()).isEqualTo(5);
             assertThat(renderer.info().resources().programCount()).isOne();
 
@@ -1308,7 +1310,7 @@ final class RendererIT {
 
             material.setAlphaCutoff(0.0f);
             renderer.render(scene, camera);
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
         }
     }
 
@@ -1335,7 +1337,7 @@ final class RendererIT {
 
             renderer.render(scene, camera);
 
-            assertCenterPixelIsGreen(window);
+            assertCenterPixelIsNormalizedGreen(window);
         }
     }
 
@@ -1359,7 +1361,7 @@ final class RendererIT {
 
             renderer.render(scene, camera);
 
-            assertCenterPixelIsRed(window);
+            assertCenterPixelIsNormalizedRed(window);
         }
     }
 
@@ -1806,11 +1808,15 @@ final class RendererIT {
         assertPixelIsRed(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
     }
 
-    private static void assertCenterPixelIsGreen(Window window) {
+    private static void assertCenterPixelIsNormalizedRed(Window window) {
+        assertPixelIsNormalizedRed(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+    }
+
+    private static void assertCenterPixelIsNormalizedGreen(Window window) {
         ByteBuffer pixel = readPixel(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
 
         assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
-        assertThat(Byte.toUnsignedInt(pixel.get(1))).isGreaterThan(240);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isBetween(150, 156);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
     }
 
@@ -1838,6 +1844,14 @@ final class RendererIT {
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
     }
 
+    private static void assertPixelIsNormalizedRed(int x, int y) {
+        ByteBuffer pixel = readPixel(x, y);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isBetween(150, 156);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+
     private static void assertPixelIsBlack(int x, int y) {
         ByteBuffer pixel = readPixel(x, y);
 
@@ -1852,6 +1866,14 @@ final class RendererIT {
         assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isGreaterThan(240);
+    }
+
+    private static void assertPixelIsNormalizedBlue(int x, int y) {
+        ByteBuffer pixel = readPixel(x, y);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isBetween(150, 156);
     }
 
     private static void assertPixelIsNotBlack(int x, int y) {

@@ -53,6 +53,7 @@ public final class PhongProgram implements AutoCloseable {
             """;
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
+            const float RECIPROCAL_PI = 0.3183098861837907;
             const int MAX_POINT_LIGHTS = POINT_LIGHT_CAPACITY;
             const int MAX_DIRECTIONAL_LIGHTS = DIRECTIONAL_LIGHT_CAPACITY;
             const int MAX_SPOT_LIGHTS = SPOT_LIGHT_CAPACITY;
@@ -200,7 +201,7 @@ public final class PhongProgram implements AutoCloseable {
                 if (alphaCutoff >= 0.0 && surfaceColor.a < alphaCutoff) {
                     discard;
                 }
-                vec3 reflected = surfaceColor.rgb * diffuseIllumination
+                vec3 reflected = surfaceColor.rgb * diffuseIllumination * RECIPROCAL_PI
                         + specularColor * specularIllumination
                         + emissiveColor;
                 fragmentColor = vec4(reflected, surfaceColor.a);

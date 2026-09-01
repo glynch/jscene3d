@@ -53,6 +53,7 @@ public final class LambertProgram implements AutoCloseable {
             """;
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
+            const float RECIPROCAL_PI = 0.3183098861837907;
             const int MAX_POINT_LIGHTS = POINT_LIGHT_CAPACITY;
             const int MAX_DIRECTIONAL_LIGHTS = DIRECTIONAL_LIGHT_CAPACITY;
             const int MAX_SPOT_LIGHTS = SPOT_LIGHT_CAPACITY;
@@ -112,7 +113,7 @@ public final class LambertProgram implements AutoCloseable {
 
             void main() {
                 vec3 surfaceNormal = gl_FrontFacing ? resolvedViewNormal : -resolvedViewNormal;
-                vec3 illumination = ambientLightColor;
+                vec3 diffuseIrradiance = ambientLightColor;
                 for (int index = 0; index < MAX_POINT_LIGHTS; index++) {
                     if (index >= pointLightCount) {
                         break;
@@ -127,7 +128,7 @@ public final class LambertProgram implements AutoCloseable {
                             pointLightDecays[index]);
                     float visibility = pointShadow(
                             pointShadowIndices[index], resolvedViewPosition, surfaceNormal);
-                    illumination += pointLightColors[index] * diffuse * attenuation * visibility;
+                    diffuseIrradiance += pointLightColors[index] * diffuse * attenuation * visibility;
                 }
                 for (int index = 0; index < MAX_DIRECTIONAL_LIGHTS; index++) {
                     if (index >= directionalLightCount) {
@@ -136,7 +137,7 @@ public final class LambertProgram implements AutoCloseable {
                     float diffuse = max(dot(surfaceNormal, directionalLightDirections[index]), 0.0);
                     float visibility = twoDimensionalShadow(
                             directionalShadowIndices[index], resolvedViewPosition, surfaceNormal);
-                    illumination += directionalLightColors[index] * diffuse * visibility;
+                    diffuseIrradiance += directionalLightColors[index] * diffuse * visibility;
                 }
                 for (int index = 0; index < MAX_SPOT_LIGHTS; index++) {
                     if (index >= spotLightCount) {
@@ -157,7 +158,7 @@ public final class LambertProgram implements AutoCloseable {
                     float diffuse = max(dot(surfaceNormal, lightDirection), 0.0);
                     float visibility = twoDimensionalShadow(
                             spotShadowIndices[index], resolvedViewPosition, surfaceNormal);
-                    illumination += spotLightColors[index]
+                    diffuseIrradiance += spotLightColors[index]
                             * diffuse
                             * distanceFalloff
                             * coneAttenuation
@@ -168,7 +169,7 @@ public final class LambertProgram implements AutoCloseable {
                         break;
                     }
                     float skyWeight = dot(surfaceNormal, hemisphereLightDirections[index]) * 0.5 + 0.5;
-                    illumination += mix(
+                    diffuseIrradiance += mix(
                             hemisphereLightGroundColors[index],
                             hemisphereLightSkyColors[index],
                             skyWeight);
@@ -179,7 +180,9 @@ public final class LambertProgram implements AutoCloseable {
                 if (alphaCutoff >= 0.0 && surfaceColor.a < alphaCutoff) {
                     discard;
                 }
-                fragmentColor = vec4(surfaceColor.rgb * illumination, surfaceColor.a);
+                fragmentColor = vec4(
+                        surfaceColor.rgb * diffuseIrradiance * RECIPROCAL_PI,
+                        surfaceColor.a);
             }
             """.replace("SHADOW_SOURCE", ShadowShaderSource.source())
             .replace("POINT_LIGHT_CAPACITY", Integer.toString(Renderer.MAX_POINT_LIGHTS))

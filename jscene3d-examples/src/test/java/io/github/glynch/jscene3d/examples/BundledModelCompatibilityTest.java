@@ -27,6 +27,28 @@ final class BundledModelCompatibilityTest {
     private static final String INTERPOLATION_TEST_RESOURCE =
             "/io/github/glynch/jscene3d/examples/interpolation-test/InterpolationTest.glb";
     private static final String FOX_RESOURCE = "/io/github/glynch/jscene3d/examples/fox/Fox.glb";
+    private static final String SOLDIER_RESOURCE = "/io/github/glynch/jscene3d/examples/soldier/Soldier.glb";
+
+    /** Ensures Soldier retains the four skeletal clips used by the Three.js reference example. */
+    @Test
+    void loadsSoldierAnimationClips() {
+        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), SOLDIER_RESOURCE))) {
+            assertThat(loaded.animations())
+                    .extracting(AnimationClip::name)
+                    .containsExactlyInAnyOrder("Idle", "Run", "TPose", "Walk");
+
+            AnimationMixer mixer = new AnimationMixer();
+            AnimationAction idle =
+                    mixer.action(requireClip(loaded.animations(), "Idle")).play();
+            AnimationAction walk = mixer.action(requireClip(loaded.animations(), "Walk"));
+
+            mixer.crossFade(idle, walk, 0.5f);
+            mixer.update(0.25f);
+
+            assertThat(idle.effectiveWeight()).isEqualTo(0.5f);
+            assertThat(walk.effectiveWeight()).isEqualTo(0.5f);
+        }
+    }
 
     /** Ensures Fox retains the compatible idle, walking, and running skeletal clips. */
     @Test
@@ -130,5 +152,13 @@ final class BundledModelCompatibilityTest {
                 assertThat(material.emissiveMap()).isPresent();
             });
         }
+    }
+
+    /** Finds one required animation fixture clip by exact name. */
+    private static AnimationClip requireClip(List<AnimationClip> clips, String name) {
+        return clips.stream()
+                .filter(clip -> clip.name().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Missing required animation clip: " + name));
     }
 }

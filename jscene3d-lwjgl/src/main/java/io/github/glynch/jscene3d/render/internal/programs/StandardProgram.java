@@ -374,7 +374,7 @@ public final class StandardProgram implements AutoCloseable {
                                     occlusionMapCoordinateSet)).r;
                     occlusion = mix(1.0, sampledOcclusion, occlusionStrength);
                 }
-                reflected += indirectLight * diffuseColor * occlusion;
+                reflected += indirectLight * diffuseColor * occlusion / PI;
 
                 if (useEnvironmentMap) {
                     vec3 worldNormal = normalize(viewToWorldMatrix * surfaceNormal);

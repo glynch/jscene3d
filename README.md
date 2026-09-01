@@ -87,7 +87,8 @@ when a clean build is required.
 `TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
-`KeyframeAnimationExample`, `AnimationBlendingExample`, `GltfAnimationExample`, `GltfLoadingExample`,
+`KeyframeAnimationExample`, `AnimationBlendingExample`, `SoldierAnimationBlendingExample`,
+`GltfAnimationExample`, `GltfLoadingExample`,
 `SpotAndHemisphereLightsExample`, `ShadowsExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
@@ -183,7 +184,11 @@ with live playback controls. `GltfAnimationExample` imports and synchronously
 plays the nine transform clips in Khronos's CC0 Interpolation Test asset.
 `SkeletalAnimationExample` constructs and animates a two-joint skinned mesh,
 `AnimationBlendingExample` cross-fades the Khronos Fox model between idle,
-walking, and running clips, while `LittlestTokyoExample` loads Glen Fox's
+walking, and running clips. `SoldierAnimationBlendingExample` follows the
+Three.js skeletal-animation-blending reference with explicit activation,
+single-step, cross-fade, blend-weight, and playback-speed controls. The
+Soldier resource retains its Mixamo usage terms and attribution rather than
+being relicensed under JScene3D. `LittlestTokyoExample` loads Glen Fox's
 Draco-compressed, skeletally animated Littlest Tokyo scene.
 
 ## Transparency

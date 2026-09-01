@@ -43,6 +43,21 @@ final class ControlPanelTest {
     }
 
     @Test
+    void preventsDisabledButtonActivationUntilItsBindingEnablesIt() {
+        ControlPanel panel = new ControlPanel("Controls");
+        AtomicBoolean enabled = new AtomicBoolean();
+        AtomicInteger invocationCount = new AtomicInteger();
+        panel.addSection("Actions").addButton("apply", enabled::get, invocationCount::incrementAndGet);
+
+        assertThat(panel.update(pointer(520.0, 100.0), 800, 600)).isFalse();
+        assertThat(invocationCount).hasValue(0);
+
+        enabled.set(true);
+        assertThat(panel.update(pointer(520.0, 100.0), 800, 600)).isTrue();
+        assertThat(invocationCount).hasValue(1);
+    }
+
+    @Test
     void appliesExplicitIntegerAndChoiceBindings() {
         ControlPanel panel = new ControlPanel("Controls");
         ControlPanel.Section section = panel.addSection("Geometry");
@@ -212,6 +227,8 @@ final class ControlPanelTest {
         assertThatNullPointerException().isThrownBy(() -> section.addFloat("speed", null, ignored -> {}, 0.0f, 1.0f));
         assertThatNullPointerException().isThrownBy(() -> section.addFloat("speed", () -> 0.0f, null, 0.0f, 1.0f));
         assertThatNullPointerException().isThrownBy(() -> section.addButton("reset", null));
+        assertThatNullPointerException().isThrownBy(() -> section.addButton("reset", null, () -> {}));
+        assertThatNullPointerException().isThrownBy(() -> section.addButton("reset", () -> true, null));
         assertThatNullPointerException().isThrownBy(() -> section.addText("selected", null));
         assertThatNullPointerException().isThrownBy(() -> section.addInteger("segments", null, ignored -> {}, 2, 50));
         assertThatNullPointerException()

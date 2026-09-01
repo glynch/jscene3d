@@ -313,6 +313,9 @@ public final class ControlPanel implements Overlay {
             }
             case ChoiceItem<?> choiceItem -> choiceItem.select(x >= panelX + WIDTH * 0.5f);
             case ButtonItem buttonItem -> {
+                if (!buttonItem.enabled.getAsBoolean()) {
+                    yield false;
+                }
                 buttonItem.action.run();
                 yield true;
             }
@@ -537,8 +540,21 @@ public final class ControlPanel implements Overlay {
          * @param action action invoked once for each primary-button press
          */
         public void addButton(String label, Runnable action) {
+            addButton(label, () -> true, action);
+        }
+
+        /**
+         * Adds an action button whose availability is evaluated when painted or activated.
+         *
+         * @param label non-blank button label
+         * @param enabled current enabled-state supplier
+         * @param action action invoked once for each enabled primary-button press
+         */
+        public void addButton(String label, BooleanSupplier enabled, Runnable action) {
             items.add(new ButtonItem(
-                    Preconditions.requireNonBlank(label, "label"), Objects.requireNonNull(action, "action")));
+                    Preconditions.requireNonBlank(label, "label"),
+                    Objects.requireNonNull(enabled, "enabled"),
+                    Objects.requireNonNull(action, "action")));
         }
 
         /**
@@ -699,15 +715,23 @@ public final class ControlPanel implements Overlay {
     }
 
     /** Action-button row. */
-    private record ButtonItem(String label, Runnable action) implements Item {
+    private record ButtonItem(String label, BooleanSupplier enabled, Runnable action) implements Item {
         @Override
         public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
             float buttonX = x + HORIZONTAL_PADDING;
             float buttonY = y + 6.0f;
             float buttonWidth = WIDTH - HORIZONTAL_PADDING * 2.0f;
-            canvas.roundedRectangle(buttonX, buttonY, buttonWidth, 26.0f, 5.0f, theme.accent(), hovered ? 1.0f : 0.82f);
+            boolean isEnabled = enabled.getAsBoolean();
+            canvas.roundedRectangle(
+                    buttonX,
+                    buttonY,
+                    buttonWidth,
+                    26.0f,
+                    5.0f,
+                    isEnabled ? theme.accent() : theme.control(),
+                    isEnabled && hovered ? 1.0f : 0.82f);
             float textX = buttonX + (buttonWidth - FONT.width(label, ITEM_FONT_SIZE)) * 0.5f;
-            FONT.text(canvas, textX, y + 11.0f, label, ITEM_FONT_SIZE, theme.text());
+            FONT.text(canvas, textX, y + 11.0f, label, ITEM_FONT_SIZE, isEnabled ? theme.text() : theme.mutedText());
         }
     }
 

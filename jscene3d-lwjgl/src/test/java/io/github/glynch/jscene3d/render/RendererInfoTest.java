@@ -23,6 +23,7 @@ final class RendererInfoTest {
         assertThat(statistics.triangles()).isZero();
         assertThat(statistics.lineSegments()).isZero();
         assertThat(statistics.visibleMeshes()).isZero();
+        assertThat(statistics.renderedInstances()).isZero();
         assertThat(statistics.culledMeshes()).isZero();
         assertThat(statistics.visibleLines()).isZero();
         assertThat(statistics.culledLines()).isZero();
@@ -36,6 +37,7 @@ final class RendererInfoTest {
         assertThat(statistics.shadowTriangles()).isZero();
         assertThat(resources.activeGeometryResources()).isZero();
         assertThat(resources.activeTextureResources()).isZero();
+        assertThat(resources.activeInstanceResources()).isZero();
         assertThat(resources.programCount()).isZero();
         assertThat(resources.activeShadowMaps()).isZero();
     }
@@ -45,7 +47,7 @@ final class RendererInfoTest {
         RendererInfo info = new RendererInfo();
         RenderStatistics statistics = info.statistics();
         ResourceStatistics resources = info.resources();
-        statistics.recordMeshDraw(6);
+        statistics.recordMeshDraw(6, 4);
         statistics.recordLineDraw(3L);
         statistics.recordCulledMesh();
         statistics.recordCulledLine();
@@ -55,6 +57,7 @@ final class RendererInfoTest {
         statistics.completeFrame();
         resources.setActiveGeometryResources(2);
         resources.setActiveTextureResources(3);
+        resources.setActiveInstanceResources(5);
         resources.setProgramCount(1);
         resources.setActiveShadowMaps(4);
 
@@ -65,6 +68,7 @@ final class RendererInfoTest {
         assertThat(statistics.triangles()).isZero();
         assertThat(statistics.lineSegments()).isZero();
         assertThat(statistics.visibleMeshes()).isZero();
+        assertThat(statistics.renderedInstances()).isZero();
         assertThat(statistics.culledMeshes()).isZero();
         assertThat(statistics.visibleLines()).isZero();
         assertThat(statistics.culledLines()).isZero();
@@ -78,6 +82,7 @@ final class RendererInfoTest {
         assertThat(statistics.shadowTriangles()).isZero();
         assertThat(resources.activeGeometryResources()).isEqualTo(2);
         assertThat(resources.activeTextureResources()).isEqualTo(3);
+        assertThat(resources.activeInstanceResources()).isEqualTo(5);
         assertThat(resources.programCount()).isEqualTo(1);
         assertThat(resources.activeShadowMaps()).isEqualTo(4);
     }

@@ -48,6 +48,7 @@ import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Bone;
 import io.github.glynch.jscene3d.objects.Group;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
@@ -101,6 +102,52 @@ final class RendererIT {
             #endif
             }
             """;
+
+    @Test
+    void rendersColoredInstancesWithOneDrawAndUploadsOnlyChangedTransformRange() {
+        WindowOptions options = WindowOptions.builder()
+                .size(320, 240)
+                .title("Renderer instancing integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+        try (Window window = Window.create(options);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial()) {
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 2);
+            mesh.setMatrixAt(0, new Matrix4f().translation(-0.65f, 0.0f, 0.0f).scale(0.55f));
+            mesh.setMatrixAt(1, new Matrix4f().translation(0.65f, 0.0f, 0.0f).scale(0.55f));
+            mesh.setColorAt(0, Color.RED);
+            mesh.setColorAt(1, Color.GREEN);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            OrthographicCamera camera = new OrthographicCamera(-1.5f, 1.5f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            RenderStatistics statistics = renderer.info().statistics();
+            assertThat(statistics.drawCalls()).isOne();
+            assertThat(statistics.visibleMeshes()).isOne();
+            assertThat(statistics.renderedInstances()).isEqualTo(2L);
+            assertThat(statistics.triangles()).isEqualTo(2L);
+            assertThat(renderer.info().resources().activeInstanceResources()).isOne();
+            assertPixelIsRed(Math.round(window.framebufferWidth() * 0.28f), window.framebufferHeight() / 2);
+            assertPixelIsGreen(Math.round(window.framebufferWidth() * 0.72f), window.framebufferHeight() / 2);
+
+            renderer.render(scene, camera);
+            assertThat(statistics.bufferUploads()).isZero();
+
+            mesh.setMatrixAt(1, new Matrix4f().translation(0.7f, 0.0f, 0.0f).scale(0.55f));
+            renderer.render(scene, camera);
+            assertThat(statistics.bufferUploads()).isOne();
+            assertThat(statistics.bufferUploadBytes()).isEqualTo(Float.BYTES);
+
+            scene.remove(mesh);
+            renderer.render(scene, camera);
+            assertThat(renderer.info().resources().activeInstanceResources()).isZero();
+        }
+    }
 
     @Test
     void rendersGeometryAndUploadsOnlyChangedData() {
@@ -1869,6 +1916,14 @@ final class RendererIT {
 
         assertThat(Byte.toUnsignedInt(pixel.get(0))).isGreaterThan(240);
         assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
+    }
+
+    private static void assertPixelIsGreen(int x, int y) {
+        ByteBuffer pixel = readPixel(x, y);
+
+        assertThat(Byte.toUnsignedInt(pixel.get(0))).isLessThan(10);
+        assertThat(Byte.toUnsignedInt(pixel.get(1))).isGreaterThan(240);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
     }
 

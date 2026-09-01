@@ -54,6 +54,8 @@ import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_SRGB;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
+import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
 
 import io.github.glynch.jscene3d.cameras.Camera;
 import io.github.glynch.jscene3d.fogs.Fog;
@@ -75,6 +77,7 @@ import io.github.glynch.jscene3d.materials.ShaderUniform;
 import io.github.glynch.jscene3d.materials.ShaderUniformType;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.RenderCallback;
 import io.github.glynch.jscene3d.objects.RenderContext;
@@ -103,6 +106,7 @@ import io.github.glynch.jscene3d.render.internal.resources.DefaultShadowMaps;
 import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
 import io.github.glynch.jscene3d.render.internal.resources.EnvironmentResource;
 import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
+import io.github.glynch.jscene3d.render.internal.resources.InstanceResource;
 import io.github.glynch.jscene3d.render.internal.resources.TextureResource;
 import io.github.glynch.jscene3d.render.internal.resources.ToneMappingTarget;
 import io.github.glynch.jscene3d.scenes.Scene;
@@ -159,6 +163,8 @@ public final class Renderer implements AutoCloseable {
     private final RenderStatistics statistics;
     private final ResourceStatistics resources;
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
+    private final Map<InstancedMesh, InstanceResource> instanceResources;
+    private final Set<InstancedMesh> activeInstancedMeshes;
     private final IdentityHashMap<Texture, TextureResource> textureResources;
     private final IdentityHashMap<EnvironmentMap, EnvironmentResource> environmentResources;
     private final Map<ShaderProgramKey, ShaderProgram> shaderPrograms;
@@ -217,6 +223,8 @@ public final class Renderer implements AutoCloseable {
         statistics = info.statistics();
         resources = info.resources();
         geometryResources = new IdentityHashMap<>();
+        instanceResources = new IdentityHashMap<>();
+        activeInstancedMeshes = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
         textureResources = new IdentityHashMap<>();
         environmentResources = new IdentityHashMap<>();
         shaderPrograms = new HashMap<>();
@@ -288,6 +296,7 @@ public final class Renderer implements AutoCloseable {
         releaseClosedTextureResources();
         releaseClosedEnvironmentResources();
         standardTextureUnitsPrimed = false;
+        activeInstancedMeshes.clear();
         activeFog = validScene.fog();
         statistics.beginFrame();
 
@@ -304,7 +313,13 @@ public final class Renderer implements AutoCloseable {
                 frustum.update(viewMatrix, projectionMatrix);
                 renderList.build(validScene, viewMatrix, frustum);
                 activeShadowFrame = shadowRenderer.render(
-                        validScene, validCamera, renderList.lights(), viewMatrix, geometryResources);
+                        validScene,
+                        validCamera,
+                        renderList.lights(),
+                        viewMatrix,
+                        geometryResources,
+                        instanceResources,
+                        activeInstancedMeshes);
                 recordShadowWork(activeShadowFrame);
                 updateProgramCount();
                 updateShadowResourceCount();
@@ -344,6 +359,7 @@ public final class Renderer implements AutoCloseable {
         renderList.clear();
         activeShadowFrame = null;
         activeFog = null;
+        releaseInactiveInstanceResources();
         glBindVertexArray(0);
         if (!mainTargetStarted) {
             return;
@@ -560,6 +576,7 @@ public final class Renderer implements AutoCloseable {
             renderList.clear();
             resources.setActiveGeometryResources(0);
             resources.setActiveTextureResources(0);
+            resources.setActiveInstanceResources(0);
             resources.setActiveShadowMaps(0);
             resources.setProgramCount(0);
             closed = true;
@@ -572,6 +589,9 @@ public final class Renderer implements AutoCloseable {
     private void closeCachedResources() {
         geometryResources.values().forEach(GeometryResource::close);
         geometryResources.clear();
+        instanceResources.values().forEach(InstanceResource::close);
+        instanceResources.clear();
+        activeInstancedMeshes.clear();
         textureResources.values().forEach(TextureResource::close);
         textureResources.clear();
         environmentResources.values().forEach(EnvironmentResource::close);
@@ -692,6 +712,11 @@ public final class Renderer implements AutoCloseable {
             throw new IllegalStateException("SkinnedMesh currently requires StandardMaterial: "
                     + material.getClass().getName());
         }
+        if (item.object() instanceof InstancedMesh && material instanceof ShaderMaterial) {
+            throw new IllegalStateException("InstancedMesh does not support ShaderMaterial without explicit "
+                    + "instance attributes: "
+                    + material.getClass().getName());
+        }
         applyMaterialState(material, topology);
         if (topology.isLine()) {
             renderLine(item, geometry, (LineBasicMaterial) material, resource, viewMatrix, projectionMatrix);
@@ -716,7 +741,9 @@ public final class Renderer implements AutoCloseable {
         }
 
         resource.bind();
-        drawGeometry(geometry, topology, item.elementCount());
+        bindInstanceResource(item);
+        drawGeometry(
+                geometry, topology, item.elementCount(), item.instanceCount(), item.object() instanceof InstancedMesh);
     }
 
     /** Synchronizes and binds one built-in line-material draw. */
@@ -759,6 +786,7 @@ public final class Renderer implements AutoCloseable {
 
         glUseProgram(program.id());
         program.uploadFog(activeFog);
+        uploadInstancing(program, item);
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
@@ -802,6 +830,7 @@ public final class Renderer implements AutoCloseable {
 
         glUseProgram(program.id());
         program.uploadFog(activeFog);
+        uploadInstancing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
@@ -845,6 +874,7 @@ public final class Renderer implements AutoCloseable {
 
         glUseProgram(program.id());
         program.uploadFog(activeFog);
+        uploadInstancing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         glUniform1f(program.opacityLocation(), resolvedAlpha(material));
         glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
@@ -868,6 +898,7 @@ public final class Renderer implements AutoCloseable {
 
         glUseProgram(program.id());
         program.uploadFog(activeFog);
+        uploadInstancing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
@@ -962,6 +993,7 @@ public final class Renderer implements AutoCloseable {
         primeStandardTextureUnits();
         glUseProgram(program.id());
         program.uploadFog(activeFog);
+        uploadInstancing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         program.uploadSkinning(item.object(), item.worldMatrix());
         program.uploadLights(renderList.lights(), viewMatrix);
@@ -1056,20 +1088,79 @@ public final class Renderer implements AutoCloseable {
         uploadApplicationUniforms(program, material);
     }
 
+    /** Binds and synchronizes optional instance data after the geometry vertex array is active. */
+    private void bindInstanceResource(RenderItem item) {
+        if (!(item.object() instanceof InstancedMesh mesh)) {
+            return;
+        }
+        InstanceResource resource =
+                instanceResources.computeIfAbsent(mesh, ignored -> new InstanceResource(mesh.capacity()));
+        activeInstancedMeshes.add(mesh);
+        resources.setActiveInstanceResources(instanceResources.size());
+        InstanceResource.UploadResult result = resource.synchronizeAndBind(mesh);
+        statistics.recordUploads(result.count(), result.byteCount());
+    }
+
     /** Issues one indexed or non-indexed primitive draw and records its statistics. */
-    private void drawGeometry(BufferGeometry geometry, PrimitiveTopology topology, int elementCount) {
+    private void drawGeometry(
+            BufferGeometry geometry,
+            PrimitiveTopology topology,
+            int elementCount,
+            int instanceCount,
+            boolean instanced) {
         int start = geometry.drawRangeStart();
         IndexBuffer index = geometry.index();
-        if (index == null) {
-            glDrawArrays(topology.openGlMode(), start, elementCount);
+        if (!instanced) {
+            if (index == null) {
+                glDrawArrays(topology.openGlMode(), start, elementCount);
+            } else {
+                glDrawElements(topology.openGlMode(), elementCount, GL_UNSIGNED_INT, (long) start * Integer.BYTES);
+            }
+        } else if (index == null) {
+            glDrawArraysInstanced(topology.openGlMode(), start, elementCount, instanceCount);
         } else {
-            glDrawElements(topology.openGlMode(), elementCount, GL_UNSIGNED_INT, (long) start * Integer.BYTES);
+            glDrawElementsInstanced(
+                    topology.openGlMode(), elementCount, GL_UNSIGNED_INT, (long) start * Integer.BYTES, instanceCount);
         }
         if (topology.isLine()) {
             statistics.recordLineDraw(topology.primitiveCount(elementCount));
         } else {
-            statistics.recordMeshDraw(elementCount);
+            statistics.recordMeshDraw(elementCount, instanceCount);
         }
+    }
+
+    /** Uploads Basic-program instancing switches. */
+    private static void uploadInstancing(BasicProgram program, RenderItem item) {
+        boolean instanced = item.object() instanceof InstancedMesh;
+        program.uploadInstancing(instanced, hasInstanceColors(item));
+    }
+
+    /** Uploads Lambert-program instancing switches. */
+    private static void uploadInstancing(LambertProgram program, RenderItem item) {
+        boolean instanced = item.object() instanceof InstancedMesh;
+        program.uploadInstancing(instanced, hasInstanceColors(item));
+    }
+
+    /** Uploads Normal-program instancing switches. */
+    private static void uploadInstancing(NormalProgram program, RenderItem item) {
+        program.uploadInstancing(item.object() instanceof InstancedMesh, false);
+    }
+
+    /** Uploads Phong-program instancing switches. */
+    private static void uploadInstancing(PhongProgram program, RenderItem item) {
+        boolean instanced = item.object() instanceof InstancedMesh;
+        program.uploadInstancing(instanced, hasInstanceColors(item));
+    }
+
+    /** Uploads Standard-program instancing switches. */
+    private static void uploadInstancing(StandardProgram program, RenderItem item) {
+        boolean instanced = item.object() instanceof InstancedMesh;
+        program.uploadInstancing(instanced, hasInstanceColors(item));
+    }
+
+    /** Returns whether the selected instance batch supplies colors. */
+    private static boolean hasInstanceColors(RenderItem item) {
+        return item.object() instanceof InstancedMesh mesh && mesh.hasInstanceColors();
     }
 
     /** Resolves a shared custom program, caching only a successful realization. */
@@ -1500,6 +1591,20 @@ public final class Renderer implements AutoCloseable {
             }
         }
         resources.setActiveGeometryResources(geometryResources.size());
+    }
+
+    /** Releases instance buffers for batches absent from both shadow and main passes this frame. */
+    private void releaseInactiveInstanceResources() {
+        Iterator<Map.Entry<InstancedMesh, InstanceResource>> iterator =
+                instanceResources.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<InstancedMesh, InstanceResource> entry = iterator.next();
+            if (!activeInstancedMeshes.contains(entry.getKey())) {
+                entry.getValue().close();
+                iterator.remove();
+            }
+        }
+        resources.setActiveInstanceResources(instanceResources.size());
     }
 
     /** Releases realized GPU resources whose texture descriptions were closed. */

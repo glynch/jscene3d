@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.raycasting;
 
 import io.github.glynch.jscene3d.objects.Mesh;
 import java.util.Objects;
+import java.util.OptionalInt;
 import org.joml.Vector2f;
 import org.joml.Vector2fc;
 import org.joml.Vector3f;
@@ -20,12 +21,24 @@ public final class RaycastHit {
     private final float pointY;
     private final float pointZ;
     private final int faceIndex;
+    private final int instanceIndex;
     private final boolean hasTextureCoordinate;
     private final float textureCoordinateU;
     private final float textureCoordinateV;
 
     /** Retains one validated intersection while copying its vector values. */
     RaycastHit(Mesh mesh, float distance, Vector3fc point, int faceIndex, @Nullable Vector2fc textureCoordinate) {
+        this(mesh, distance, point, faceIndex, -1, textureCoordinate);
+    }
+
+    /** Retains one validated ordinary or instanced intersection while copying vector values. */
+    RaycastHit(
+            Mesh mesh,
+            float distance,
+            Vector3fc point,
+            int faceIndex,
+            int instanceIndex,
+            @Nullable Vector2fc textureCoordinate) {
         this.mesh = Objects.requireNonNull(mesh, "mesh");
         this.distance = distance;
         Vector3fc validPoint = Objects.requireNonNull(point, "point");
@@ -33,6 +46,7 @@ public final class RaycastHit {
         pointY = validPoint.y();
         pointZ = validPoint.z();
         this.faceIndex = faceIndex;
+        this.instanceIndex = instanceIndex;
         hasTextureCoordinate = textureCoordinate != null;
         textureCoordinateU = textureCoordinate == null ? 0.0f : textureCoordinate.x();
         textureCoordinateV = textureCoordinate == null ? 0.0f : textureCoordinate.y();
@@ -74,6 +88,15 @@ public final class RaycastHit {
      */
     public int faceIndex() {
         return faceIndex;
+    }
+
+    /**
+     * Returns the selected instance index when {@link #mesh()} is an instanced mesh.
+     *
+     * @return selected instance index, or an empty value for an ordinary mesh
+     */
+    public OptionalInt instanceIndex() {
+        return instanceIndex < 0 ? OptionalInt.empty() : OptionalInt.of(instanceIndex);
     }
 
     /**

@@ -15,6 +15,7 @@ import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
@@ -206,6 +207,31 @@ final class RenderListTest {
             assertThat(renderList.culledMeshes()).isZero();
             assertThat(geometry.boundingSphere()).isNull();
             renderList.clear();
+        }
+    }
+
+    @Test
+    void usesAggregateInstanceBoundsAndCapturesTheActiveCount() {
+        try (BufferGeometry geometry = createTriangle();
+                BasicMaterial material = new BasicMaterial()) {
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 3);
+            mesh.setMatrixAt(0, new Matrix4f().translation(3.0f, 0.0f, 0.0f));
+            mesh.setMatrixAt(1, new Matrix4f().translation(0.0f, 0.0f, 0.0f));
+            mesh.setMatrixAt(2, new Matrix4f().translation(-3.0f, 0.0f, 0.0f));
+            mesh.setCount(2);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            RenderList renderList = newRenderList();
+
+            build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isOne();
+            assertThat(renderList.opaqueItem(0).instanceCount()).isEqualTo(2);
+
+            mesh.setCount(1);
+            build(renderList, scene);
+            assertThat(renderList.opaqueCount()).isZero();
+            assertThat(renderList.culledMeshes()).isOne();
         }
     }
 

@@ -8,6 +8,7 @@ package io.github.glynch.jscene3d.render;
 public final class ResourceStatistics {
     private int activeGeometryResources;
     private int activeTextureResources;
+    private int activeInstanceResources;
     private int programCount;
     private int activeShadowMaps;
 
@@ -32,6 +33,15 @@ public final class ResourceStatistics {
      */
     public int activeTextureResources() {
         return activeTextureResources;
+    }
+
+    /**
+     * Returns currently realized instanced-mesh data resources.
+     *
+     * @return active instance-resource count
+     */
+    public int activeInstanceResources() {
+        return activeInstanceResources;
     }
 
     /**
@@ -60,6 +70,11 @@ public final class ResourceStatistics {
     /** Replaces the current context-local texture-resource count. */
     void setActiveTextureResources(int activeTextureResources) {
         this.activeTextureResources = activeTextureResources;
+    }
+
+    /** Replaces the current context-local instance-resource count. */
+    void setActiveInstanceResources(int activeInstanceResources) {
+        this.activeInstanceResources = activeInstanceResources;
     }
 
     /** Replaces the current context-local shader-program count. */

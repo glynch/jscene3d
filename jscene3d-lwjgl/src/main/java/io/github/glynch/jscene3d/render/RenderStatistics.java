@@ -11,6 +11,7 @@ public final class RenderStatistics {
     private long triangles;
     private long lineSegments;
     private int visibleMeshes;
+    private long renderedInstances;
     private int culledMeshes;
     private int visibleLines;
     private int culledLines;
@@ -71,6 +72,17 @@ public final class RenderStatistics {
      */
     public int visibleMeshes() {
         return visibleMeshes;
+    }
+
+    /**
+     * Returns geometry instances submitted by visible mesh draws in the most recent frame.
+     *
+     * <p>An ordinary mesh contributes one. An instanced mesh contributes its active count.
+     *
+     * @return submitted mesh-instance count
+     */
+    public long renderedInstances() {
+        return renderedInstances;
     }
 
     /**
@@ -178,6 +190,7 @@ public final class RenderStatistics {
         triangles = 0L;
         lineSegments = 0L;
         visibleMeshes = 0;
+        renderedInstances = 0L;
         culledMeshes = 0;
         visibleLines = 0;
         culledLines = 0;
@@ -198,9 +211,15 @@ public final class RenderStatistics {
 
     /** Records one visible mesh draw and its submitted triangle count. */
     void recordMeshDraw(int elementCount) {
+        recordMeshDraw(elementCount, 1);
+    }
+
+    /** Records one visible mesh batch and its repeated submitted triangle count. */
+    void recordMeshDraw(int elementCount, int instanceCount) {
         drawCalls++;
         visibleMeshes++;
-        triangles += elementCount / 3L;
+        renderedInstances += instanceCount;
+        triangles += (elementCount / 3L) * instanceCount;
     }
 
     /** Records one visible line-object draw and its submitted segment count. */

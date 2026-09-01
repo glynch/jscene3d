@@ -17,6 +17,8 @@ public final class BasicProgram implements AutoCloseable {
             layout(location = 3) in vec4 vertexColor;
             layout(location = 2) in vec2 textureCoordinate;
 
+            INSTANCING_SOURCE
+
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
             uniform mat4 projectionMatrix;
@@ -30,7 +32,7 @@ public final class BasicProgram implements AutoCloseable {
             out float resolvedFogDepth;
 
             void main() {
-                resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
+                resolvedVertexColor = (useVertexColor ? vertexColor : vec4(1.0)) * resolvedInstanceColor();
                 if (useColorMap) {
                     vec2 transformedTextureCoordinate =
                             (colorMapTransform * vec3(textureCoordinate, 1.0)).xy;
@@ -40,11 +42,11 @@ public final class BasicProgram implements AutoCloseable {
                 } else {
                     resolvedTextureCoordinate = vec2(0.0);
                 }
-                vec4 viewPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+                vec4 viewPosition = viewMatrix * modelMatrix * resolvedInstanceMatrix() * vec4(position, 1.0);
                 resolvedFogDepth = -viewPosition.z;
                 gl_Position = projectionMatrix * viewPosition;
             }
-            """;
+            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source());
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             in vec4 resolvedVertexColor;
@@ -82,6 +84,7 @@ public final class BasicProgram implements AutoCloseable {
     private final int useColorMapLocation;
     private final int alphaCutoffLocation;
     private final FogProgramState fogState;
+    private final InstancingProgramState instancingState;
 
     /** Retains a linked program and its required uniform locations. */
     private BasicProgram(int id) {
@@ -97,6 +100,7 @@ public final class BasicProgram implements AutoCloseable {
         useColorMapLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "useColorMap");
         alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "alphaCutoff");
         fogState = new FogProgramState(id, "Built-in basic");
+        instancingState = new InstancingProgramState(id, "Built-in basic");
     }
 
     /**
@@ -220,6 +224,16 @@ public final class BasicProgram implements AutoCloseable {
      */
     public void uploadFog(@Nullable Fog fog) {
         fogState.upload(fog);
+    }
+
+    /**
+     * Uploads optional batch-transform and color switches.
+     *
+     * @param instanced whether the draw consumes per-instance transforms
+     * @param colors whether the draw consumes per-instance colors
+     */
+    public void uploadInstancing(boolean instanced, boolean colors) {
+        instancingState.upload(instanced, colors);
     }
 
     @Override

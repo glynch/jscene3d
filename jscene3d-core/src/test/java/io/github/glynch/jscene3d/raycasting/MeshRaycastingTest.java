@@ -20,16 +20,37 @@ import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.math.BoundingBox;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.objects.Group;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.List;
 import java.util.Objects;
+import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 final class MeshRaycastingTest {
+    @Test
+    void intersectsActiveInstancesAndReportsTheirIndices() {
+        try (BufferGeometry geometry = triangle();
+                BasicMaterial material = new BasicMaterial()) {
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 3);
+            mesh.setMatrixAt(0, new Matrix4f().translation(-3.0f, 0.0f, 0.0f));
+            mesh.setMatrixAt(1, new Matrix4f().translation(0.0f, 0.0f, -1.0f));
+            mesh.setMatrixAt(2, new Matrix4f().translation(0.0f, 0.0f, -2.0f));
+            mesh.setCount(2);
+
+            List<RaycastHit> hits = frontRay(2.0f).intersect(mesh);
+
+            assertThat(hits).hasSize(1);
+            assertThat(hits.getFirst().mesh()).isSameAs(mesh);
+            assertThat(hits.getFirst().instanceIndex()).hasValue(1);
+            assertThat(hits.getFirst().distance()).isCloseTo(3.0f, within(EPSILON));
+        }
+    }
+
     @Test
     void intersectsNonIndexedGeometryAndReturnsImmutableHitValues() {
         try (BufferGeometry geometry = triangleWithTextureCoordinates();

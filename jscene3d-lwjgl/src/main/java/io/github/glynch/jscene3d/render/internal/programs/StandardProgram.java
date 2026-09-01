@@ -18,8 +18,7 @@ import org.jspecify.annotations.Nullable;
 
 /** Compiled built-in metallic-roughness physically based mesh program. */
 public final class StandardProgram implements AutoCloseable {
-    private static final String VERTEX_SOURCE =
-            """
+    private static final String VERTEX_SOURCE = """
             #version 330 core
             layout(location = 0) in vec3 position;
             layout(location = 1) in vec3 normal;
@@ -28,6 +27,8 @@ public final class StandardProgram implements AutoCloseable {
             layout(location = 4) in vec4 jointIndices;
             layout(location = 5) in vec4 skinWeights;
             layout(location = 6) in vec2 secondaryTextureCoordinate;
+
+            INSTANCING_SOURCE
 
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
@@ -52,16 +53,22 @@ public final class StandardProgram implements AutoCloseable {
                             + normalizedWeights.z * jointMatrices[int(jointIndices.z)]
                             + normalizedWeights.w * jointMatrices[int(jointIndices.w)];
                 }
+                mat4 instanceMatrix = resolvedInstanceMatrix();
                 vec4 localPosition = skinMatrix * vec4(position, 1.0);
-                vec4 viewPosition = viewMatrix * modelMatrix * localPosition;
+                vec4 viewPosition = viewMatrix * modelMatrix * instanceMatrix * localPosition;
                 resolvedViewPosition = viewPosition.xyz;
-                resolvedViewNormal = normalize(normalMatrix * mat3(skinMatrix) * normal);
-                resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
+                resolvedViewNormal = normalize(normalMatrix
+                        * resolvedInstanceNormalMatrix(instanceMatrix)
+                        * mat3(skinMatrix)
+                        * normal);
+                resolvedVertexColor = (useVertexColor ? vertexColor : vec4(1.0)) * resolvedInstanceColor();
                 resolvedTextureCoordinate = textureCoordinate;
                 resolvedSecondaryTextureCoordinate = secondaryTextureCoordinate;
                 gl_Position = projectionMatrix * viewPosition;
             }
-            """.replace("SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS));
+            """.replace(
+                    "SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS))
+            .replace("INSTANCING_SOURCE", InstancingShaderSource.source());
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             const float PI = 3.141592653589793;
@@ -520,6 +527,16 @@ public final class StandardProgram implements AutoCloseable {
      */
     public void uploadTransforms(Matrix4fc modelMatrix, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
         litState.uploadTransforms(modelMatrix, viewMatrix, projectionMatrix);
+    }
+
+    /**
+     * Uploads optional batch-transform and color switches.
+     *
+     * @param instanced whether the draw consumes per-instance transforms
+     * @param colors whether the draw consumes per-instance colors
+     */
+    public void uploadInstancing(boolean instanced, boolean colors) {
+        litState.uploadInstancing(instanced, colors);
     }
 
     /**

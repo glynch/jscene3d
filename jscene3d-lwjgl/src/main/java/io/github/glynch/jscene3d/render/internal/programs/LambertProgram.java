@@ -22,6 +22,8 @@ public final class LambertProgram implements AutoCloseable {
             layout(location = 2) in vec2 textureCoordinate;
             layout(location = 3) in vec4 vertexColor;
 
+            INSTANCING_SOURCE
+
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
             uniform mat4 projectionMatrix;
@@ -37,10 +39,11 @@ public final class LambertProgram implements AutoCloseable {
             out vec2 resolvedTextureCoordinate;
 
             void main() {
-                vec4 viewPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+                mat4 instanceMatrix = resolvedInstanceMatrix();
+                vec4 viewPosition = viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0);
                 resolvedViewPosition = viewPosition.xyz;
-                resolvedViewNormal = normalize(normalMatrix * normal);
-                resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
+                resolvedViewNormal = normalize(normalMatrix * resolvedInstanceNormalMatrix(instanceMatrix) * normal);
+                resolvedVertexColor = (useVertexColor ? vertexColor : vec4(1.0)) * resolvedInstanceColor();
                 if (useColorMap) {
                     vec2 transformedTextureCoordinate =
                             (colorMapTransform * vec3(textureCoordinate, 1.0)).xy;
@@ -52,7 +55,7 @@ public final class LambertProgram implements AutoCloseable {
                 }
                 gl_Position = projectionMatrix * viewPosition;
             }
-            """;
+            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source());
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             const float RECIPROCAL_PI = 0.3183098861837907;
@@ -348,6 +351,16 @@ public final class LambertProgram implements AutoCloseable {
      */
     public void uploadFog(@Nullable Fog fog) {
         fogState.upload(fog);
+    }
+
+    /**
+     * Uploads optional batch-transform and color switches.
+     *
+     * @param instanced whether the draw consumes per-instance transforms
+     * @param colors whether the draw consumes per-instance colors
+     */
+    public void uploadInstancing(boolean instanced, boolean colors) {
+        litState.uploadInstancing(instanced, colors);
     }
 
     /** Deletes the linked context-local program. */

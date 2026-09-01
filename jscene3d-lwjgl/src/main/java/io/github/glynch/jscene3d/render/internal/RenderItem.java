@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.render.internal;
 
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.Material;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.RenderableObject;
 import java.util.Objects;
 import org.joml.Matrix4fc;
@@ -19,6 +20,7 @@ public final class RenderItem {
     private @Nullable Matrix4fc worldMatrix;
     private @Nullable PrimitiveTopology topology;
     private int elementCount;
+    private int instanceCount;
     private int materialSortKey;
     private int geometrySortKey;
     private int renderOrder;
@@ -92,6 +94,7 @@ public final class RenderItem {
         worldMatrix = assignedWorldMatrix;
         this.topology = topology;
         this.elementCount = elementCount;
+        instanceCount = object instanceof InstancedMesh instancedMesh ? instancedMesh.count() : 1;
         float worldX = assignedWorldMatrix.m30();
         float worldY = assignedWorldMatrix.m31();
         float worldZ = assignedWorldMatrix.m32();
@@ -157,6 +160,15 @@ public final class RenderItem {
         return elementCount;
     }
 
+    /**
+     * Returns how many copies of the geometry participate in this draw.
+     *
+     * @return positive instance count
+     */
+    public int instanceCount() {
+        return instanceCount;
+    }
+
     /** Clears references and scalar state before returning this item to the pool. */
     public void release() {
         object = null;
@@ -165,6 +177,7 @@ public final class RenderItem {
         worldMatrix = null;
         topology = null;
         elementCount = 0;
+        instanceCount = 0;
         materialSortKey = 0;
         geometrySortKey = 0;
         renderOrder = 0;

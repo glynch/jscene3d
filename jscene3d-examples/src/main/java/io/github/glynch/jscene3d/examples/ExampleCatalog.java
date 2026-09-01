@@ -311,6 +311,20 @@ final class ExampleCatalog {
                         List.of("raycaster", "picking", "selection", "mouse"),
                         ObjectSelectionExample::create),
                 definition(
+                        "instancing",
+                        "Instanced mesh",
+                        "Rendering",
+                        "One GPU-instanced batch compared live with hundreds of ordinary meshes.",
+                        List.of("instancing", "performance", "draw calls", "selection", "colors", "shadows"),
+                        List.of(new GalleryAttribution(
+                                "Instancing example design",
+                                "Three.js Authors",
+                                "Three.js WebGPU Instance Mesh Example",
+                                URI.create("https://threejs.org/examples/webgpu_instance_mesh.html"),
+                                "MIT",
+                                URI.create("https://github.com/mrdoob/three.js/blob/dev/LICENSE"))),
+                        InstancingExample::create),
+                definition(
                         "shader-material",
                         "Shader material",
                         "Materials",

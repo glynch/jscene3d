@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.render.internal.programs;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 import static org.lwjgl.opengl.GL20.glUniform1f;
+import static org.lwjgl.opengl.GL20.glUniform1i;
 import static org.lwjgl.opengl.GL20.glUniform3f;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 
@@ -22,10 +23,15 @@ public final class ShadowDepthProgram implements AutoCloseable {
             layout(location = 0) in vec3 position;
             layout(location = 4) in vec4 jointIndices;
             layout(location = 5) in vec4 skinWeights;
+            layout(location = 7) in vec4 instanceMatrixColumn0;
+            layout(location = 8) in vec4 instanceMatrixColumn1;
+            layout(location = 9) in vec4 instanceMatrixColumn2;
+            layout(location = 10) in vec4 instanceMatrixColumn3;
 
             uniform mat4 lightViewProjectionMatrix;
             uniform mat4 modelMatrix;
             uniform bool useSkinning;
+            uniform bool useInstancing;
             uniform mat4 jointMatrices[SKIN_JOINT_CAPACITY];
 
             void main() {
@@ -37,7 +43,10 @@ public final class ShadowDepthProgram implements AutoCloseable {
                             + normalizedWeights.z * jointMatrices[int(jointIndices.z)]
                             + normalizedWeights.w * jointMatrices[int(jointIndices.w)];
                 }
-                gl_Position = lightViewProjectionMatrix * modelMatrix * skinMatrix * vec4(position, 1.0);
+                mat4 instanceMatrix = useInstancing
+                        ? mat4(instanceMatrixColumn0, instanceMatrixColumn1, instanceMatrixColumn2, instanceMatrixColumn3)
+                        : mat4(1.0);
+                gl_Position = lightViewProjectionMatrix * modelMatrix * instanceMatrix * skinMatrix * vec4(position, 1.0);
             }
             """.replace("SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS));
     private static final String PROJECTED_FRAGMENT_SOURCE = """
@@ -53,10 +62,15 @@ public final class ShadowDepthProgram implements AutoCloseable {
             layout(location = 0) in vec3 position;
             layout(location = 4) in vec4 jointIndices;
             layout(location = 5) in vec4 skinWeights;
+            layout(location = 7) in vec4 instanceMatrixColumn0;
+            layout(location = 8) in vec4 instanceMatrixColumn1;
+            layout(location = 9) in vec4 instanceMatrixColumn2;
+            layout(location = 10) in vec4 instanceMatrixColumn3;
 
             uniform mat4 lightViewProjectionMatrix;
             uniform mat4 modelMatrix;
             uniform bool useSkinning;
+            uniform bool useInstancing;
             uniform mat4 jointMatrices[SKIN_JOINT_CAPACITY];
 
             out vec3 worldPosition;
@@ -70,7 +84,10 @@ public final class ShadowDepthProgram implements AutoCloseable {
                             + normalizedWeights.z * jointMatrices[int(jointIndices.z)]
                             + normalizedWeights.w * jointMatrices[int(jointIndices.w)];
                 }
-                vec4 resolvedWorldPosition = modelMatrix * skinMatrix * vec4(position, 1.0);
+                mat4 instanceMatrix = useInstancing
+                        ? mat4(instanceMatrixColumn0, instanceMatrixColumn1, instanceMatrixColumn2, instanceMatrixColumn3)
+                        : mat4(1.0);
+                vec4 resolvedWorldPosition = modelMatrix * instanceMatrix * skinMatrix * vec4(position, 1.0);
                 worldPosition = resolvedWorldPosition.xyz;
                 gl_Position = lightViewProjectionMatrix * resolvedWorldPosition;
             }
@@ -91,6 +108,7 @@ public final class ShadowDepthProgram implements AutoCloseable {
     private final boolean radial;
     private final int lightViewProjectionMatrixLocation;
     private final int modelMatrixLocation;
+    private final int useInstancingLocation;
     private final int lightPositionLocation;
     private final int lightFarPlaneLocation;
     private final SkinningProgramState skinningState;
@@ -102,6 +120,7 @@ public final class ShadowDepthProgram implements AutoCloseable {
         this.radial = radial;
         lightViewProjectionMatrixLocation = ProgramSupport.requiredUniform(id, label, "lightViewProjectionMatrix");
         modelMatrixLocation = ProgramSupport.requiredUniform(id, label, "modelMatrix");
+        useInstancingLocation = ProgramSupport.requiredUniform(id, label, "useInstancing");
         lightPositionLocation = radial ? ProgramSupport.requiredUniform(id, label, "lightPosition") : -1;
         lightFarPlaneLocation = radial ? ProgramSupport.requiredUniform(id, label, "lightFarPlane") : -1;
         skinningState = new SkinningProgramState(id, label);
@@ -190,6 +209,15 @@ public final class ShadowDepthProgram implements AutoCloseable {
     public void uploadModel(Matrix4fc modelMatrix) {
         modelMatrix.get(matrixValues);
         glUniformMatrix4fv(modelMatrixLocation, false, matrixValues);
+    }
+
+    /**
+     * Uploads whether the current depth draw consumes per-instance transforms.
+     *
+     * @param instanced whether the draw consumes per-instance transforms
+     */
+    public void uploadInstancing(boolean instanced) {
+        glUniform1i(useInstancingLocation, instanced ? 1 : 0);
     }
 
     /**

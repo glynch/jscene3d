@@ -26,6 +26,7 @@ import org.joml.Vector3f;
 /** Shared transform and light-uniform staging for built-in lit mesh programs. */
 final class LitProgramState {
     private final ShadowProgramState shadowState;
+    private final InstancingProgramState instancingState;
     private final int modelMatrixLocation;
     private final int viewMatrixLocation;
     private final int projectionMatrixLocation;
@@ -86,6 +87,7 @@ final class LitProgramState {
     /** Resolves common uniform locations and allocates reusable upload staging. */
     LitProgramState(int program, String label) {
         shadowState = new ShadowProgramState(program, label);
+        instancingState = new InstancingProgramState(program, label);
         modelMatrixLocation = ProgramSupport.requiredUniform(program, label, "modelMatrix");
         viewMatrixLocation = ProgramSupport.requiredUniform(program, label, "viewMatrix");
         projectionMatrixLocation = ProgramSupport.requiredUniform(program, label, "projectionMatrix");
@@ -157,6 +159,11 @@ final class LitProgramState {
         modelViewMatrix.set(viewMatrix).mul(modelMatrix);
         normalMatrix.set(modelViewMatrix).normal().get(matrix3Values);
         glUniformMatrix3fv(normalMatrixLocation, false, matrix3Values);
+    }
+
+    /** Uploads optional batch-transform and color switches. */
+    void uploadInstancing(boolean instanced, boolean colors) {
+        instancingState.upload(instanced, colors);
     }
 
     /** Uploads combined ambient and ordered point- and directional-light state without allocating. */

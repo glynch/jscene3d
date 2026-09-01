@@ -11,6 +11,7 @@ import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.math.BoundingBox;
 import io.github.glynch.jscene3d.math.BoundingSphere;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Mesh;
 import java.util.List;
 import java.util.Objects;
@@ -25,6 +26,8 @@ final class MeshIntersector {
     private static final double PARALLEL_TOLERANCE = 1.0e-12;
 
     private final Matrix4f inverseWorldMatrix = new Matrix4f();
+    private final Matrix4f instanceMatrix = new Matrix4f();
+    private final Matrix4f instanceWorldMatrix = new Matrix4f();
     private final Vector3f localOrigin = new Vector3f();
     private final Vector3f localDirection = new Vector3f();
     private final Vector3f worldPoint = new Vector3f();
@@ -36,6 +39,7 @@ final class MeshIntersector {
     private @Nullable BufferAttribute activeTextureCoordinates;
     private @Nullable MaterialSide activeSide;
     private @Nullable List<RaycastHit> activeHits;
+    private int activeInstanceIndex = -1;
     private double boxNear;
     private double boxFar;
 
@@ -51,15 +55,35 @@ final class MeshIntersector {
             return;
         }
         BufferAttribute positions = requirePositions(geometry);
-        Matrix4fc worldMatrix = mesh.matrixWorld();
-        transformRayToLocal(worldMatrix, ray);
+        BufferAttribute uvs = geometry.attribute(BufferGeometry.UV);
+        IntersectionContext context = new IntersectionContext(mesh, ray, hits, positions, uvs, drawCount);
+        if (mesh instanceof InstancedMesh instancedMesh) {
+            intersectInstances(instancedMesh, context);
+        } else {
+            intersectSingle(context, mesh.matrixWorld(), -1);
+        }
+    }
+
+    /** Intersects every active instance using its combined object and local-instance transform. */
+    private void intersectInstances(InstancedMesh mesh, IntersectionContext context) {
+        Matrix4fc meshWorldMatrix = mesh.matrixWorld();
+        for (int index = 0; index < mesh.count(); index++) {
+            mesh.matrixAt(index, instanceMatrix);
+            instanceWorldMatrix.set(meshWorldMatrix).mul(instanceMatrix);
+            intersectSingle(context, instanceWorldMatrix, index);
+        }
+    }
+
+    /** Intersects one ordinary mesh or one selected instance transform. */
+    private void intersectSingle(IntersectionContext context, Matrix4fc worldMatrix, int instanceIndex) {
+        transformRayToLocal(worldMatrix, context.ray());
+        BufferGeometry geometry = context.mesh().geometry();
         if (!intersectsBounds(geometry)) {
             return;
         }
-        MaterialSide side = effectiveSide(material.side(), worldMatrix.determinant3x3());
-        BufferAttribute uvs = geometry.attribute(BufferGeometry.UV);
-        configureTriangleIntersection(mesh, ray, positions, uvs, side, hits);
-        intersectTriangles(geometry, drawCount);
+        MaterialSide side = effectiveSide(context.mesh().material().side(), worldMatrix.determinant3x3());
+        configureTriangleIntersection(context, side, instanceIndex);
+        intersectTriangles(geometry, context.drawCount());
     }
 
     /** Returns the required non-empty position attribute. */
@@ -116,20 +140,24 @@ final class MeshIntersector {
     }
 
     /** Retains the mesh-level values shared by every selected triangle. */
-    private void configureTriangleIntersection(
+    private void configureTriangleIntersection(IntersectionContext context, MaterialSide side, int instanceIndex) {
+        activeMesh = context.mesh();
+        activeRay = context.ray();
+        activePositions = context.positions();
+        activeTextureCoordinates = context.textureCoordinates();
+        activeSide = side;
+        activeHits = context.hits();
+        activeInstanceIndex = instanceIndex;
+    }
+
+    /** Values shared by each local-space intersection belonging to one mesh batch. */
+    private record IntersectionContext(
             Mesh mesh,
             RayState ray,
+            List<RaycastHit> hits,
             BufferAttribute positions,
-            @Nullable BufferAttribute uvs,
-            MaterialSide side,
-            List<RaycastHit> hits) {
-        activeMesh = mesh;
-        activeRay = ray;
-        activePositions = positions;
-        activeTextureCoordinates = uvs;
-        activeSide = side;
-        activeHits = hits;
-    }
+            @Nullable BufferAttribute textureCoordinates,
+            int drawCount) {}
 
     /** Releases mesh-level references after one narrow-phase pass. */
     private void releaseTriangleIntersection() {
@@ -139,6 +167,7 @@ final class MeshIntersector {
         activeTextureCoordinates = null;
         activeSide = null;
         activeHits = null;
+        activeInstanceIndex = -1;
     }
 
     /** Swaps front and back selection when a world transform reverses triangle winding. */
@@ -271,6 +300,7 @@ final class MeshIntersector {
                         hitDistance,
                         worldPoint,
                         faceIndex,
+                        activeInstanceIndex,
                         interpolateTextureCoordinate(
                                 activeTextureCoordinates, first, second, third, secondWeight, thirdWeight)));
     }

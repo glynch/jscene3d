@@ -28,6 +28,8 @@ import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30.GL_MAX_TEXTURE_SIZE;
 import static org.lwjgl.opengl.GL30.glBindFramebuffer;
+import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
+import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
 
 import io.github.glynch.jscene3d.cameras.Camera;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
@@ -40,6 +42,7 @@ import io.github.glynch.jscene3d.lights.ShadowCastingLight;
 import io.github.glynch.jscene3d.lights.SpotLight;
 import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.MaterialSide;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.objects.RenderCallback;
@@ -51,6 +54,7 @@ import io.github.glynch.jscene3d.render.internal.ShadowFrame.ShadowRenderMetrics
 import io.github.glynch.jscene3d.render.internal.ShadowFrame.TwoDimensionalShadow;
 import io.github.glynch.jscene3d.render.internal.programs.ShadowDepthProgram;
 import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
+import io.github.glynch.jscene3d.render.internal.resources.InstanceResource;
 import io.github.glynch.jscene3d.render.internal.resources.ShadowMapResource;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.ArrayDeque;
@@ -65,6 +69,7 @@ import java.util.Set;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
+import org.jspecify.annotations.Nullable;
 
 /** Owns context-local shadow maps, depth rendering, and per-frame light projection state. */
 public final class ShadowRenderer implements AutoCloseable {
@@ -106,6 +111,8 @@ public final class ShadowRenderer implements AutoCloseable {
     private long triangles;
     private int uploads;
     private long uploadedBytes;
+    private @Nullable Map<InstancedMesh, InstanceResource> instanceResources;
+    private @Nullable Set<InstancedMesh> activeInstancedMeshes;
 
     /** Creates an unrealized renderer-owned shadow subsystem. */
     public ShadowRenderer() {
@@ -133,6 +140,8 @@ public final class ShadowRenderer implements AutoCloseable {
      * @param lights visible lights collected for the main frame
      * @param mainViewMatrix main camera view matrix
      * @param geometryResources renderer geometry cache shared with the main pass
+     * @param instanceResources renderer instance-data cache shared with the main pass
+     * @param activeInstancedMeshes batches used by either pass during this frame
      * @return immutable completed frame state
      */
     public ShadowFrame render(
@@ -140,13 +149,17 @@ public final class ShadowRenderer implements AutoCloseable {
             Camera camera,
             LightCollection lights,
             Matrix4fc mainViewMatrix,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources) {
+            Map<BufferGeometry, GeometryResource> geometryResources,
+            Map<InstancedMesh, InstanceResource> instanceResources,
+            Set<InstancedMesh> activeInstancedMeshes) {
         collectCasters(scene);
         activeLights.clear();
         drawCalls = 0;
         triangles = 0L;
         uploads = 0;
         uploadedBytes = 0L;
+        this.instanceResources = instanceResources;
+        this.activeInstancedMeshes = activeInstancedMeshes;
         inverseMainView.set(mainViewMatrix).invert();
         requireSupportedShadowCounts(lights);
         int[] directionalIndices = indices(lights.directionalLightCount());
@@ -165,6 +178,8 @@ public final class ShadowRenderer implements AutoCloseable {
                     twoDimensional.size() + points.size(), passes, drawCalls, triangles, uploads, uploadedBytes);
             return new ShadowFrame(twoDimensional, points, directionalIndices, spotIndices, pointIndices, metrics);
         } finally {
+            this.instanceResources = null;
+            this.activeInstancedMeshes = null;
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
     }
@@ -207,7 +222,7 @@ public final class ShadowRenderer implements AutoCloseable {
             LightCollection lights,
             int[] indices,
             List<TwoDimensionalShadow> entries,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources,
+            Map<BufferGeometry, GeometryResource> geometryResources,
             CallbackFrame callbackFrame) {
         int passes = 0;
         for (int index = 0;
@@ -244,7 +259,7 @@ public final class ShadowRenderer implements AutoCloseable {
             LightCollection lights,
             int[] indices,
             List<TwoDimensionalShadow> entries,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources,
+            Map<BufferGeometry, GeometryResource> geometryResources,
             CallbackFrame callbackFrame) {
         int passes = 0;
         for (int index = 0;
@@ -276,7 +291,7 @@ public final class ShadowRenderer implements AutoCloseable {
             LightCollection lights,
             int[] indices,
             List<PointShadow> entries,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources,
+            Map<BufferGeometry, GeometryResource> geometryResources,
             CallbackFrame callbackFrame) {
         int passes = 0;
         for (int index = 0;
@@ -310,7 +325,7 @@ public final class ShadowRenderer implements AutoCloseable {
             LightShadow shadow,
             boolean cube,
             int face,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources,
+            Map<BufferGeometry, GeometryResource> geometryResources,
             CallbackFrame callbackFrame) {
         ShadowMapResource resource = resource(light, shadow, cube);
         renderFace(resource, shadow, false, face, geometryResources, callbackFrame);
@@ -323,7 +338,7 @@ public final class ShadowRenderer implements AutoCloseable {
             LightShadow shadow,
             boolean radialDepth,
             int face,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources,
+            Map<BufferGeometry, GeometryResource> geometryResources,
             CallbackFrame callbackFrame) {
         resource.bindForWriting(face);
         glViewport(0, 0, shadow.mapWidth(), shadow.mapHeight());
@@ -348,7 +363,7 @@ public final class ShadowRenderer implements AutoCloseable {
     private void drawCaster(
             Mesh mesh,
             ShadowDepthProgram activeProgram,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources,
+            Map<BufferGeometry, GeometryResource> geometryResources,
             CallbackFrame callbackFrame) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
@@ -382,7 +397,7 @@ public final class ShadowRenderer implements AutoCloseable {
             int elementCount,
             Matrix4fc worldMatrix,
             ShadowDepthProgram activeProgram,
-            IdentityHashMap<BufferGeometry, GeometryResource> geometryResources) {
+            Map<BufferGeometry, GeometryResource> geometryResources) {
         applySide(material);
         GeometryResource geometryResource =
                 geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
@@ -396,19 +411,49 @@ public final class ShadowRenderer implements AutoCloseable {
         activeProgram.uploadModel(worldMatrix);
         activeProgram.uploadSkinning(mesh, worldMatrix);
         geometryResource.bind();
+        int instanceCount = bindInstances(mesh);
+        activeProgram.uploadInstancing(mesh instanceof InstancedMesh);
         int start = geometry.drawRangeStart();
         IndexBuffer index = geometry.index();
-        if (index == null) {
-            glDrawArrays(PrimitiveTopology.TRIANGLES.openGlMode(), start, elementCount);
+        if (!(mesh instanceof InstancedMesh)) {
+            if (index == null) {
+                glDrawArrays(PrimitiveTopology.TRIANGLES.openGlMode(), start, elementCount);
+            } else {
+                glDrawElements(
+                        PrimitiveTopology.TRIANGLES.openGlMode(),
+                        elementCount,
+                        GL_UNSIGNED_INT,
+                        (long) start * Integer.BYTES);
+            }
+        } else if (index == null) {
+            glDrawArraysInstanced(PrimitiveTopology.TRIANGLES.openGlMode(), start, elementCount, instanceCount);
         } else {
-            glDrawElements(
+            glDrawElementsInstanced(
                     PrimitiveTopology.TRIANGLES.openGlMode(),
                     elementCount,
                     GL_UNSIGNED_INT,
-                    (long) start * Integer.BYTES);
+                    (long) start * Integer.BYTES,
+                    instanceCount);
         }
         drawCalls++;
-        triangles += elementCount / 3L;
+        triangles += (elementCount / 3L) * instanceCount;
+    }
+
+    /** Synchronizes optional per-instance transforms onto the active geometry vertex array. */
+    private int bindInstances(Mesh mesh) {
+        if (!(mesh instanceof InstancedMesh instancedMesh)) {
+            return 1;
+        }
+        Map<InstancedMesh, InstanceResource> resourceMap =
+                java.util.Objects.requireNonNull(instanceResources, "instanceResources");
+        InstanceResource resource =
+                resourceMap.computeIfAbsent(instancedMesh, ignored -> new InstanceResource(instancedMesh.capacity()));
+        java.util.Objects.requireNonNull(activeInstancedMeshes, "activeInstancedMeshes")
+                .add(instancedMesh);
+        InstanceResource.UploadResult result = resource.synchronizeAndBind(instancedMesh);
+        uploads += result.count();
+        uploadedBytes += result.byteCount();
+        return instancedMesh.count();
     }
 
     /** Applies only face culling from a caster's material; shadow depth always writes and tests. */
@@ -435,7 +480,8 @@ public final class ShadowRenderer implements AutoCloseable {
             }
             if (object instanceof Mesh mesh
                     && mesh.isShadowCastingEnabled()
-                    && mesh.material().visible()) {
+                    && mesh.material().visible()
+                    && (!(mesh instanceof InstancedMesh instancedMesh) || instancedMesh.count() > 0)) {
                 casters.add(mesh);
             }
             List<Object3D> children = object.children();

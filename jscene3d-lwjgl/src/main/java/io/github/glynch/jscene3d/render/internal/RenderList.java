@@ -15,6 +15,7 @@ import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.BoundingSphere;
+import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
@@ -178,6 +179,9 @@ public final class RenderList {
     private void collectMesh(Mesh mesh, Matrix4fc viewMatrix, Frustum frustum) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
+        if (mesh instanceof InstancedMesh instancedMesh && instancedMesh.count() == 0) {
+            return;
+        }
         boolean supported =
                 switch (material) {
                     case BasicMaterial ignored -> true;
@@ -223,7 +227,9 @@ public final class RenderList {
 
         Matrix4fc worldMatrix = object.matrixWorld();
         if (object.isFrustumCullingEnabled()) {
-            BoundingSphere boundingSphere = geometry.boundingSphere();
+            BoundingSphere boundingSphere = object instanceof InstancedMesh instancedMesh
+                    ? instancedMesh.boundingSphere()
+                    : geometry.boundingSphere();
             if (boundingSphere == null) {
                 boundingSphere = geometry.computeBoundingSphere();
             }

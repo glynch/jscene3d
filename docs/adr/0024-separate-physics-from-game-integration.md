@@ -13,6 +13,8 @@ becoming part of the physics model.
 
 The first physics capability profile will be deliberately bounded rather than
 attempting immediate parity with mature general-purpose engines. It will begin
-with static and dynamic bodies, sphere and box shapes, gravity and forces,
-broad-phase and narrow-phase collision detection, contact resolution, friction,
-restitution, collision events, and line-based debug visualization.
+with fixed updates, static collision, general spatial queries, kinematic bodies,
+box, sphere, and capsule shapes, triggers, collision events, and line-based
+debug visualization. Dynamic bodies and the general contact solver remain part
+of the Physics Engine direction but do not block the first playable Game
+Application.

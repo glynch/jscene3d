@@ -214,9 +214,15 @@ may interpolate between Fixed Updates for presentation.
 _Avoid_: Physics-owned Object3D
 
 **Game Engine**:
-The optional higher-level runtime that coordinates application lifecycle, game
-states, input, assets, physics, animation, and rendering through JScene3D.
-_Avoid_: Renderer, Physics World
+The optional, genre-independent runtime that coordinates application lifecycle,
+game states, input, assets, physics, animation, and rendering through JScene3D.
+It contains no rules, content formats, or assets belonging to a particular game.
+_Avoid_: Renderer, Physics World, game application
+
+**Game Application**:
+An independently packaged playable title built on the Game Engine. It owns its
+genre-specific rules, world representation, content, assets, and presentation.
+_Avoid_: Game Engine, Feature Example
 
 **Scene Persistence**:
 Future saving and restoration of JScene3D-specific scene state, identities, and

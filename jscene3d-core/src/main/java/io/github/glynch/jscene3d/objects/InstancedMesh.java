@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.objects;
 
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.math.Color;
@@ -42,11 +43,13 @@ public final class InstancedMesh extends Mesh {
     private final Vector3f scaleScratch;
 
     private @Nullable float[] colors;
+    private @Nullable float[] instanceMorphTargetInfluences;
     private @Nullable BoundingSphere cachedBoundingSphere;
     private @Nullable BufferGeometry cachedBoundsGeometry;
     private long cachedBoundsMatrixVersion = -1L;
     private long matrixVersion;
     private long colorVersion;
+    private long instanceMorphTargetInfluenceVersion;
     private int cachedBoundsCount = -1;
     private int count;
 
@@ -216,6 +219,152 @@ public final class InstancedMesh extends Mesh {
             colors = null;
             colorVersion++;
         }
+    }
+
+    /**
+     * Returns whether independent per-instance morph influences have been allocated.
+     *
+     * <p>Before allocation, every instance uses the mesh-level influence vector inherited from
+     * {@link Mesh}.
+     *
+     * @return whether per-instance values exist
+     */
+    public boolean hasInstanceMorphTargetInfluences() {
+        return instanceMorphTargetInfluences != null;
+    }
+
+    /**
+     * Returns one instance's influence, falling back to the shared mesh-level value.
+     *
+     * @param instanceIndex zero-based instance index below capacity
+     * @param targetIndex zero-based morph target index
+     * @return finite influence
+     */
+    public float morphTargetInfluenceAt(int instanceIndex, int targetIndex) {
+        int validInstance = Objects.checkIndex(instanceIndex, capacity);
+        int targetCount = morphTargetCount();
+        int validTarget = Objects.checkIndex(targetIndex, targetCount);
+        float[] values = instanceMorphTargetInfluences;
+        return values == null ? morphTargetInfluence(validTarget) : values[validInstance * targetCount + validTarget];
+    }
+
+    /**
+     * Changes one instance's morph influence, allocating independent values lazily.
+     *
+     * @param instanceIndex zero-based instance index below capacity
+     * @param targetIndex zero-based morph target index
+     * @param influence finite replacement influence
+     * @throws IllegalStateException if this geometry has no morph targets
+     */
+    public void setMorphTargetInfluenceAt(int instanceIndex, int targetIndex, float influence) {
+        int validInstance = Objects.checkIndex(instanceIndex, capacity);
+        int targetCount = morphTargetCount();
+        if (targetCount == 0) {
+            throw new IllegalStateException("InstancedMesh geometry has no morph targets");
+        }
+        int validTarget = Objects.checkIndex(targetIndex, targetCount);
+        float validInfluence = Preconditions.requireFinite(influence, "influence");
+        float[] values = requireInstanceMorphTargetInfluences();
+        int offset = validInstance * targetCount + validTarget;
+        if (values[offset] != validInfluence) {
+            values[offset] = validInfluence;
+            instanceMorphTargetInfluenceVersion++;
+        }
+    }
+
+    /**
+     * Restores shared mesh-level influences for every instance and releases independent storage.
+     */
+    public void clearInstanceMorphTargetInfluences() {
+        if (instanceMorphTargetInfluences != null) {
+            instanceMorphTargetInfluences = null;
+            instanceMorphTargetInfluenceVersion++;
+        }
+    }
+
+    /**
+     * Returns the per-instance weight-data version observed by renderer resources.
+     *
+     * @return monotonically increasing version
+     */
+    public long instanceMorphTargetInfluenceVersion() {
+        return instanceMorphTargetInfluenceVersion;
+    }
+
+    /**
+     * Copies either independent or expanded shared weights into capacity-major storage.
+     *
+     * @param destination exact-length destination of {@code capacity * morphTargetCount}
+     */
+    public void copyInstanceMorphTargetInfluencesTo(float[] destination) {
+        int targetCount = morphTargetCount();
+        int expected = Math.multiplyExact(capacity, targetCount);
+        requireLength(destination, expected, "destination");
+        float[] values = instanceMorphTargetInfluences;
+        if (values != null) {
+            System.arraycopy(values, 0, destination, 0, values.length);
+            return;
+        }
+        float[] shared = new float[targetCount];
+        copyMorphTargetInfluencesTo(shared);
+        for (int instanceIndex = 0; instanceIndex < capacity; instanceIndex++) {
+            System.arraycopy(shared, 0, destination, instanceIndex * targetCount, targetCount);
+        }
+    }
+
+    /** Mirrors one batch influence into every independently stored instance. */
+    @Override
+    protected void onMorphTargetInfluenceChanged(int targetIndex, float influence) {
+        float[] values = instanceMorphTargetInfluences;
+        if (values == null) {
+            instanceMorphTargetInfluenceVersion++;
+            return;
+        }
+        int targetCount = morphTargetCount();
+        for (int instanceIndex = 0; instanceIndex < capacity; instanceIndex++) {
+            values[instanceIndex * targetCount + targetIndex] = influence;
+        }
+        instanceMorphTargetInfluenceVersion++;
+    }
+
+    /** Mirrors a full shared influence replacement into all independently stored instances. */
+    @Override
+    protected void onMorphTargetInfluencesChanged() {
+        float[] values = instanceMorphTargetInfluences;
+        if (values == null) {
+            instanceMorphTargetInfluenceVersion++;
+            return;
+        }
+        int targetCount = morphTargetCount();
+        float[] shared = new float[targetCount];
+        copyMorphTargetInfluencesTo(shared);
+        for (int instanceIndex = 0; instanceIndex < capacity; instanceIndex++) {
+            System.arraycopy(shared, 0, values, instanceIndex * targetCount, targetCount);
+        }
+        instanceMorphTargetInfluenceVersion++;
+    }
+
+    /** Discards per-instance values when a replacement geometry changes the target shape. */
+    @Override
+    protected void onMorphTargetShapeChanged() {
+        instanceMorphTargetInfluences = null;
+        instanceMorphTargetInfluenceVersion++;
+    }
+
+    /** Lazily expands shared weights across the fixed instance capacity. */
+    private float[] requireInstanceMorphTargetInfluences() {
+        if (instanceMorphTargetInfluences == null) {
+            int targetCount = morphTargetCount();
+            float[] values = new float[Math.multiplyExact(capacity, targetCount)];
+            float[] shared = new float[targetCount];
+            copyMorphTargetInfluencesTo(shared);
+            for (int instanceIndex = 0; instanceIndex < capacity; instanceIndex++) {
+                System.arraycopy(shared, 0, values, instanceIndex * targetCount, targetCount);
+            }
+            instanceMorphTargetInfluences = values;
+            instanceMorphTargetInfluenceVersion++;
+        }
+        return instanceMorphTargetInfluences;
     }
 
     /**

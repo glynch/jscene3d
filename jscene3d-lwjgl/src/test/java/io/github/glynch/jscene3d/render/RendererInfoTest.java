@@ -38,6 +38,7 @@ final class RendererInfoTest {
         assertThat(resources.activeGeometryResources()).isZero();
         assertThat(resources.activeTextureResources()).isZero();
         assertThat(resources.activeInstanceResources()).isZero();
+        assertThat(resources.activeMorphResources()).isZero();
         assertThat(resources.programCount()).isZero();
         assertThat(resources.activeShadowMaps()).isZero();
     }
@@ -58,6 +59,7 @@ final class RendererInfoTest {
         resources.setActiveGeometryResources(2);
         resources.setActiveTextureResources(3);
         resources.setActiveInstanceResources(5);
+        resources.setActiveMorphResources(6);
         resources.setProgramCount(1);
         resources.setActiveShadowMaps(4);
 
@@ -83,6 +85,7 @@ final class RendererInfoTest {
         assertThat(resources.activeGeometryResources()).isEqualTo(2);
         assertThat(resources.activeTextureResources()).isEqualTo(3);
         assertThat(resources.activeInstanceResources()).isEqualTo(5);
+        assertThat(resources.activeMorphResources()).isEqualTo(6);
         assertThat(resources.programCount()).isEqualTo(1);
         assertThat(resources.activeShadowMaps()).isEqualTo(4);
     }

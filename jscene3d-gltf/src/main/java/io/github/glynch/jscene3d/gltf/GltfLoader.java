@@ -15,7 +15,7 @@ import java.util.Objects;
  * primitives, indices, positions, normals, primary texture coordinates, RGB/RGBA vertex colours,
  * metallic-roughness materials, PNG/JPEG images, core glTF sampler state, skeletal skinning,
  * {@code KHR_draco_mesh_compression}, and node translation, rotation, and scale animation using
- * step, linear, or cubic-spline interpolation. Other required extensions, morph targets, cameras,
+ * step, linear, or cubic-spline interpolation, including morph-target weights. Other required extensions, cameras,
  * secondary texture-coordinate selection, and non-triangle primitives fail with a diagnostic
  * {@link GltfLoadException}.
  */

@@ -7,8 +7,10 @@ package io.github.glynch.jscene3d.objects;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.Material;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -20,6 +22,8 @@ import org.jspecify.annotations.Nullable;
 public class Mesh extends RenderableObject {
     private BufferGeometry geometry;
     private Material material;
+    private float[] morphTargetInfluences;
+    private long morphTargetInfluenceVersion;
     private boolean shadowCastingEnabled;
     private boolean shadowReceivingEnabled;
     private @Nullable RenderCallback beforeShadowRenderCallback;
@@ -36,6 +40,7 @@ public class Mesh extends RenderableObject {
     public Mesh(BufferGeometry geometry, Material material) {
         this.geometry = Preconditions.requireOpen(geometry, "geometry");
         this.material = Preconditions.requireOpen(material, "material");
+        morphTargetInfluences = new float[this.geometry.morphTargets().size()];
     }
 
     /**
@@ -60,6 +65,163 @@ public class Mesh extends RenderableObject {
      */
     public void setGeometry(BufferGeometry geometry) {
         this.geometry = Preconditions.requireOpen(geometry, "geometry");
+        morphTargetInfluences = new float[this.geometry.morphTargets().size()];
+        morphTargetInfluenceVersion++;
+        onMorphTargetShapeChanged();
+    }
+
+    /**
+     * Returns the number of ordered morph influences required by the current geometry.
+     *
+     * @return target count, possibly zero
+     */
+    public final int morphTargetCount() {
+        requireCurrentMorphTargetShape();
+        return morphTargetInfluences.length;
+    }
+
+    /**
+     * Returns one morph-target influence.
+     *
+     * @param targetIndex zero-based target index
+     * @return finite influence, initially zero
+     * @throws IndexOutOfBoundsException if the index is outside the current target range
+     * @throws IllegalStateException if targets changed after this mesh bound its geometry
+     */
+    public final float morphTargetInfluence(int targetIndex) {
+        requireCurrentMorphTargetShape();
+        return morphTargetInfluences[Objects.checkIndex(targetIndex, morphTargetInfluences.length)];
+    }
+
+    /**
+     * Changes one morph-target influence.
+     *
+     * <p>Negative and greater-than-one influences are supported. On an {@link InstancedMesh}, this
+     * batch-level operation changes the default and every allocated per-instance value for the
+     * selected target.
+     *
+     * @param targetIndex zero-based target index
+     * @param influence finite replacement influence
+     * @throws IndexOutOfBoundsException if the index is outside the current target range
+     * @throws IllegalArgumentException if the influence is not finite
+     * @throws IllegalStateException if targets changed after this mesh bound its geometry
+     */
+    public final void setMorphTargetInfluence(int targetIndex, float influence) {
+        requireCurrentMorphTargetShape();
+        int validIndex = Objects.checkIndex(targetIndex, morphTargetInfluences.length);
+        float validInfluence = Preconditions.requireFinite(influence, "influence");
+        if (morphTargetInfluences[validIndex] != validInfluence) {
+            morphTargetInfluences[validIndex] = validInfluence;
+            morphTargetInfluenceVersion++;
+            onMorphTargetInfluenceChanged(validIndex, validInfluence);
+        }
+    }
+
+    /**
+     * Replaces every current morph-target influence from one exact-length array.
+     *
+     * @param influences finite influences in geometry target order
+     * @throws NullPointerException if {@code influences} is {@code null}
+     * @throws IllegalArgumentException if the length differs or a value is not finite
+     * @throws IllegalStateException if targets changed after this mesh bound its geometry
+     */
+    public final void setMorphTargetInfluences(float[] influences) {
+        requireCurrentMorphTargetShape();
+        float[] validInfluences = Objects.requireNonNull(influences, "influences");
+        if (validInfluences.length != morphTargetInfluences.length) {
+            throw new IllegalArgumentException("influences length must equal morph target count: "
+                    + validInfluences.length
+                    + " != "
+                    + morphTargetInfluences.length);
+        }
+        float[] copy = validInfluences.clone();
+        for (int index = 0; index < copy.length; index++) {
+            copy[index] = Preconditions.requireFinite(copy[index], "influences[" + index + "]");
+        }
+        if (!Arrays.equals(morphTargetInfluences, copy)) {
+            morphTargetInfluences = copy;
+            morphTargetInfluenceVersion++;
+            onMorphTargetInfluencesChanged();
+        }
+    }
+
+    /**
+     * Returns the index of a named geometry morph target.
+     *
+     * @param name target name
+     * @return target index, or an empty value when absent
+     * @throws NullPointerException if {@code name} is {@code null}
+     */
+    public final OptionalInt morphTargetIndex(String name) {
+        String validName = Objects.requireNonNull(name, "name");
+        var targets = geometry().morphTargets();
+        for (int index = 0; index < targets.size(); index++) {
+            if (targets.get(index).name().equals(validName)) {
+                return OptionalInt.of(index);
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    /**
+     * Returns the version observed by renderer-owned weight resources.
+     *
+     * @return monotonically increasing version
+     */
+    public final long morphTargetInfluenceVersion() {
+        requireCurrentMorphTargetShape();
+        return morphTargetInfluenceVersion;
+    }
+
+    /**
+     * Copies current morph-target influences into an exact-length destination.
+     *
+     * @param destination destination whose length equals {@link #morphTargetCount()}
+     * @throws NullPointerException if {@code destination} is {@code null}
+     * @throws IllegalArgumentException if its length differs
+     */
+    public final void copyMorphTargetInfluencesTo(float[] destination) {
+        requireCurrentMorphTargetShape();
+        float[] validDestination = Objects.requireNonNull(destination, "destination");
+        if (validDestination.length != morphTargetInfluences.length) {
+            throw new IllegalArgumentException("destination length must equal morph target count: "
+                    + validDestination.length
+                    + " != "
+                    + morphTargetInfluences.length);
+        }
+        System.arraycopy(morphTargetInfluences, 0, validDestination, 0, morphTargetInfluences.length);
+    }
+
+    /**
+     * Allows specializations to mirror one changed batch-level influence.
+     *
+     * @param targetIndex changed target index
+     * @param influence replacement influence
+     */
+    protected void onMorphTargetInfluenceChanged(int targetIndex, float influence) {
+        // Ordinary meshes need no additional storage.
+    }
+
+    /** Allows specializations to mirror a complete batch-level influence replacement. */
+    protected void onMorphTargetInfluencesChanged() {
+        // Ordinary meshes need no additional storage.
+    }
+
+    /** Allows specializations to discard shape-dependent storage after geometry replacement. */
+    protected void onMorphTargetShapeChanged() {
+        // Ordinary meshes keep only the freshly allocated shared vector.
+    }
+
+    /** Rejects structural target mutation after a mesh has established its weight vector. */
+    private void requireCurrentMorphTargetShape() {
+        int currentCount = geometry().morphTargets().size();
+        if (currentCount != morphTargetInfluences.length) {
+            throw new IllegalStateException("Geometry morph targets changed after binding; call setGeometry to reset "
+                    + "mesh influences: "
+                    + currentCount
+                    + " != "
+                    + morphTargetInfluences.length);
+        }
     }
 
     /**

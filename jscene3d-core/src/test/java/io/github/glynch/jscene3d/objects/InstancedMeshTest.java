@@ -9,6 +9,8 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
+import io.github.glynch.jscene3d.geometries.BufferAttribute;
+import io.github.glynch.jscene3d.geometries.MorphTarget;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.math.Color;
@@ -72,6 +74,26 @@ final class InstancedMeshTest {
 
             mesh.clearInstanceColors();
             assertThat(mesh.hasInstanceColors()).isFalse();
+        }
+    }
+
+    @Test
+    void expandsSharedMorphWeightsOnlyWhenAnInstanceDiverges() {
+        try (var geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
+                var material = new BasicMaterial()) {
+            geometry.addMorphTarget(
+                    new MorphTarget("inflate", BufferAttribute.of(new float[geometry.vertexCount() * 3], 3), null));
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 2);
+            mesh.setMorphTargetInfluence(0, 0.25f);
+
+            assertThat(mesh.hasInstanceMorphTargetInfluences()).isFalse();
+            assertThat(mesh.morphTargetInfluenceAt(1, 0)).isEqualTo(0.25f);
+
+            mesh.setMorphTargetInfluenceAt(1, 0, 0.8f);
+
+            assertThat(mesh.hasInstanceMorphTargetInfluences()).isTrue();
+            assertThat(mesh.morphTargetInfluenceAt(0, 0)).isEqualTo(0.25f);
+            assertThat(mesh.morphTargetInfluenceAt(1, 0)).isEqualTo(0.8f);
         }
     }
 }

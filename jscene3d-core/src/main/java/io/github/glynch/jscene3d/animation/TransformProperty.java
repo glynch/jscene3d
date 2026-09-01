@@ -5,7 +5,7 @@
 package io.github.glynch.jscene3d.animation;
 
 /** Local transform property controlled by a typed keyframe track. */
-public enum TransformProperty {
+public enum TransformProperty implements AnimatedProperty {
     /** Local position with three scalar components per value. */
     POSITION,
 

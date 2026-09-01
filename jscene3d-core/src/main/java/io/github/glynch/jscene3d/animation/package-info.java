@@ -3,5 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 /** Keyframe clips, typed transform tracks, and caller-driven playback. */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package io.github.glynch.jscene3d.animation;
+
+import org.jspecify.annotations.NullMarked;

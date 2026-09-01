@@ -24,6 +24,7 @@ import io.github.glynch.jscene3d.geometries.CircleGeometry;
 import io.github.glynch.jscene3d.geometries.ConeGeometry;
 import io.github.glynch.jscene3d.geometries.CylinderGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
+import io.github.glynch.jscene3d.geometries.MorphTarget;
 import io.github.glynch.jscene3d.geometries.PlaneGeometry;
 import io.github.glynch.jscene3d.geometries.TorusGeometry;
 import io.github.glynch.jscene3d.helpers.AxesHelper;
@@ -39,6 +40,7 @@ import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.DepthFunction;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
+import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.materials.NormalMaterial;
 import io.github.glynch.jscene3d.materials.PhongMaterial;
@@ -102,6 +104,93 @@ final class RendererIT {
             #endif
             }
             """;
+
+    @Test
+    void rendersIndependentMorphWeightsAcrossOneInstancedDraw() {
+        WindowOptions options = WindowOptions.builder()
+                .size(320, 240)
+                .title("Renderer instanced morph integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+        try (Window window = Window.create(options);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createMorphTriangle();
+                BasicMaterial material = new BasicMaterial(Color.RED)) {
+            InstancedMesh mesh = new InstancedMesh(geometry, material, 2);
+            mesh.setMatrixAt(0, new Matrix4f().translation(-0.6f, 0.0f, 0.0f));
+            mesh.setMatrixAt(1, new Matrix4f().translation(0.6f, 0.0f, 0.0f));
+            mesh.setMorphTargetInfluenceAt(0, 0, 0.0f);
+            mesh.setMorphTargetInfluenceAt(1, 0, 1.0f);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            OrthographicCamera camera = new OrthographicCamera(-1.5f, 1.5f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertPixelIsRed(Math.round(window.framebufferWidth() * 0.30f), window.framebufferHeight() / 2);
+            RedBounds rightInstance = redBounds(
+                    Math.round(window.framebufferWidth() * 0.60f),
+                    Math.round(window.framebufferWidth() * 0.80f),
+                    0,
+                    window.framebufferHeight() - 1);
+            assertThat(rightInstance.minimumY()).isGreaterThan(Math.round(window.framebufferHeight() * 0.60f));
+            assertThat(renderer.info().statistics().drawCalls()).isOne();
+            assertThat(renderer.info().resources().activeMorphResources()).isEqualTo(2);
+
+            renderer.render(scene, camera);
+            assertThat(renderer.info().statistics().bufferUploads()).isZero();
+
+            mesh.setMorphTargetInfluenceAt(1, 0, 0.5f);
+            renderer.render(scene, camera);
+            assertThat(renderer.info().statistics().bufferUploads()).isOne();
+            assertThat(renderer.info().statistics().bufferUploadBytes()).isEqualTo(Float.BYTES);
+        }
+    }
+
+    @Test
+    void realizesEveryBuiltInMeshProgramForMorphedGeometry() {
+        WindowOptions options = WindowOptions.builder()
+                .size(320, 240)
+                .title("Renderer morph material integration test")
+                .verticalSync(VerticalSync.DISABLED)
+                .build();
+        Material[] materials = {
+            new BasicMaterial(Color.RED),
+            new LambertMaterial(Color.RED),
+            new NormalMaterial(),
+            new PhongMaterial(Color.RED),
+            new StandardMaterial(Color.RED)
+        };
+        try (Window window = Window.create(options);
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createMorphTriangle()) {
+            Scene scene = new Scene();
+            scene.add(new AmbientLight(Color.WHITE, 1.0f));
+            DirectionalLight shadowLight = new DirectionalLight(Color.WHITE, 1.0f);
+            shadowLight.setPosition(0.0f, 3.0f, 3.0f);
+            shadowLight.setTarget(0.0f, 0.0f, 0.0f);
+            shadowLight.setShadowCastingEnabled(true);
+            shadowLight.shadow().setMapSize(128, 128);
+            scene.add(shadowLight);
+            OrthographicCamera camera = new OrthographicCamera(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+            for (Material material : materials) {
+                Mesh mesh = new Mesh(geometry, material);
+                mesh.setMorphTargetInfluence(0, 1.0f);
+                mesh.setShadowCastingEnabled(true);
+                scene.add(mesh);
+                renderer.render(scene, camera);
+                assertThat(renderer.info().statistics().drawCalls()).isOne();
+                assertThat(renderer.info().statistics().shadowDrawCalls()).isOne();
+                scene.remove(mesh);
+            }
+        } finally {
+            for (Material material : materials) {
+                material.close();
+            }
+        }
+    }
 
     @Test
     void rendersColoredInstancesWithOneDrawAndUploadsOnlyChangedTransformRange() {
@@ -1826,6 +1915,17 @@ final class RendererIT {
                 .build();
     }
 
+    /** Creates a centered triangle with one relative upward translation target. */
+    private static BufferGeometry createMorphTriangle() {
+        BufferGeometry geometry = BufferGeometry.builder()
+                .positions(-0.22f, -0.22f, 0.0f, 0.22f, -0.22f, 0.0f, 0.0f, 0.22f, 0.0f)
+                .normals(0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f)
+                .build();
+        geometry.addMorphTarget(new MorphTarget(
+                "rise", BufferAttribute.of(new float[] {0.0f, 0.55f, 0.0f, 0.0f, 0.55f, 0.0f, 0.0f, 0.55f, 0.0f}, 3)));
+        return geometry;
+    }
+
     private static BufferGeometry createTexturedTriangle() {
         return BufferGeometry.builder()
                 .positions(-0.25f, -0.25f, 0.0f, 0.25f, -0.25f, 0.0f, 0.0f, 0.25f, 0.0f)
@@ -1918,6 +2018,28 @@ final class RendererIT {
         assertThat(Byte.toUnsignedInt(pixel.get(1))).isLessThan(10);
         assertThat(Byte.toUnsignedInt(pixel.get(2))).isLessThan(10);
     }
+
+    /** Returns inclusive vertical bounds of red pixels in one framebuffer region. */
+    private static RedBounds redBounds(int minimumX, int maximumX, int minimumY, int maximumY) {
+        int firstY = Integer.MAX_VALUE;
+        int lastY = Integer.MIN_VALUE;
+        for (int y = minimumY; y <= maximumY; y++) {
+            for (int x = minimumX; x <= maximumX; x++) {
+                ByteBuffer pixel = readPixel(x, y);
+                if (Byte.toUnsignedInt(pixel.get(0)) > 240
+                        && Byte.toUnsignedInt(pixel.get(1)) < 10
+                        && Byte.toUnsignedInt(pixel.get(2)) < 10) {
+                    firstY = Math.min(firstY, y);
+                    lastY = Math.max(lastY, y);
+                }
+            }
+        }
+        assertThat(firstY).as("first red framebuffer row").isNotEqualTo(Integer.MAX_VALUE);
+        return new RedBounds(firstY, lastY);
+    }
+
+    /** Inclusive vertical framebuffer extent of selected red pixels. */
+    private record RedBounds(int minimumY, int maximumY) {}
 
     private static void assertPixelIsGreen(int x, int y) {
         ByteBuffer pixel = readPixel(x, y);

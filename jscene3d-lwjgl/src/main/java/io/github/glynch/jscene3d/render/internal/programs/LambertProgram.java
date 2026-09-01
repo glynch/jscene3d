@@ -23,6 +23,7 @@ public final class LambertProgram implements AutoCloseable {
             layout(location = 3) in vec4 vertexColor;
 
             INSTANCING_SOURCE
+            MORPH_SOURCE
 
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
@@ -40,9 +41,11 @@ public final class LambertProgram implements AutoCloseable {
 
             void main() {
                 mat4 instanceMatrix = resolvedInstanceMatrix();
-                vec4 viewPosition = viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0);
+                vec4 viewPosition = viewMatrix * modelMatrix * instanceMatrix
+                        * vec4(resolvedMorphPosition(position), 1.0);
                 resolvedViewPosition = viewPosition.xyz;
-                resolvedViewNormal = normalize(normalMatrix * resolvedInstanceNormalMatrix(instanceMatrix) * normal);
+                resolvedViewNormal = normalize(normalMatrix * resolvedInstanceNormalMatrix(instanceMatrix)
+                        * resolvedMorphNormal(normal));
                 resolvedVertexColor = (useVertexColor ? vertexColor : vec4(1.0)) * resolvedInstanceColor();
                 if (useColorMap) {
                     vec2 transformedTextureCoordinate =
@@ -55,7 +58,8 @@ public final class LambertProgram implements AutoCloseable {
                 }
                 gl_Position = projectionMatrix * viewPosition;
             }
-            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source());
+            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source())
+            .replace("MORPH_SOURCE", MorphShaderSource.source());
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             const float RECIPROCAL_PI = 0.3183098861837907;
@@ -361,6 +365,18 @@ public final class LambertProgram implements AutoCloseable {
      */
     public void uploadInstancing(boolean instanced, boolean colors) {
         litState.uploadInstancing(instanced, colors);
+    }
+
+    /**
+     * Uploads the current morph-target data layout.
+     *
+     * @param enabled whether morph deformation is enabled
+     * @param targetCount number of morph targets
+     * @param vertexCount number of vertices in each target
+     * @param instanceWeights whether weights vary by instance
+     */
+    public void uploadMorphing(boolean enabled, int targetCount, int vertexCount, boolean instanceWeights) {
+        litState.uploadMorphing(enabled, targetCount, vertexCount, instanceWeights);
     }
 
     /** Deletes the linked context-local program. */

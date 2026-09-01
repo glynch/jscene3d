@@ -17,8 +17,7 @@ import org.joml.Vector3fc;
 
 /** One projected or radial depth-only program used by shadow-map passes. */
 public final class ShadowDepthProgram implements AutoCloseable {
-    private static final String PROJECTED_VERTEX_SOURCE =
-            """
+    private static final String PROJECTED_VERTEX_SOURCE = """
             #version 330 core
             layout(location = 0) in vec3 position;
             layout(location = 4) in vec4 jointIndices;
@@ -33,6 +32,8 @@ public final class ShadowDepthProgram implements AutoCloseable {
             uniform bool useSkinning;
             uniform bool useInstancing;
             uniform mat4 jointMatrices[SKIN_JOINT_CAPACITY];
+
+            MORPH_SOURCE
 
             void main() {
                 mat4 skinMatrix = mat4(1.0);
@@ -46,9 +47,12 @@ public final class ShadowDepthProgram implements AutoCloseable {
                 mat4 instanceMatrix = useInstancing
                         ? mat4(instanceMatrixColumn0, instanceMatrixColumn1, instanceMatrixColumn2, instanceMatrixColumn3)
                         : mat4(1.0);
-                gl_Position = lightViewProjectionMatrix * modelMatrix * instanceMatrix * skinMatrix * vec4(position, 1.0);
+                gl_Position = lightViewProjectionMatrix * modelMatrix * instanceMatrix * skinMatrix
+                        * vec4(resolvedMorphPosition(position), 1.0);
             }
-            """.replace("SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS));
+            """.replace(
+                    "SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS))
+            .replace("MORPH_SOURCE", MorphShaderSource.source());
     private static final String PROJECTED_FRAGMENT_SOURCE = """
             #version 330 core
 
@@ -56,8 +60,7 @@ public final class ShadowDepthProgram implements AutoCloseable {
                 // The fixed-function depth value is the complete projected shadow output.
             }
             """;
-    private static final String POINT_VERTEX_SOURCE =
-            """
+    private static final String POINT_VERTEX_SOURCE = """
             #version 330 core
             layout(location = 0) in vec3 position;
             layout(location = 4) in vec4 jointIndices;
@@ -72,6 +75,8 @@ public final class ShadowDepthProgram implements AutoCloseable {
             uniform bool useSkinning;
             uniform bool useInstancing;
             uniform mat4 jointMatrices[SKIN_JOINT_CAPACITY];
+
+            MORPH_SOURCE
 
             out vec3 worldPosition;
 
@@ -87,11 +92,14 @@ public final class ShadowDepthProgram implements AutoCloseable {
                 mat4 instanceMatrix = useInstancing
                         ? mat4(instanceMatrixColumn0, instanceMatrixColumn1, instanceMatrixColumn2, instanceMatrixColumn3)
                         : mat4(1.0);
-                vec4 resolvedWorldPosition = modelMatrix * instanceMatrix * skinMatrix * vec4(position, 1.0);
+                vec4 resolvedWorldPosition = modelMatrix * instanceMatrix * skinMatrix
+                        * vec4(resolvedMorphPosition(position), 1.0);
                 worldPosition = resolvedWorldPosition.xyz;
                 gl_Position = lightViewProjectionMatrix * resolvedWorldPosition;
             }
-            """.replace("SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS));
+            """.replace(
+                    "SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS))
+            .replace("MORPH_SOURCE", MorphShaderSource.source());
     private static final String POINT_FRAGMENT_SOURCE = """
             #version 330 core
             in vec3 worldPosition;
@@ -112,6 +120,7 @@ public final class ShadowDepthProgram implements AutoCloseable {
     private final int lightPositionLocation;
     private final int lightFarPlaneLocation;
     private final SkinningProgramState skinningState;
+    private final MorphProgramState morphState;
     private final float[] matrixValues;
 
     /** Retains one linked depth variant and reusable matrix staging. */
@@ -124,6 +133,7 @@ public final class ShadowDepthProgram implements AutoCloseable {
         lightPositionLocation = radial ? ProgramSupport.requiredUniform(id, label, "lightPosition") : -1;
         lightFarPlaneLocation = radial ? ProgramSupport.requiredUniform(id, label, "lightFarPlane") : -1;
         skinningState = new SkinningProgramState(id, label);
+        morphState = new MorphProgramState(id, label);
         matrixValues = new float[16];
     }
 
@@ -218,6 +228,18 @@ public final class ShadowDepthProgram implements AutoCloseable {
      */
     public void uploadInstancing(boolean instanced) {
         glUniform1i(useInstancingLocation, instanced ? 1 : 0);
+    }
+
+    /**
+     * Uploads the current caster morph-target data layout.
+     *
+     * @param enabled whether morph deformation is enabled
+     * @param targetCount number of morph targets
+     * @param vertexCount number of vertices in each target
+     * @param instanceWeights whether weights vary by instance
+     */
+    public void uploadMorphing(boolean enabled, int targetCount, int vertexCount, boolean instanceWeights) {
+        morphState.upload(enabled, targetCount, vertexCount, instanceWeights);
     }
 
     /**

@@ -54,6 +54,30 @@ final class BufferGeometryTest {
     }
 
     @Test
+    void retainsValidatedOrderedMorphTargets() {
+        try (BufferGeometry geometry = geometryWithVertexCount(2)) {
+            MorphTarget first = new MorphTarget(
+                    "wide", BufferAttribute.of(new float[] {-1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f}, 3), null);
+            MorphTarget second = new MorphTarget(
+                    "tall",
+                    BufferAttribute.of(new float[] {0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f}, 3),
+                    BufferAttribute.of(new float[6], 3));
+
+            geometry.addMorphTarget(first);
+            geometry.addMorphTarget(second);
+
+            assertThat(geometry.morphTargets()).containsExactly(first, second);
+            assertThatIllegalArgumentException().isThrownBy(() -> geometry.addMorphTarget(first));
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> geometry.addMorphTarget(
+                            new MorphTarget("wrong", BufferAttribute.of(new float[9], 3), null)));
+            assertThatIllegalArgumentException()
+                    .isThrownBy(
+                            () -> geometry.setAttribute(BufferGeometry.POSITION, BufferAttribute.of(new float[9], 3)));
+        }
+    }
+
+    @Test
     void enforcesSharedIndexValidityAcrossAttachedGeometries() {
         IndexBuffer sharedIndex = IndexBuffer.of(new int[] {0, 1, 1});
         try (BufferGeometry larger = geometryWithVertexCount(3);

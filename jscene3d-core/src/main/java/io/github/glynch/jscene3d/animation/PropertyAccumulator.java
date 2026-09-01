@@ -4,28 +4,37 @@
  */
 package io.github.glynch.jscene3d.animation;
 
+import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
 import java.util.Arrays;
 import org.joml.Vector3fc;
 
-/** Mixer-owned weighted accumulator for one object identity and local transform property. */
+/** Mixer-owned weighted accumulator for one object identity and animated property. */
 final class PropertyAccumulator {
-    private static final int MAXIMUM_COMPONENTS = 4;
-
     private final Object3D target;
-    private final TransformProperty property;
-    private final float[] base = new float[MAXIMUM_COMPONENTS];
-    private final float[] weighted = new float[MAXIMUM_COMPONENTS];
-    private final float[] reference = new float[MAXIMUM_COMPONENTS];
+    private final AnimatedProperty property;
+    private final int components;
+    private final float[] base;
+    private final float[] weighted;
+    private final float[] reference;
 
     private float totalWeight;
     private boolean baseCaptured;
     private boolean referenceCaptured;
 
     /** Retains the controlled target and property without capturing mutable scene state. */
-    PropertyAccumulator(Object3D target, TransformProperty property) {
+    PropertyAccumulator(Object3D target, AnimatedProperty property, int components) {
         this.target = target;
         this.property = property;
+        this.components = components;
+        base = new float[components];
+        weighted = new float[components];
+        reference = new float[components];
+    }
+
+    /** Returns the component count established by the first registered track. */
+    int components() {
+        return components;
     }
 
     /** Clears contributions while retaining the base pose captured by an active blend. */
@@ -41,7 +50,6 @@ final class PropertyAccumulator {
             captureBase();
         }
         float signedWeight = property == TransformProperty.ROTATION ? alignedWeight(sample, weight) : weight;
-        int components = property == TransformProperty.ROTATION ? 4 : 3;
         for (int component = 0; component < components; component++) {
             weighted[component] = Math.fma(sample[component], signedWeight, weighted[component]);
         }
@@ -54,22 +62,26 @@ final class PropertyAccumulator {
             restoreInactiveBase();
         } else if (property == TransformProperty.ROTATION) {
             applyQuaternion();
-        } else {
+        } else if (property instanceof TransformProperty) {
             applyVector();
+        } else {
+            applyMorphInfluences();
         }
     }
 
     /** Captures the property value that contributes whenever action weights total less than one. */
     private void captureBase() {
-        switch (property) {
-            case POSITION -> copyVector(target.position(), base);
-            case ROTATION -> {
-                base[0] = target.quaternion().x();
-                base[1] = target.quaternion().y();
-                base[2] = target.quaternion().z();
-                base[3] = target.quaternion().w();
-            }
-            case SCALE -> copyVector(target.scale(), base);
+        if (property == MorphProperty.INFLUENCES) {
+            ((Mesh) target).copyMorphTargetInfluencesTo(base);
+        } else if (property == TransformProperty.POSITION) {
+            copyVector(target.position(), base);
+        } else if (property == TransformProperty.ROTATION) {
+            base[0] = target.quaternion().x();
+            base[1] = target.quaternion().y();
+            base[2] = target.quaternion().z();
+            base[3] = target.quaternion().w();
+        } else {
+            copyVector(target.scale(), base);
         }
         baseCaptured = true;
     }
@@ -93,20 +105,31 @@ final class PropertyAccumulator {
 
     /** Applies a base-completed blend below unit weight or a normalized blend above unit weight. */
     private void applyVector() {
-        if (totalWeight < 1.0f) {
-            float baseWeight = 1.0f - totalWeight;
-            for (int component = 0; component < 3; component++) {
-                weighted[component] = Math.fma(base[component], baseWeight, weighted[component]);
-            }
-        } else if (totalWeight > 1.0f) {
-            for (int component = 0; component < 3; component++) {
-                weighted[component] /= totalWeight;
-            }
-        }
+        completeLinearBlend();
         if (property == TransformProperty.POSITION) {
             target.setPosition(weighted[0], weighted[1], weighted[2]);
         } else {
             target.setScale(weighted[0], weighted[1], weighted[2]);
+        }
+    }
+
+    /** Applies component-wise blended morph influences. */
+    private void applyMorphInfluences() {
+        completeLinearBlend();
+        ((Mesh) target).setMorphTargetInfluences(weighted);
+    }
+
+    /** Completes a linear blend with its base below unit weight or normalizes above it. */
+    private void completeLinearBlend() {
+        if (totalWeight < 1.0f) {
+            float baseWeight = 1.0f - totalWeight;
+            for (int component = 0; component < components; component++) {
+                weighted[component] = Math.fma(base[component], baseWeight, weighted[component]);
+            }
+        } else if (totalWeight > 1.0f) {
+            for (int component = 0; component < components; component++) {
+                weighted[component] /= totalWeight;
+            }
         }
     }
 
@@ -130,10 +153,14 @@ final class PropertyAccumulator {
         if (!baseCaptured) {
             return;
         }
-        switch (property) {
-            case POSITION -> target.setPosition(base[0], base[1], base[2]);
-            case ROTATION -> target.setQuaternion(base[0], base[1], base[2], base[3]);
-            case SCALE -> target.setScale(base[0], base[1], base[2]);
+        if (property == MorphProperty.INFLUENCES) {
+            ((Mesh) target).setMorphTargetInfluences(base);
+        } else if (property == TransformProperty.POSITION) {
+            target.setPosition(base[0], base[1], base[2]);
+        } else if (property == TransformProperty.ROTATION) {
+            target.setQuaternion(base[0], base[1], base[2], base[3]);
+        } else {
+            target.setScale(base[0], base[1], base[2]);
         }
         baseCaptured = false;
     }

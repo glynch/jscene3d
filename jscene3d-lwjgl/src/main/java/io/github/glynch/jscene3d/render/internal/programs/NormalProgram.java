@@ -22,6 +22,7 @@ public final class NormalProgram implements AutoCloseable {
             layout(location = 1) in vec3 normal;
 
             INSTANCING_SOURCE
+            MORPH_SOURCE
 
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
@@ -33,12 +34,15 @@ public final class NormalProgram implements AutoCloseable {
 
             void main() {
                 mat4 instanceMatrix = resolvedInstanceMatrix();
-                vec4 viewPosition = viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0);
-                resolvedViewNormal = normalize(normalMatrix * resolvedInstanceNormalMatrix(instanceMatrix) * normal);
+                vec4 viewPosition = viewMatrix * modelMatrix * instanceMatrix
+                        * vec4(resolvedMorphPosition(position), 1.0);
+                resolvedViewNormal = normalize(normalMatrix * resolvedInstanceNormalMatrix(instanceMatrix)
+                        * resolvedMorphNormal(normal));
                 resolvedFogDepth = -viewPosition.z;
                 gl_Position = projectionMatrix * viewPosition;
             }
-            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source());
+            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source())
+            .replace("MORPH_SOURCE", MorphShaderSource.source());
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             in vec3 resolvedViewNormal;
@@ -70,6 +74,7 @@ public final class NormalProgram implements AutoCloseable {
     private final int alphaCutoffLocation;
     private final FogProgramState fogState;
     private final InstancingProgramState instancingState;
+    private final MorphProgramState morphState;
     private final Matrix4f modelViewMatrix;
     private final Matrix3f normalMatrix;
     private final float[] matrix4Values;
@@ -86,6 +91,7 @@ public final class NormalProgram implements AutoCloseable {
         alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in Normal", "alphaCutoff");
         fogState = new FogProgramState(id, "Built-in Normal");
         instancingState = new InstancingProgramState(id, "Built-in Normal");
+        morphState = new MorphProgramState(id, "Built-in Normal");
         modelViewMatrix = new Matrix4f();
         normalMatrix = new Matrix3f();
         matrix4Values = new float[16];
@@ -151,6 +157,18 @@ public final class NormalProgram implements AutoCloseable {
      */
     public void uploadInstancing(boolean instanced, boolean colors) {
         instancingState.upload(instanced, colors);
+    }
+
+    /**
+     * Uploads the current morph-target data layout.
+     *
+     * @param enabled whether morph deformation is enabled
+     * @param targetCount number of morph targets
+     * @param vertexCount number of vertices in each target
+     * @param instanceWeights whether weights vary by instance
+     */
+    public void uploadMorphing(boolean enabled, int targetCount, int vertexCount, boolean instanceWeights) {
+        morphState.upload(enabled, targetCount, vertexCount, instanceWeights);
     }
 
     /**

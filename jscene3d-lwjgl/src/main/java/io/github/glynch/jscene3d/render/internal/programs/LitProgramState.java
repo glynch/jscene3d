@@ -27,6 +27,7 @@ import org.joml.Vector3f;
 final class LitProgramState {
     private final ShadowProgramState shadowState;
     private final InstancingProgramState instancingState;
+    private final MorphProgramState morphState;
     private final int modelMatrixLocation;
     private final int viewMatrixLocation;
     private final int projectionMatrixLocation;
@@ -88,6 +89,7 @@ final class LitProgramState {
     LitProgramState(int program, String label) {
         shadowState = new ShadowProgramState(program, label);
         instancingState = new InstancingProgramState(program, label);
+        morphState = new MorphProgramState(program, label);
         modelMatrixLocation = ProgramSupport.requiredUniform(program, label, "modelMatrix");
         viewMatrixLocation = ProgramSupport.requiredUniform(program, label, "viewMatrix");
         projectionMatrixLocation = ProgramSupport.requiredUniform(program, label, "projectionMatrix");
@@ -164,6 +166,11 @@ final class LitProgramState {
     /** Uploads optional batch-transform and color switches. */
     void uploadInstancing(boolean instanced, boolean colors) {
         instancingState.upload(instanced, colors);
+    }
+
+    /** Uploads optional morph-target deformation state. */
+    void uploadMorphing(boolean enabled, int targetCount, int vertexCount, boolean instanceWeights) {
+        morphState.upload(enabled, targetCount, vertexCount, instanceWeights);
     }
 
     /** Uploads combined ambient and ordered point- and directional-light state without allocating. */

@@ -325,6 +325,27 @@ final class ExampleCatalog {
                                 URI.create("https://github.com/mrdoob/three.js/blob/dev/LICENSE"))),
                         InstancingExample::create),
                 definition(
+                        "morph-targets",
+                        "Morph targets",
+                        "Animation",
+                        "Named position and normal targets driven by one vector animation track.",
+                        List.of("morph", "blend shape", "animation", "weights", "normals"),
+                        MorphTargetsExample::create),
+                definition(
+                        "instanced-morph-targets",
+                        "Instanced morph targets",
+                        "Rendering",
+                        "Hundreds of independently deforming objects submitted in one instanced draw.",
+                        List.of("morph", "instancing", "weights", "performance", "texture buffer"),
+                        List.of(new GalleryAttribution(
+                                "Instanced morphing example concept",
+                                "Three.js Authors",
+                                "Three.js WebGPU Instancing Morph Example",
+                                URI.create("https://threejs.org/examples/webgpu_instancing_morph.html"),
+                                "MIT",
+                                URI.create("https://github.com/mrdoob/three.js/blob/dev/LICENSE"))),
+                        InstancedMorphTargetsExample::create),
+                definition(
                         "shader-material",
                         "Shader material",
                         "Materials",

@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import org.assertj.core.data.Offset;
 import org.joml.Vector2f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -96,6 +97,25 @@ final class GltfLoaderTest {
             assertThat(target.scale().x()).isEqualTo(2.0f);
             assertThat(target.scale().y()).isEqualTo(2.0f);
             assertThat(target.scale().z()).isEqualTo(2.0f);
+        }
+    }
+
+    /** Loads named morph displacements, node weight overrides, and playable weight animation. */
+    @Test
+    void loadsMorphTargetsAndWeightAnimation() throws IOException {
+        Path source = GltfTestAssets.writeMorphedTriangle(temporaryDirectory);
+
+        try (LoadedGltf loaded = GltfLoader.load(source)) {
+            Mesh mesh = (Mesh) loaded.scene().children().getFirst().children().getFirst();
+
+            assertThat(mesh.geometry().morphTargets()).hasSize(1);
+            assertThat(mesh.geometry().morphTargets().getFirst().name()).isEqualTo("stretch");
+            assertThat(mesh.geometry().morphTargets().getFirst().normals()).isPresent();
+            assertThat(mesh.morphTargetInfluence(0)).isEqualTo(0.2f);
+
+            new AnimationMixer().action(loaded.animations().getFirst()).setTime(0.75f);
+
+            assertThat(mesh.morphTargetInfluence(0)).isEqualTo(0.75f);
         }
     }
 
@@ -376,7 +396,7 @@ final class GltfLoaderTest {
     }
 
     /** Creates an AssertJ absolute-offset for float comparisons. */
-    private static org.assertj.core.data.Offset<Float> within(float value) {
-        return org.assertj.core.data.Offset.offset(value);
+    private static Offset<Float> within(float value) {
+        return Offset.offset(value);
     }
 }

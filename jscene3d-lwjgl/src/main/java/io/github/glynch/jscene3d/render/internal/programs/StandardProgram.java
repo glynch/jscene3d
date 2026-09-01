@@ -29,6 +29,7 @@ public final class StandardProgram implements AutoCloseable {
             layout(location = 6) in vec2 secondaryTextureCoordinate;
 
             INSTANCING_SOURCE
+            MORPH_SOURCE
 
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
@@ -54,13 +55,13 @@ public final class StandardProgram implements AutoCloseable {
                             + normalizedWeights.w * jointMatrices[int(jointIndices.w)];
                 }
                 mat4 instanceMatrix = resolvedInstanceMatrix();
-                vec4 localPosition = skinMatrix * vec4(position, 1.0);
+                vec4 localPosition = skinMatrix * vec4(resolvedMorphPosition(position), 1.0);
                 vec4 viewPosition = viewMatrix * modelMatrix * instanceMatrix * localPosition;
                 resolvedViewPosition = viewPosition.xyz;
                 resolvedViewNormal = normalize(normalMatrix
                         * resolvedInstanceNormalMatrix(instanceMatrix)
                         * mat3(skinMatrix)
-                        * normal);
+                        * resolvedMorphNormal(normal));
                 resolvedVertexColor = (useVertexColor ? vertexColor : vec4(1.0)) * resolvedInstanceColor();
                 resolvedTextureCoordinate = textureCoordinate;
                 resolvedSecondaryTextureCoordinate = secondaryTextureCoordinate;
@@ -68,7 +69,8 @@ public final class StandardProgram implements AutoCloseable {
             }
             """.replace(
                     "SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS))
-            .replace("INSTANCING_SOURCE", InstancingShaderSource.source());
+            .replace("INSTANCING_SOURCE", InstancingShaderSource.source())
+            .replace("MORPH_SOURCE", MorphShaderSource.source());
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             const float PI = 3.141592653589793;
@@ -537,6 +539,18 @@ public final class StandardProgram implements AutoCloseable {
      */
     public void uploadInstancing(boolean instanced, boolean colors) {
         litState.uploadInstancing(instanced, colors);
+    }
+
+    /**
+     * Uploads the current morph-target data layout.
+     *
+     * @param enabled whether morph deformation is enabled
+     * @param targetCount number of morph targets
+     * @param vertexCount number of vertices in each target
+     * @param instanceWeights whether weights vary by instance
+     */
+    public void uploadMorphing(boolean enabled, int targetCount, int vertexCount, boolean instanceWeights) {
+        litState.uploadMorphing(enabled, targetCount, vertexCount, instanceWeights);
     }
 
     /**

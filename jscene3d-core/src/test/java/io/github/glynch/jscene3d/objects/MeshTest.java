@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.MorphTarget;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,28 @@ final class MeshTest {
 
             assertThat(mesh.isShadowCastingEnabled()).isTrue();
             assertThat(mesh.isShadowReceivingEnabled()).isTrue();
+        }
+    }
+
+    @Test
+    void ownsVersionedGeometryOrderedMorphInfluences() {
+        try (BufferGeometry geometry = geometry();
+                BasicMaterial material = new BasicMaterial()) {
+            geometry.addMorphTarget(new MorphTarget("smile", BufferAttribute.of(new float[9], 3), null));
+            Mesh mesh = new Mesh(geometry, material);
+
+            assertThat(mesh.morphTargetCount()).isOne();
+            assertThat(mesh.morphTargetIndex("smile")).hasValue(0);
+            assertThat(mesh.morphTargetInfluence(0)).isZero();
+
+            mesh.setMorphTargetInfluence(0, 0.75f);
+            long version = mesh.morphTargetInfluenceVersion();
+            mesh.setMorphTargetInfluence(0, 0.75f);
+
+            assertThat(mesh.morphTargetInfluence(0)).isEqualTo(0.75f);
+            assertThat(mesh.morphTargetInfluenceVersion()).isEqualTo(version);
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> mesh.setMorphTargetInfluences(new float[] {0.0f, 1.0f}));
         }
     }
 

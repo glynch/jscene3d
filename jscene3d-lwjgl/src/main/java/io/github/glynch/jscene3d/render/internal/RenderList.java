@@ -226,21 +226,16 @@ public final class RenderList {
         }
 
         Matrix4fc worldMatrix = object.matrixWorld();
-        if (object.isFrustumCullingEnabled()) {
-            BoundingSphere boundingSphere = object instanceof InstancedMesh instancedMesh
-                    ? instancedMesh.boundingSphere()
-                    : geometry.boundingSphere();
-            if (boundingSphere == null) {
-                boundingSphere = geometry.computeBoundingSphere();
+        boolean hasDynamicMorphBounds = object instanceof Mesh mesh && mesh.morphTargetCount() > 0;
+        if (object.isFrustumCullingEnabled()
+                && !hasDynamicMorphBounds
+                && isOutsideFrustum(object, geometry, worldMatrix, frustum)) {
+            if (topology.isLine()) {
+                culledLines++;
+            } else {
+                culledMeshes++;
             }
-            if (!frustum.intersects(boundingSphere, worldMatrix)) {
-                if (topology.isLine()) {
-                    culledLines++;
-                } else {
-                    culledMeshes++;
-                }
-                return;
-            }
+            return;
         }
 
         RenderItem item = acquireItem();
@@ -250,6 +245,18 @@ public final class RenderList {
         } else {
             opaqueItems.add(item);
         }
+    }
+
+    /** Resolves one object's current static bounds and tests them against the camera frustum. */
+    private static boolean isOutsideFrustum(
+            RenderableObject object, BufferGeometry geometry, Matrix4fc worldMatrix, Frustum frustum) {
+        BoundingSphere boundingSphere = object instanceof InstancedMesh instancedMesh
+                ? instancedMesh.boundingSphere()
+                : geometry.boundingSphere();
+        if (boundingSphere == null) {
+            boundingSphere = geometry.computeBoundingSphere();
+        }
+        return !frustum.intersects(boundingSphere, worldMatrix);
     }
 
     /** Acquires one active item while growing retained pool capacity only when necessary. */

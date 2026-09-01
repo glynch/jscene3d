@@ -18,6 +18,7 @@ public final class BasicProgram implements AutoCloseable {
             layout(location = 2) in vec2 textureCoordinate;
 
             INSTANCING_SOURCE
+            MORPH_SOURCE
 
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
@@ -42,11 +43,13 @@ public final class BasicProgram implements AutoCloseable {
                 } else {
                     resolvedTextureCoordinate = vec2(0.0);
                 }
-                vec4 viewPosition = viewMatrix * modelMatrix * resolvedInstanceMatrix() * vec4(position, 1.0);
+                vec4 viewPosition = viewMatrix * modelMatrix * resolvedInstanceMatrix()
+                        * vec4(resolvedMorphPosition(position), 1.0);
                 resolvedFogDepth = -viewPosition.z;
                 gl_Position = projectionMatrix * viewPosition;
             }
-            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source());
+            """.replace("INSTANCING_SOURCE", InstancingShaderSource.source())
+            .replace("MORPH_SOURCE", MorphShaderSource.source());
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             in vec4 resolvedVertexColor;
@@ -85,6 +88,7 @@ public final class BasicProgram implements AutoCloseable {
     private final int alphaCutoffLocation;
     private final FogProgramState fogState;
     private final InstancingProgramState instancingState;
+    private final MorphProgramState morphState;
 
     /** Retains a linked program and its required uniform locations. */
     private BasicProgram(int id) {
@@ -101,6 +105,7 @@ public final class BasicProgram implements AutoCloseable {
         alphaCutoffLocation = ProgramSupport.requiredUniform(id, "Built-in basic", "alphaCutoff");
         fogState = new FogProgramState(id, "Built-in basic");
         instancingState = new InstancingProgramState(id, "Built-in basic");
+        morphState = new MorphProgramState(id, "Built-in basic");
     }
 
     /**
@@ -234,6 +239,18 @@ public final class BasicProgram implements AutoCloseable {
      */
     public void uploadInstancing(boolean instanced, boolean colors) {
         instancingState.upload(instanced, colors);
+    }
+
+    /**
+     * Uploads the current morph-target data layout.
+     *
+     * @param enabled whether morph deformation is enabled
+     * @param targetCount number of morph targets
+     * @param vertexCount number of vertices in each target
+     * @param instanceWeights whether weights vary by instance
+     */
+    public void uploadMorphing(boolean enabled, int targetCount, int vertexCount, boolean instanceWeights) {
+        morphState.upload(enabled, targetCount, vertexCount, instanceWeights);
     }
 
     @Override

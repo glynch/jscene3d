@@ -3,5 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 /** Optional themed controls, monitors, and overlays for JScene3D. */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package io.github.glynch.jscene3d.gui;
+
+import org.jspecify.annotations.NullMarked;

@@ -78,7 +78,7 @@ final class MeshIntersector {
     private void intersectSingle(IntersectionContext context, Matrix4fc worldMatrix, int instanceIndex) {
         transformRayToLocal(worldMatrix, context.ray());
         BufferGeometry geometry = context.mesh().geometry();
-        if (!intersectsBounds(geometry)) {
+        if (context.mesh().morphTargetCount() == 0 && !intersectsBounds(geometry)) {
             return;
         }
         MaterialSide side = effectiveSide(context.mesh().material().side(), worldMatrix.determinant3x3());
@@ -239,15 +239,15 @@ final class MeshIntersector {
         RayState ray = Objects.requireNonNull(activeRay, "activeRay");
         BufferAttribute positions = Objects.requireNonNull(activePositions, "activePositions");
         MaterialSide side = Objects.requireNonNull(activeSide, "activeSide");
-        double ax = positions.value(first, 0);
-        double ay = positions.value(first, 1);
-        double az = positions.value(first, 2);
-        double edgeOneX = positions.value(second, 0) - ax;
-        double edgeOneY = positions.value(second, 1) - ay;
-        double edgeOneZ = positions.value(second, 2) - az;
-        double edgeTwoX = positions.value(third, 0) - ax;
-        double edgeTwoY = positions.value(third, 1) - ay;
-        double edgeTwoZ = positions.value(third, 2) - az;
+        double ax = resolvedPosition(first, 0, positions);
+        double ay = resolvedPosition(first, 1, positions);
+        double az = resolvedPosition(first, 2, positions);
+        double edgeOneX = resolvedPosition(second, 0, positions) - ax;
+        double edgeOneY = resolvedPosition(second, 1, positions) - ay;
+        double edgeOneZ = resolvedPosition(second, 2, positions) - az;
+        double edgeTwoX = resolvedPosition(third, 0, positions) - ax;
+        double edgeTwoY = resolvedPosition(third, 1, positions) - ay;
+        double edgeTwoZ = resolvedPosition(third, 2, positions) - az;
 
         double directionX = localDirection.x();
         double directionY = localDirection.y();
@@ -303,6 +303,19 @@ final class MeshIntersector {
                         activeInstanceIndex,
                         interpolateTextureCoordinate(
                                 activeTextureCoordinates, first, second, third, secondWeight, thirdWeight)));
+    }
+
+    /** Resolves one base-position component plus every active relative morph displacement. */
+    private double resolvedPosition(int vertex, int component, BufferAttribute positions) {
+        Mesh mesh = Objects.requireNonNull(activeMesh, "activeMesh");
+        double value = positions.value(vertex, component);
+        for (int targetIndex = 0; targetIndex < mesh.morphTargetCount(); targetIndex++) {
+            float influence = activeInstanceIndex < 0
+                    ? mesh.morphTargetInfluence(targetIndex)
+                    : ((InstancedMesh) mesh).morphTargetInfluenceAt(activeInstanceIndex, targetIndex);
+            value += mesh.geometry().morphTargets().get(targetIndex).positions().value(vertex, component) * influence;
+        }
+        return value;
     }
 
     /** Computes a scale-aware determinant tolerance for one ray and triangle. */

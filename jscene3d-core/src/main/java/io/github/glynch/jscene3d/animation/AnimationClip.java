@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.animation;
 
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.objects.Object3D;
-import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,10 +69,10 @@ public final class AnimationClip {
 
     /** Rejects multiple tracks that would ambiguously control one property in this clip. */
     private void validateUniqueBindings() {
-        Map<Object3D, EnumSet<TransformProperty>> propertiesByTarget = new IdentityHashMap<>();
+        Map<Object3D, HashSet<AnimatedProperty>> propertiesByTarget = new IdentityHashMap<>();
         for (AnimationTrack track : tracks) {
-            EnumSet<TransformProperty> properties = propertiesByTarget.computeIfAbsent(
-                    track.target(), ignored -> EnumSet.noneOf(TransformProperty.class));
+            HashSet<AnimatedProperty> properties =
+                    propertiesByTarget.computeIfAbsent(track.target(), ignored -> new HashSet<>());
             if (!properties.add(track.property())) {
                 throw new IllegalArgumentException(
                         "tracks must not contain duplicate target property bindings: " + track.property());

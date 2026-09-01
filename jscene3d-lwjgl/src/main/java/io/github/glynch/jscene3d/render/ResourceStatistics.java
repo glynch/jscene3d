@@ -9,6 +9,7 @@ public final class ResourceStatistics {
     private int activeGeometryResources;
     private int activeTextureResources;
     private int activeInstanceResources;
+    private int activeMorphResources;
     private int programCount;
     private int activeShadowMaps;
 
@@ -45,6 +46,15 @@ public final class ResourceStatistics {
     }
 
     /**
+     * Returns currently realized morph-target delta and weight resources.
+     *
+     * @return active morph-resource count
+     */
+    public int activeMorphResources() {
+        return activeMorphResources;
+    }
+
+    /**
      * Returns currently compiled shader programs.
      *
      * @return compiled-program count
@@ -75,6 +85,11 @@ public final class ResourceStatistics {
     /** Replaces the current context-local instance-resource count. */
     void setActiveInstanceResources(int activeInstanceResources) {
         this.activeInstanceResources = activeInstanceResources;
+    }
+
+    /** Replaces the current context-local morph-resource count. */
+    void setActiveMorphResources(int activeMorphResources) {
+        this.activeMorphResources = activeMorphResources;
     }
 
     /** Replaces the current context-local shader-program count. */

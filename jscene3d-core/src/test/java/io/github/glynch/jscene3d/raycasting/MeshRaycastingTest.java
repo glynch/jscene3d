@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.within;
 
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.geometries.MorphTarget;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.materials.MaterialSide;
@@ -26,12 +27,37 @@ import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 final class MeshRaycastingTest {
+    @Test
+    void intersectsOrdinaryAndPerInstanceMorphedPositions() {
+        try (BufferGeometry geometry = triangle();
+                BasicMaterial material = new BasicMaterial()) {
+            geometry.addMorphTarget(new MorphTarget(
+                    "shift",
+                    BufferAttribute.of(new float[] {2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f}, 3)));
+            Mesh ordinary = new Mesh(geometry, material);
+            ordinary.setMorphTargetInfluence(0, 1.0f);
+            Raycaster shiftedRay = new Raycaster(new Vector3f(2.0f, 0.0f, 2.0f), new Vector3f(0.0f, 0.0f, -1.0f));
+            assertThat(shiftedRay.intersect(ordinary)).hasSize(1);
+            assertThat(frontRay(2.0f).intersect(ordinary)).isEmpty();
+
+            InstancedMesh instanced = new InstancedMesh(geometry, material, 2);
+            instanced.setMatrixAt(0, new Matrix4f().translation(-3.0f, 0.0f, 0.0f));
+            instanced.setMatrixAt(1, new Matrix4f());
+            instanced.setMorphTargetInfluenceAt(0, 0, 0.0f);
+            instanced.setMorphTargetInfluenceAt(1, 0, 1.0f);
+            assertThat(shiftedRay.intersect(instanced))
+                    .extracting(RaycastHit::instanceIndex)
+                    .containsExactly(OptionalInt.of(1));
+        }
+    }
+
     @Test
     void intersectsActiveInstancesAndReportsTheirIndices() {
         try (BufferGeometry geometry = triangle();

@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.animation;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.objects.Object3D;
 import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,11 +25,9 @@ public final class AnimationMixer {
     private final Map<AnimationClip, AnimationAction> actionsByClip = new IdentityHashMap<>();
     private final List<AnimationAction> actions = new ArrayList<>();
     private final Map<AnimationTrack, PropertyAccumulator> bindingsByTrack = new IdentityHashMap<>();
-    private final Map<Object3D, EnumMap<TransformProperty, PropertyAccumulator>> bindingsByTarget =
-            new IdentityHashMap<>();
+    private final Map<Object3D, Map<AnimatedProperty, PropertyAccumulator>> bindingsByTarget = new IdentityHashMap<>();
     private final List<PropertyAccumulator> bindings = new ArrayList<>();
-    private final float[] vectorSample = new float[3];
-    private final float[] quaternionSample = new float[4];
+    private float[] sample = new float[4];
 
     /** Creates an empty mixer with no actions or captured base poses. */
     public AnimationMixer() {
@@ -119,13 +117,15 @@ public final class AnimationMixer {
     /** Registers stable shared property accumulators for every track in one new clip. */
     private void registerBindings(AnimationClip clip) {
         for (AnimationTrack track : clip.tracks()) {
-            EnumMap<TransformProperty, PropertyAccumulator> targetBindings =
-                    bindingsByTarget.computeIfAbsent(track.target(), ignored -> new EnumMap<>(TransformProperty.class));
+            Map<AnimatedProperty, PropertyAccumulator> targetBindings =
+                    bindingsByTarget.computeIfAbsent(track.target(), ignored -> new HashMap<>());
             PropertyAccumulator binding = targetBindings.get(track.property());
             if (binding == null) {
-                binding = new PropertyAccumulator(track.target(), track.property());
+                binding = new PropertyAccumulator(track.target(), track.property(), track.components());
                 targetBindings.put(track.property(), binding);
                 bindings.add(binding);
+            } else if (binding.components() != track.components()) {
+                throw new IllegalArgumentException("tracks for one target property must use the same component count");
             }
             bindingsByTrack.put(track, binding);
         }
@@ -139,11 +139,13 @@ public final class AnimationMixer {
         float actionWeight = action.effectiveWeight();
         for (AnimationTrack track : action.clip().tracks()) {
             float localTime = Math.clamp(action.time(), 0.0f, track.duration());
-            float[] destination = track.components() == vectorSample.length ? vectorSample : quaternionSample;
-            track.sample(localTime, destination);
+            if (sample.length != track.components()) {
+                sample = new float[track.components()];
+            }
+            track.sample(localTime, sample);
             PropertyAccumulator binding =
                     Objects.requireNonNull(bindingsByTrack.get(track), "registered track binding");
-            binding.accumulate(destination, actionWeight);
+            binding.accumulate(sample, actionWeight);
         }
     }
 

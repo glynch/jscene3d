@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.objects;
 
+import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -17,9 +18,9 @@ import org.joml.Matrix4fc;
  * Ordered bones and inverse bind matrices used for linear-blend skinning.
  *
  * <p>Bone order is stable and corresponds directly to indices stored in a skinned geometry's
- * {@link io.github.glynch.jscene3d.geometries.BufferGeometry#JOINTS joints} attribute. Inverse bind
- * matrices are copied during construction. Bones remain caller-owned mutable scene nodes, while
- * this skeleton is an immutable binding description.
+ * {@link BufferGeometry#JOINTS joints} attribute. Inverse bind matrices are copied during
+ * construction. Bones remain caller-owned mutable scene nodes, while this skeleton is an immutable
+ * binding description.
  */
 public final class Skeleton {
     /** Number of scalar values in one column-major 4-by-4 joint matrix. */

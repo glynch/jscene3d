@@ -181,6 +181,57 @@ final class GltfTestAssets {
         return writeJson(directory, "animated.gltf", json);
     }
 
+    /** Writes one named position-and-normal morph target with animated node weights. */
+    static Path writeMorphedTriangle(Path directory) throws IOException {
+        ByteBuffer data = ByteBuffer.allocate(160).order(ByteOrder.LITTLE_ENDIAN);
+        putFloats(data, -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        putFloats(data, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f);
+        putFloats(data, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f);
+        putFloats(data, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, -1.0f);
+        putFloats(data, 0.0f, 1.0f);
+        putFloats(data, 0.0f, 1.0f);
+        Files.write(directory.resolve("morphed.bin"), data.array());
+        String json = """
+                {
+                  "asset":{"version":"2.0"},
+                  "scene":0,
+                  "scenes":[{"nodes":[0]}],
+                  "nodes":[{"mesh":0,"weights":[0.2]}],
+                  "meshes":[{
+                    "weights":[0.4],
+                    "extras":{"targetNames":["stretch"]},
+                    "primitives":[{
+                      "attributes":{"POSITION":0,"NORMAL":1},
+                      "targets":[{"POSITION":2,"NORMAL":3}]
+                    }]
+                  }],
+                  "animations":[{
+                    "name":"Morph stretch",
+                    "samplers":[{"input":4,"output":5,"interpolation":"LINEAR"}],
+                    "channels":[{"sampler":0,"target":{"node":0,"path":"weights"}}]
+                  }],
+                  "buffers":[{"uri":"morphed.bin","byteLength":160}],
+                  "bufferViews":[
+                    {"buffer":0,"byteOffset":0,"byteLength":36},
+                    {"buffer":0,"byteOffset":36,"byteLength":36},
+                    {"buffer":0,"byteOffset":72,"byteLength":36},
+                    {"buffer":0,"byteOffset":108,"byteLength":36},
+                    {"buffer":0,"byteOffset":144,"byteLength":8},
+                    {"buffer":0,"byteOffset":152,"byteLength":8}
+                  ],
+                  "accessors":[
+                    {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+                    {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+                    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"},
+                    {"bufferView":3,"componentType":5126,"count":3,"type":"VEC3"},
+                    {"bufferView":4,"componentType":5126,"count":2,"type":"SCALAR","min":[0],"max":[1]},
+                    {"bufferView":5,"componentType":5126,"count":2,"type":"SCALAR"}
+                  ]
+                }
+                """;
+        return writeJson(directory, "morphed.gltf", json);
+    }
+
     /** Writes a one-primitive embedded-buffer triangle with caller-selected node and root features. */
     static Path writeSimpleTriangle(
             Path directory, String fileName, String node, String primitive, String additionalRootProperties)

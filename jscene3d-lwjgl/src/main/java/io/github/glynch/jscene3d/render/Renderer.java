@@ -91,6 +91,7 @@ import io.github.glynch.jscene3d.render.internal.RenderItem;
 import io.github.glynch.jscene3d.render.internal.RenderList;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import io.github.glynch.jscene3d.render.internal.ShadowRenderer;
+import io.github.glynch.jscene3d.render.internal.ShadowResourceContext;
 import io.github.glynch.jscene3d.render.internal.programs.BasicProgram;
 import io.github.glynch.jscene3d.render.internal.programs.EnvironmentBackgroundProgram;
 import io.github.glynch.jscene3d.render.internal.programs.LambertProgram;
@@ -107,6 +108,7 @@ import io.github.glynch.jscene3d.render.internal.resources.DefaultTexture;
 import io.github.glynch.jscene3d.render.internal.resources.EnvironmentResource;
 import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
 import io.github.glynch.jscene3d.render.internal.resources.InstanceResource;
+import io.github.glynch.jscene3d.render.internal.resources.MorphResources;
 import io.github.glynch.jscene3d.render.internal.resources.TextureResource;
 import io.github.glynch.jscene3d.render.internal.resources.ToneMappingTarget;
 import io.github.glynch.jscene3d.scenes.Scene;
@@ -115,6 +117,7 @@ import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
 import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -165,6 +168,7 @@ public final class Renderer implements AutoCloseable {
     private final IdentityHashMap<BufferGeometry, GeometryResource> geometryResources;
     private final Map<InstancedMesh, InstanceResource> instanceResources;
     private final Set<InstancedMesh> activeInstancedMeshes;
+    private final MorphResources morphResources;
     private final IdentityHashMap<Texture, TextureResource> textureResources;
     private final IdentityHashMap<EnvironmentMap, EnvironmentResource> environmentResources;
     private final Map<ShaderProgramKey, ShaderProgram> shaderPrograms;
@@ -224,7 +228,8 @@ public final class Renderer implements AutoCloseable {
         resources = info.resources();
         geometryResources = new IdentityHashMap<>();
         instanceResources = new IdentityHashMap<>();
-        activeInstancedMeshes = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        activeInstancedMeshes = Collections.newSetFromMap(new IdentityHashMap<>());
+        morphResources = new MorphResources();
         textureResources = new IdentityHashMap<>();
         environmentResources = new IdentityHashMap<>();
         shaderPrograms = new HashMap<>();
@@ -297,6 +302,7 @@ public final class Renderer implements AutoCloseable {
         releaseClosedEnvironmentResources();
         standardTextureUnitsPrimed = false;
         activeInstancedMeshes.clear();
+        morphResources.beginFrame();
         activeFog = validScene.fog();
         statistics.beginFrame();
 
@@ -312,14 +318,10 @@ public final class Renderer implements AutoCloseable {
                 prepareEnvironmentMatrices(validScene, viewMatrix);
                 frustum.update(viewMatrix, projectionMatrix);
                 renderList.build(validScene, viewMatrix, frustum);
+                ShadowResourceContext shadowResources = new ShadowResourceContext(
+                        geometryResources, instanceResources, activeInstancedMeshes, morphResources);
                 activeShadowFrame = shadowRenderer.render(
-                        validScene,
-                        validCamera,
-                        renderList.lights(),
-                        viewMatrix,
-                        geometryResources,
-                        instanceResources,
-                        activeInstancedMeshes);
+                        validScene, validCamera, renderList.lights(), viewMatrix, shadowResources);
                 recordShadowWork(activeShadowFrame);
                 updateProgramCount();
                 updateShadowResourceCount();
@@ -360,6 +362,8 @@ public final class Renderer implements AutoCloseable {
         activeShadowFrame = null;
         activeFog = null;
         releaseInactiveInstanceResources();
+        morphResources.finishFrame();
+        resources.setActiveMorphResources(morphResources.resourceCount());
         glBindVertexArray(0);
         if (!mainTargetStarted) {
             return;
@@ -577,6 +581,7 @@ public final class Renderer implements AutoCloseable {
             resources.setActiveGeometryResources(0);
             resources.setActiveTextureResources(0);
             resources.setActiveInstanceResources(0);
+            resources.setActiveMorphResources(0);
             resources.setActiveShadowMaps(0);
             resources.setProgramCount(0);
             closed = true;
@@ -592,6 +597,7 @@ public final class Renderer implements AutoCloseable {
         instanceResources.values().forEach(InstanceResource::close);
         instanceResources.clear();
         activeInstancedMeshes.clear();
+        morphResources.close();
         textureResources.values().forEach(TextureResource::close);
         textureResources.clear();
         environmentResources.values().forEach(EnvironmentResource::close);
@@ -717,6 +723,11 @@ public final class Renderer implements AutoCloseable {
                     + "instance attributes: "
                     + material.getClass().getName());
         }
+        if (item.object() instanceof Mesh mesh && mesh.morphTargetCount() > 0 && material instanceof ShaderMaterial) {
+            throw new IllegalStateException("Morph-target meshes do not support ShaderMaterial without explicit "
+                    + "texture-buffer deformation code: "
+                    + material.getClass().getName());
+        }
         applyMaterialState(material, topology);
         if (topology.isLine()) {
             renderLine(item, geometry, (LineBasicMaterial) material, resource, viewMatrix, projectionMatrix);
@@ -787,6 +798,7 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadFog(activeFog);
         uploadInstancing(program, item);
+        uploadMorphing(program, item);
         uploadMatrix(program.modelMatrixLocation(), item.worldMatrix());
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
@@ -831,6 +843,7 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadFog(activeFog);
         uploadInstancing(program, item);
+        uploadMorphing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
@@ -875,6 +888,7 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadFog(activeFog);
         uploadInstancing(program, item);
+        uploadMorphing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         glUniform1f(program.opacityLocation(), resolvedAlpha(material));
         glUniform1f(program.alphaCutoffLocation(), resolvedAlphaCutoff(material));
@@ -899,6 +913,7 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadFog(activeFog);
         uploadInstancing(program, item);
+        uploadMorphing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         if (colorMap != null) {
             uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
@@ -994,6 +1009,7 @@ public final class Renderer implements AutoCloseable {
         glUseProgram(program.id());
         program.uploadFog(activeFog);
         uploadInstancing(program, item);
+        uploadMorphing(program, item);
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
         program.uploadSkinning(item.object(), item.worldMatrix());
         program.uploadLights(renderList.lights(), viewMatrix);
@@ -1156,6 +1172,56 @@ public final class Renderer implements AutoCloseable {
     private static void uploadInstancing(StandardProgram program, RenderItem item) {
         boolean instanced = item.object() instanceof InstancedMesh;
         program.uploadInstancing(instanced, hasInstanceColors(item));
+    }
+
+    /** Binds current morph data and uploads it to the basic program. */
+    private void uploadMorphing(BasicProgram program, RenderItem item) {
+        MorphResources.Binding binding = bindMorphResources(item);
+        program.uploadMorphing(
+                binding.enabled(), binding.targetCount(), binding.vertexCount(), binding.instanceWeights());
+    }
+
+    /** Binds current morph data and uploads it to the Lambert program. */
+    private void uploadMorphing(LambertProgram program, RenderItem item) {
+        MorphResources.Binding binding = bindMorphResources(item);
+        program.uploadMorphing(
+                binding.enabled(), binding.targetCount(), binding.vertexCount(), binding.instanceWeights());
+    }
+
+    /** Binds current morph data and uploads it to the normal program. */
+    private void uploadMorphing(NormalProgram program, RenderItem item) {
+        MorphResources.Binding binding = bindMorphResources(item);
+        program.uploadMorphing(
+                binding.enabled(), binding.targetCount(), binding.vertexCount(), binding.instanceWeights());
+    }
+
+    /** Binds current morph data and uploads it to the Phong program. */
+    private void uploadMorphing(PhongProgram program, RenderItem item) {
+        MorphResources.Binding binding = bindMorphResources(item);
+        program.uploadMorphing(
+                binding.enabled(), binding.targetCount(), binding.vertexCount(), binding.instanceWeights());
+    }
+
+    /** Binds current morph data and uploads it to the standard program. */
+    private void uploadMorphing(StandardProgram program, RenderItem item) {
+        MorphResources.Binding binding = bindMorphResources(item);
+        program.uploadMorphing(
+                binding.enabled(), binding.targetCount(), binding.vertexCount(), binding.instanceWeights());
+    }
+
+    /** Synchronizes and binds texture-buffer deformation data for the current mesh. */
+    private MorphResources.Binding bindMorphResources(RenderItem item) {
+        Mesh mesh = (Mesh) item.object();
+        if (mesh.morphTargetCount() > 0 && maxTextureUnits <= MorphResources.WEIGHT_TEXTURE_UNIT) {
+            throw new IllegalStateException("Morph targets require at least "
+                    + (MorphResources.WEIGHT_TEXTURE_UNIT + 1)
+                    + " combined texture units, but this context exposes "
+                    + maxTextureUnits);
+        }
+        MorphResources.Binding binding = morphResources.bind(mesh);
+        statistics.recordUploads(binding.uploadCount(), binding.uploadedBytes());
+        resources.setActiveMorphResources(morphResources.resourceCount());
+        return binding;
     }
 
     /** Returns whether the selected instance batch supplies colors. */

@@ -8,8 +8,10 @@ import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.math.BoundingBox;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.math.Color;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -49,6 +51,8 @@ public final class BufferGeometry implements AutoCloseable {
 
     private final Map<String, BufferAttribute> attributes;
     private final Map<String, BufferAttribute> attributesView;
+    private final List<MorphTarget> morphTargets;
+    private final List<MorphTarget> morphTargetsView;
 
     private @Nullable IndexBuffer index;
     private @Nullable BoundingBox boundingBox;
@@ -69,6 +73,8 @@ public final class BufferGeometry implements AutoCloseable {
     public BufferGeometry() {
         attributes = new LinkedHashMap<>();
         attributesView = Collections.unmodifiableMap(attributes);
+        morphTargets = new ArrayList<>();
+        morphTargetsView = Collections.unmodifiableList(morphTargets);
     }
 
     /**
@@ -120,6 +126,58 @@ public final class BufferGeometry implements AutoCloseable {
     }
 
     /**
+     * Returns the stable unmodifiable live view of ordered morph targets.
+     *
+     * @return morph targets in shader influence order
+     * @throws IllegalStateException if this geometry is closed
+     */
+    public List<MorphTarget> morphTargets() {
+        requireOpen();
+        return morphTargetsView;
+    }
+
+    /**
+     * Adds one morph target after validating it against the base vertex count and existing names.
+     *
+     * @param target target to retain
+     * @throws NullPointerException if {@code target} is {@code null}
+     * @throws IllegalArgumentException if no base positions exist, counts differ, or the name is
+     *     already present
+     * @throws IllegalStateException if this geometry is closed
+     */
+    public void addMorphTarget(MorphTarget target) {
+        requireOpen();
+        MorphTarget validTarget = Objects.requireNonNull(target, "target");
+        int vertexCount = requirePositionAttribute().count();
+        if (validTarget.positions().count() != vertexCount) {
+            throw new IllegalArgumentException("morph position count must equal base vertex count: "
+                    + validTarget.positions().count()
+                    + " != "
+                    + vertexCount);
+        }
+        for (MorphTarget existing : morphTargets) {
+            if (existing.name().equals(validTarget.name())) {
+                throw new IllegalArgumentException("morph target name must be unique: " + validTarget.name());
+            }
+        }
+        morphTargets.add(validTarget);
+        version++;
+    }
+
+    /**
+     * Removes every morph target without closing its shared attributes.
+     *
+     * @throws IllegalStateException if this geometry is closed
+     */
+    public void clearMorphTargets() {
+        requireOpen();
+        if (!morphTargets.isEmpty()) {
+            morphTargets.clear();
+            version++;
+        }
+    }
+
+    /**
      * Sets or replaces a named attribute.
      *
      * <p>All attributes must have the same item count. The standard position attribute must have
@@ -157,6 +215,7 @@ public final class BufferGeometry implements AutoCloseable {
 
         if (POSITION.equals(validName)) {
             validatePositionReplacement(validAttribute);
+            validateMorphTargetCount(validAttribute.count());
         }
         attributes.put(validName, validAttribute);
         if (POSITION.equals(validName)) {
@@ -185,6 +244,9 @@ public final class BufferGeometry implements AutoCloseable {
         }
         if (POSITION.equals(validName) && index != null) {
             throw new IllegalArgumentException("position attribute cannot be removed while an index buffer is set");
+        }
+        if (POSITION.equals(validName) && !morphTargets.isEmpty()) {
+            throw new IllegalArgumentException("position attribute cannot be removed while morph targets are retained");
         }
         int remainingVertexCount = vertexCountExcluding(existingAttribute);
         if (index == null && remainingVertexCount != existingAttribute.count()) {
@@ -533,6 +595,7 @@ public final class BufferGeometry implements AutoCloseable {
             existingIndex.detachVertexCount(positions.count());
         }
         attributes.clear();
+        morphTargets.clear();
         index = null;
         boundingBox = null;
         boundingSphere = null;
@@ -776,6 +839,20 @@ public final class BufferGeometry implements AutoCloseable {
         if (existingIndex != null) {
             existingIndex.attachVertexCount(replacementPosition.count());
             existingIndex.detachVertexCount(replacementPosition.count());
+        }
+    }
+
+    /** Rejects a base-position replacement incompatible with retained displacement targets. */
+    private void validateMorphTargetCount(int vertexCount) {
+        for (MorphTarget target : morphTargets) {
+            if (target.positions().count() != vertexCount) {
+                throw new IllegalArgumentException("position count must match morph target "
+                        + target.name()
+                        + ": "
+                        + vertexCount
+                        + " != "
+                        + target.positions().count());
+            }
         }
     }
 

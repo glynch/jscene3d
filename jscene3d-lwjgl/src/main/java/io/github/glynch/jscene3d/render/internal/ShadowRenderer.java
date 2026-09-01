@@ -55,15 +55,18 @@ import io.github.glynch.jscene3d.render.internal.ShadowFrame.TwoDimensionalShado
 import io.github.glynch.jscene3d.render.internal.programs.ShadowDepthProgram;
 import io.github.glynch.jscene3d.render.internal.resources.GeometryResource;
 import io.github.glynch.jscene3d.render.internal.resources.InstanceResource;
+import io.github.glynch.jscene3d.render.internal.resources.MorphResources;
 import io.github.glynch.jscene3d.render.internal.resources.ShadowMapResource;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.joml.Matrix4f;
@@ -113,13 +116,14 @@ public final class ShadowRenderer implements AutoCloseable {
     private long uploadedBytes;
     private @Nullable Map<InstancedMesh, InstanceResource> instanceResources;
     private @Nullable Set<InstancedMesh> activeInstancedMeshes;
+    private @Nullable MorphResources morphResources;
 
     /** Creates an unrealized renderer-owned shadow subsystem. */
     public ShadowRenderer() {
         resources = new IdentityHashMap<>();
         casters = new ArrayList<>();
         pendingObjects = new ArrayDeque<>();
-        activeLights = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        activeLights = Collections.newSetFromMap(new IdentityHashMap<>());
         projection = new Matrix4f();
         view = new Matrix4f();
         viewProjection = new Matrix4f();
@@ -139,9 +143,7 @@ public final class ShadowRenderer implements AutoCloseable {
      * @param camera application camera that initiated the scene render
      * @param lights visible lights collected for the main frame
      * @param mainViewMatrix main camera view matrix
-     * @param geometryResources renderer geometry cache shared with the main pass
-     * @param instanceResources renderer instance-data cache shared with the main pass
-     * @param activeInstancedMeshes batches used by either pass during this frame
+     * @param resourceContext renderer resource caches shared with the main pass
      * @return immutable completed frame state
      */
     public ShadowFrame render(
@@ -149,17 +151,17 @@ public final class ShadowRenderer implements AutoCloseable {
             Camera camera,
             LightCollection lights,
             Matrix4fc mainViewMatrix,
-            Map<BufferGeometry, GeometryResource> geometryResources,
-            Map<InstancedMesh, InstanceResource> instanceResources,
-            Set<InstancedMesh> activeInstancedMeshes) {
+            ShadowResourceContext resourceContext) {
         collectCasters(scene);
         activeLights.clear();
         drawCalls = 0;
         triangles = 0L;
         uploads = 0;
         uploadedBytes = 0L;
-        this.instanceResources = instanceResources;
-        this.activeInstancedMeshes = activeInstancedMeshes;
+        Map<BufferGeometry, GeometryResource> geometryResources = resourceContext.geometries();
+        instanceResources = resourceContext.instances();
+        activeInstancedMeshes = resourceContext.activeInstances();
+        morphResources = resourceContext.morphs();
         inverseMainView.set(mainViewMatrix).invert();
         requireSupportedShadowCounts(lights);
         int[] directionalIndices = indices(lights.directionalLightCount());
@@ -180,6 +182,7 @@ public final class ShadowRenderer implements AutoCloseable {
         } finally {
             this.instanceResources = null;
             this.activeInstancedMeshes = null;
+            morphResources = null;
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
     }
@@ -411,8 +414,14 @@ public final class ShadowRenderer implements AutoCloseable {
         activeProgram.uploadModel(worldMatrix);
         activeProgram.uploadSkinning(mesh, worldMatrix);
         geometryResource.bind();
+        MorphResources.Binding morphBinding = bindMorphTargets(mesh);
         int instanceCount = bindInstances(mesh);
         activeProgram.uploadInstancing(mesh instanceof InstancedMesh);
+        activeProgram.uploadMorphing(
+                morphBinding.enabled(),
+                morphBinding.targetCount(),
+                morphBinding.vertexCount(),
+                morphBinding.instanceWeights());
         int start = geometry.drawRangeStart();
         IndexBuffer index = geometry.index();
         if (!(mesh instanceof InstancedMesh)) {
@@ -445,15 +454,23 @@ public final class ShadowRenderer implements AutoCloseable {
             return 1;
         }
         Map<InstancedMesh, InstanceResource> resourceMap =
-                java.util.Objects.requireNonNull(instanceResources, "instanceResources");
+                Objects.requireNonNull(instanceResources, "instanceResources");
         InstanceResource resource =
                 resourceMap.computeIfAbsent(instancedMesh, ignored -> new InstanceResource(instancedMesh.capacity()));
-        java.util.Objects.requireNonNull(activeInstancedMeshes, "activeInstancedMeshes")
-                .add(instancedMesh);
+        Objects.requireNonNull(activeInstancedMeshes, "activeInstancedMeshes").add(instancedMesh);
         InstanceResource.UploadResult result = resource.synchronizeAndBind(instancedMesh);
         uploads += result.count();
         uploadedBytes += result.byteCount();
         return instancedMesh.count();
+    }
+
+    /** Synchronizes and binds optional morph-target data for a shadow caster. */
+    private MorphResources.Binding bindMorphTargets(Mesh mesh) {
+        MorphResources activeMorphResources = Objects.requireNonNull(morphResources, "morphResources");
+        MorphResources.Binding binding = activeMorphResources.bind(mesh);
+        uploads += binding.uploadCount();
+        uploadedBytes += binding.uploadedBytes();
+        return binding;
     }
 
     /** Applies only face culling from a caster's material; shadow depth always writes and tests. */

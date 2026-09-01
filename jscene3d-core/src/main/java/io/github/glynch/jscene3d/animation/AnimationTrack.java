@@ -14,9 +14,10 @@ import java.util.Objects;
  * that scene instance. Track evaluation is performed by {@link AnimationMixer}; callers do not
  * apply sampled values directly.
  */
-public abstract sealed class AnimationTrack permits QuaternionKeyframeTrack, Vector3KeyframeTrack {
+public abstract sealed class AnimationTrack
+        permits MorphTargetKeyframeTrack, QuaternionKeyframeTrack, Vector3KeyframeTrack {
     private final Object3D target;
-    private final TransformProperty property;
+    private final AnimatedProperty property;
     private final Interpolation interpolation;
     private final KeyframeData keyframes;
     private final int components;
@@ -24,7 +25,7 @@ public abstract sealed class AnimationTrack permits QuaternionKeyframeTrack, Vec
     /** Retains the validated typed binding and copied keyframe data. */
     AnimationTrack(
             Object3D target,
-            TransformProperty property,
+            AnimatedProperty property,
             float[] times,
             float[] values,
             int components,
@@ -50,7 +51,7 @@ public abstract sealed class AnimationTrack permits QuaternionKeyframeTrack, Vec
      *
      * @return transform property
      */
-    public final TransformProperty property() {
+    public final AnimatedProperty property() {
         return property;
     }
 

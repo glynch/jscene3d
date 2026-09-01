@@ -19,19 +19,20 @@ final class ShadowShaderSource {
             uniform mat4 shadowMatrices[MAX_TWO_DIMENSIONAL_SHADOWS];
             uniform float shadowBiases[MAX_TWO_DIMENSIONAL_SHADOWS];
             uniform float shadowNormalBiases[MAX_TWO_DIMENSIONAL_SHADOWS];
-            uniform sampler2D shadowMaps[MAX_TWO_DIMENSIONAL_SHADOWS];
+            uniform sampler2DShadow shadowMaps[MAX_TWO_DIMENSIONAL_SHADOWS];
             uniform vec3 pointShadowPositions[MAX_POINT_SHADOWS];
             uniform float pointShadowFarPlanes[MAX_POINT_SHADOWS];
             uniform float pointShadowBiases[MAX_POINT_SHADOWS];
             uniform float pointShadowNormalBiases[MAX_POINT_SHADOWS];
-            uniform samplerCube pointShadowMaps[MAX_POINT_SHADOWS];
+            uniform samplerCubeShadow pointShadowMaps[MAX_POINT_SHADOWS];
             uniform mat3 shadowViewToWorldMatrix;
 
-            float sampleTwoDimensionalMap(int slot, vec2 coordinate) {
-                if (slot == 0) return texture(shadowMaps[0], coordinate).r;
-                if (slot == 1) return texture(shadowMaps[1], coordinate).r;
-                if (slot == 2) return texture(shadowMaps[2], coordinate).r;
-                return texture(shadowMaps[3], coordinate).r;
+            float sampleTwoDimensionalMap(int slot, vec2 coordinate, float comparison) {
+                vec3 sampleCoordinate = vec3(coordinate, comparison);
+                if (slot == 0) return texture(shadowMaps[0], sampleCoordinate);
+                if (slot == 1) return texture(shadowMaps[1], sampleCoordinate);
+                if (slot == 2) return texture(shadowMaps[2], sampleCoordinate);
+                return texture(shadowMaps[3], sampleCoordinate);
             }
 
             vec2 twoDimensionalTexelSize(int slot) {
@@ -54,20 +55,24 @@ final class ShadowShaderSource {
                 vec2 texel = twoDimensionalTexelSize(slot);
                 float comparison = coordinate.z - shadowBiases[slot];
                 float visibility = 0.0;
+                float totalWeight = 0.0;
                 for (int y = -1; y <= 1; y++) {
                     for (int x = -1; x <= 1; x++) {
-                        float stored = sampleTwoDimensionalMap(slot, coordinate.xy + vec2(x, y) * texel);
-                        visibility += comparison <= stored ? 1.0 : 0.0;
+                        float weight = (2.0 - abs(float(x))) * (2.0 - abs(float(y)));
+                        visibility += weight * sampleTwoDimensionalMap(
+                                slot, coordinate.xy + vec2(x, y) * texel, comparison);
+                        totalWeight += weight;
                     }
                 }
-                return visibility / 9.0;
+                return visibility / totalWeight;
             }
 
-            float samplePointMap(int slot, vec3 direction) {
-                if (slot == 0) return texture(pointShadowMaps[0], direction).r;
-                if (slot == 1) return texture(pointShadowMaps[1], direction).r;
-                if (slot == 2) return texture(pointShadowMaps[2], direction).r;
-                return texture(pointShadowMaps[3], direction).r;
+            float samplePointMap(int slot, vec3 direction, float comparison) {
+                vec4 sampleCoordinate = vec4(direction, comparison);
+                if (slot == 0) return texture(pointShadowMaps[0], sampleCoordinate);
+                if (slot == 1) return texture(pointShadowMaps[1], sampleCoordinate);
+                if (slot == 2) return texture(pointShadowMaps[2], sampleCoordinate);
+                return texture(pointShadowMaps[3], sampleCoordinate);
             }
 
             float pointShadow(int slot, vec3 viewPosition, vec3 viewNormal) {
@@ -85,8 +90,8 @@ final class ShadowShaderSource {
                         vec3(1.0, -1.0, -1.0), vec3(-1.0, -1.0, -1.0));
                 float visibility = 0.0;
                 for (int sampleIndex = 0; sampleIndex < 8; sampleIndex++) {
-                    float stored = samplePointMap(slot, worldDirection + offsets[sampleIndex] * diskRadius);
-                    visibility += comparison <= stored ? 1.0 : 0.0;
+                    visibility += samplePointMap(
+                            slot, worldDirection + offsets[sampleIndex] * diskRadius, comparison);
                 }
                 return visibility / 8.0;
             }

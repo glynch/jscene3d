@@ -65,6 +65,7 @@ import org.junit.jupiter.api.Test;
 import org.lwjgl.BufferUtils;
 
 final class RendererIT {
+    private static final int MAXIMUM_COLOR_CHANNEL_VALUE = 255;
     private static final String CUSTOM_VERTEX_SHADER = """
             in vec3 position;
 
@@ -385,7 +386,7 @@ final class RendererIT {
     @Test
     void rendersStableSolidDirectionalShadowDepth() {
         WindowOptions windowOptions = WindowOptions.builder()
-                .size(160, 160)
+                .size(320, 320)
                 .title("Directional shadow depth regression test")
                 .verticalSync(VerticalSync.DISABLED)
                 .build();
@@ -420,6 +421,7 @@ final class RendererIT {
             OverlayImage baseline = renderer.captureViewport();
 
             assertSolidShadowCore(baseline);
+            assertSmoothShadowEdge(baseline);
             for (int frame = 0; frame < 8; frame++) {
                 renderer.render(scene, camera);
                 assertThat(renderer.captureViewport().pixels()).isEqualTo(baseline.pixels());
@@ -1489,6 +1491,36 @@ final class RendererIT {
             }
         }
         assertThat(darkPixels).isEqualTo((maximum - minimum) * (maximum - minimum));
+    }
+
+    /** Checks that filtering produces a continuous transition instead of a small set of visible bands. */
+    private static void assertSmoothShadowEdge(OverlayImage image) {
+        byte[] pixels = image.pixels();
+        int row = image.height() / 2;
+        int minimumBrightness = Integer.MAX_VALUE;
+        int maximumBrightness = Integer.MIN_VALUE;
+        int[] brightnesses = new int[image.width()];
+        for (int x = 0; x < image.width(); x++) {
+            int offset = (row * image.width() + x) * 4;
+            int brightness = Byte.toUnsignedInt(pixels[offset])
+                    + Byte.toUnsignedInt(pixels[offset + 1])
+                    + Byte.toUnsignedInt(pixels[offset + 2]);
+            brightnesses[x] = brightness;
+            minimumBrightness = Math.min(minimumBrightness, brightness);
+            maximumBrightness = Math.max(maximumBrightness, brightness);
+        }
+        int margin = (maximumBrightness - minimumBrightness) / 10;
+        boolean[] observedBrightnesses = new boolean[MAXIMUM_COLOR_CHANNEL_VALUE * 3 + 1];
+        int distinctIntermediateBrightnesses = 0;
+        for (int brightness : brightnesses) {
+            if (brightness > minimumBrightness + margin
+                    && brightness < maximumBrightness - margin
+                    && !observedBrightnesses[brightness]) {
+                observedBrightnesses[brightness] = true;
+                distinctIntermediateBrightnesses++;
+            }
+        }
+        assertThat(distinctIntermediateBrightnesses).isGreaterThan(10);
     }
 
     /** Renders one depth comparison against the cleared depth buffer and checks its result. */

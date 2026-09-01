@@ -14,6 +14,7 @@
 
     <properties>
         <jacoco.skip>true</jacoco.skip>
+        <jscene3d.examples.natives>${lwjgl.natives}</jscene3d.examples.natives>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 
@@ -51,30 +52,175 @@
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
+            <classifier>${jscene3d.examples.natives}</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-glfw</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
+            <classifier>${jscene3d.examples.natives}</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-opengl</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
+            <classifier>${jscene3d.examples.natives}</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-stb</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
+            <classifier>${jscene3d.examples.natives}</classifier>
             <scope>runtime</scope>
         </dependency>
     </dependencies>
 
     <profiles>
+        <profile>
+            <id>example-distribution-macos-arm64</id>
+            <properties>
+                <jscene3d.examples.natives>natives-macos-arm64</jscene3d.examples.natives>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>enforce-macos-arm64-distribution-host</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>enforce</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <requireOS>
+                                            <family>mac</family>
+                                            <arch>aarch64</arch>
+                                        </requireOS>
+                                    </rules>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>create-macos-arm64-runtime</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/jlink</executable>
+                                    <arguments>
+                                        <argument>--add-modules</argument>
+                                        <argument>java.base,java.desktop,java.logging,java.management,java.naming,java.sql,java.xml,jdk.incubator.vector,jdk.unsupported</argument>
+                                        <argument>--compress</argument>
+                                        <argument>zip-6</argument>
+                                        <argument>--no-header-files</argument>
+                                        <argument>--no-man-pages</argument>
+                                        <argument>--strip-debug</argument>
+                                        <argument>--output</argument>
+                                        <argument>${project.build.directory}/runtime-macos-arm64</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>verify-macos-arm64-bundled-resources</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${project.build.directory}/runtime-macos-arm64/bin/java</executable>
+                                    <arguments>
+                                        <argument>-classpath</argument>
+                                        <argument>${project.build.testOutputDirectory}:${project.build.directory}/${project.build.finalName}-macos-arm64.jar</argument>
+                                        <argument>io.github.glynch.jscene3d.examples.framework.BundledResourcesDistributionProbe</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>package-macos-arm64-example-browser</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                                    <shadedArtifactAttached>true</shadedArtifactAttached>
+                                    <shadedClassifierName>macos-arm64</shadedClassifierName>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>module-info.class</exclude>
+                                                <exclude>META-INF/LICENSE</exclude>
+                                                <exclude>META-INF/MANIFEST.MF</exclude>
+                                                <exclude>META-INF/versions/**/module-info.class</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/INDEX.LIST</exclude>
+                                            </excludes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.lwjgl:*:jar:natives-macos-arm64</artifact>
+                                            <excludes>
+                                                <exclude>**/*.sha1</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <transformers>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer" />
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                            <resource>META-INF/LICENSE</resource>
+                                            <file>${maven.multiModuleProjectDirectory}/LICENSE</file>
+                                        </transformer>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                            <resource>META-INF/THIRD_PARTY_NOTICES.md</resource>
+                                            <file>${maven.multiModuleProjectDirectory}/THIRD_PARTY_NOTICES.md</file>
+                                        </transformer>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <mainClass>io.github.glynch.jscene3d.examples.ExampleBrowser</mainClass>
+                                        </transformer>
+                                    </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>assemble-macos-arm64-example-browser</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <configuration>
+                                    <descriptors>
+                                        <descriptor>src/assembly/macos-arm64.xml</descriptor>
+                                    </descriptors>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>run-example</id>
             <build>

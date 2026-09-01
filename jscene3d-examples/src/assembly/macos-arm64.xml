@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <id>macos-arm64</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>true</includeBaseDirectory>
+    <baseDirectory>jscene3d-examples-${project.version}-macos-arm64</baseDirectory>
+    <fileSets>
+        <fileSet>
+            <directory>${project.build.directory}/runtime-macos-arm64</directory>
+            <outputDirectory>/runtime</outputDirectory>
+        </fileSet>
+    </fileSets>
+    <files>
+        <file>
+            <source>${project.build.directory}/${project.build.finalName}-macos-arm64.jar</source>
+            <outputDirectory>/</outputDirectory>
+            <destName>jscene3d-examples.jar</destName>
+            <fileMode>0644</fileMode>
+        </file>
+        <file>
+            <source>src/distribution/macos-arm64/run.sh</source>
+            <outputDirectory>/</outputDirectory>
+            <destName>run.sh</destName>
+            <fileMode>0755</fileMode>
+        </file>
+        <file>
+            <source>src/distribution/macos-arm64/README.txt</source>
+            <outputDirectory>/</outputDirectory>
+            <destName>README.txt</destName>
+            <fileMode>0644</fileMode>
+        </file>
+    </files>
+</assembly>

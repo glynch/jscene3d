@@ -134,10 +134,31 @@ with a source-aware diagnostic.
 JglTF performs container and reference parsing internally; no JglTF type is
 part of the public JScene3D API.
 
-On macOS, the OS-activated Maven profile launches the new JVM with
-`-XstartOnFirstThread`. Other platforms use the same runner without that JVM
-option. The examples artifact is never deployed. Run `./mvnw clean verify`
-separately when the project needs complete verification.
+### Package the example browser
+
+Build the standalone macOS ARM64 example-browser distribution with:
+
+```shell
+./mvnw clean verify -pl jscene3d-examples -am -Pexample-distribution-macos-arm64
+```
+
+The resulting distribution is
+`jscene3d-examples/target/jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64.zip`.
+It contains an uber JAR with the examples, assets, runtime dependencies, macOS
+ARM64 LWJGL native libraries, and a trimmed Java 21 runtime. Extract it and run
+its launcher:
+
+```shell
+unzip jscene3d-examples/target/jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64.zip
+cd jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64
+./run.sh
+```
+
+The script validates the host architecture, uses the included runtime, and
+supplies `-XstartOnFirstThread`. If the included runtime is unavailable, it can
+fall back to an installed Java 21 or newer runtime with a warning. Future
+platform distributions can provide their own launcher while sharing the same
+uber-JAR packaging configuration.
 
 ## Animation
 

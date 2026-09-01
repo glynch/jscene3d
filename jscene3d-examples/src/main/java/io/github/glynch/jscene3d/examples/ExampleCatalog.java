@@ -157,6 +157,29 @@ final class ExampleCatalog {
                                         URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
                         WaterBottleModelExample::create),
                 definition(
+                        "boom-box-model",
+                        "Boom Box glTF model",
+                        "Loading",
+                        "A CC0 portable radio with metallic surfaces and an emissive front panel.",
+                        List.of("gltf", "glb", "pbr", "emissive", "metallic", "ibl"),
+                        List.of(
+                                new GalleryAttribution(
+                                        "Boom Box glTF model",
+                                        "Microsoft",
+                                        "Khronos glTF Sample Assets — Boom Box",
+                                        URI.create(
+                                                "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoomBox"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/")),
+                                new GalleryAttribution(
+                                        "Studio Small 08 HDRI",
+                                        "Sergej Majboroda",
+                                        "Poly Haven — polyhaven.com/a/studio_small_08",
+                                        URI.create("https://polyhaven.com/a/studio_small_08"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        BoomBoxModelExample::create),
+                definition(
                         "gltf-loading",
                         "glTF loading",
                         "Loading",

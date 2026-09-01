@@ -19,11 +19,35 @@ import org.junit.jupiter.api.Test;
 final class BundledModelCompatibilityTest {
     private static final String WATER_BOTTLE_RESOURCE =
             "/io/github/glynch/jscene3d/examples/water-bottle/WaterBottle.glb";
+    private static final String BOOM_BOX_RESOURCE = "/io/github/glynch/jscene3d/examples/boom-box/BoomBox.glb";
 
     /** Ensures Water Bottle exercises every currently supported StandardMaterial texture role. */
     @Test
     void loadsWaterBottleMaterialMaps() {
         try (LoadedGltf loaded = GltfLoader.load(path(getClass(), WATER_BOTTLE_RESOURCE))) {
+            List<Mesh> meshes = new ArrayList<>();
+            loaded.scene().traverse(object -> {
+                if (object instanceof Mesh mesh) {
+                    meshes.add(mesh);
+                }
+            });
+
+            assertThat(meshes).singleElement().satisfies(mesh -> {
+                assertThat(mesh.material()).isInstanceOf(StandardMaterial.class);
+                StandardMaterial material = (StandardMaterial) mesh.material();
+                assertThat(material.colorMap()).isPresent();
+                assertThat(material.metalnessRoughnessMap()).isPresent();
+                assertThat(material.normalMap()).isPresent();
+                assertThat(material.occlusionMap()).isPresent();
+                assertThat(material.emissiveMap()).isPresent();
+            });
+        }
+    }
+
+    /** Ensures Boom Box preserves its metallic, occlusion, normal, and glowing-panel material maps. */
+    @Test
+    void loadsBoomBoxMaterialMaps() {
+        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), BOOM_BOX_RESOURCE))) {
             List<Mesh> meshes = new ArrayList<>();
             loaded.scene().traverse(object -> {
                 if (object instanceof Mesh mesh) {

@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Boom Box glTF model
+
+- Asset: Boom Box binary glTF model
+- Creator: Microsoft
+- Source: [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoomBox)
+- License: [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)
+- Bundled file: `jscene3d-examples/src/main/resources/io/github/glynch/jscene3d/examples/boom-box/BoomBox.glb`
+
+The source metadata identifies the model and directly associated files as
+CC0-1.0. Detailed provenance and the downloaded file checksum are stored beside
+the bundled asset.
+
 ## Water Bottle glTF model
 
 - Asset: Water Bottle binary glTF model

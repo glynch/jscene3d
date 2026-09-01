@@ -203,7 +203,9 @@ lighting. `EnvironmentLightingExample` presents the same material dimensions
 under HDR image-based lighting, while `AvocadoModelExample` combines the glTF
 loader, a realistic CC0 model, environment lighting, and ACES filmic tone
 mapping. `WaterBottleModelExample` exercises base-colour, metallic-roughness,
-normal, occlusion, and emissive maps on another CC0 glTF asset. The browser
+normal, occlusion, and emissive maps on another CC0 glTF asset.
+`BoomBoxModelExample` presents metallic surfaces and a glowing emissive front
+panel under the same HDR lighting pipeline. The browser
 displays source and licence metadata for bundled
 third-party assets; complete notices are collected in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

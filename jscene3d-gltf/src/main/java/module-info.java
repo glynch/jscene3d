@@ -8,6 +8,7 @@ module io.github.glynch.jscene3d.gltf {
     requires java.desktop;
     requires jgltf.impl.v2;
     requires jgltf.model;
+    requires drako;
     requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.gltf;

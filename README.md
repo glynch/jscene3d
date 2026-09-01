@@ -122,14 +122,15 @@ try (LoadedGltf loaded = GltfLoader.load(Path.of("scene.glb"))) {
 
 The current capability profile supports selected-scene hierarchies, TRS
 and decomposable matrix transforms, triangle primitives, indices, positions,
-normals, primary texture coordinates, RGB/RGBA vertex colours,
+normals, two texture-coordinate sets, RGB/RGBA vertex colours,
 metallic-roughness materials, PNG/JPEG images, alpha modes, double-sided
-materials, core sampler state, and translation, rotation, and scale animation
-channels using step, linear, or cubic-spline interpolation. Imported textures
-retain glTF's top-left texture-coordinate convention rather than rewriting
-geometry UVs. Unsupported required extensions, skinning, morph targets,
-animation weight channels, embedded cameras, secondary texture-coordinate
-selection, and non-triangle primitives fail with a source-aware diagnostic.
+materials, core sampler state, skeletal skinning, Draco-compressed mesh
+primitives, and translation, rotation, and scale animation channels using step,
+linear, or cubic-spline interpolation. Imported textures retain glTF's top-left
+texture-coordinate convention rather than rewriting geometry UVs. Unsupported
+required extensions, morph targets, animation weight channels, embedded
+cameras, texture-coordinate sets beyond one, and non-triangle primitives fail
+with a source-aware diagnostic.
 JglTF performs container and reference parsing internally; no JglTF type is
 part of the public JScene3D API.
 
@@ -155,6 +156,9 @@ object properties because weighted blending is not yet supported.
 `KeyframeAnimationExample` compares step, linear, and cubic-spline interpolation
 with live playback controls. `GltfAnimationExample` imports and synchronously
 plays the nine transform clips in Khronos's CC0 Interpolation Test asset.
+`SkeletalAnimationExample` constructs and animates a two-joint skinned mesh,
+while `LittlestTokyoExample` loads Glen Fox's Draco-compressed, skeletally
+animated Littlest Tokyo scene.
 
 ## Transparency
 

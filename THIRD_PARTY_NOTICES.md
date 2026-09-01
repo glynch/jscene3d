@@ -1,5 +1,18 @@
 # Third-party notices
 
+## Littlest Tokyo glTF model
+
+- Asset: Littlest Tokyo binary glTF model
+- Creator: Glen Fox
+- Source: [ArtStation](https://glenatron.artstation.com/projects/AJGbV)
+- Distributor: [Three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf/LittlestTokyo.glb)
+- License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Bundled file: `jscene3d-examples/src/main/resources/io/github/glynch/jscene3d/examples/littlest-tokyo/LittlestTokyo.glb`
+
+The example demonstrates Draco mesh decompression, skeletal animation, and
+secondary texture-coordinate selection. Detailed provenance and the downloaded
+file checksum are stored beside the bundled asset.
+
 ## Interpolation Test glTF model
 
 - Asset: Interpolation Test binary glTF model

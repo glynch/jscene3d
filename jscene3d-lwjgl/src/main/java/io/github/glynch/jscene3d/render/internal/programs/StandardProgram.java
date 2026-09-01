@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.render.internal.programs;
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 import static org.lwjgl.opengl.GL20.glUniformMatrix3fv;
 
+import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.internal.LightCollection;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame;
@@ -15,33 +16,50 @@ import org.joml.Matrix4fc;
 
 /** Compiled built-in metallic-roughness physically based mesh program. */
 public final class StandardProgram implements AutoCloseable {
-    private static final String VERTEX_SOURCE = """
+    private static final String VERTEX_SOURCE =
+            """
             #version 330 core
             layout(location = 0) in vec3 position;
             layout(location = 1) in vec3 normal;
             layout(location = 2) in vec2 textureCoordinate;
             layout(location = 3) in vec4 vertexColor;
+            layout(location = 4) in vec4 jointIndices;
+            layout(location = 5) in vec4 skinWeights;
+            layout(location = 6) in vec2 secondaryTextureCoordinate;
 
             uniform mat4 modelMatrix;
             uniform mat4 viewMatrix;
             uniform mat4 projectionMatrix;
             uniform mat3 normalMatrix;
             uniform bool useVertexColor;
+            uniform bool useSkinning;
+            uniform mat4 jointMatrices[SKIN_JOINT_CAPACITY];
 
             out vec3 resolvedViewPosition;
             out vec3 resolvedViewNormal;
             out vec4 resolvedVertexColor;
             out vec2 resolvedTextureCoordinate;
+            out vec2 resolvedSecondaryTextureCoordinate;
 
             void main() {
-                vec4 viewPosition = viewMatrix * modelMatrix * vec4(position, 1.0);
+                mat4 skinMatrix = mat4(1.0);
+                if (useSkinning) {
+                    vec4 normalizedWeights = skinWeights / max(dot(skinWeights, vec4(1.0)), 1e-7);
+                    skinMatrix = normalizedWeights.x * jointMatrices[int(jointIndices.x)]
+                            + normalizedWeights.y * jointMatrices[int(jointIndices.y)]
+                            + normalizedWeights.z * jointMatrices[int(jointIndices.z)]
+                            + normalizedWeights.w * jointMatrices[int(jointIndices.w)];
+                }
+                vec4 localPosition = skinMatrix * vec4(position, 1.0);
+                vec4 viewPosition = viewMatrix * modelMatrix * localPosition;
                 resolvedViewPosition = viewPosition.xyz;
-                resolvedViewNormal = normalize(normalMatrix * normal);
+                resolvedViewNormal = normalize(normalMatrix * mat3(skinMatrix) * normal);
                 resolvedVertexColor = useVertexColor ? vertexColor : vec4(1.0);
                 resolvedTextureCoordinate = textureCoordinate;
+                resolvedSecondaryTextureCoordinate = secondaryTextureCoordinate;
                 gl_Position = projectionMatrix * viewPosition;
             }
-            """;
+            """.replace("SKIN_JOINT_CAPACITY", Integer.toString(Renderer.MAX_SKIN_JOINTS));
     private static final String FRAGMENT_SOURCE = """
             #version 330 core
             const float PI = 3.141592653589793;
@@ -54,6 +72,7 @@ public final class StandardProgram implements AutoCloseable {
             in vec3 resolvedViewNormal;
             in vec4 resolvedVertexColor;
             in vec2 resolvedTextureCoordinate;
+            in vec2 resolvedSecondaryTextureCoordinate;
 
             uniform vec4 baseColor;
             uniform float metalness;
@@ -88,6 +107,11 @@ public final class StandardProgram implements AutoCloseable {
             uniform bool flipNormalMapVertically;
             uniform bool flipOcclusionMapVertically;
             uniform bool flipEmissiveMapVertically;
+            uniform int colorMapCoordinateSet;
+            uniform int metalnessRoughnessMapCoordinateSet;
+            uniform int normalMapCoordinateSet;
+            uniform int occlusionMapCoordinateSet;
+            uniform int emissiveMapCoordinateSet;
             uniform sampler2D environmentIrradianceMap;
             uniform sampler2D environmentReflectionMap;
             uniform sampler2D environmentBrdfMap;
@@ -118,8 +142,11 @@ public final class StandardProgram implements AutoCloseable {
 
             out vec4 fragmentColor;
 
-            vec2 transformedCoordinate(mat3 transform, bool flipVertically) {
-                vec2 transformed = (transform * vec3(resolvedTextureCoordinate, 1.0)).xy;
+            vec2 transformedCoordinate(mat3 transform, bool flipVertically, int coordinateSet) {
+                vec2 sourceCoordinate = coordinateSet == 1
+                        ? resolvedSecondaryTextureCoordinate
+                        : resolvedTextureCoordinate;
+                vec2 transformed = (transform * vec3(sourceCoordinate, 1.0)).xy;
                 return flipVertically
                         ? vec2(transformed.x, 1.0 - transformed.y)
                         : transformed;
@@ -162,7 +189,10 @@ public final class StandardProgram implements AutoCloseable {
                 if (!useNormalMap) {
                     return surfaceNormal;
                 }
-                vec2 coordinate = transformedCoordinate(normalMapTransform, flipNormalMapVertically);
+                vec2 coordinate = transformedCoordinate(
+                        normalMapTransform,
+                        flipNormalMapVertically,
+                        normalMapCoordinateSet);
                 vec3 sampledNormal = texture(normalMap, coordinate).xyz * 2.0 - 1.0;
                 sampledNormal.xy *= normalScale;
                 return normalize(cotangentFrame(surfaceNormal, resolvedViewPosition, coordinate) * sampledNormal);
@@ -228,7 +258,10 @@ public final class StandardProgram implements AutoCloseable {
 
             void main() {
                 vec4 sampledBaseColor = useColorMap
-                        ? texture(colorMap, transformedCoordinate(colorMapTransform, flipColorMapVertically))
+                        ? texture(colorMap, transformedCoordinate(
+                                colorMapTransform,
+                                flipColorMapVertically,
+                                colorMapCoordinateSet))
                         : vec4(1.0);
                 vec4 surfaceColor = baseColor * resolvedVertexColor * sampledBaseColor;
                 if (alphaCutoff >= 0.0 && surfaceColor.a < alphaCutoff) {
@@ -242,7 +275,8 @@ public final class StandardProgram implements AutoCloseable {
                             metalnessRoughnessMap,
                             transformedCoordinate(
                                     metalnessRoughnessMapTransform,
-                                    flipMetalnessRoughnessMapVertically));
+                                    flipMetalnessRoughnessMapVertically,
+                                    metalnessRoughnessMapCoordinateSet));
                     resolvedRoughness *= sampledProperties.g;
                     resolvedMetalness *= sampledProperties.b;
                 }
@@ -334,7 +368,10 @@ public final class StandardProgram implements AutoCloseable {
                 if (useOcclusionMap) {
                     float sampledOcclusion = texture(
                             occlusionMap,
-                            transformedCoordinate(occlusionMapTransform, flipOcclusionMapVertically)).r;
+                            transformedCoordinate(
+                                    occlusionMapTransform,
+                                    flipOcclusionMapVertically,
+                                    occlusionMapCoordinateSet)).r;
                     occlusion = mix(1.0, sampledOcclusion, occlusionStrength);
                 }
                 reflected += indirectLight * diffuseColor * occlusion;
@@ -373,7 +410,10 @@ public final class StandardProgram implements AutoCloseable {
                 vec3 emissiveSample = useEmissiveMap
                         ? texture(
                                 emissiveMap,
-                                transformedCoordinate(emissiveMapTransform, flipEmissiveMapVertically)).rgb
+                                transformedCoordinate(
+                                        emissiveMapTransform,
+                                        flipEmissiveMapVertically,
+                                        emissiveMapCoordinateSet)).rgb
                         : vec3(1.0);
                 reflected += emissiveColor * emissiveSample;
                 fragmentColor = vec4(reflected, surfaceColor.a);
@@ -386,6 +426,7 @@ public final class StandardProgram implements AutoCloseable {
 
     private final int id;
     private final LitProgramState litState;
+    private final SkinningProgramState skinningState;
     private final int baseColorLocation;
     private final int metalnessLocation;
     private final int roughnessLocation;
@@ -414,6 +455,7 @@ public final class StandardProgram implements AutoCloseable {
         this.id = id;
         String label = "Built-in standard";
         litState = new LitProgramState(id, label);
+        skinningState = new SkinningProgramState(id, label);
         baseColorLocation = ProgramSupport.requiredUniform(id, label, "baseColor");
         metalnessLocation = ProgramSupport.requiredUniform(id, label, "metalness");
         roughnessLocation = ProgramSupport.requiredUniform(id, label, "roughness");
@@ -470,6 +512,16 @@ public final class StandardProgram implements AutoCloseable {
      */
     public void uploadTransforms(Matrix4fc modelMatrix, Matrix4fc viewMatrix, Matrix4fc projectionMatrix) {
         litState.uploadTransforms(modelMatrix, viewMatrix, projectionMatrix);
+    }
+
+    /**
+     * Uploads the optional skeletal deformation palette for the current object.
+     *
+     * @param object current scene object
+     * @param modelMatrix current object-to-world transform
+     */
+    public void uploadSkinning(Object3D object, Matrix4fc modelMatrix) {
+        skinningState.upload(object, modelMatrix);
     }
 
     /**
@@ -691,15 +743,17 @@ public final class StandardProgram implements AutoCloseable {
      * @param enabled texture-role enable-switch uniform location
      * @param transform texture-coordinate transform uniform location
      * @param verticalFlip vertical-orientation switch uniform location
+     * @param coordinateSet primary-or-secondary coordinate-set uniform location
      */
-    public record TextureLocations(int sampler, int enabled, int transform, int verticalFlip) {
+    public record TextureLocations(int sampler, int enabled, int transform, int verticalFlip, int coordinateSet) {
         /** Resolves one texture role's required uniforms. */
         private static TextureLocations resolve(int program, String label, String name) {
             return new TextureLocations(
                     ProgramSupport.requiredUniform(program, label, name),
                     ProgramSupport.requiredUniform(program, label, "use" + capitalize(name)),
                     ProgramSupport.requiredUniform(program, label, name + "Transform"),
-                    ProgramSupport.requiredUniform(program, label, "flip" + capitalize(name) + "Vertically"));
+                    ProgramSupport.requiredUniform(program, label, "flip" + capitalize(name) + "Vertically"),
+                    ProgramSupport.requiredUniform(program, label, name + "CoordinateSet"));
         }
 
         /** Converts the first ASCII character of a fixed shader identifier to uppercase. */

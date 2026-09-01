@@ -41,6 +41,7 @@ import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
+import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame.PointShadow;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame.ShadowRenderMetrics;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame.TwoDimensionalShadow;
@@ -342,12 +343,15 @@ public final class ShadowRenderer implements AutoCloseable {
         applySide(mesh.material());
         GeometryResource geometryResource =
                 geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
+        int skinJointCount =
+                mesh instanceof SkinnedMesh skinnedMesh ? skinnedMesh.skeleton().jointCount() : 0;
         GeometryResource.UploadResult result =
-                geometryResource.synchronize(geometry, false, false, false, "Shadow pass");
+                geometryResource.synchronize(geometry, false, false, false, skinJointCount, "Shadow pass");
         uploads += result.count();
         uploadedBytes += result.byteCount();
         glUseProgram(activeProgram.id());
         activeProgram.uploadModel(mesh.matrixWorld());
+        activeProgram.uploadSkinning(mesh, mesh.matrixWorld());
         geometryResource.bind();
         int start = geometry.drawRangeStart();
         IndexBuffer index = geometry.index();

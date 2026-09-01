@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.gltf;
 import de.javagl.jgltf.impl.v2.GlTF;
 import de.javagl.jgltf.model.AccessorModel;
 import de.javagl.jgltf.model.AnimationModel;
+import de.javagl.jgltf.model.BufferViewModel;
 import de.javagl.jgltf.model.GltfConstants;
 import de.javagl.jgltf.model.GltfModel;
 import de.javagl.jgltf.model.ImageModel;
@@ -15,6 +16,7 @@ import de.javagl.jgltf.model.MeshModel;
 import de.javagl.jgltf.model.MeshPrimitiveModel;
 import de.javagl.jgltf.model.NodeModel;
 import de.javagl.jgltf.model.SceneModel;
+import de.javagl.jgltf.model.SkinModel;
 import de.javagl.jgltf.model.TextureModel;
 import de.javagl.jgltf.model.io.GltfAsset;
 import de.javagl.jgltf.model.io.GltfAssetReader;
@@ -30,6 +32,8 @@ import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
 import io.github.glynch.jscene3d.gltf.internal.AccessorDecoder;
+import io.github.glynch.jscene3d.gltf.internal.DracoDecoder;
+import io.github.glynch.jscene3d.gltf.internal.DracoDecoder.DecodedPrimitive;
 import io.github.glynch.jscene3d.gltf.internal.ImageDecoder;
 import io.github.glynch.jscene3d.gltf.internal.ImageDecoder.DecodedImage;
 import io.github.glynch.jscene3d.materials.AlphaMode;
@@ -37,21 +41,25 @@ import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Bone;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
+import io.github.glynch.jscene3d.objects.Skeleton;
+import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureColorSpace;
 import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
+import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,7 +70,10 @@ import org.jspecify.annotations.Nullable;
 
 /** Performs one complete JglTF-to-JScene3D conversion without exposing parser types. */
 final class GltfConverter {
+    private static final String DRACO_EXTENSION = "KHR_draco_mesh_compression";
+
     private final Path source;
+    private final GlTF gltf;
     private final GltfModel model;
     private final int defaultSceneIndex;
     private final List<BufferGeometry> geometries = new ArrayList<>();
@@ -72,15 +83,44 @@ final class GltfConverter {
     private final Map<MaterialModel, StandardMaterial> materialCache = new IdentityHashMap<>();
     private final Map<TextureModel, EnumMap<TextureColorSpace, Texture>> textureCache = new IdentityHashMap<>();
     private final Map<ImageModel, DecodedImage> imageCache = new IdentityHashMap<>();
-    private final Map<NodeModel, Group> convertedNodes = new IdentityHashMap<>();
+    private final Map<NodeModel, Object3D> convertedNodes = new IdentityHashMap<>();
+    private final Map<SkinModel, Skeleton> skeletonCache = new IdentityHashMap<>();
+    private final Map<MeshPrimitiveModel, de.javagl.jgltf.impl.v2.MeshPrimitive> primitiveDefinitions =
+            new IdentityHashMap<>();
 
     private @Nullable StandardMaterial defaultMaterial;
 
     /** Retains parsed model state for one isolated conversion. */
-    private GltfConverter(Path source, GltfModel model, int defaultSceneIndex) {
+    private GltfConverter(Path source, GlTF gltf, GltfModel model, int defaultSceneIndex) {
         this.source = source;
+        this.gltf = gltf;
         this.model = model;
         this.defaultSceneIndex = defaultSceneIndex;
+        indexPrimitiveDefinitions();
+    }
+
+    /** Associates JglTF primitive models with their extension-bearing source definitions. */
+    private void indexPrimitiveDefinitions() {
+        List<de.javagl.jgltf.impl.v2.Mesh> definitions = gltf.getMeshes();
+        List<MeshModel> meshModels = model.getMeshModels();
+        if (definitions == null || definitions.size() != meshModels.size()) {
+            if (!meshModels.isEmpty()) {
+                throw failure("Parsed mesh definitions do not match JglTF mesh models", null);
+            }
+            return;
+        }
+        for (int meshIndex = 0; meshIndex < meshModels.size(); meshIndex++) {
+            List<MeshPrimitiveModel> primitiveModels = meshModels.get(meshIndex).getMeshPrimitiveModels();
+            List<de.javagl.jgltf.impl.v2.MeshPrimitive> primitiveDefinitionsForMesh =
+                    definitions.get(meshIndex).getPrimitives();
+            if (primitiveDefinitionsForMesh.size() != primitiveModels.size()) {
+                throw failure("Parsed primitive definitions do not match JglTF primitive models", null);
+            }
+            for (int primitiveIndex = 0; primitiveIndex < primitiveModels.size(); primitiveIndex++) {
+                primitiveDefinitions.put(
+                        primitiveModels.get(primitiveIndex), primitiveDefinitionsForMesh.get(primitiveIndex));
+            }
+        }
     }
 
     /** Reads and converts one source file. */
@@ -92,7 +132,7 @@ final class GltfConverter {
         GlTF gltf = assetV2.getGltf();
         validateRootCapabilities(source, gltf);
         int sceneIndex = gltf.getScene() == null ? 0 : gltf.getScene();
-        GltfConverter converter = new GltfConverter(source, GltfModelCreatorV2.create(assetV2), sceneIndex);
+        GltfConverter converter = new GltfConverter(source, gltf, GltfModelCreatorV2.create(assetV2), sceneIndex);
         return converter.convert();
     }
 
@@ -110,8 +150,14 @@ final class GltfConverter {
 
     /** Rejects unsupported root features before JglTF constructs their specialized models. */
     private static void validateRootCapabilities(Path source, GlTF gltf) {
-        rejectPresent(source, "required extensions " + gltf.getExtensionsRequired(), gltf.getExtensionsRequired());
-        rejectPresent(source, "skinning", gltf.getSkins());
+        List<String> requiredExtensions = gltf.getExtensionsRequired();
+        if (requiredExtensions != null) {
+            for (String extension : requiredExtensions) {
+                if (!DRACO_EXTENSION.equals(extension)) {
+                    throw new GltfLoadException(source, "Unsupported required extensions entry: " + extension, null);
+                }
+            }
+        }
         rejectPresent(source, "embedded cameras", gltf.getCameras());
     }
 
@@ -122,7 +168,7 @@ final class GltfConverter {
         }
     }
 
-    /** Converts the selected scene using an iterative graph walk. */
+    /** Converts nodes in stable source order before wiring hierarchy, skins, and selected roots. */
     private Scene convertScene() {
         Scene scene = new Scene();
         List<SceneModel> sceneModels = model.getSceneModels();
@@ -133,21 +179,23 @@ final class GltfConverter {
             throw failure("Default scene index is outside the scene list: " + defaultSceneIndex, null);
         }
         List<NodeModel> roots = sceneModels.get(defaultSceneIndex).getNodeModels();
-        ArrayDeque<NodeModel> pending = new ArrayDeque<>(roots);
-        while (!pending.isEmpty()) {
-            NodeModel node = pending.removeFirst();
-            if (convertedNodes.containsKey(node)) {
-                continue;
-            }
-            Group group = convertNode(node);
-            convertedNodes.put(node, group);
-            pending.addAll(node.getChildren());
+        Map<NodeModel, Boolean> jointNodes = new IdentityHashMap<>();
+        for (SkinModel skin : model.getSkinModels()) {
+            skin.getJoints().forEach(joint -> jointNodes.put(joint, Boolean.TRUE));
         }
-        for (Map.Entry<NodeModel, Group> entry : convertedNodes.entrySet()) {
+        for (NodeModel node : model.getNodeModels()) {
+            Object3D converted = jointNodes.containsKey(node) ? new Bone() : new Group();
+            applyTransform(node, converted);
+            convertedNodes.put(node, converted);
+        }
+        for (NodeModel node : model.getNodeModels()) {
+            addNodeMeshes(node, Objects.requireNonNull(convertedNodes.get(node), "converted node"));
+        }
+        for (Map.Entry<NodeModel, Object3D> entry : convertedNodes.entrySet()) {
             for (NodeModel child : entry.getKey().getChildren()) {
-                Group convertedChild = convertedNodes.get(child);
+                Object3D convertedChild = convertedNodes.get(child);
                 if (convertedChild == null) {
-                    throw failure("Scene hierarchy contains an unreachable child", null);
+                    throw failure("Scene hierarchy contains an unknown child", null);
                 }
                 entry.getValue().add(convertedChild);
             }
@@ -181,7 +229,7 @@ final class GltfConverter {
     /** Converts one channel after resolving its target in the selected scene. */
     private AnimationTrack convertAnimationChannel(AnimationModel.Channel channel) {
         NodeModel sourceTarget = channel.getNodeModel();
-        Group target = convertedNodes.get(sourceTarget);
+        Object3D target = convertedNodes.get(sourceTarget);
         if (target == null) {
             throw failure("Animation targets a node outside the selected scene", null);
         }
@@ -193,30 +241,36 @@ final class GltfConverter {
         float[] times = AccessorDecoder.floats(input, de.javagl.jgltf.model.ElementType.SCALAR, "animation input");
         Interpolation interpolation = interpolation(sampler.getInterpolation());
         return switch (channel.getPath()) {
-            case "translation" ->
-                Vector3KeyframeTrack.position(
-                        target,
-                        times,
-                        AccessorDecoder.floats(
-                                output, de.javagl.jgltf.model.ElementType.VEC3, "animation translation output"),
-                        interpolation);
-            case "rotation" ->
-                QuaternionKeyframeTrack.rotation(
-                        target,
-                        times,
-                        AccessorDecoder.floats(
-                                output, de.javagl.jgltf.model.ElementType.VEC4, "animation rotation output"),
-                        interpolation);
-            case "scale" ->
-                Vector3KeyframeTrack.scale(
-                        target,
-                        times,
-                        AccessorDecoder.floats(
-                                output, de.javagl.jgltf.model.ElementType.VEC3, "animation scale output"),
-                        interpolation);
+            case "translation" -> positionTrack(target, times, output, interpolation);
+            case "rotation" -> rotationTrack(target, times, output, interpolation);
+            case "scale" -> scaleTrack(target, times, output, interpolation);
             case "weights" -> throw unsupportedFailure("animation morph weights");
             default -> throw unsupportedFailure("animation target path " + channel.getPath());
         };
+    }
+
+    /** Creates one position track while preserving source timestamp discontinuities. */
+    private AnimationTrack positionTrack(
+            Object3D target, float[] times, AccessorModel output, Interpolation interpolation) {
+        float[] values =
+                AccessorDecoder.floats(output, de.javagl.jgltf.model.ElementType.VEC3, "animation translation output");
+        return Vector3KeyframeTrack.position(target, times, values, interpolation);
+    }
+
+    /** Creates one rotation track while preserving source timestamp discontinuities. */
+    private AnimationTrack rotationTrack(
+            Object3D target, float[] times, AccessorModel output, Interpolation interpolation) {
+        float[] values =
+                AccessorDecoder.floats(output, de.javagl.jgltf.model.ElementType.VEC4, "animation rotation output");
+        return QuaternionKeyframeTrack.rotation(target, times, values, interpolation);
+    }
+
+    /** Creates one scale track while preserving source timestamp discontinuities. */
+    private AnimationTrack scaleTrack(
+            Object3D target, float[] times, AccessorModel output, Interpolation interpolation) {
+        float[] values =
+                AccessorDecoder.floats(output, de.javagl.jgltf.model.ElementType.VEC3, "animation scale output");
+        return Vector3KeyframeTrack.scale(target, times, values, interpolation);
     }
 
     /** Maps JglTF's interpolation vocabulary into the public animation vocabulary. */
@@ -243,26 +297,47 @@ final class GltfConverter {
         return failure("Unsupported glTF capability: " + capability, null);
     }
 
-    /** Converts one node's local transform and attached mesh primitives. */
-    private Group convertNode(NodeModel node) {
-        if (node.getSkinModel() != null) {
-            unsupported("skinned node");
-        }
+    /** Converts and attaches one node's mesh primitives after its skeleton hierarchy exists. */
+    private void addNodeMeshes(NodeModel node, Object3D target) {
         if (node.getCameraModel() != null) {
             unsupported("camera node");
         }
-        Group group = new Group();
-        applyTransform(node, group);
+        SkinModel skinModel = node.getSkinModel();
+        Skeleton skeleton = skinModel == null ? null : skeletonFor(skinModel);
         for (MeshModel meshModel : node.getMeshModels()) {
             float[] weights = meshModel.getWeights();
             if (weights != null && weights.length > 0) {
                 unsupported("mesh morph weights");
             }
             for (MeshPrimitiveModel primitive : meshModel.getMeshPrimitiveModels()) {
-                group.add(convertPrimitive(primitive));
+                target.add(convertPrimitive(primitive, skeleton));
             }
         }
-        return group;
+    }
+
+    /** Returns or creates one skeleton using the source skin's stable joint ordering. */
+    private Skeleton skeletonFor(SkinModel skinModel) {
+        Skeleton existing = skeletonCache.get(skinModel);
+        if (existing != null) {
+            return existing;
+        }
+        List<Bone> bones = new ArrayList<>(skinModel.getJoints().size());
+        List<Matrix4f> inverseBindMatrices =
+                new ArrayList<>(skinModel.getJoints().size());
+        for (int index = 0; index < skinModel.getJoints().size(); index++) {
+            Object3D joint = convertedNodes.get(skinModel.getJoints().get(index));
+            if (!(joint instanceof Bone bone)) {
+                throw failure("Skin joint was not converted as a Bone", null);
+            }
+            bones.add(bone);
+            float[] values = skinModel.getInverseBindMatrices() == null
+                    ? new Matrix4f().get(new float[16])
+                    : skinModel.getInverseBindMatrix(index, new float[16]);
+            inverseBindMatrices.add(new Matrix4f().set(values));
+        }
+        Skeleton skeleton = new Skeleton(bones, inverseBindMatrices);
+        skeletonCache.put(skinModel, skeleton);
+        return skeleton;
     }
 
     /** Applies either a decomposed matrix or explicit glTF TRS values. */
@@ -307,7 +382,7 @@ final class GltfConverter {
     }
 
     /** Converts one triangle primitive into a mesh sharing cached resources. */
-    private Mesh convertPrimitive(MeshPrimitiveModel primitive) {
+    private Mesh convertPrimitive(MeshPrimitiveModel primitive, @Nullable Skeleton skeleton) {
         if (primitive.getMode() != GltfConstants.GL_TRIANGLES) {
             unsupported("non-triangle primitive mode " + primitive.getMode());
         }
@@ -319,33 +394,190 @@ final class GltfConverter {
         if (primitive.getAttributes().containsKey("COLOR_0")) {
             material.setUsesVertexColors(true);
         }
-        return new Mesh(geometry, material);
+        return skeleton == null ? new Mesh(geometry, material) : new SkinnedMesh(geometry, material, skeleton);
     }
 
     /** Creates geometry from renderer-supported glTF attributes. */
     private BufferGeometry createGeometry(MeshPrimitiveModel primitive) {
         Map<String, AccessorModel> attributes = primitive.getAttributes();
-        if (attributes.containsKey("JOINTS_0") || attributes.containsKey("WEIGHTS_0")) {
-            unsupported("skinning attributes");
+        boolean hasJoints = attributes.containsKey("JOINTS_0");
+        boolean hasWeights = attributes.containsKey("WEIGHTS_0");
+        if (hasJoints != hasWeights) {
+            throw failure("Primitive must provide JOINTS_0 and WEIGHTS_0 together", null);
         }
         AccessorModel position = attributes.get("POSITION");
         if (position == null) {
             throw failure("Triangle primitive is missing POSITION", null);
         }
+        @Nullable DecodedPrimitive compressed = decodeCompressedPrimitive(primitive, attributes);
         BufferGeometry geometry = new BufferGeometry();
         geometries.add(geometry);
+        if (compressed == null) {
+            setUncompressedAttributes(geometry, primitive, attributes, position);
+        } else {
+            setCompressedAttributes(geometry, attributes, compressed);
+        }
+        return geometry;
+    }
+
+    /** Decodes a compressed primitive when its source definition selects the Draco extension. */
+    private @Nullable DecodedPrimitive decodeCompressedPrimitive(
+            MeshPrimitiveModel primitive, Map<String, AccessorModel> accessors) {
+        de.javagl.jgltf.impl.v2.MeshPrimitive definition = primitiveDefinitions.get(primitive);
+        if (definition == null || definition.getExtensions() == null) {
+            return null;
+        }
+        Object extension = definition.getExtensions().get(DRACO_EXTENSION);
+        if (extension == null) {
+            return null;
+        }
+        if (!(extension instanceof Map<?, ?> descriptor)) {
+            throw failure("Draco extension descriptor must be an object", null);
+        }
+        int bufferViewIndex = integerProperty(descriptor, "bufferView", "Draco extension");
+        if (bufferViewIndex < 0
+                || bufferViewIndex >= model.getBufferViewModels().size()) {
+            throw failure("Draco bufferView index is outside the buffer-view list: " + bufferViewIndex, null);
+        }
+        Object rawAttributes = descriptor.get("attributes");
+        if (!(rawAttributes instanceof Map<?, ?> attributeDescriptor)) {
+            throw failure("Draco extension attributes must be an object", null);
+        }
+        Map<String, Integer> attributeIds = new LinkedHashMap<>();
+        Map<String, Integer> componentCounts = new LinkedHashMap<>();
+        Map<String, float[]> attributeMinimums = new LinkedHashMap<>();
+        for (String semantic :
+                List.of("POSITION", "NORMAL", "TEXCOORD_0", "TEXCOORD_1", "COLOR_0", "JOINTS_0", "WEIGHTS_0")) {
+            AccessorModel accessor = accessors.get(semantic);
+            if (accessor == null) {
+                continue;
+            }
+            Object rawId = attributeDescriptor.get(semantic);
+            if (!(rawId instanceof Number number)) {
+                throw failure("Draco extension does not map required semantic " + semantic, null);
+            }
+            attributeIds.put(semantic, number.intValue());
+            componentCounts.put(semantic, accessor.getElementType().getNumComponents());
+            float[] minimum = sourceAttributeMinimum(definition, semantic);
+            if (minimum != null) {
+                attributeMinimums.put(semantic, minimum);
+            }
+        }
+        BufferViewModel bufferView = model.getBufferViewModels().get(bufferViewIndex);
+        try {
+            return DracoDecoder.decode(
+                    bufferView.getBufferViewData(), attributeIds, componentCounts, attributeMinimums);
+        } catch (IllegalArgumentException exception) {
+            throw failure("Failed to decode Draco primitive", exception);
+        }
+    }
+
+    /** Returns bounds retained by the source accessor rather than JglTF's compressed placeholder. */
+    private float @Nullable [] sourceAttributeMinimum(
+            de.javagl.jgltf.impl.v2.MeshPrimitive primitive, String semantic) {
+        Integer accessorIndex = primitive.getAttributes().get(semantic);
+        if (accessorIndex == null
+                || accessorIndex < 0
+                || accessorIndex >= gltf.getAccessors().size()) {
+            throw failure("Draco primitive has an invalid source accessor for " + semantic, null);
+        }
+        Number[] minimum = gltf.getAccessors().get(accessorIndex).getMin();
+        return minimum == null ? null : floats(minimum);
+    }
+
+    /** Converts accessor bounds into primitive storage used by Draco correction. */
+    private static float[] floats(Number[] values) {
+        float[] converted = new float[values.length];
+        for (int index = 0; index < values.length; index++) {
+            converted[index] = values[index].floatValue();
+        }
+        return converted;
+    }
+
+    /** Reads one required integral numeric extension property. */
+    private int integerProperty(Map<?, ?> values, String name, String label) {
+        Object value = values.get(name);
+        if (!(value instanceof Number number)) {
+            throw failure(label + " requires numeric " + name, null);
+        }
+        int integer = number.intValue();
+        if (number.doubleValue() != integer) {
+            throw failure(label + ' ' + name + " must be an integer: " + number, null);
+        }
+        return integer;
+    }
+
+    /** Populates one ordinary uncompressed primitive. */
+    private static void setUncompressedAttributes(
+            BufferGeometry geometry,
+            MeshPrimitiveModel primitive,
+            Map<String, AccessorModel> attributes,
+            AccessorModel position) {
         geometry.setAttribute(
                 BufferGeometry.POSITION,
                 BufferAttribute.of(
                         AccessorDecoder.floats(position, de.javagl.jgltf.model.ElementType.VEC3, "POSITION"), 3));
         setOptionalAttribute(geometry, attributes, "NORMAL", BufferGeometry.NORMAL, 3);
         setOptionalAttribute(geometry, attributes, "TEXCOORD_0", BufferGeometry.UV, 2);
+        setOptionalAttribute(geometry, attributes, "TEXCOORD_1", BufferGeometry.UV1, 2);
+        setOptionalAttribute(geometry, attributes, "JOINTS_0", BufferGeometry.JOINTS, 4);
+        setOptionalAttribute(geometry, attributes, "WEIGHTS_0", BufferGeometry.WEIGHTS, 4);
         setOptionalColor(geometry, attributes.get("COLOR_0"));
         AccessorModel indices = primitive.getIndices();
         if (indices != null) {
             geometry.setIndex(IndexBuffer.of(AccessorDecoder.indices(indices)));
         }
-        return geometry;
+    }
+
+    /** Populates one primitive from already decoded Draco point data. */
+    private void setCompressedAttributes(
+            BufferGeometry geometry, Map<String, AccessorModel> accessors, DecodedPrimitive compressed) {
+        Map<String, float[]> values = compressed.attributes();
+        setCompressedAttribute(
+                geometry, accessors, values, "POSITION", BufferGeometry.POSITION, 3, compressed.vertexCount());
+        setCompressedAttribute(
+                geometry, accessors, values, "NORMAL", BufferGeometry.NORMAL, 3, compressed.vertexCount());
+        setCompressedAttribute(
+                geometry, accessors, values, "TEXCOORD_0", BufferGeometry.UV, 2, compressed.vertexCount());
+        setCompressedAttribute(
+                geometry, accessors, values, "TEXCOORD_1", BufferGeometry.UV1, 2, compressed.vertexCount());
+        setCompressedAttribute(
+                geometry, accessors, values, "JOINTS_0", BufferGeometry.JOINTS, 4, compressed.vertexCount());
+        setCompressedAttribute(
+                geometry, accessors, values, "WEIGHTS_0", BufferGeometry.WEIGHTS, 4, compressed.vertexCount());
+        AccessorModel color = accessors.get("COLOR_0");
+        if (color != null) {
+            int components = color.getElementType().getNumComponents();
+            setCompressedAttribute(
+                    geometry, accessors, values, "COLOR_0", BufferGeometry.COLOR, components, compressed.vertexCount());
+        }
+        geometry.setIndex(IndexBuffer.of(compressed.indices()));
+    }
+
+    /** Adds one decoded Draco semantic after checking its accessor metadata. */
+    private void setCompressedAttribute(
+            BufferGeometry geometry,
+            Map<String, AccessorModel> accessors,
+            Map<String, float[]> values,
+            String sourceName,
+            String targetName,
+            int components,
+            int vertexCount) {
+        AccessorModel accessor = accessors.get(sourceName);
+        if (accessor == null) {
+            return;
+        }
+        if (accessor.getCount() != vertexCount) {
+            throw failure(
+                    sourceName + " accessor count differs from decoded Draco point count: " + accessor.getCount()
+                            + " != " + vertexCount,
+                    null);
+        }
+        float[] decoded = values.get(sourceName);
+        if (decoded == null) {
+            throw failure("Draco extension does not map required semantic " + sourceName, null);
+        }
+        geometry.setAttribute(targetName, BufferAttribute.of(decoded, components));
     }
 
     /** Adds one optional fixed-width vertex attribute. */
@@ -358,7 +590,13 @@ final class GltfConverter {
         AccessorModel accessor = attributes.get(sourceName);
         if (accessor != null) {
             de.javagl.jgltf.model.ElementType type =
-                    components == 2 ? de.javagl.jgltf.model.ElementType.VEC2 : de.javagl.jgltf.model.ElementType.VEC3;
+                    switch (components) {
+                        case 2 -> de.javagl.jgltf.model.ElementType.VEC2;
+                        case 3 -> de.javagl.jgltf.model.ElementType.VEC3;
+                        case 4 -> de.javagl.jgltf.model.ElementType.VEC4;
+                        default ->
+                            throw new IllegalArgumentException("unsupported attribute component count: " + components);
+                    };
             geometry.setAttribute(
                     targetName, BufferAttribute.of(AccessorDecoder.floats(accessor, type, sourceName), components));
         }
@@ -454,16 +692,33 @@ final class GltfConverter {
         if (textureModel == null) {
             return;
         }
-        if (texcoord != null && texcoord != 0) {
+        if (texcoord != null && texcoord != 0 && texcoord != 1) {
             unsupported("texture coordinate set " + texcoord);
         }
+        TextureCoordinateSet coordinateSet =
+                texcoord != null && texcoord == 1 ? TextureCoordinateSet.SECONDARY : TextureCoordinateSet.PRIMARY;
         Texture texture = textureFor(textureModel, role.colorSpace());
         switch (role) {
-            case COLOR -> material.setColorMap(texture);
-            case METALLIC_ROUGHNESS -> material.setMetalnessRoughnessMap(texture);
-            case NORMAL -> material.setNormalMap(texture);
-            case OCCLUSION -> material.setOcclusionMap(texture);
-            case EMISSIVE -> material.setEmissiveMap(texture);
+            case COLOR -> {
+                material.setColorMap(texture);
+                material.setColorMapCoordinateSet(coordinateSet);
+            }
+            case METALLIC_ROUGHNESS -> {
+                material.setMetalnessRoughnessMap(texture);
+                material.setMetalnessRoughnessMapCoordinateSet(coordinateSet);
+            }
+            case NORMAL -> {
+                material.setNormalMap(texture);
+                material.setNormalMapCoordinateSet(coordinateSet);
+            }
+            case OCCLUSION -> {
+                material.setOcclusionMap(texture);
+                material.setOcclusionMapCoordinateSet(coordinateSet);
+            }
+            case EMISSIVE -> {
+                material.setEmissiveMap(texture);
+                material.setEmissiveMapCoordinateSet(coordinateSet);
+            }
         }
     }
 

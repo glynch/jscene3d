@@ -25,7 +25,8 @@ public final class QuaternionKeyframeTrack extends AnimationTrack {
      * sampled result is normalized before it is applied.
      *
      * @param target object whose local orientation is controlled
-     * @param times strictly increasing non-negative key times in seconds
+     * @param times non-decreasing, non-negative key times in seconds; adjacent duplicates encode
+     *     an instantaneous change
      * @param values flat quaternion keyframe data in XYZW order
      * @param interpolation interpolation between keys
      * @return immutable rotation track

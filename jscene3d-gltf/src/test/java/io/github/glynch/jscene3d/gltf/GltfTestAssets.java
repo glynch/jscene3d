@@ -4,6 +4,12 @@
  */
 package io.github.glynch.jscene3d.gltf;
 
+import dev.fileformat.drako.AttributeType;
+import dev.fileformat.drako.Draco;
+import dev.fileformat.drako.DracoMesh;
+import dev.fileformat.drako.DrakoException;
+import dev.fileformat.drako.PointAttribute;
+import dev.fileformat.drako.Vector3;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -50,7 +56,7 @@ final class GltfTestAssets {
                     {"mesh": 0, "translation": [0, 1, 0]}
                   ],
                   "meshes": [{"primitives": [{
-                    "attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2, "COLOR_0": 3},
+                    "attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2, "TEXCOORD_1": 2, "COLOR_0": 3},
                     "indices": 4,
                     "material": 0
                   }]}],
@@ -63,7 +69,7 @@ final class GltfTestAssets {
                       "metallicRoughnessTexture": {"index": 0}
                     },
                     "normalTexture": {"index": 0, "scale": 0.4},
-                    "occlusionTexture": {"index": 0, "strength": 0.7},
+                    "occlusionTexture": {"index": 0, "texCoord": 1, "strength": 0.7},
                     "emissiveTexture": {"index": 0},
                     "emissiveFactor": [0.1, 0.2, 0.3],
                     "alphaMode": "BLEND",
@@ -191,6 +197,63 @@ final class GltfTestAssets {
                 """;
         json = String.format(Locale.ROOT, json, node, primitive, encoded, additionalRootProperties);
         return writeJson(directory, fileName, json);
+    }
+
+    /** Writes a one-bone skinned triangle with explicit inverse bind data. */
+    static Path writeSkinnedTriangle(Path directory) throws IOException {
+        ByteBuffer binary = ByteBuffer.allocate(196).order(ByteOrder.LITTLE_ENDIAN);
+        putFloats(binary, -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        putFloats(binary, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f);
+        binary.put(new byte[12]);
+        putFloats(binary, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+        putFloats(
+                binary, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+        String encoded = Base64.getEncoder().encodeToString(binary.array());
+        String json = """
+                {"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],
+                "nodes":[{"mesh":0,"skin":0,"children":[1]},{"name":"Joint"}],
+                "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"JOINTS_0":2,"WEIGHTS_0":3}}]}],
+                "skins":[{"inverseBindMatrices":4,"joints":[1],"skeleton":1}],
+                "buffers":[{"uri":"data:application/octet-stream;base64,%s","byteLength":196}],
+                "bufferViews":[
+                  {"buffer":0,"byteOffset":0,"byteLength":36},
+                  {"buffer":0,"byteOffset":36,"byteLength":36},
+                  {"buffer":0,"byteOffset":72,"byteLength":12},
+                  {"buffer":0,"byteOffset":84,"byteLength":48},
+                  {"buffer":0,"byteOffset":132,"byteLength":64}],
+                "accessors":[
+                  {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+                  {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+                  {"bufferView":2,"componentType":5121,"count":3,"type":"VEC4"},
+                  {"bufferView":3,"componentType":5126,"count":3,"type":"VEC4"},
+                  {"bufferView":4,"componentType":5126,"count":1,"type":"MAT4"}]}
+                """.replace("%s", encoded);
+        return writeJson(directory, "skinned.gltf", json);
+    }
+
+    /** Writes a triangle whose positions and indices use {@code KHR_draco_mesh_compression}. */
+    static Path writeDracoTriangle(Path directory) throws IOException, DrakoException {
+        DracoMesh mesh = new DracoMesh();
+        mesh.setNumPoints(3);
+        mesh.addAttribute(PointAttribute.wrap(AttributeType.POSITION, new Vector3[] {
+            new Vector3(-1.0f, -1.0f, 0.0f), new Vector3(1.0f, -1.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f)
+        }));
+        mesh.addFace(new int[] {0, 1, 2});
+        byte[] encoded = Draco.encode(mesh);
+        String payload = Base64.getEncoder().encodeToString(encoded);
+        String json = """
+                {"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],
+                "extensionsUsed":["KHR_draco_mesh_compression"],
+                "extensionsRequired":["KHR_draco_mesh_compression"],
+                "nodes":[{"mesh":0}],"meshes":[{"primitives":[{
+                  "attributes":{"POSITION":0},
+                  "extensions":{"KHR_draco_mesh_compression":{"bufferView":0,"attributes":{"POSITION":0}}}
+                }]}],
+                "buffers":[{"uri":"data:application/octet-stream;base64,%s","byteLength":%d}],
+                "bufferViews":[{"buffer":0,"byteLength":%d}],
+                "accessors":[{"componentType":5126,"count":3,"type":"VEC3"}]}
+                """.replace("%s", payload).replace("%d", Integer.toString(encoded.length));
+        return writeJson(directory, "draco.gltf", json);
     }
 
     /** Writes a triangle with a base-colour texture and default glTF sampler state. */

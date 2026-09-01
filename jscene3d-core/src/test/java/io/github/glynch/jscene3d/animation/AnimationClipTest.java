@@ -77,6 +77,30 @@ final class AnimationClipTest {
         assertThat(cubic.position().z()).isEqualTo(3.0f);
     }
 
+    /** Preserves both sides of an instantaneous change encoded by duplicate timestamps. */
+    @Test
+    void preservesDiscontinuitiesAtDuplicateTimestamps() {
+        Object3D target = new Object3D();
+        Vector3KeyframeTrack track = Vector3KeyframeTrack.position(
+                target,
+                new float[] {0.0f, 1.0f, 1.0f, 2.0f},
+                new float[] {
+                    0.0f, 0.0f, 0.0f,
+                    10.0f, 0.0f, 0.0f,
+                    20.0f, 0.0f, 0.0f,
+                    30.0f, 0.0f, 0.0f
+                },
+                Interpolation.LINEAR);
+        AnimationAction action = new AnimationMixer().action(new AnimationClip("jump", List.of(track)));
+
+        action.setTime(0.5f);
+        assertThat(target.position().x()).isEqualTo(5.0f);
+        action.setTime(1.0f);
+        assertThat(target.position().x()).isEqualTo(20.0f);
+        action.setTime(1.5f);
+        assertThat(target.position().x()).isEqualTo(25.0f);
+    }
+
     /** Copies caller arrays before later evaluation. */
     @Test
     void copiesKeyframeArrays() {
@@ -104,8 +128,8 @@ final class AnimationClipTest {
 
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> Vector3KeyframeTrack.position(
-                        target, new float[] {0.0f, 0.0f}, validValues, Interpolation.LINEAR))
-                .withMessageContaining("strictly increasing");
+                        target, new float[] {1.0f, 0.0f}, validValues, Interpolation.LINEAR))
+                .withMessageContaining("must not decrease");
         assertThatIllegalArgumentException()
                 .isThrownBy(() ->
                         Vector3KeyframeTrack.position(target, validTimes, new float[] {1.0f}, Interpolation.LINEAR))

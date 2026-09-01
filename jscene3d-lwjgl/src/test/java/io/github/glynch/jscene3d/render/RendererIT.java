@@ -44,10 +44,13 @@ import io.github.glynch.jscene3d.materials.ShaderAttribute;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Bone;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.objects.Skeleton;
+import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.platform.VerticalSync;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.platform.WindowOptions;
@@ -55,9 +58,11 @@ import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.EnvironmentMap;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
+import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Objects;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -1257,6 +1262,57 @@ final class RendererIT {
     }
 
     @Test
+    void rendersSecondaryTextureCoordinates() {
+        byte opaque = (byte) 255;
+        try (Window window = Window.create("Secondary texture coordinates integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createLitTexturedTriangle();
+                StandardMaterial material = new StandardMaterial();
+                Texture colorMap = Texture.baseColor(2, 1, new byte[] {opaque, 0, 0, opaque, 0, opaque, 0, opaque})) {
+            geometry.setAttribute(
+                    BufferGeometry.UV1, BufferAttribute.of(new float[] {0.75f, 0.5f, 0.75f, 0.5f, 0.75f, 0.5f}, 2));
+            colorMap.setMagnificationFilter(TextureFilter.NEAREST);
+            colorMap.setHorizontalWrap(TextureWrap.CLAMP_TO_EDGE);
+            material.setColorMap(colorMap);
+            material.setColorMapCoordinateSet(TextureCoordinateSet.SECONDARY);
+            Scene scene = new Scene();
+            scene.add(new Mesh(geometry, material));
+            scene.add(new AmbientLight(Color.WHITE));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsGreen(window);
+        }
+    }
+
+    @Test
+    void rendersGpuSkinnedStandardMaterial() {
+        try (Window window = Window.create("Skinning integration test");
+                Renderer renderer = Renderer.create(window);
+                BufferGeometry geometry = createSkinnedTriangle();
+                StandardMaterial material = new StandardMaterial(Color.RED)) {
+            Bone bone = new Bone();
+            Skeleton skeleton = Skeleton.fromCurrentPose(List.of(bone));
+            SkinnedMesh mesh = new SkinnedMesh(geometry, material, skeleton);
+            mesh.add(bone);
+            bone.setPosition(1.0f, 0.0f, 0.0f);
+            Scene scene = new Scene();
+            scene.add(mesh);
+            scene.add(new AmbientLight(Color.WHITE));
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+
+            assertCenterPixelIsRed(window);
+        }
+    }
+
+    @Test
     void rendersHdrEnvironmentLightingBackgroundAndToneMapping() {
         RendererOptions options = RendererOptions.builder()
                 .toneMapping(ToneMapping.ACES_FILMIC)
@@ -1567,6 +1623,22 @@ final class RendererIT {
                 .positions(-0.8f, -0.8f, 0.0f, 0.8f, -0.8f, 0.0f, 0.0f, 0.8f, 0.0f)
                 .normals(0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f)
                 .build();
+    }
+
+    private static BufferGeometry createSkinnedTriangle() {
+        BufferGeometry geometry = new BufferGeometry();
+        geometry.setAttribute(
+                BufferGeometry.POSITION,
+                BufferAttribute.of(new float[] {-1.4f, -0.4f, 0.0f, -0.6f, -0.4f, 0.0f, -1.0f, 0.4f, 0.0f}, 3));
+        geometry.setAttribute(
+                BufferGeometry.NORMAL,
+                BufferAttribute.of(new float[] {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, 3));
+        geometry.setAttribute(BufferGeometry.JOINTS, BufferAttribute.of(new float[12], 4));
+        geometry.setAttribute(
+                BufferGeometry.WEIGHTS,
+                BufferAttribute.of(
+                        new float[] {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f}, 4));
+        return geometry;
     }
 
     private static BufferGeometry createLitTexturedGreenTriangle() {

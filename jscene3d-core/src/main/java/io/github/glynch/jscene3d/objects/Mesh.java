@@ -8,8 +8,13 @@ import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.Material;
 
-/** A triangular scene object that binds one buffer geometry to one material. */
-public final class Mesh extends Object3D {
+/**
+ * A triangular scene object that binds one buffer geometry to one material.
+ *
+ * <p>The class is extensible only for scene-object specializations that preserve this resource
+ * binding contract, such as {@link SkinnedMesh}.
+ */
+public class Mesh extends Object3D {
     private BufferGeometry geometry;
     private Material material;
     private boolean shadowCastingEnabled;

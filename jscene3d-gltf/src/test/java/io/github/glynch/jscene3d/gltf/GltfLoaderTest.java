@@ -21,10 +21,12 @@ import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
+import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureColorSpace;
 import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
+import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.io.IOException;
@@ -207,19 +209,19 @@ final class GltfLoaderTest {
                 .hasMessageContaining("missing POSITION");
     }
 
-    /** Rejects secondary texture coordinates until materials can select UV attributes. */
+    /** Rejects texture-coordinate sets beyond the two supported glTF core sets. */
     @Test
-    void rejectsSecondaryTextureCoordinates() throws IOException {
+    void rejectsUnsupportedTextureCoordinateSet() throws IOException {
         GltfTestAssets.writePixel(temporaryDirectory.resolve("secondary.png"));
         Path source = GltfTestAssets.writeSimpleTriangle(
                 temporaryDirectory,
                 "secondary-uv.gltf",
                 "{\"mesh\":0}",
                 "{\"attributes\":{\"POSITION\":0},\"material\":0}",
-                ",\"materials\":[{\"pbrMetallicRoughness\":{\"baseColorTexture\":{\"index\":0,\"texCoord\":1}}}],"
+                ",\"materials\":[{\"pbrMetallicRoughness\":{\"baseColorTexture\":{\"index\":0,\"texCoord\":2}}}],"
                         + "\"textures\":[{\"source\":0}],\"images\":[{\"uri\":\"secondary.png\"}]");
 
-        assertUnsupported(source, "texture coordinate set 1");
+        assertUnsupported(source, "texture coordinate set 2");
     }
 
     /** Rejects malformed image data with a loader-owned diagnostic. */
@@ -239,17 +241,36 @@ final class GltfLoaderTest {
                 .hasMessageContaining("decode glTF image");
     }
 
-    /** Rejects renderer-unsupported skinning before creating scene resources. */
+    /** Converts skin joints, inverse bind matrices, and four-influence vertex attributes. */
     @Test
-    void rejectsSkins() throws IOException {
-        Path source = GltfTestAssets.writeSimpleTriangle(
-                temporaryDirectory,
-                "skin.gltf",
-                "{\"mesh\":0,\"skin\":0}",
-                "{\"attributes\":{\"POSITION\":0}}",
-                ",\"skins\":[{\"joints\":[0]}]");
+    void loadsSkins() throws IOException {
+        Path source = GltfTestAssets.writeSkinnedTriangle(temporaryDirectory);
 
-        assertUnsupported(source, "skinning");
+        try (LoadedGltf loaded = GltfLoader.load(source)) {
+            SkinnedMesh mesh = (SkinnedMesh)
+                    loaded.scene().children().getFirst().children().getFirst();
+
+            assertThat(mesh.skeleton().jointCount()).isOne();
+            assertThat(mesh.geometry().attribute(BufferGeometry.JOINTS)).isNotNull();
+            assertThat(mesh.geometry().attribute(BufferGeometry.WEIGHTS)).isNotNull();
+        }
+    }
+
+    /** Decodes a Draco-compressed primitive through the public glTF loader. */
+    @Test
+    void loadsDracoCompressedPrimitive() throws Exception {
+        Path source = GltfTestAssets.writeDracoTriangle(temporaryDirectory);
+
+        try (LoadedGltf loaded = GltfLoader.load(source)) {
+            Mesh mesh = (Mesh) loaded.scene().children().getFirst().children().getFirst();
+            BufferAttribute positions =
+                    Objects.requireNonNull(mesh.geometry().attribute(BufferGeometry.POSITION), "positions");
+
+            assertThat(mesh.geometry().vertexCount()).isEqualTo(3);
+            assertThat(Objects.requireNonNull(mesh.geometry().index(), "index").toArray())
+                    .containsExactly(0, 1, 2);
+            assertThat(positions.toArray()).hasSize(9);
+        }
     }
 
     /** Rejects embedded cameras while camera import is outside the initial profile. */
@@ -278,6 +299,7 @@ final class GltfLoaderTest {
     /** Verifies decoded float, normalized integer, colour, and index accessors. */
     private static void assertGeometry(BufferGeometry geometry) {
         BufferAttribute uv = Objects.requireNonNull(geometry.attribute(BufferGeometry.UV), "uv");
+        BufferAttribute uv1 = Objects.requireNonNull(geometry.attribute(BufferGeometry.UV1), "uv1");
         BufferAttribute color = Objects.requireNonNull(geometry.attribute(BufferGeometry.COLOR), "color");
         assertThat(geometry.vertexCount()).isEqualTo(3);
         assertThat(Objects.requireNonNull(geometry.index(), "index").count()).isEqualTo(3);
@@ -285,6 +307,7 @@ final class GltfLoaderTest {
         assertThat(uv).isNotNull();
         assertThat(uv.value(1, 0)).isEqualTo(1.0f);
         assertThat(uv.value(2, 0)).isCloseTo(0.5000076f, within(0.000001f));
+        assertThat(uv1.toArray()).containsExactly(uv.toArray());
         assertThat(color).isNotNull();
         assertThat(color.itemSize()).isEqualTo(4);
         assertThat(color.value(1, 3)).isCloseTo(128.0f / 255.0f, within(0.000001f));
@@ -305,6 +328,7 @@ final class GltfLoaderTest {
         assertThat(material.emissiveMap()).containsSame(color);
         assertThat(material.metalnessRoughnessMap()).containsSame(data);
         assertThat(material.occlusionMap()).containsSame(data);
+        assertThat(material.occlusionMapCoordinateSet()).isEqualTo(TextureCoordinateSet.SECONDARY);
         assertSampler(color);
     }
 

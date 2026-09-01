@@ -35,8 +35,17 @@ public final class BufferGeometry implements AutoCloseable {
     /** Standard texture-coordinate attribute name. */
     public static final String UV = "uv";
 
+    /** Conventional secondary two-component texture-coordinate attribute name. */
+    public static final String UV1 = "uv1";
+
     /** Standard vertex-color attribute name. */
     public static final String COLOR = "color";
+
+    /** Standard four-component skeletal-joint index attribute name. */
+    public static final String JOINTS = "joints";
+
+    /** Standard four-component skeletal-joint weight attribute name. */
+    public static final String WEIGHTS = "weights";
 
     private final Map<String, BufferAttribute> attributes;
     private final Map<String, BufferAttribute> attributesView;
@@ -129,6 +138,10 @@ public final class BufferGeometry implements AutoCloseable {
         BufferAttribute validAttribute = Objects.requireNonNull(attribute, "attribute");
         if (POSITION.equals(validName) && validAttribute.itemSize() != 3) {
             throw new IllegalArgumentException("position attribute itemSize must be 3: " + validAttribute.itemSize());
+        }
+        if ((JOINTS.equals(validName) || WEIGHTS.equals(validName)) && validAttribute.itemSize() != 4) {
+            throw new IllegalArgumentException(
+                    validName + " attribute itemSize must be 4: " + validAttribute.itemSize());
         }
 
         BufferAttribute existingAttribute = attributes.get(validName);
@@ -685,6 +698,8 @@ public final class BufferGeometry implements AutoCloseable {
             if (positions != null && positions.itemSize() != 3) {
                 throw new IllegalArgumentException("position attribute itemSize must be 3: " + positions.itemSize());
             }
+            validateFourComponentAttribute(JOINTS);
+            validateFourComponentAttribute(WEIGHTS);
 
             int vertexCount = -1;
             for (BufferAttribute attribute : attributes.values()) {
@@ -707,6 +722,14 @@ public final class BufferGeometry implements AutoCloseable {
             if (explicitDrawRange) {
                 int availableCount = configuredIndex == null ? Math.max(vertexCount, 0) : configuredIndex.count();
                 requireRangeWithin(drawRangeStart, drawRangeCount, availableCount);
+            }
+        }
+
+        /** Rejects a configured skeletal attribute that does not contain four components. */
+        private void validateFourComponentAttribute(String name) {
+            BufferAttribute attribute = attributes.get(name);
+            if (attribute != null && attribute.itemSize() != 4) {
+                throw new IllegalArgumentException(name + " attribute itemSize must be 4: " + attribute.itemSize());
             }
         }
 

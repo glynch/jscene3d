@@ -50,12 +50,29 @@ final class MeshIntersector {
         if (drawCount < 3) {
             return;
         }
+        BufferAttribute positions = requirePositions(geometry);
+        Matrix4fc worldMatrix = mesh.matrixWorld();
+        transformRayToLocal(worldMatrix, ray);
+        if (!intersectsBounds(geometry)) {
+            return;
+        }
+        MaterialSide side = effectiveSide(material.side(), worldMatrix.determinant3x3());
+        BufferAttribute uvs = geometry.attribute(BufferGeometry.UV);
+        configureTriangleIntersection(mesh, ray, positions, uvs, side, hits);
+        intersectTriangles(geometry, drawCount);
+    }
+
+    /** Returns the required non-empty position attribute. */
+    private static BufferAttribute requirePositions(BufferGeometry geometry) {
         BufferAttribute positions = geometry.attribute(BufferGeometry.POSITION);
         if (positions == null || positions.count() == 0) {
             throw new IllegalStateException("Raycast mesh geometry must contain positions");
         }
+        return positions;
+    }
 
-        Matrix4fc worldMatrix = mesh.matrixWorld();
+    /** Transforms the ray into mesh-local space after validating the world transform. */
+    private void transformRayToLocal(Matrix4fc worldMatrix, RayState ray) {
         float determinant = worldMatrix.determinant();
         if (!worldMatrix.isFinite() || !Float.isFinite(determinant) || determinant == 0.0f) {
             throw new IllegalStateException("Mesh world transform must be finite and invertible for raycasting");
@@ -66,25 +83,26 @@ final class MeshIntersector {
         }
         inverseWorldMatrix.transformPosition(ray.origin, localOrigin);
         inverseWorldMatrix.transformDirection(ray.direction, localDirection);
+    }
 
+    /** Returns whether the local ray reaches the geometry's available bounds. */
+    private boolean intersectsBounds(BufferGeometry geometry) {
         BoundingSphere sphere = geometry.boundingSphere();
         if (sphere == null) {
             sphere = geometry.computeBoundingSphere();
         }
         if (!intersectsSphere(sphere)) {
-            return;
+            return false;
         }
         BoundingBox box = geometry.boundingBox();
-        if (box != null && !intersectsBox(box)) {
-            return;
-        }
+        return box == null || intersectsBox(box);
+    }
 
-        MaterialSide side = effectiveSide(material.side(), worldMatrix.determinant3x3());
-        BufferAttribute uvs = geometry.attribute(BufferGeometry.UV);
+    /** Intersects every selected triangle after broad-phase bounds acceptance. */
+    private void intersectTriangles(BufferGeometry geometry, int drawCount) {
         IndexBuffer indices = geometry.index();
         int drawStart = geometry.drawRangeStart();
         int drawEnd = drawStart + drawCount;
-        configureTriangleIntersection(mesh, ray, positions, uvs, side, hits);
         try {
             for (int elementIndex = drawStart; elementIndex + 2 < drawEnd; elementIndex += 3) {
                 int first = indices == null ? elementIndex : indices.value(elementIndex);

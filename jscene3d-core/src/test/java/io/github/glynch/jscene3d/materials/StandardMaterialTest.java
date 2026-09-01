@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.textures.Texture;
+import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import java.util.List;
 import org.joml.Vector2f;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,33 @@ final class StandardMaterialTest {
             assertThat(material.normalMap()).isEmpty();
             assertThat(material.occlusionMap()).isEmpty();
             assertThat(material.emissiveMap()).isEmpty();
+            assertThat(material.colorMapCoordinateSet()).isEqualTo(TextureCoordinateSet.PRIMARY);
+            assertThat(material.metalnessRoughnessMapCoordinateSet()).isEqualTo(TextureCoordinateSet.PRIMARY);
+            assertThat(material.normalMapCoordinateSet()).isEqualTo(TextureCoordinateSet.PRIMARY);
+            assertThat(material.occlusionMapCoordinateSet()).isEqualTo(TextureCoordinateSet.PRIMARY);
+            assertThat(material.emissiveMapCoordinateSet()).isEqualTo(TextureCoordinateSet.PRIMARY);
             assertThat(material.version()).isZero();
+        }
+    }
+
+    @Test
+    void selectsTextureCoordinatesIndependentlyAndVersionsActualChanges() {
+        try (StandardMaterial material = new StandardMaterial()) {
+            material.setColorMapCoordinateSet(TextureCoordinateSet.SECONDARY);
+            material.setMetalnessRoughnessMapCoordinateSet(TextureCoordinateSet.SECONDARY);
+            material.setNormalMapCoordinateSet(TextureCoordinateSet.SECONDARY);
+            material.setOcclusionMapCoordinateSet(TextureCoordinateSet.SECONDARY);
+            material.setEmissiveMapCoordinateSet(TextureCoordinateSet.SECONDARY);
+
+            assertThat(material.colorMapCoordinateSet()).isEqualTo(TextureCoordinateSet.SECONDARY);
+            assertThat(material.metalnessRoughnessMapCoordinateSet()).isEqualTo(TextureCoordinateSet.SECONDARY);
+            assertThat(material.normalMapCoordinateSet()).isEqualTo(TextureCoordinateSet.SECONDARY);
+            assertThat(material.occlusionMapCoordinateSet()).isEqualTo(TextureCoordinateSet.SECONDARY);
+            assertThat(material.emissiveMapCoordinateSet()).isEqualTo(TextureCoordinateSet.SECONDARY);
+            assertThat(material.version()).isEqualTo(5L);
+
+            material.setColorMapCoordinateSet(TextureCoordinateSet.SECONDARY);
+            assertThat(material.version()).isEqualTo(5L);
         }
     }
 
@@ -111,6 +138,11 @@ final class StandardMaterialTest {
             assertThatIllegalArgumentException().isThrownBy(() -> material.setEnvironmentIntensity(Float.NaN));
             assertThatIllegalArgumentException().isThrownBy(() -> material.setNormalScale(Float.NaN, 1.0f));
             assertThatNullPointerException().isThrownBy(() -> material.setNormalScale(null));
+            assertThatNullPointerException().isThrownBy(() -> material.setColorMapCoordinateSet(null));
+            assertThatNullPointerException().isThrownBy(() -> material.setMetalnessRoughnessMapCoordinateSet(null));
+            assertThatNullPointerException().isThrownBy(() -> material.setNormalMapCoordinateSet(null));
+            assertThatNullPointerException().isThrownBy(() -> material.setOcclusionMapCoordinateSet(null));
+            assertThatNullPointerException().isThrownBy(() -> material.setEmissiveMapCoordinateSet(null));
 
             Texture closedTexture = Texture.data(1, 1, new byte[4]);
             closedTexture.close();

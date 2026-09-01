@@ -3,6 +3,11 @@
 <module name="Checker">
     <property name="charset" value="UTF-8" />
     <property name="severity" value="error" />
+    <module name="RegexpMultiline">
+        <property name="format" value="\brecord\s+\w+\s*\([^)]*\[\]" />
+        <property name="matchAcrossLines" value="true" />
+        <property name="message" value="Arrays must not be record components; use an immutable class with deliberate equality semantics." />
+    </module>
     <module name="TreeWalker">
         <module name="ArrayTypeStyle" />
         <module name="AvoidStarImport" />

@@ -63,6 +63,13 @@ final class ExampleCatalog {
                                 URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
                         GltfAnimationExample::create),
                 definition(
+                        "skeletal-animation",
+                        "Skeletal animation",
+                        "Animation",
+                        "GPU skinning driven by a two-bone Java scene hierarchy and keyframe clip.",
+                        List.of("animation", "skinning", "skeleton", "bones", "gpu"),
+                        SkeletalAnimationExample::create),
+                definition(
                         "generated-geometries",
                         "Generated geometries",
                         "Geometry",
@@ -279,7 +286,29 @@ final class ExampleCatalog {
                         "Showcases",
                         "A complete textured, lit, animated, and controllable scene.",
                         List.of("planets", "textures", "orbit", "showcase"),
-                        SolarSystemViewer::create));
+                        SolarSystemViewer::create),
+                definition(
+                        "littlest-tokyo",
+                        "Littlest Tokyo",
+                        "Showcases",
+                        "A Draco-compressed glTF city animated through a 32-joint imported skeleton.",
+                        List.of("animation", "gltf", "draco", "skinning", "pbr", "showcase"),
+                        List.of(
+                                new GalleryAttribution(
+                                        "Littlest Tokyo",
+                                        "Glen Fox (glenatron)",
+                                        "ArtStation — Littlest Tokyo",
+                                        URI.create("https://glenatron.artstation.com/projects/AJGbV"),
+                                        "CC BY 4.0",
+                                        URI.create("https://creativecommons.org/licenses/by/4.0/")),
+                                new GalleryAttribution(
+                                        "Studio Small 08 HDRI",
+                                        "Sergej Majboroda",
+                                        "Poly Haven — polyhaven.com/a/studio_small_08",
+                                        URI.create("https://polyhaven.com/a/studio_small_08"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        LittlestTokyoExample::create));
     }
 
     /** Creates one definition and loads its required captured thumbnail. */

@@ -25,7 +25,8 @@ public final class Vector3KeyframeTrack extends AnimationTrack {
      * tangent, value, and outgoing tangent vectors for each key, in that order.
      *
      * @param target object whose local position is controlled
-     * @param times strictly increasing non-negative key times in seconds
+     * @param times non-decreasing, non-negative key times in seconds; adjacent duplicates encode
+     *     an instantaneous change
      * @param values flat keyframe data
      * @param interpolation interpolation between keys
      * @return immutable position track
@@ -44,7 +45,8 @@ public final class Vector3KeyframeTrack extends AnimationTrack {
      * tangent, value, and outgoing tangent vectors for each key, in that order.
      *
      * @param target object whose local scale is controlled
-     * @param times strictly increasing non-negative key times in seconds
+     * @param times non-decreasing, non-negative key times in seconds; adjacent duplicates encode
+     *     an instantaneous change
      * @param values flat keyframe data
      * @param interpolation interpolation between keys
      * @return immutable scale track

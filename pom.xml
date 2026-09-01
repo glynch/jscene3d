@@ -58,6 +58,7 @@
         <jacoco.maven.version>0.8.15</jacoco.maven.version>
         <joml.version>1.10.9</joml.version>
         <jgltf.version>2.0.4</jgltf.version>
+        <drako.version>1.4.2</drako.version>
         <jspecify.version>1.0.1</jspecify.version>
         <junit.version>6.1.3</junit.version>
         <lwjgl.version>3.4.3</lwjgl.version>
@@ -73,6 +74,7 @@
         <maven.install.version>3.1.4</maven.install.version>
         <maven.javadoc.version>3.12.0</maven.javadoc.version>
         <maven.jar.version>3.5.1</maven.jar.version>
+        <maven.pmd.version>3.28.0</maven.pmd.version>
         <maven.resources.version>3.5.0</maven.resources.version>
         <maven.site.version>3.22.0</maven.site.version>
         <maven.surefire.version>3.5.6</maven.surefire.version>
@@ -116,6 +118,11 @@
                 <groupId>de.javagl</groupId>
                 <artifactId>jgltf-impl-v2</artifactId>
                 <version>${jgltf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.fileformat</groupId>
+                <artifactId>drako</artifactId>
+                <version>${drako.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.joml</groupId>
@@ -311,6 +318,23 @@
                     </configuration>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-pmd-plugin</artifactId>
+                    <version>${maven.pmd.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>**/module-info.java</exclude>
+                        </excludes>
+                        <failOnViolation>true</failOnViolation>
+                        <includeTests>false</includeTests>
+                        <printFailingErrors>true</printFailingErrors>
+                        <rulesets>
+                            <ruleset>${maven.multiModuleProjectDirectory}/config/pmd/jscene3d-ruleset.xml</ruleset>
+                        </rulesets>
+                        <targetJdk>${maven.compiler.release}</targetJdk>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
                     <version>${spotless.maven.version}</version>
@@ -425,6 +449,19 @@
                 <executions>
                     <execution>
                         <id>check-java-semantics</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check-cognitive-complexity</id>
                         <phase>verify</phase>
                         <goals>
                             <goal>check</goal>

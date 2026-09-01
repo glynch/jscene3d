@@ -75,6 +75,7 @@ import io.github.glynch.jscene3d.materials.ShaderUniformType;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.render.internal.Frustum;
 import io.github.glynch.jscene3d.render.internal.PrimitiveTopology;
@@ -103,6 +104,7 @@ import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.EnvironmentMap;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
+import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -136,6 +138,9 @@ public final class Renderer implements AutoCloseable {
 
     /** Maximum number of point-light cube shadow maps sampled by one draw. */
     public static final int MAX_POINT_SHADOW_MAPS = ShadowFrame.MAX_POINT_SHADOWS;
+
+    /** Maximum joints addressable by one GPU-skinned mesh in version 0.1. */
+    public static final int MAX_SKIN_JOINTS = 48;
 
     private final Window window;
     private final WindowContextRegistry.Access context;
@@ -653,6 +658,10 @@ public final class Renderer implements AutoCloseable {
         GeometryResource resource = geometryResources.computeIfAbsent(geometry, ignored -> new GeometryResource());
         resources.setActiveGeometryResources(geometryResources.size());
         PrimitiveTopology topology = item.topology();
+        if (item.object() instanceof SkinnedMesh && !(material instanceof StandardMaterial)) {
+            throw new IllegalStateException("SkinnedMesh currently requires StandardMaterial: "
+                    + material.getClass().getName());
+        }
         applyMaterialState(material, topology);
         if (topology.isLine()) {
             renderLine(item, geometry, (LineBasicMaterial) material, resource, viewMatrix, projectionMatrix);
@@ -885,17 +894,40 @@ public final class Renderer implements AutoCloseable {
         requireOpenTexture(normalMap, "StandardMaterial normalMap");
         requireOpenTexture(occlusionMap, "StandardMaterial occlusionMap");
         requireOpenTexture(emissiveMap, "StandardMaterial emissiveMap");
-        boolean requiresTextureCoordinates = colorMap != null
-                || metalnessRoughnessMap != null
-                || normalMap != null
-                || occlusionMap != null
-                || emissiveMap != null;
+        boolean requiresTextureCoordinates = usesCoordinateSet(
+                        colorMap, material.colorMapCoordinateSet(), TextureCoordinateSet.PRIMARY)
+                || usesCoordinateSet(
+                        metalnessRoughnessMap,
+                        material.metalnessRoughnessMapCoordinateSet(),
+                        TextureCoordinateSet.PRIMARY)
+                || usesCoordinateSet(normalMap, material.normalMapCoordinateSet(), TextureCoordinateSet.PRIMARY)
+                || usesCoordinateSet(occlusionMap, material.occlusionMapCoordinateSet(), TextureCoordinateSet.PRIMARY)
+                || usesCoordinateSet(emissiveMap, material.emissiveMapCoordinateSet(), TextureCoordinateSet.PRIMARY);
+        boolean requiresSecondaryTextureCoordinates = usesCoordinateSet(
+                        colorMap, material.colorMapCoordinateSet(), TextureCoordinateSet.SECONDARY)
+                || usesCoordinateSet(
+                        metalnessRoughnessMap,
+                        material.metalnessRoughnessMapCoordinateSet(),
+                        TextureCoordinateSet.SECONDARY)
+                || usesCoordinateSet(normalMap, material.normalMapCoordinateSet(), TextureCoordinateSet.SECONDARY)
+                || usesCoordinateSet(occlusionMap, material.occlusionMapCoordinateSet(), TextureCoordinateSet.SECONDARY)
+                || usesCoordinateSet(emissiveMap, material.emissiveMapCoordinateSet(), TextureCoordinateSet.SECONDARY);
+        int skinJointCount = item.object() instanceof SkinnedMesh skinnedMesh
+                ? skinnedMesh.skeleton().jointCount()
+                : 0;
         recordUploads(resource.synchronize(
-                geometry, true, material.usesVertexColors(), requiresTextureCoordinates, "StandardMaterial"));
+                geometry,
+                true,
+                material.usesVertexColors(),
+                requiresTextureCoordinates,
+                requiresSecondaryTextureCoordinates,
+                skinJointCount,
+                "StandardMaterial"));
 
         primeStandardTextureUnits();
         glUseProgram(program.id());
         program.uploadTransforms(item.worldMatrix(), viewMatrix, projectionMatrix);
+        program.uploadSkinning(item.object(), item.worldMatrix());
         program.uploadLights(renderList.lights(), viewMatrix);
         bindShadowMaps();
         program.uploadShadows(
@@ -920,11 +952,15 @@ public final class Renderer implements AutoCloseable {
         glUniform1f(
                 program.alphaCutoffLocation(), material.alphaMode() == AlphaMode.MASK ? material.alphaCutoff() : -1.0f);
         glUniform1i(program.useVertexColorLocation(), material.usesVertexColors() ? 1 : 0);
-        bindStandardTexture(colorMap, program.colorMap(), 0);
-        bindStandardTexture(metalnessRoughnessMap, program.metalnessRoughnessMap(), 1);
-        bindStandardTexture(normalMap, program.normalMap(), 2);
-        bindStandardTexture(occlusionMap, program.occlusionMap(), 3);
-        bindStandardTexture(emissiveMap, program.emissiveMap(), 4);
+        bindStandardTexture(colorMap, material.colorMapCoordinateSet(), program.colorMap(), 0);
+        bindStandardTexture(
+                metalnessRoughnessMap,
+                material.metalnessRoughnessMapCoordinateSet(),
+                program.metalnessRoughnessMap(),
+                1);
+        bindStandardTexture(normalMap, material.normalMapCoordinateSet(), program.normalMap(), 2);
+        bindStandardTexture(occlusionMap, material.occlusionMapCoordinateSet(), program.occlusionMap(), 3);
+        bindStandardTexture(emissiveMap, material.emissiveMapCoordinateSet(), program.emissiveMap(), 4);
         bindEnvironment(program, scene, material);
     }
 
@@ -1107,13 +1143,17 @@ public final class Renderer implements AutoCloseable {
 
     /** Binds one optional standard-material texture role to its fixed texture unit. */
     private void bindStandardTexture(
-            @Nullable Texture texture, StandardProgram.TextureLocations locations, int textureUnit) {
+            @Nullable Texture texture,
+            TextureCoordinateSet coordinateSet,
+            StandardProgram.TextureLocations locations,
+            int textureUnit) {
         if (textureUnit >= maxTextureUnits) {
             throw new IllegalStateException(
                     "StandardMaterial requires more texture units than this context supports: " + (textureUnit + 1));
         }
         glActiveTexture(GL_TEXTURE0 + textureUnit);
         glUniform1i(locations.sampler(), textureUnit);
+        glUniform1i(locations.coordinateSet(), coordinateSet == TextureCoordinateSet.SECONDARY ? 1 : 0);
         if (texture == null) {
             defaultTexture().bind();
             glUniform1i(locations.enabled(), 0);
@@ -1124,6 +1164,12 @@ public final class Renderer implements AutoCloseable {
         synchronizeTexture(textureResource, texture);
         uploadTextureState(locations.transform(), locations.verticalFlip(), texture);
         glUniform1i(locations.enabled(), 1);
+    }
+
+    /** Returns whether an active texture role requires the selected coordinate set. */
+    private static boolean usesCoordinateSet(
+            @Nullable Texture texture, TextureCoordinateSet actual, TextureCoordinateSet expected) {
+        return texture != null && actual == expected;
     }
 
     /** Ensures every fixed standard-program sampler is complete before the program becomes active. */

@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.materials;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.textures.Texture;
+import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import java.util.Objects;
 import java.util.Optional;
 import org.joml.Vector2f;
@@ -17,9 +18,9 @@ import org.jspecify.annotations.Nullable;
  * Metallic-roughness physically based surface material.
  *
  * <p>The base color is multiplied by optional vertex colors and a color map. Metalness and
- * roughness may be modulated by the blue and green channels of a shared data texture. Normal,
- * occlusion, and emissive maps use the geometry's primary texture coordinates. Textures are shared
- * without ownership transfer. Instances are mutable, shareable, and not thread-safe.
+ * roughness may be modulated by the blue and green channels of a shared data texture. Every map
+ * independently selects the geometry's primary or secondary texture coordinates. Textures are
+ * shared without ownership transfer. Instances are mutable, shareable, and not thread-safe.
  */
 public final class StandardMaterial extends Material {
     private static final float DEFAULT_METALNESS = 0.0f;
@@ -40,6 +41,11 @@ public final class StandardMaterial extends Material {
     private @Nullable Texture normalMap;
     private @Nullable Texture occlusionMap;
     private @Nullable Texture emissiveMap;
+    private TextureCoordinateSet colorMapCoordinateSet = TextureCoordinateSet.PRIMARY;
+    private TextureCoordinateSet metalnessRoughnessMapCoordinateSet = TextureCoordinateSet.PRIMARY;
+    private TextureCoordinateSet normalMapCoordinateSet = TextureCoordinateSet.PRIMARY;
+    private TextureCoordinateSet occlusionMapCoordinateSet = TextureCoordinateSet.PRIMARY;
+    private TextureCoordinateSet emissiveMapCoordinateSet = TextureCoordinateSet.PRIMARY;
 
     /** Creates an opaque white dielectric material with maximum roughness. */
     public StandardMaterial() {
@@ -361,6 +367,29 @@ public final class StandardMaterial extends Material {
     }
 
     /**
+     * Returns the geometry texture-coordinate set sampled by the base-color map.
+     *
+     * @return selected texture-coordinate set
+     * @throws IllegalStateException if this material is closed
+     */
+    public TextureCoordinateSet colorMapCoordinateSet() {
+        requireOpen();
+        return colorMapCoordinateSet;
+    }
+
+    /**
+     * Selects the geometry texture-coordinate set sampled by the base-color map.
+     *
+     * @param coordinateSet texture-coordinate set to sample
+     * @throws NullPointerException if {@code coordinateSet} is {@code null}
+     * @throws IllegalStateException if this material is closed
+     */
+    public void setColorMapCoordinateSet(TextureCoordinateSet coordinateSet) {
+        requireOpen();
+        colorMapCoordinateSet = requireChangedCoordinateSet(colorMapCoordinateSet, coordinateSet);
+    }
+
+    /**
      * Returns the optional linear metallic-roughness texture.
      *
      * @return the selected shared texture, or an empty optional
@@ -400,6 +429,30 @@ public final class StandardMaterial extends Material {
     }
 
     /**
+     * Returns the geometry texture-coordinate set sampled by the metallic-roughness map.
+     *
+     * @return selected texture-coordinate set
+     * @throws IllegalStateException if this material is closed
+     */
+    public TextureCoordinateSet metalnessRoughnessMapCoordinateSet() {
+        requireOpen();
+        return metalnessRoughnessMapCoordinateSet;
+    }
+
+    /**
+     * Selects the geometry texture-coordinate set sampled by the metallic-roughness map.
+     *
+     * @param coordinateSet texture-coordinate set to sample
+     * @throws NullPointerException if {@code coordinateSet} is {@code null}
+     * @throws IllegalStateException if this material is closed
+     */
+    public void setMetalnessRoughnessMapCoordinateSet(TextureCoordinateSet coordinateSet) {
+        requireOpen();
+        metalnessRoughnessMapCoordinateSet =
+                requireChangedCoordinateSet(metalnessRoughnessMapCoordinateSet, coordinateSet);
+    }
+
+    /**
      * Returns the optional linear tangent-space normal texture.
      *
      * @return the selected shared texture, or an empty optional
@@ -434,6 +487,29 @@ public final class StandardMaterial extends Material {
             normalMap = null;
             markChanged();
         }
+    }
+
+    /**
+     * Returns the geometry texture-coordinate set sampled by the normal map.
+     *
+     * @return selected texture-coordinate set
+     * @throws IllegalStateException if this material is closed
+     */
+    public TextureCoordinateSet normalMapCoordinateSet() {
+        requireOpen();
+        return normalMapCoordinateSet;
+    }
+
+    /**
+     * Selects the geometry texture-coordinate set sampled by the normal map.
+     *
+     * @param coordinateSet texture-coordinate set to sample
+     * @throws NullPointerException if {@code coordinateSet} is {@code null}
+     * @throws IllegalStateException if this material is closed
+     */
+    public void setNormalMapCoordinateSet(TextureCoordinateSet coordinateSet) {
+        requireOpen();
+        normalMapCoordinateSet = requireChangedCoordinateSet(normalMapCoordinateSet, coordinateSet);
     }
 
     /**
@@ -476,6 +552,29 @@ public final class StandardMaterial extends Material {
     }
 
     /**
+     * Returns the geometry texture-coordinate set sampled by the ambient-occlusion map.
+     *
+     * @return selected texture-coordinate set
+     * @throws IllegalStateException if this material is closed
+     */
+    public TextureCoordinateSet occlusionMapCoordinateSet() {
+        requireOpen();
+        return occlusionMapCoordinateSet;
+    }
+
+    /**
+     * Selects the geometry texture-coordinate set sampled by the ambient-occlusion map.
+     *
+     * @param coordinateSet texture-coordinate set to sample
+     * @throws NullPointerException if {@code coordinateSet} is {@code null}
+     * @throws IllegalStateException if this material is closed
+     */
+    public void setOcclusionMapCoordinateSet(TextureCoordinateSet coordinateSet) {
+        requireOpen();
+        occlusionMapCoordinateSet = requireChangedCoordinateSet(occlusionMapCoordinateSet, coordinateSet);
+    }
+
+    /**
      * Returns the optional sRGB emissive texture.
      *
      * @return the selected shared texture, or an empty optional
@@ -510,5 +609,38 @@ public final class StandardMaterial extends Material {
             emissiveMap = null;
             markChanged();
         }
+    }
+
+    /**
+     * Returns the geometry texture-coordinate set sampled by the emissive map.
+     *
+     * @return selected texture-coordinate set
+     * @throws IllegalStateException if this material is closed
+     */
+    public TextureCoordinateSet emissiveMapCoordinateSet() {
+        requireOpen();
+        return emissiveMapCoordinateSet;
+    }
+
+    /**
+     * Selects the geometry texture-coordinate set sampled by the emissive map.
+     *
+     * @param coordinateSet texture-coordinate set to sample
+     * @throws NullPointerException if {@code coordinateSet} is {@code null}
+     * @throws IllegalStateException if this material is closed
+     */
+    public void setEmissiveMapCoordinateSet(TextureCoordinateSet coordinateSet) {
+        requireOpen();
+        emissiveMapCoordinateSet = requireChangedCoordinateSet(emissiveMapCoordinateSet, coordinateSet);
+    }
+
+    /** Validates one coordinate-set replacement and records an actual material change. */
+    private TextureCoordinateSet requireChangedCoordinateSet(
+            TextureCoordinateSet current, TextureCoordinateSet coordinateSet) {
+        TextureCoordinateSet validSet = Objects.requireNonNull(coordinateSet, "coordinateSet");
+        if (current != validSet) {
+            markChanged();
+        }
+        return validSet;
     }
 }

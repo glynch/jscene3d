@@ -16,7 +16,7 @@ final class KeyframeData {
     private final int components;
     private final int groupsPerKey;
 
-    /** Copies arrays after validating their shape and finite, strictly increasing times. */
+    /** Copies arrays after validating their shape and finite, non-decreasing times. */
     KeyframeData(float[] times, float[] values, int components, Interpolation interpolation) {
         Objects.requireNonNull(interpolation, "interpolation");
         this.times = Objects.requireNonNull(times, "times").clone();
@@ -39,8 +39,8 @@ final class KeyframeData {
         float previous = -1.0f;
         for (int index = 0; index < times.length; index++) {
             float time = Preconditions.requireNonNegative(times[index], "times[" + index + "]");
-            if (index > 0 && time <= previous) {
-                throw new IllegalArgumentException("times must be strictly increasing at index " + index + ": " + time);
+            if (index > 0 && time < previous) {
+                throw new IllegalArgumentException("times must not decrease at index " + index + ": " + time);
             }
             previous = time;
         }
@@ -66,7 +66,7 @@ final class KeyframeData {
 
     /** Returns the lower key index for a clamped sample time. */
     int lowerKey(float sampleTime) {
-        if (sampleTime <= times[0] || times.length == 1) {
+        if (sampleTime < times[0] || times.length == 1) {
             return 0;
         }
         int last = times.length - 1;

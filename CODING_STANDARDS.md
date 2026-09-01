@@ -48,6 +48,14 @@ automatically.
 - Do not leave public constructors or methods empty. Perform their required
   initialization, omit them, or document why an intentionally empty body is
   part of the public contract.
+- Keep production methods at or below Sonar's cognitive-complexity threshold of
+  15. PMD enforces the same threshold during `clean verify`. When a feature adds
+  another decision branch, extract cohesive validation or behavior in the same
+  change instead of leaving a new warning for a later cleanup. Do not suppress
+  cognitive-complexity findings.
+- Do not declare arrays as record components. Java records compare arrays by
+  identity, which is almost never the intended value semantics. Use an immutable
+  class with defensive copies and deliberately implemented equality instead.
 - Original source files use this short license header with the appropriate
   comment syntax:
 
@@ -109,6 +117,7 @@ The normal `clean verify` lifecycle must eventually include:
 - Spotless formatting checks.
 - Java compiler linting, Error Prone, and NullAway.
 - The checked-in semantic Checkstyle rules.
+- PMD cognitive-complexity analysis over production methods.
 - SpotBugs restricted to high-confidence findings.
 - Maven Enforcer checks for Java and Maven versions, plugin versions, dependency
   convergence, reactor convergence, and upper dependency bounds.

@@ -13,10 +13,11 @@ import java.util.Objects;
  *
  * <p>The initial capability profile supports the selected scene, node TRS transforms, triangle
  * primitives, indices, positions, normals, primary texture coordinates, RGB/RGBA vertex colours,
- * metallic-roughness materials, PNG/JPEG images, core glTF sampler state, and node translation,
- * rotation, and scale animation using step, linear, or cubic-spline interpolation. Unsupported
- * required extensions, skinning, morph targets, cameras, secondary texture-coordinate selection,
- * and non-triangle primitives fail with a diagnostic {@link GltfLoadException}.
+ * metallic-roughness materials, PNG/JPEG images, core glTF sampler state, skeletal skinning,
+ * {@code KHR_draco_mesh_compression}, and node translation, rotation, and scale animation using
+ * step, linear, or cubic-spline interpolation. Other required extensions, morph targets, cameras,
+ * secondary texture-coordinate selection, and non-triangle primitives fail with a diagnostic
+ * {@link GltfLoadException}.
  */
 public final class GltfLoader {
     /** Prevents instantiation of this stateless loader. */

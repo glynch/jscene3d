@@ -33,6 +33,9 @@ public final class GeometryResource implements AutoCloseable {
     private static final int NORMAL_LOCATION = 1;
     private static final int UV_LOCATION = 2;
     private static final int COLOR_LOCATION = 3;
+    private static final int JOINT_LOCATION = 4;
+    private static final int WEIGHT_LOCATION = 5;
+    private static final int SECONDARY_UV_LOCATION = 6;
 
     private final int vertexArray;
 
@@ -40,7 +43,15 @@ public final class GeometryResource implements AutoCloseable {
     private @Nullable AttributeResource normals;
     private @Nullable AttributeResource colors;
     private @Nullable AttributeResource uvs;
+    private @Nullable AttributeResource joints;
+    private @Nullable AttributeResource weights;
+    private @Nullable AttributeResource secondaryUvs;
     private @Nullable IndexResource indices;
+    private @Nullable BufferAttribute validatedJoints;
+    private @Nullable BufferAttribute validatedWeights;
+    private long validatedJointVersion = -1L;
+    private long validatedWeightVersion = -1L;
+    private int validatedJointCount = -1;
 
     /** Allocates the vertex-array object that owns geometry bindings. */
     public GeometryResource() {
@@ -63,27 +74,80 @@ public final class GeometryResource implements AutoCloseable {
             boolean requiresVertexColors,
             boolean requiresTextureCoordinates,
             String materialLabel) {
+        return synchronize(
+                geometry, requiresNormals, requiresVertexColors, requiresTextureCoordinates, false, 0, materialLabel);
+    }
+
+    /**
+     * Synchronizes geometry, including optional four-influence skeletal attributes.
+     *
+     * @param geometry geometry to synchronize
+     * @param requiresNormals whether the material requires normals
+     * @param requiresVertexColors whether the material requires vertex colors
+     * @param requiresTextureCoordinates whether the material requires texture coordinates
+     * @param skinJointCount positive skeleton joint count, or zero for an unskinned draw
+     * @param materialLabel material label used in diagnostics
+     * @return uploads performed by this synchronization
+     */
+    public UploadResult synchronize(
+            BufferGeometry geometry,
+            boolean requiresNormals,
+            boolean requiresVertexColors,
+            boolean requiresTextureCoordinates,
+            int skinJointCount,
+            String materialLabel) {
+        return synchronize(
+                geometry,
+                requiresNormals,
+                requiresVertexColors,
+                requiresTextureCoordinates,
+                false,
+                skinJointCount,
+                materialLabel);
+    }
+
+    /**
+     * Synchronizes geometry including secondary texture coordinates and skeletal attributes.
+     *
+     * @param geometry geometry to synchronize
+     * @param requiresNormals whether the material requires normals
+     * @param requiresVertexColors whether the material requires vertex colors
+     * @param requiresTextureCoordinates whether the material requires primary texture coordinates
+     * @param requiresSecondaryTextureCoordinates whether the material requires secondary texture
+     *     coordinates
+     * @param skinJointCount positive skeleton joint count, or zero for an unskinned draw
+     * @param materialLabel material label used in diagnostics
+     * @return uploads performed by this synchronization
+     */
+    public UploadResult synchronize(
+            BufferGeometry geometry,
+            boolean requiresNormals,
+            boolean requiresVertexColors,
+            boolean requiresTextureCoordinates,
+            boolean requiresSecondaryTextureCoordinates,
+            int skinJointCount,
+            String materialLabel) {
         @Nullable BufferAttribute positionAttribute = geometry.attribute(BufferGeometry.POSITION);
         @Nullable BufferAttribute normalAttribute = geometry.attribute(BufferGeometry.NORMAL);
         @Nullable BufferAttribute colorAttribute = geometry.attribute(BufferGeometry.COLOR);
         @Nullable BufferAttribute uvAttribute = geometry.attribute(BufferGeometry.UV);
-        if (requiresNormals && normalAttribute == null) {
-            throw new IllegalStateException(materialLabel + " requires a normal attribute but geometry has none");
+        @Nullable BufferAttribute secondaryUvAttribute = geometry.attribute(BufferGeometry.UV1);
+        @Nullable
+        BufferAttribute jointAttribute = skinJointCount == 0 ? null : geometry.attribute(BufferGeometry.JOINTS);
+        @Nullable
+        BufferAttribute weightAttribute = skinJointCount == 0 ? null : geometry.attribute(BufferGeometry.WEIGHTS);
+        validateAttributeRequirements(
+                geometry,
+                requiresNormals,
+                requiresVertexColors,
+                requiresTextureCoordinates,
+                requiresSecondaryTextureCoordinates,
+                materialLabel);
+        if (skinJointCount < 0) {
+            throw new IllegalArgumentException("skinJointCount must not be negative: " + skinJointCount);
         }
-        if (normalAttribute != null && normalAttribute.itemSize() != 3) {
-            throw new IllegalStateException("normal attribute itemSize must be 3: " + normalAttribute.itemSize());
-        }
-        if (requiresVertexColors && colorAttribute == null) {
-            throw new IllegalStateException(materialLabel + " requires a color attribute but geometry has none");
-        }
-        if (colorAttribute != null && colorAttribute.itemSize() != 3 && colorAttribute.itemSize() != 4) {
-            throw new IllegalStateException("color attribute itemSize must be 3 or 4: " + colorAttribute.itemSize());
-        }
-        if (requiresTextureCoordinates && uvAttribute == null) {
-            throw new IllegalStateException(materialLabel + " requires a uv attribute but geometry has none");
-        }
-        if (uvAttribute != null && uvAttribute.itemSize() != 2) {
-            throw new IllegalStateException("uv attribute itemSize must be 2: " + uvAttribute.itemSize());
+        if (skinJointCount > 0) {
+            validateSkinningAttributes(jointAttribute, weightAttribute, skinJointCount);
         }
 
         UploadCounter uploads = new UploadCounter();
@@ -98,9 +162,57 @@ public final class GeometryResource implements AutoCloseable {
                 false,
                 uploads);
         uvs = synchronizeAttribute(uvs, uvAttribute, UV_LOCATION, 2, false, uploads);
+        joints = synchronizeAttribute(joints, jointAttribute, JOINT_LOCATION, 4, false, uploads);
+        weights = synchronizeAttribute(weights, weightAttribute, WEIGHT_LOCATION, 4, false, uploads);
+        secondaryUvs =
+                synchronizeAttribute(secondaryUvs, secondaryUvAttribute, SECONDARY_UV_LOCATION, 2, false, uploads);
         indices = synchronizeIndex(indices, geometry.index(), uploads);
         glBindVertexArray(0);
         return uploads.result();
+    }
+
+    /** Validates material-driven attribute presence and component counts before binding OpenGL state. */
+    private static void validateAttributeRequirements(
+            BufferGeometry geometry,
+            boolean requiresNormals,
+            boolean requiresVertexColors,
+            boolean requiresTextureCoordinates,
+            boolean requiresSecondaryTextureCoordinates,
+            String materialLabel) {
+        validateFixedAttribute(geometry.attribute(BufferGeometry.NORMAL), requiresNormals, 3, "normal", materialLabel);
+        validateColorAttribute(geometry.attribute(BufferGeometry.COLOR), requiresVertexColors, materialLabel);
+        validateFixedAttribute(
+                geometry.attribute(BufferGeometry.UV), requiresTextureCoordinates, 2, "uv", materialLabel);
+        validateFixedAttribute(
+                geometry.attribute(BufferGeometry.UV1), requiresSecondaryTextureCoordinates, 2, "uv1", materialLabel);
+    }
+
+    /** Validates one optional attribute with a fixed component count. */
+    private static void validateFixedAttribute(
+            @Nullable BufferAttribute attribute,
+            boolean required,
+            int itemSize,
+            String semantic,
+            String materialLabel) {
+        if (required && attribute == null) {
+            throw new IllegalStateException(
+                    materialLabel + " requires a " + semantic + " attribute but geometry has none");
+        }
+        if (attribute != null && attribute.itemSize() != itemSize) {
+            throw new IllegalStateException(
+                    semantic + " attribute itemSize must be " + itemSize + ": " + attribute.itemSize());
+        }
+    }
+
+    /** Validates the optional RGB or RGBA vertex-colour attribute. */
+    private static void validateColorAttribute(
+            @Nullable BufferAttribute colorAttribute, boolean required, String materialLabel) {
+        if (required && colorAttribute == null) {
+            throw new IllegalStateException(materialLabel + " requires a color attribute but geometry has none");
+        }
+        if (colorAttribute != null && colorAttribute.itemSize() != 3 && colorAttribute.itemSize() != 4) {
+            throw new IllegalStateException("color attribute itemSize must be 3 or 4: " + colorAttribute.itemSize());
+        }
     }
 
     /** Binds this geometry's vertex-array object for drawing. */
@@ -114,10 +226,64 @@ public final class GeometryResource implements AutoCloseable {
         closeAttribute(normals);
         closeAttribute(colors);
         closeAttribute(uvs);
+        closeAttribute(joints);
+        closeAttribute(weights);
+        closeAttribute(secondaryUvs);
         if (indices != null) {
             glDeleteBuffers(indices.buffer);
         }
         glDeleteVertexArrays(vertexArray);
+    }
+
+    /** Validates changed joint indices and weights once per attribute version and skeleton size. */
+    private void validateSkinningAttributes(
+            @Nullable BufferAttribute jointAttribute, @Nullable BufferAttribute weightAttribute, int skinJointCount) {
+        if (jointAttribute == null || weightAttribute == null) {
+            throw new IllegalStateException("Skinned geometry requires joints and weights attributes");
+        }
+        if (isSkinningValidationCurrent(jointAttribute, weightAttribute, skinJointCount)) {
+            return;
+        }
+        for (int vertex = 0; vertex < jointAttribute.count(); vertex++) {
+            validateSkinningVertex(jointAttribute, weightAttribute, vertex, skinJointCount);
+        }
+        validatedJoints = jointAttribute;
+        validatedWeights = weightAttribute;
+        validatedJointVersion = jointAttribute.version();
+        validatedWeightVersion = weightAttribute.version();
+        validatedJointCount = skinJointCount;
+    }
+
+    /** Returns whether the current skinning attributes have already passed validation. */
+    private boolean isSkinningValidationCurrent(
+            BufferAttribute jointAttribute, BufferAttribute weightAttribute, int skinJointCount) {
+        return jointAttribute == validatedJoints
+                && weightAttribute == validatedWeights
+                && jointAttribute.version() == validatedJointVersion
+                && weightAttribute.version() == validatedWeightVersion
+                && skinJointCount == validatedJointCount;
+    }
+
+    /** Validates the four joint influences belonging to one vertex. */
+    private static void validateSkinningVertex(
+            BufferAttribute jointAttribute, BufferAttribute weightAttribute, int vertex, int skinJointCount) {
+        float weightSum = 0.0f;
+        for (int influence = 0; influence < 4; influence++) {
+            float joint = jointAttribute.value(vertex, influence);
+            if (joint < 0.0f || joint >= skinJointCount || joint != Math.rint(joint)) {
+                throw new IllegalStateException("joints[" + vertex + "][" + influence + "] must be an integer in [0, "
+                        + skinJointCount + "): " + joint);
+            }
+            float weight = weightAttribute.value(vertex, influence);
+            if (weight < 0.0f) {
+                throw new IllegalStateException(
+                        "weights[" + vertex + "][" + influence + "] must not be negative: " + weight);
+            }
+            weightSum += weight;
+        }
+        if (weightSum <= 0.0f) {
+            throw new IllegalStateException("weights[" + vertex + "] must have a positive sum");
+        }
     }
 
     /** Reuses or replaces one attribute buffer and uploads it only when its version changed. */

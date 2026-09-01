@@ -2746,22 +2746,21 @@ can be enabled when the repository becomes public and CI capacity is available.
 Correctly rendered glTF 2.0 and GLB loading now builds on metallic-roughness PBR,
 environment lighting, and the existing scene hierarchy. Its current animation
 slice adds renderer-independent clips, typed transform tracks, explicit mixer
-playback, and glTF translation, rotation, and scale channels. Skinning, morph
-targets, lights stored in assets, and compression extensions remain deferred
-until their corresponding runtime features and focused examples exist.
+playback, glTF translation, rotation, and scale channels, skeletal skinning,
+weighted property accumulation, linear fades, and explicit cross-fading. Morph
+targets and lights stored in assets remain deferred until their corresponding
+runtime features and focused examples exist.
 
 After that block, a plausible sequence is:
 
-1. Skinning.
-2. Morph targets.
-3. Weighted animation blending and cross-fading.
-4. Animation retargeting.
-5. Render targets and framebuffer management.
-6. Instanced meshes.
-7. Additional glTF extensions and optional compression integrations.
-8. Additional material models when an example requires them.
-9. Post-processing graph.
-10. Additional renderer only if product requirements justify it.
+1. Morph targets.
+2. Animation retargeting.
+3. Render targets and framebuffer management.
+4. Instanced meshes.
+5. Additional glTF extensions and optional compression integrations.
+6. Additional material models when an example requires them.
+7. Post-processing graph.
+8. Additional renderer only if product requirements justify it.
 
 The sequence should be adjusted by real user needs. For example, a
 data-visualization library may prioritize lines, points, labels, and picking

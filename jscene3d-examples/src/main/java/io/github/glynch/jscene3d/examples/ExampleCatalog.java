@@ -48,6 +48,29 @@ final class ExampleCatalog {
                         List.of("animation", "keyframe", "step", "linear", "cubic spline", "mixer"),
                         KeyframeAnimationExample::create),
                 definition(
+                        "animation-blending",
+                        "Animation blending",
+                        "Animation",
+                        "Weighted cross-fades between idle, walking, and running skeletal clips.",
+                        List.of("animation", "blending", "cross-fade", "skinning", "gltf", "fox"),
+                        List.of(
+                                new GalleryAttribution(
+                                        "Fox glTF model",
+                                        "PixelMannen / tomkranis / Asobo Studio / scurest",
+                                        "Khronos glTF Sample Assets — Fox",
+                                        URI.create(
+                                                "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox"),
+                                        "CC0-1.0 and CC-BY-4.0",
+                                        URI.create("https://creativecommons.org/licenses/by/4.0/")),
+                                new GalleryAttribution(
+                                        "Studio Small 08 HDRI",
+                                        "Sergej Majboroda",
+                                        "Poly Haven — polyhaven.com/a/studio_small_08",
+                                        URI.create("https://polyhaven.com/a/studio_small_08"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        AnimationBlendingExample::create),
+                definition(
                         "gltf-animation",
                         "glTF animation",
                         "Animation",

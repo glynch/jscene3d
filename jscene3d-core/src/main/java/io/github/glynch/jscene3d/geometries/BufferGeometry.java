@@ -263,6 +263,23 @@ public final class BufferGeometry implements AutoCloseable {
     }
 
     /**
+     * Computes area-weighted unit vertex normals for the complete triangle geometry.
+     *
+     * <p>An existing normal attribute is replaced. Indexed triangles sharing a vertex receive a
+     * smooth averaged normal, while non-indexed triangles retain independent face normals.
+     * Unreferenced and degenerate vertices receive a zero normal.
+     *
+     * @throws IllegalArgumentException if the indexed or non-indexed element count is not composed
+     *     of complete triangles
+     * @throws IllegalStateException if this geometry is closed or has no position attribute
+     */
+    public void computeVertexNormals() {
+        requireOpen();
+        BufferAttribute positions = requirePositionAttribute();
+        setAttribute(NORMAL, GeometryNormalGenerator.generate(positions, index));
+    }
+
+    /**
      * Returns the common number of vertex items.
      *
      * @return zero for empty geometry, otherwise the common attribute count

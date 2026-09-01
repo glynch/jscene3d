@@ -5,7 +5,11 @@
 package io.github.glynch.jscene3d.animation;
 
 import io.github.glynch.jscene3d.internal.Preconditions;
+import io.github.glynch.jscene3d.objects.Object3D;
+import java.util.EnumSet;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** Immutable named collection of typed keyframe tracks sharing one playback timeline. */
@@ -28,6 +32,7 @@ public final class AnimationClip {
         if (this.tracks.isEmpty()) {
             throw new IllegalArgumentException("tracks must not be empty");
         }
+        validateUniqueBindings();
         float maximumDuration = 0.0f;
         for (AnimationTrack track : this.tracks) {
             maximumDuration = Math.max(maximumDuration, track.duration());
@@ -62,10 +67,16 @@ public final class AnimationClip {
         return duration;
     }
 
-    /** Applies every track at one already-normalized local time. */
-    void apply(float time) {
+    /** Rejects multiple tracks that would ambiguously control one property in this clip. */
+    private void validateUniqueBindings() {
+        Map<Object3D, EnumSet<TransformProperty>> propertiesByTarget = new IdentityHashMap<>();
         for (AnimationTrack track : tracks) {
-            track.apply(Math.clamp(time, 0.0f, track.duration()));
+            EnumSet<TransformProperty> properties = propertiesByTarget.computeIfAbsent(
+                    track.target(), ignored -> EnumSet.noneOf(TransformProperty.class));
+            if (!properties.add(track.property())) {
+                throw new IllegalArgumentException(
+                        "tracks must not contain duplicate target property bindings: " + track.property());
+            }
         }
     }
 }

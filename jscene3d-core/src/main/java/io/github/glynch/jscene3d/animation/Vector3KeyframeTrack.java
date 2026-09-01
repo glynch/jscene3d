@@ -10,8 +10,6 @@ import io.github.glynch.jscene3d.objects.Object3D;
 public final class Vector3KeyframeTrack extends AnimationTrack {
     private static final int COMPONENTS = 3;
 
-    private final float[] sample = new float[COMPONENTS];
-
     /** Retains copied keyframes for one vector-valued transform property. */
     private Vector3KeyframeTrack(
             Object3D target, TransformProperty property, float[] times, float[] values, Interpolation interpolation) {
@@ -58,14 +56,9 @@ public final class Vector3KeyframeTrack extends AnimationTrack {
         return new Vector3KeyframeTrack(target, TransformProperty.SCALE, times, values, interpolation);
     }
 
-    /** Samples and applies one vector value through the target's controlled setter. */
+    /** Samples one vector value into caller-owned scalar storage. */
     @Override
-    void apply(float time) {
-        KeyframeSampler.vector(keyframes(), interpolation(), time, sample);
-        if (property() == TransformProperty.POSITION) {
-            boundTarget().setPosition(sample[0], sample[1], sample[2]);
-        } else {
-            boundTarget().setScale(sample[0], sample[1], sample[2]);
-        }
+    void sample(float time, float[] destination) {
+        KeyframeSampler.vector(keyframes(), interpolation(), time, destination);
     }
 }

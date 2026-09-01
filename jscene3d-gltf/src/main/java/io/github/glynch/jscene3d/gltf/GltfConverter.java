@@ -417,6 +417,9 @@ final class GltfConverter {
         } else {
             setCompressedAttributes(geometry, attributes, compressed);
         }
+        if (geometry.attribute(BufferGeometry.NORMAL) == null) {
+            geometry.computeVertexNormals();
+        }
         return geometry;
     }
 

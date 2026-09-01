@@ -141,6 +141,20 @@ final class AnimationClipTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new AnimationClip("empty", List.of()));
     }
 
+    /** Rejects two tracks that ambiguously control the same property on one target. */
+    @Test
+    void rejectsDuplicateBindingsWithinOneClip() {
+        Object3D target = new Object3D();
+        AnimationTrack first = Vector3KeyframeTrack.position(
+                target, new float[] {0.0f}, new float[] {0.0f, 0.0f, 0.0f}, Interpolation.STEP);
+        AnimationTrack second = Vector3KeyframeTrack.position(
+                target, new float[] {0.0f}, new float[] {1.0f, 0.0f, 0.0f}, Interpolation.STEP);
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new AnimationClip("duplicate", List.of(first, second)))
+                .withMessageContaining("duplicate target property bindings");
+    }
+
     /** Rejects nulls at each supported construction seam. */
     @Test
     @SuppressWarnings("NullAway")

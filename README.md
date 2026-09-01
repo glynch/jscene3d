@@ -87,7 +87,7 @@ when a clean build is required.
 `TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
-`KeyframeAnimationExample`, `GltfAnimationExample`, `GltfLoadingExample`,
+`KeyframeAnimationExample`, `AnimationBlendingExample`, `GltfAnimationExample`, `GltfLoadingExample`,
 `SpotAndHemisphereLightsExample`, `ShadowsExample`, `OrbitControlsExample`, and
 `ObjectSelectionExample` are also
 available using the same command. `LineRenderingExample` demonstrates a
@@ -169,17 +169,22 @@ construction. Track bindings retain their target `Object3D` and apply values
 through controlled transform setters; they do not expose mutable JOML state.
 
 `AnimationAction` supports explicit play, pause, stop, reset, seeking, positive
-or negative time scales, and once, repeat, or ping-pong looping. Applications
-advance a mixer with their frame delta; the animation package creates neither
-threads nor a hidden clock. Concurrent actions must currently target distinct
-object properties because weighted blending is not yet supported.
+or negative time scales, contribution weights, linear fades, and once, repeat,
+or ping-pong looping. Applications advance a mixer with their frame delta; the
+animation package creates neither threads nor a hidden clock. The mixer resolves
+concurrent tracks once per controlled property, completes partial weights with
+the captured base pose, normalizes overweight blends, and aligns equivalent
+quaternion signs before normalization. `AnimationMixer.crossFade` performs an
+explicit source-to-destination transition and deactivates the source on
+completion.
 
 `KeyframeAnimationExample` compares step, linear, and cubic-spline interpolation
 with live playback controls. `GltfAnimationExample` imports and synchronously
 plays the nine transform clips in Khronos's CC0 Interpolation Test asset.
 `SkeletalAnimationExample` constructs and animates a two-joint skinned mesh,
-while `LittlestTokyoExample` loads Glen Fox's Draco-compressed, skeletally
-animated Littlest Tokyo scene.
+`AnimationBlendingExample` cross-fades the Khronos Fox model between idle,
+walking, and running clips, while `LittlestTokyoExample` loads Glen Fox's
+Draco-compressed, skeletally animated Littlest Tokyo scene.
 
 ## Transparency
 

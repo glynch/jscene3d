@@ -136,6 +136,40 @@ final class BufferGeometryTest {
     }
 
     @Test
+    void computesSmoothIndexedVertexNormals() {
+        try (BufferGeometry geometry = new BufferGeometry()) {
+            geometry.setAttribute(
+                    BufferGeometry.POSITION,
+                    BufferAttribute.of(
+                            new float[] {
+                                0.0f, 0.0f, 0.0f,
+                                1.0f, 0.0f, 0.0f,
+                                1.0f, 1.0f, 0.0f,
+                                0.0f, 1.0f, 0.0f
+                            },
+                            3));
+            geometry.setIndex(IndexBuffer.of(new int[] {0, 1, 2, 0, 2, 3}));
+
+            geometry.computeVertexNormals();
+
+            BufferAttribute normals = Objects.requireNonNull(geometry.attribute(BufferGeometry.NORMAL));
+            assertThat(normals.count()).isEqualTo(4);
+            for (int vertex = 0; vertex < normals.count(); vertex++) {
+                assertThat(normals.value(vertex, 0)).isZero();
+                assertThat(normals.value(vertex, 1)).isZero();
+                assertThat(normals.value(vertex, 2)).isEqualTo(1.0f);
+            }
+        }
+    }
+
+    @Test
+    void rejectsIncompleteTrianglesWhenComputingNormals() {
+        try (BufferGeometry geometry = geometryWithVertexCount(2)) {
+            assertThatIllegalArgumentException().isThrownBy(geometry::computeVertexNormals);
+        }
+    }
+
+    @Test
     void closesTerminallyWithoutClosingSharedData() {
         BufferGeometry geometry = geometryWithVertexCount(3);
         BufferAttribute positions = Objects.requireNonNull(geometry.attribute(BufferGeometry.POSITION));

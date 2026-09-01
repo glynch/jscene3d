@@ -19,6 +19,7 @@ public abstract sealed class AnimationTrack permits QuaternionKeyframeTrack, Vec
     private final TransformProperty property;
     private final Interpolation interpolation;
     private final KeyframeData keyframes;
+    private final int components;
 
     /** Retains the validated typed binding and copied keyframe data. */
     AnimationTrack(
@@ -31,6 +32,7 @@ public abstract sealed class AnimationTrack permits QuaternionKeyframeTrack, Vec
         this.target = Objects.requireNonNull(target, "target");
         this.property = Objects.requireNonNull(property, "property");
         this.interpolation = Objects.requireNonNull(interpolation, "interpolation");
+        this.components = components;
         keyframes = new KeyframeData(times, values, components, interpolation);
     }
 
@@ -70,16 +72,16 @@ public abstract sealed class AnimationTrack permits QuaternionKeyframeTrack, Vec
         return keyframes.duration();
     }
 
-    /** Returns the retained target to package-local evaluators. */
-    final Object3D boundTarget() {
-        return target;
-    }
-
     /** Returns copied keyframes to the owning concrete evaluator. */
     final KeyframeData keyframes() {
         return keyframes;
     }
 
-    /** Samples and applies this track at one local clip time. */
-    abstract void apply(float time);
+    /** Returns the number of scalar components in one sampled value. */
+    final int components() {
+        return components;
+    }
+
+    /** Samples this track at one local clip time into caller-owned scalar storage. */
+    abstract void sample(float time, float[] destination);
 }

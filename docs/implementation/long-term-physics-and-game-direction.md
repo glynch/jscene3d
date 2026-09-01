@@ -39,6 +39,7 @@ initial profile is correct and well tested.
 
 ## Near-term sequencing
 
-Animation blending and cross-fading remain the next graphics-library feature.
-Their design should leave room for later root motion and animation events needed
-by the Game Engine without adding those capabilities prematurely.
+Weighted animation blending and cross-fading now provide the transition
+foundation needed by the future Game Engine. Root motion and animation events
+remain later graphics-library capabilities and should be added only with focused
+runtime requirements and examples.

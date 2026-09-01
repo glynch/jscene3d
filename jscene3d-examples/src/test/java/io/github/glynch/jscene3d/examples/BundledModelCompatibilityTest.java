@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.examples;
 import static io.github.glynch.jscene3d.examples.framework.BundledResources.path;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.animation.AnimationAction;
 import io.github.glynch.jscene3d.animation.AnimationClip;
 import io.github.glynch.jscene3d.animation.AnimationMixer;
 import io.github.glynch.jscene3d.animation.Interpolation;
@@ -25,6 +26,35 @@ final class BundledModelCompatibilityTest {
     private static final String BOOM_BOX_RESOURCE = "/io/github/glynch/jscene3d/examples/boom-box/BoomBox.glb";
     private static final String INTERPOLATION_TEST_RESOURCE =
             "/io/github/glynch/jscene3d/examples/interpolation-test/InterpolationTest.glb";
+    private static final String FOX_RESOURCE = "/io/github/glynch/jscene3d/examples/fox/Fox.glb";
+
+    /** Ensures Fox retains the compatible idle, walking, and running skeletal clips. */
+    @Test
+    void loadsFoxAnimationClips() {
+        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), FOX_RESOURCE))) {
+            assertThat(loaded.animations())
+                    .extracting(AnimationClip::name)
+                    .containsExactlyInAnyOrder("Survey", "Walk", "Run");
+
+            AnimationMixer mixer = new AnimationMixer();
+            AnimationClip survey = loaded.animations().stream()
+                    .filter(clip -> clip.name().equals("Survey"))
+                    .findFirst()
+                    .orElseThrow();
+            AnimationClip walk = loaded.animations().stream()
+                    .filter(clip -> clip.name().equals("Walk"))
+                    .findFirst()
+                    .orElseThrow();
+            AnimationAction surveyAction = mixer.action(survey).play();
+            AnimationAction walkAction = mixer.action(walk);
+
+            mixer.crossFade(surveyAction, walkAction, 0.5f);
+            mixer.update(0.25f);
+
+            assertThat(surveyAction.effectiveWeight()).isEqualTo(0.5f);
+            assertThat(walkAction.effectiveWeight()).isEqualTo(0.5f);
+        }
+    }
 
     /** Ensures the official interpolation fixture retains all imported transform clips. */
     @Test

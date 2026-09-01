@@ -10,8 +10,6 @@ import io.github.glynch.jscene3d.objects.Object3D;
 public final class QuaternionKeyframeTrack extends AnimationTrack {
     private static final int COMPONENTS = 4;
 
-    private final float[] sample = new float[COMPONENTS];
-
     /** Retains copied keyframes for one local-orientation binding. */
     private QuaternionKeyframeTrack(Object3D target, float[] times, float[] values, Interpolation interpolation) {
         super(target, TransformProperty.ROTATION, times, values, COMPONENTS, interpolation);
@@ -39,10 +37,9 @@ public final class QuaternionKeyframeTrack extends AnimationTrack {
         return new QuaternionKeyframeTrack(target, times, values, interpolation);
     }
 
-    /** Samples, normalizes, and applies one quaternion value. */
+    /** Samples and normalizes one quaternion value into caller-owned scalar storage. */
     @Override
-    void apply(float time) {
-        KeyframeSampler.quaternion(keyframes(), interpolation(), time, sample);
-        boundTarget().setQuaternion(sample[0], sample[1], sample[2], sample[3]);
+    void sample(float time, float[] destination) {
+        KeyframeSampler.quaternion(keyframes(), interpolation(), time, destination);
     }
 }

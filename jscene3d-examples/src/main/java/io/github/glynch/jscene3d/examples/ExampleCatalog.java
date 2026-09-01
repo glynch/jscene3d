@@ -134,6 +134,29 @@ final class ExampleCatalog {
                                         URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
                         AvocadoModelExample::create),
                 definition(
+                        "water-bottle-model",
+                        "Water Bottle glTF model",
+                        "Loading",
+                        "A CC0 PBR asset exercising normal, occlusion, and emissive maps.",
+                        List.of("gltf", "glb", "pbr", "normal map", "occlusion", "emissive", "ibl"),
+                        List.of(
+                                new GalleryAttribution(
+                                        "Water Bottle glTF model",
+                                        "Microsoft",
+                                        "Khronos glTF Sample Assets — Water Bottle",
+                                        URI.create(
+                                                "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/WaterBottle"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/")),
+                                new GalleryAttribution(
+                                        "Studio Small 08 HDRI",
+                                        "Sergej Majboroda",
+                                        "Poly Haven — polyhaven.com/a/studio_small_08",
+                                        URI.create("https://polyhaven.com/a/studio_small_08"),
+                                        "CC0-1.0",
+                                        URI.create("https://creativecommons.org/publicdomain/zero/1.0/"))),
+                        WaterBottleModelExample::create),
+                definition(
                         "gltf-loading",
                         "glTF loading",
                         "Loading",

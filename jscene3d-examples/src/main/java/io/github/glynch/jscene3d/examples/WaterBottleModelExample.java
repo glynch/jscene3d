@@ -26,16 +26,16 @@ import io.github.glynch.jscene3d.render.ToneMapping;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.EnvironmentMap;
 
-/** Displays a realistic CC0 glTF asset with HDR image-based lighting. */
-public final class AvocadoModelExample {
+/** Displays the CC0 Water Bottle glTF asset with HDR image-based lighting. */
+public final class WaterBottleModelExample {
     private static final Color BACKGROUND = Color.srgb(0x10141b);
-    private static final String MODEL_RESOURCE = "/io/github/glynch/jscene3d/examples/avocado/Avocado.glb";
+    private static final String MODEL_RESOURCE = "/io/github/glynch/jscene3d/examples/water-bottle/WaterBottle.glb";
     private static final String ENVIRONMENT_RESOURCE =
             "/io/github/glynch/jscene3d/examples/environment/studio_small_08_1k.hdr";
 
     /** Prevents instantiation of this example entry point. */
-    private AvocadoModelExample() {
-        throw new AssertionError("AvocadoModelExample cannot be instantiated");
+    private WaterBottleModelExample() {
+        throw new AssertionError("WaterBottleModelExample cannot be instantiated");
     }
 
     /**
@@ -44,26 +44,26 @@ public final class AvocadoModelExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        ExampleLauncher.launch("JScene3D - Avocado glTF Model", AvocadoModelExample::create);
+        ExampleLauncher.launch("JScene3D - Water Bottle glTF Model", WaterBottleModelExample::create);
     }
 
     /** Creates the shared hosted implementation used by standalone and browser launch modes. */
     static HostedExample create(ExampleContext context) {
-        LoadedGltf loaded = GltfLoader.load(path(AvocadoModelExample.class, MODEL_RESOURCE));
+        LoadedGltf loaded = GltfLoader.load(path(WaterBottleModelExample.class, MODEL_RESOURCE));
         EnvironmentMap environmentMap =
-                EnvironmentMapLoader.load(path(AvocadoModelExample.class, ENVIRONMENT_RESOURCE));
+                EnvironmentMapLoader.load(path(WaterBottleModelExample.class, ENVIRONMENT_RESOURCE));
         Scene scene = loaded.scene();
         scene.setEnvironment(environmentMap);
         scene.setBackground(BACKGROUND);
-        scene.setEnvironmentIntensity(0.65f);
+        scene.setEnvironmentIntensity(0.8f);
 
         Object3D model = scene.children().getFirst();
-        model.setScale(45.0f, 45.0f, 45.0f);
+        model.setScale(10.0f, 10.0f, 10.0f);
 
         PerspectiveCamera camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.05f, 100.0f);
-        camera.setPosition(2.6f, 2.0f, 3.2f);
+        camera.setPosition(1.7f, 0.9f, 2.8f);
         OrbitControls controls = new OrbitControls(camera, context.window());
-        controls.setTarget(0.0f, 1.3f, 0.0f);
+        controls.setTarget(0.0f, 0.0f, 0.0f);
         controls.setDistanceLimits(2.0f, 12.0f);
         controls.setDampingEnabled(true);
         controls.update();
@@ -71,7 +71,7 @@ public final class AvocadoModelExample {
         Renderer renderer = context.renderer();
         RendererSettingsScope rendererSettings = RendererSettingsScope.capture(renderer);
         renderer.setToneMapping(ToneMapping.ACES_FILMIC);
-        renderer.setExposure(0.85f);
+        renderer.setExposure(0.9f);
 
         ExampleState settings = new ExampleState(scene, environmentMap, renderer);
         SceneExample example = new SceneExample(context, scene, camera, controls);
@@ -86,7 +86,7 @@ public final class AvocadoModelExample {
             panel.update();
             fpsMonitor.update();
             if (settings.autoRotate()) {
-                model.rotateY(frame.elapsedSeconds() * 0.35f);
+                model.rotateY(frame.elapsedSeconds() * 0.3f);
             }
         });
         return example;
@@ -94,7 +94,7 @@ public final class AvocadoModelExample {
 
     /** Creates controls for the model presentation and independent environment roles. */
     private static ControlPanel createPanel(ExampleContext context, ExampleState settings) {
-        ControlPanel panel = new ControlPanel(context.window(), "Avocado Model");
+        ControlPanel panel = new ControlPanel(context.window(), "Water Bottle");
         ControlPanel.Section model = panel.addSection("Model");
         model.addBoolean("auto rotate", settings::autoRotate, settings::setAutoRotate);
         ControlPanel.Section environment = panel.addSection("Environment");
@@ -106,7 +106,7 @@ public final class AvocadoModelExample {
         return panel;
     }
 
-    /** Mutable explicit GUI bindings for the realistic model presentation. */
+    /** Mutable explicit GUI bindings for the Water Bottle presentation. */
     private static final class ExampleState {
         private final Scene scene;
         private final EnvironmentMap environmentMap;

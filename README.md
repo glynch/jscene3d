@@ -202,7 +202,9 @@ side. Its control panel changes Phong shininess and emissive intensity live.
 lighting. `EnvironmentLightingExample` presents the same material dimensions
 under HDR image-based lighting, while `AvocadoModelExample` combines the glTF
 loader, a realistic CC0 model, environment lighting, and ACES filmic tone
-mapping. The browser displays source and licence metadata for bundled
+mapping. `WaterBottleModelExample` exercises base-colour, metallic-roughness,
+normal, occlusion, and emissive maps on another CC0 glTF asset. The browser
+displays source and licence metadata for bundled
 third-party assets; complete notices are collected in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 `SpotAndHemisphereLightsExample` demonstrates the two directional-area light

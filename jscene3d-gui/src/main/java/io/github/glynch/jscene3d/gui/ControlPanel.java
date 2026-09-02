@@ -15,6 +15,7 @@ import io.github.glynch.jscene3d.render.Overlay;
 import io.github.glynch.jscene3d.render.OverlayCanvas;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -29,8 +30,8 @@ import org.jspecify.annotations.Nullable;
  * Themed immediate control panel explicitly bound to application state.
  *
  * <p>Sections contain read-only text, checkboxes, floating-point and integer sliders, steppers,
- * radio groups, selects, and action buttons. Bindings use Java method references or lambdas; the
- * panel does not use reflection or direct field access. Call {@link #update()} after {@link
+ * radio groups, selects, audio players, and action buttons. Bindings use Java method references or
+ * lambdas; the panel does not use reflection or direct field access. Call {@link #update()} after {@link
  * Window#pollEvents()}, then pass this overlay to the renderer after drawing the scene.
  *
  * <p>The panel owns no native or GPU resources. It is mutable, not thread-safe, and subject to its
@@ -65,6 +66,7 @@ public final class ControlPanel implements Overlay {
     private final OverlayGuiCanvas overlayCanvas = new OverlayGuiCanvas();
 
     private @Nullable SliderItem activeSlider;
+    private @Nullable AudioPlayerItem activeAudioPlayer;
     private @Nullable SelectItem<?> openSelect;
     private boolean visible = true;
     private boolean capturesPointer;
@@ -138,6 +140,7 @@ public final class ControlPanel implements Overlay {
         this.visible = visible;
         if (!visible) {
             activeSlider = null;
+            activeAudioPlayer = null;
             closeOpenSelect();
             capturesPointer = false;
             ownsPointerPress = false;
@@ -268,42 +271,75 @@ public final class ControlPanel implements Overlay {
         pointerX = validPointer.x();
         pointerY = validPointer.y();
         if (!visible) {
-            capturesPointer = false;
-            activeSlider = null;
-            closeOpenSelect();
-            ownsPointerPress = false;
-            return false;
+            return resetHiddenInputState();
         }
+        releaseDisabledItems();
+
+        float panelX = panelX(windowWidth);
+        boolean pointerOverPanel = contains(pointerX, pointerY, panelX, MARGIN, WIDTH, height());
+        return processPointer(validPointer, panelX, pointerOverPanel);
+    }
+
+    /** Releases active controls that belong to sections which no longer accept input. */
+    private void releaseDisabledItems() {
         if (activeSlider != null && !isEnabled(activeSlider)) {
             activeSlider = null;
+        }
+        if (activeAudioPlayer != null && !isEnabled(activeAudioPlayer)) {
+            activeAudioPlayer = null;
         }
         if (openSelect != null && !isEnabled(openSelect)) {
             closeOpenSelect();
         }
+    }
 
-        float panelX = panelX(windowWidth);
-        boolean pointerOverPanel = contains(pointerX, pointerY, panelX, MARGIN, WIDTH, height());
-        if (validPointer.pressed() && pointerOverPanel) {
+    /** Applies drag, press, release, and pointer-capture semantics for one visible frame. */
+    private boolean processPointer(PointerFrame pointer, float panelX, boolean pointerOverPanel) {
+        if (pointer.pressed() && pointerOverPanel) {
             ownsPointerPress = true;
         }
-        capturesPointer = ownsPointerPress || activeSlider != null || pointerOverPanel;
+        capturesPointer = ownsPointerPress || activeSlider != null || activeAudioPlayer != null || pointerOverPanel;
 
-        boolean changed = false;
-        if (activeSlider != null && validPointer.down()) {
-            changed |= applySlider(activeSlider, pointerX, panelX);
+        boolean changed = applyActiveDrag(pointer, panelX);
+        if (pointer.pressed()) {
+            changed |= pointerOverPanel ? activate(pointerX, pointerY, panelX) : closeOpenSelect();
         }
-        if (validPointer.pressed()) {
-            if (pointerOverPanel) {
-                changed |= activate(pointerX, pointerY, panelX);
-            } else {
-                changed |= closeOpenSelect();
-            }
-        }
-        if (validPointer.released()) {
-            activeSlider = null;
-            ownsPointerPress = false;
+        if (pointer.released()) {
+            releasePointer();
         }
         return changed;
+    }
+
+    /** Applies the current slider or audio-player drag while the primary button remains down. */
+    private boolean applyActiveDrag(PointerFrame pointer, float panelX) {
+        boolean changed = false;
+        if (activeSlider != null && pointer.down()) {
+            changed |= applySlider(activeSlider, pointerX, panelX);
+        }
+        if (activeAudioPlayer != null && pointer.down()) {
+            changed |= activeAudioPlayer.drag((float) pointerX - panelX);
+        }
+        return changed;
+    }
+
+    /** Releases every drag and press ownership state. */
+    private void releasePointer() {
+        activeSlider = null;
+        if (activeAudioPlayer != null) {
+            activeAudioPlayer.endDrag();
+            activeAudioPlayer = null;
+        }
+        ownsPointerPress = false;
+    }
+
+    /** Clears transient input state while the panel is hidden. */
+    private boolean resetHiddenInputState() {
+        capturesPointer = false;
+        activeSlider = null;
+        activeAudioPlayer = null;
+        closeOpenSelect();
+        ownsPointerPress = false;
+        return false;
     }
 
     /** Finds and activates the panel row under one primary-button press. */
@@ -314,6 +350,7 @@ public final class ControlPanel implements Overlay {
                 closeOpenSelect();
                 section.expanded = !section.expanded;
                 activeSlider = null;
+                activeAudioPlayer = null;
                 return true;
             }
             rowY += SECTION_HEIGHT;
@@ -360,6 +397,13 @@ public final class ControlPanel implements Overlay {
                         }
                         activeSlider = sliderItem;
                         yield applySlider(sliderItem, x, panelX);
+                    }
+                    case AudioPlayerItem audioPlayerItem -> {
+                        boolean changed = audioPlayerItem.activate((float) x - panelX, (float) y - itemY);
+                        if (audioPlayerItem.isDragging()) {
+                            activeAudioPlayer = audioPlayerItem;
+                        }
+                        yield changed;
                     }
                     case ChoiceItem<?> choiceItem -> choiceItem.select(x >= panelX + WIDTH * 0.5f);
                     case RadioGroupItem<?> radioGroupItem -> radioGroupItem.select((float) y - itemY);
@@ -530,6 +574,9 @@ public final class ControlPanel implements Overlay {
             if (!expanded && panel.activeSlider != null && items.contains(panel.activeSlider)) {
                 panel.activeSlider = null;
             }
+            if (!expanded && panel.activeAudioPlayer != null && items.contains(panel.activeAudioPlayer)) {
+                panel.activeAudioPlayer = null;
+            }
             if (!expanded && panel.openSelect != null && items.contains(panel.openSelect)) {
                 panel.closeOpenSelect();
             }
@@ -557,6 +604,9 @@ public final class ControlPanel implements Overlay {
             this.enabled = Objects.requireNonNull(enabled, "enabled");
             if (!isEnabled() && panel.activeSlider != null && items.contains(panel.activeSlider)) {
                 panel.activeSlider = null;
+            }
+            if (!isEnabled() && panel.activeAudioPlayer != null && items.contains(panel.activeAudioPlayer)) {
+                panel.activeAudioPlayer = null;
             }
             if (!isEnabled() && panel.openSelect != null && items.contains(panel.openSelect)) {
                 panel.closeOpenSelect();
@@ -649,6 +699,16 @@ public final class ControlPanel implements Overlay {
                     Objects.requireNonNull(setter, "setter"),
                     minimum,
                     maximum));
+        }
+
+        /**
+         * Adds a media-style audio player with transport, seek, mute, and volume controls.
+         *
+         * @param binding application-owned audio playback binding
+         * @throws NullPointerException if {@code binding} is {@code null}
+         */
+        public void addAudioPlayer(AudioPlayerBinding binding) {
+            items.add(new AudioPlayerItem(Objects.requireNonNull(binding, "binding")));
         }
 
         /**
@@ -768,7 +828,14 @@ public final class ControlPanel implements Overlay {
 
     /** Shared paint contract for one panel row. */
     private sealed interface Item
-            permits BooleanItem, SliderItem, ChoiceItem, RadioGroupItem, SelectItem, ButtonItem, TextItem {
+            permits BooleanItem,
+                    SliderItem,
+                    ChoiceItem,
+                    RadioGroupItem,
+                    SelectItem,
+                    AudioPlayerItem,
+                    ButtonItem,
+                    TextItem {
         /** Returns this control's current logical height. */
         default float height() {
             return ITEM_HEIGHT;
@@ -1075,6 +1142,197 @@ public final class ControlPanel implements Overlay {
                 }
             }
         }
+    }
+
+    /** Media-style transport, position, mute, and volume controls in one bound item. */
+    private static final class AudioPlayerItem implements Item {
+        private static final float PLAYER_HEIGHT = 72.0f;
+        private static final float SEEK_X = 108.0f;
+        private static final float SEEK_WIDTH = 104.0f;
+        private static final float VOLUME_X = 76.0f;
+        private static final float VOLUME_WIDTH = 160.0f;
+        private static final float TRACK_HEIGHT = 4.0f;
+        private static final float THUMB_SIZE = 10.0f;
+
+        private final AudioPlayerBinding binding;
+        private @Nullable AudioDragTarget dragTarget;
+
+        /** Retains one backend-independent playback binding. */
+        private AudioPlayerItem(AudioPlayerBinding binding) {
+            this.binding = binding;
+        }
+
+        @Override
+        public float height() {
+            return PLAYER_HEIGHT;
+        }
+
+        /** Applies the action or begins the drag under one local pointer position. */
+        private boolean activate(float x, float y) {
+            if (y < ITEM_HEIGHT && x < 40.0f) {
+                togglePlayback();
+                return true;
+            }
+            if (y < ITEM_HEIGHT && x >= 224.0f) {
+                binding.setMuted(!binding.isMuted());
+                return true;
+            }
+            if (y < ITEM_HEIGHT && x >= SEEK_X) {
+                dragTarget = AudioDragTarget.SEEK;
+                return drag(x);
+            }
+            if (y >= ITEM_HEIGHT && x >= VOLUME_X) {
+                dragTarget = AudioDragTarget.VOLUME;
+                return drag(x);
+            }
+            return false;
+        }
+
+        /** Applies the active seek or volume drag. */
+        private boolean drag(float x) {
+            if (dragTarget == AudioDragTarget.SEEK) {
+                float fraction = Math.clamp((x - SEEK_X) / SEEK_WIDTH, 0.0f, 1.0f);
+                binding.seek(positionAt(fraction));
+                return true;
+            }
+            if (dragTarget == AudioDragTarget.VOLUME) {
+                binding.setVolume(Math.clamp((x - VOLUME_X) / VOLUME_WIDTH, 0.0f, 1.0f));
+                return true;
+            }
+            return false;
+        }
+
+        /** Returns whether this item currently owns a pointer drag. */
+        private boolean isDragging() {
+            return dragTarget != null;
+        }
+
+        /** Releases this item's pointer drag. */
+        private void endDrag() {
+            dragTarget = null;
+        }
+
+        @Override
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
+            Duration duration = requireDuration(binding.duration(), "duration");
+            Duration position = requirePosition(binding.position(), duration);
+            float volume = requireVolume(binding.volume());
+            paintPlaybackIcon(canvas, x + 21.0f, y + 19.0f, binding.isPlaying(), theme);
+            FONT.text(
+                    canvas,
+                    x + 40.0f,
+                    y + 11.5f,
+                    formatTime(position) + " / " + formatTime(duration),
+                    VALUE_FONT_SIZE,
+                    theme.text());
+            paintTrack(canvas, x + SEEK_X, y + 17.0f, SEEK_WIDTH, fraction(position, duration), theme);
+            paintSpeaker(canvas, x + 241.0f, y + 19.0f, binding.isMuted(), theme);
+            FONT.text(canvas, x + HORIZONTAL_PADDING, y + 48.0f, "volume", ITEM_FONT_SIZE, theme.secondaryText());
+            paintTrack(canvas, x + VOLUME_X, y + 55.0f, VOLUME_WIDTH, volume, theme);
+        }
+
+        /** Starts or pauses playback according to the current state. */
+        private void togglePlayback() {
+            if (binding.isPlaying()) {
+                binding.pause();
+            } else {
+                binding.play();
+            }
+        }
+
+        /** Converts a normalized seek fraction to an exact duration. */
+        private Duration positionAt(float fraction) {
+            Duration duration = requireDuration(binding.duration(), "duration");
+            long nanos = Math.round(duration.toNanos() * (double) fraction);
+            return Duration.ofNanos(nanos);
+        }
+
+        /** Paints a standard control track and thumb. */
+        private static void paintTrack(
+                GuiCanvas canvas, float x, float y, float width, float fraction, GuiTheme theme) {
+            canvas.roundedRectangle(x, y, width, TRACK_HEIGHT, 2.0f, theme.control(), 1.0f);
+            canvas.roundedRectangle(x, y, width * fraction, TRACK_HEIGHT, 2.0f, theme.accent(), 1.0f);
+            float thumbX = x + width * fraction - THUMB_SIZE * 0.5f;
+            canvas.roundedRectangle(thumbX, y - 3.0f, THUMB_SIZE, THUMB_SIZE, THUMB_SIZE * 0.5f, theme.accent(), 1.0f);
+        }
+
+        /** Paints either a play triangle or two pause bars. */
+        private static void paintPlaybackIcon(GuiCanvas canvas, float x, float y, boolean playing, GuiTheme theme) {
+            if (playing) {
+                canvas.roundedRectangle(x - 5.0f, y - 6.0f, 3.0f, 12.0f, 1.0f, theme.text(), 1.0f);
+                canvas.roundedRectangle(x + 2.0f, y - 6.0f, 3.0f, 12.0f, 1.0f, theme.text(), 1.0f);
+                return;
+            }
+            canvas.line(x - 4.0f, y - 7.0f, x + 6.0f, y, 2.0f, theme.text(), 1.0f);
+            canvas.line(x + 6.0f, y, x - 4.0f, y + 7.0f, 2.0f, theme.text(), 1.0f);
+            canvas.line(x - 4.0f, y + 7.0f, x - 4.0f, y - 7.0f, 2.0f, theme.text(), 1.0f);
+        }
+
+        /** Paints a compact speaker and optional mute cross. */
+        private static void paintSpeaker(GuiCanvas canvas, float x, float y, boolean muted, GuiTheme theme) {
+            canvas.roundedRectangle(x - 9.0f, y - 3.0f, 4.0f, 6.0f, 1.0f, theme.text(), 1.0f);
+            canvas.line(x - 5.0f, y - 3.0f, x, y - 7.0f, 1.5f, theme.text(), 1.0f);
+            canvas.line(x, y - 7.0f, x, y + 7.0f, 1.5f, theme.text(), 1.0f);
+            canvas.line(x, y + 7.0f, x - 5.0f, y + 3.0f, 1.5f, theme.text(), 1.0f);
+            if (muted) {
+                canvas.line(x + 4.0f, y - 5.0f, x + 10.0f, y + 5.0f, 1.5f, theme.mutedText(), 1.0f);
+                canvas.line(x + 10.0f, y - 5.0f, x + 4.0f, y + 5.0f, 1.5f, theme.mutedText(), 1.0f);
+                return;
+            }
+            canvas.line(x + 4.0f, y - 4.0f, x + 7.0f, y, 1.5f, theme.text(), 1.0f);
+            canvas.line(x + 7.0f, y, x + 4.0f, y + 4.0f, 1.5f, theme.text(), 1.0f);
+        }
+
+        /** Converts one duration to a compact hours-or-minutes display. */
+        private static String formatTime(Duration duration) {
+            long totalSeconds = duration.toSeconds();
+            long hours = totalSeconds / 3_600L;
+            long minutes = totalSeconds % 3_600L / 60L;
+            long seconds = totalSeconds % 60L;
+            if (hours > 0L) {
+                return hours + ":" + twoDigits(minutes) + ":" + twoDigits(seconds);
+            }
+            return minutes + ":" + twoDigits(seconds);
+        }
+
+        /** Returns exactly two decimal digits for a time component. */
+        private static String twoDigits(long value) {
+            return value < 10L ? "0" + value : Long.toString(value);
+        }
+
+        /** Returns a valid non-negative duration. */
+        private static Duration requireDuration(Duration value, String name) {
+            Duration duration = Objects.requireNonNull(value, name);
+            if (duration.isNegative()) {
+                throw new IllegalArgumentException(name + " must not be negative");
+            }
+            return duration;
+        }
+
+        /** Returns a position clamped to a valid non-negative media interval. */
+        private static Duration requirePosition(Duration value, Duration duration) {
+            Duration position = requireDuration(value, "position");
+            return position.compareTo(duration) > 0 ? duration : position;
+        }
+
+        /** Returns a valid unit-interval volume. */
+        private static float requireVolume(float value) {
+            return Preconditions.requireUnitInterval(value, "volume");
+        }
+
+        /** Computes a position fraction, including the zero-duration case. */
+        private static float fraction(Duration position, Duration duration) {
+            if (duration.isZero()) {
+                return 0.0f;
+            }
+            return (float) Math.clamp(position.toNanos() / (double) duration.toNanos(), 0.0, 1.0);
+        }
+    }
+
+    /** Active drag destination within one audio player. */
+    private enum AudioDragTarget {
+        SEEK,
+        VOLUME
     }
 
     /** Action-button row. */

@@ -60,7 +60,13 @@ Open the game-runtime suite with:
 ./tools/scripts/run-example.sh GameExampleBrowser
 ```
 
-All three browsers use `jscene3d-example-framework`, which keeps one native window
+Open the audio suite with:
+
+```shell
+./tools/scripts/run-example.sh AudioExampleBrowser
+```
+
+All four browsers use `jscene3d-example-framework`, which keeps one native window
 and renderer alive while examples are selected. Their left sidebars provide
 captured thumbnails, category and tag search, scrolling, and persistent
 selection; the right content area hosts the fully interactive example.
@@ -107,6 +113,11 @@ kinematic-movement`.
 Use `--suite game` for game-runtime examples, such as
 `./tools/scripts/capture-example-thumbnails.sh --suite game
 first-person-sandbox third-person-sandbox`.
+
+Use `--suite audio` for audio examples, such as
+`ALSOFT_DRIVERS=null ./tools/scripts/capture-example-thumbnails.sh --suite
+audio positional-audio`. The null driver is useful for silent automated
+captures; omit it when interactively listening to an example.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
@@ -499,6 +510,27 @@ collision, and sliding. Run them in the game example browser or directly with:
 ./tools/scripts/run-example.sh ThirdPersonSandboxExample
 ```
 
+## Audio
+
+The optional `jscene3d-audio` artifact provides buffered Ogg Vorbis clips,
+independent playback sources, three-dimensional distance attenuation,
+camera-listener updates, and separate master, music, and effects gains through
+an OpenAL implementation. The public interface remains focused on application
+audio concepts; OpenAL handles and decoder details stay encapsulated.
+
+The separate audio suite demonstrates a mono source orbiting the listener and
+independent stereo music and interface-effect mixing. Run either example
+directly with:
+
+```shell
+./tools/scripts/run-example.sh PositionalAudioExample
+./tools/scripts/run-example.sh AudioMixingExample
+```
+
+All bundled example sounds and music are CC0 assets from Kenney. Their source,
+license notices, and exact selected filenames are recorded beside the assets in
+`jscene3d-audio-examples`.
+
 ## Project structure
 
 - `jscene3d-core`: renderer-independent scene, camera, geometry, material,
@@ -513,12 +545,16 @@ collision, and sliding. Run them in the game example browser or directly with:
 - `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
 - `jscene3d-game`: optional, genre-independent application lifecycle, Fixed
   Updates, semantic input actions, and interpolated Physics Bindings.
+- `jscene3d-audio`: optional OpenAL-backed clips, playback sources, positional
+  attenuation, listener control, and volume categories.
 - `jscene3d-example-framework`: unpublished reusable native hosting, browsing,
   lifecycle, catalog, and thumbnail-capture support.
 - `jscene3d-examples`: unpublished rendering and asset-loading examples.
 - `jscene3d-physics-examples`: unpublished visual physics examples.
 - `jscene3d-game-examples`: unpublished examples that integrate the Game
   Engine, Physics Engine, renderer, and shared browser framework.
+- `jscene3d-audio-examples`: unpublished positional-audio and mixing examples
+  using attributed CC0 sounds and music.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and
 `CONTEXT.md` for the accepted version 0.1 design and terminology.

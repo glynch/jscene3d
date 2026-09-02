@@ -7,9 +7,11 @@ coordinates are `io.github.glynch:jscene3d-core`,
 `io.github.glynch:jscene3d-lwjgl`, and the optional
 `io.github.glynch:jscene3d-gui`; the post-foundation reusable artifacts include
 `io.github.glynch:jscene3d-gltf`, `io.github.glynch:jscene3d-physics`, and
-`io.github.glynch:jscene3d-game`. The unpublished example reactor artifacts are
+`io.github.glynch:jscene3d-game`, and `io.github.glynch:jscene3d-audio`. The
+unpublished example reactor artifacts are
 `jscene3d-example-framework`, `jscene3d-examples`,
-`jscene3d-physics-examples`, and `jscene3d-game-examples`.
+`jscene3d-physics-examples`, `jscene3d-game-examples`, and
+`jscene3d-audio-examples`.
 
 ## Language
 

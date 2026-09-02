@@ -36,6 +36,7 @@
         <module>jscene3d-core</module>
         <module>jscene3d-physics</module>
         <module>jscene3d-game</module>
+        <module>jscene3d-audio</module>
         <module>jscene3d-lwjgl</module>
         <module>jscene3d-gui</module>
         <module>jscene3d-gltf</module>
@@ -43,6 +44,7 @@
         <module>jscene3d-examples</module>
         <module>jscene3d-physics-examples</module>
         <module>jscene3d-game-examples</module>
+        <module>jscene3d-audio-examples</module>
     </modules>
 
     <properties>
@@ -163,6 +165,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-game</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-audio</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

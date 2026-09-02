@@ -11,7 +11,7 @@ PROJECT_DIRECTORY="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd)"
 readonly PROJECT_DIRECTORY
 
 print_usage() {
-    printf 'Usage: %s [--suite rendering|physics|game] [catalog-id ...]\n' "$0"
+    printf 'Usage: %s [--suite rendering|physics|game|audio] [catalog-id ...]\n' "$0"
     printf 'Captures every example in the selected suite when no catalog IDs are supplied.\n'
 }
 
@@ -38,6 +38,10 @@ case ${suite} in
     game)
         readonly EXAMPLE_MODULE="jscene3d-game-examples"
         readonly CAPTURE_CLASS="io.github.glynch.jscene3d.game.examples.tools.ExampleThumbnailCapture"
+        ;;
+    audio)
+        readonly EXAMPLE_MODULE="jscene3d-audio-examples"
+        readonly CAPTURE_CLASS="io.github.glynch.jscene3d.audio.examples.tools.ExampleThumbnailCapture"
         ;;
     *)
         printf 'Unknown example suite: %s\n\n' "${suite}" >&2

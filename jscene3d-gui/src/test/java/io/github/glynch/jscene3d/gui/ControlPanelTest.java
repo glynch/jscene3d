@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import io.github.glynch.jscene3d.gui.internal.GuiCanvas;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,6 +18,47 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 final class ControlPanelTest {
+    @Test
+    void appliesAudioPlayerTransportSeekMuteAndVolumeBindings() {
+        ControlPanel panel = new ControlPanel("Controls");
+        TestAudioPlayerBinding binding = new TestAudioPlayerBinding();
+        panel.addSection("Playback").addAudioPlayer(binding);
+
+        assertThat(panel.update(pointer(537.0, 107.0), 800, 600)).isTrue();
+        assertThat(binding.isPlaying()).isTrue();
+        release(panel, 537.0, 107.0);
+
+        assertThat(panel.update(pointer(676.0, 107.0), 800, 600)).isTrue();
+        assertThat(binding.position()).isEqualTo(Duration.ofSeconds(5L));
+        release(panel, 676.0, 107.0);
+
+        assertThat(panel.update(pointer(756.0, 107.0), 800, 600)).isTrue();
+        assertThat(binding.isMuted()).isTrue();
+        release(panel, 756.0, 107.0);
+
+        assertThat(panel.update(pointer(672.0, 145.0), 800, 600)).isTrue();
+        assertThat(binding.volume()).isEqualTo(0.5F);
+        release(panel, 672.0, 145.0);
+
+        assertThat(panel.update(pointer(537.0, 107.0), 800, 600)).isTrue();
+        assertThat(binding.isPlaying()).isFalse();
+    }
+
+    @Test
+    @SuppressWarnings("NullAway") // Deliberately exercises runtime null validation.
+    void paintsAnAudioPlayerAndRejectsMissingBindings() {
+        ControlPanel panel = new ControlPanel("Controls");
+        ControlPanel.Section section = panel.addSection("Playback");
+        section.addAudioPlayer(new TestAudioPlayerBinding());
+        RecordingGuiCanvas canvas = new RecordingGuiCanvas();
+
+        panel.paint(canvas, 800, 600);
+
+        assertThat(canvas.roundedRectangleCount()).isGreaterThan(8);
+        assertThat(canvas.lineCount()).isGreaterThan(5);
+        assertThatNullPointerException().isThrownBy(() -> section.addAudioPlayer(null));
+    }
+
     @Test
     void paintsFloatSlidersAtTheirConfiguredPrecision() {
         ControlPanel roundedPanel = new ControlPanel("Controls");
@@ -378,5 +420,70 @@ final class ControlPanelTest {
     /** Creates one primary-button press retained as held for the frame. */
     private static ControlPanel.PointerFrame pointer(double x, double y) {
         return new ControlPanel.PointerFrame(x, y, true, true, false);
+    }
+
+    /** Releases one simulated primary-pointer press. */
+    private static void release(ControlPanel panel, double x, double y) {
+        panel.update(new ControlPanel.PointerFrame(x, y, false, false, true), 800, 600);
+    }
+
+    /** Mutable backend-independent player used by the control interaction test. */
+    private static final class TestAudioPlayerBinding implements AudioPlayerBinding {
+        private static final Duration DURATION = Duration.ofSeconds(10L);
+
+        private Duration position = Duration.ofSeconds(1L);
+        private float volume = 1.0F;
+        private boolean playing;
+        private boolean muted;
+
+        @Override
+        public boolean isPlaying() {
+            return playing;
+        }
+
+        @Override
+        public Duration position() {
+            return position;
+        }
+
+        @Override
+        public Duration duration() {
+            return DURATION;
+        }
+
+        @Override
+        public void play() {
+            playing = true;
+        }
+
+        @Override
+        public void pause() {
+            playing = false;
+        }
+
+        @Override
+        public void seek(Duration position) {
+            this.position = position;
+        }
+
+        @Override
+        public float volume() {
+            return volume;
+        }
+
+        @Override
+        public void setVolume(float volume) {
+            this.volume = volume;
+        }
+
+        @Override
+        public boolean isMuted() {
+            return muted;
+        }
+
+        @Override
+        public void setMuted(boolean muted) {
+            this.muted = muted;
+        }
     }
 }

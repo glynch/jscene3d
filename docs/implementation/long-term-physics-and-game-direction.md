@@ -59,6 +59,11 @@ The first-person sandbox proves semantic input, deterministic character motion,
 and interpolated presentation without placing application rules in a reusable
 artifact.
 
+Audio examples likewise live in the unpublished `jscene3d-audio-examples`
+artifact. The reusable OpenAL-backed implementation remains isolated in
+`jscene3d-audio`, so neither the physics nor game module acquires a native audio
+dependency.
+
 Dynamic Rigid Bodies, forces, mass, friction, restitution, contact resolution,
 constraints, continuous collision detection, sleeping, and more advanced
 solvers remain part of the general Physics Engine direction. They follow the

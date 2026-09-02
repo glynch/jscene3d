@@ -42,6 +42,21 @@ public final class Preconditions {
     }
 
     /**
+     * Requires a finite floating-point argument in the inclusive unit interval.
+     *
+     * @param value value to validate
+     * @param name argument name used in diagnostics
+     * @return validated value
+     */
+    public static float requireUnitInterval(float value, String name) {
+        requireFinite(value, name);
+        if (value < 0.0F || value > 1.0F) {
+            throw new IllegalArgumentException(name + " must be between zero and one: " + value);
+        }
+        return value;
+    }
+
+    /**
      * Requires an ordered finite floating-point interval.
      *
      * @param minimum lower endpoint

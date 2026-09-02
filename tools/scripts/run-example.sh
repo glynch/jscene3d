@@ -15,6 +15,8 @@ readonly PHYSICS_MODULE="jscene3d-physics-examples"
 readonly PHYSICS_PACKAGE="io.github.glynch.jscene3d.physics.examples"
 readonly GAME_MODULE="jscene3d-game-examples"
 readonly GAME_PACKAGE="io.github.glynch.jscene3d.game.examples"
+readonly AUDIO_MODULE="jscene3d-audio-examples"
+readonly AUDIO_PACKAGE="io.github.glynch.jscene3d.audio.examples"
 
 example_directory() {
     local module=$1
@@ -38,6 +40,7 @@ print_examples() {
         print_module_examples "${RENDERING_MODULE}" "${RENDERING_PACKAGE}"
         print_module_examples "${PHYSICS_MODULE}" "${PHYSICS_PACKAGE}"
         print_module_examples "${GAME_MODULE}" "${GAME_PACKAGE}"
+        print_module_examples "${AUDIO_MODULE}" "${AUDIO_PACKAGE}"
     } | sort
 }
 
@@ -51,9 +54,11 @@ resolve_example() {
     local rendering_source
     local physics_source
     local game_source
+    local audio_source
     rendering_source="$(example_directory "${RENDERING_MODULE}" "${RENDERING_PACKAGE}")/${example_name}.java"
     physics_source="$(example_directory "${PHYSICS_MODULE}" "${PHYSICS_PACKAGE}")/${example_name}.java"
     game_source="$(example_directory "${GAME_MODULE}" "${GAME_PACKAGE}")/${example_name}.java"
+    audio_source="$(example_directory "${AUDIO_MODULE}" "${AUDIO_PACKAGE}")/${example_name}.java"
     if [[ -f ${rendering_source} ]]; then
         printf '%s\t%s' "${RENDERING_MODULE}" "${RENDERING_PACKAGE}"
         return
@@ -64,6 +69,10 @@ resolve_example() {
     fi
     if [[ -f ${game_source} ]]; then
         printf '%s\t%s' "${GAME_MODULE}" "${GAME_PACKAGE}"
+        return
+    fi
+    if [[ -f ${audio_source} ]]; then
+        printf '%s\t%s' "${AUDIO_MODULE}" "${AUDIO_PACKAGE}"
         return
     fi
     return 1

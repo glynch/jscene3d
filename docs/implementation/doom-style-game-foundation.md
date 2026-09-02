@@ -86,9 +86,11 @@ must not define sectors, weapons, enemies, damage rules, or a Doom level format.
 
 A recognizable action game requires positional effects, non-positional user
 interface effects, music, camera-listener updates, and separate master, music,
-and effects volumes. This should be an optional concrete JScene3D audio artifact
-backed initially by OpenAL. A multi-backend adapter hierarchy will not be added
-until a second backend creates a real integration seam.
+and effects volumes. The optional `jscene3d-audio` artifact now provides this
+foundation through buffered Ogg Vorbis clips and an OpenAL implementation. Its
+public interface exposes application audio concepts rather than native handles.
+A multi-backend adapter hierarchy will not be added until a second backend
+creates a real integration seam.
 
 ## First Game Application slice
 
@@ -110,7 +112,7 @@ meshes, dynamic rigid-body props, multiple weapons, or complex enemy AI.
 
 ## Delivery sequence
 
-The first five reusable foundation slices are complete:
+The first six reusable foundation slices are complete:
 
 1. Cursor capture, raw mouse support, focus state, and pointer-lock controls.
 2. The collision-query foundation in `jscene3d-physics`.
@@ -122,12 +124,14 @@ The first five reusable foundation slices are complete:
    `jscene3d-game-examples` suite.
 5. Reusable named sprite-atlas animations, independent animated-billboard
    playback, and observable frame, loop, and completion events.
+6. Buffered Ogg Vorbis playback, positional effects, listener updates, and
+   independent master, music, and effects volumes in `jscene3d-audio`, proven
+   by the separate `jscene3d-audio-examples` suite using CC0 assets.
 
 The remaining sequence is:
 
 1. Define game-state and asset-lifetime requirements from the first playable
    application rather than introducing speculative abstractions.
-2. Add the initial audio artifact.
-3. Build a one-room combat prototype in the separate Game Application.
-4. Expand the prototype into the first compact level without broadening the
+2. Build a one-room combat prototype in the separate Game Application.
+3. Expand the prototype into the first compact level without broadening the
    reusable artifacts with title-specific concepts.

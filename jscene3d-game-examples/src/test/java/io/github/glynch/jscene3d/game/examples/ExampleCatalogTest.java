@@ -31,12 +31,12 @@ final class ExampleCatalogTest {
         });
     }
 
-    /** Keeps the initial suite focused on the complete reusable game-runtime seam. */
+    /** Keeps both camera-policy examples in stable display order. */
     @Test
-    void containsTheFirstPersonSandbox() {
+    void containsFirstAndThirdPersonSandboxes() {
         assertThat(ExampleCatalog.definitions())
                 .extracting(ExampleDefinition::id)
-                .containsExactly("first-person-sandbox");
+                .containsExactly("first-person-sandbox", "third-person-sandbox");
     }
 
     /** Loads one required thumbnail through the suite's resource anchor. */

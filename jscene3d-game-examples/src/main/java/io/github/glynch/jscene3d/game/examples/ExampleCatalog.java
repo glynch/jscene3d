@@ -31,13 +31,38 @@ public final class ExampleCatalog {
 
     /** Returns all game definitions in stable display order. */
     static List<ExampleDefinition> definitions() {
-        return List.of(new ExampleDefinition(
-                "first-person-sandbox",
-                "First-person game sandbox",
-                "Game Runtime",
-                "Fixed simulation, semantic input, pointer look, character movement, and interpolated physics presentation.",
-                List.of("game", "loop", "input", "actions", "physics", "binding", "interpolation", "first-person"),
-                List.of(),
-                FirstPersonSandboxExample::create));
+        return List.of(
+                new ExampleDefinition(
+                        "first-person-sandbox",
+                        "First-person game sandbox",
+                        "Game Runtime",
+                        "Fixed simulation, semantic input, pointer and keyboard look, character movement, and interpolated physics presentation.",
+                        List.of(
+                                "game",
+                                "loop",
+                                "input",
+                                "actions",
+                                "physics",
+                                "binding",
+                                "interpolation",
+                                "first-person"),
+                        List.of(),
+                        FirstPersonSandboxExample::create),
+                new ExampleDefinition(
+                        "third-person-sandbox",
+                        "Third-person game sandbox",
+                        "Game Runtime",
+                        "Camera-relative movement, a visible facing direction, and an independently orbiting follow camera.",
+                        List.of(
+                                "game",
+                                "input",
+                                "actions",
+                                "physics",
+                                "binding",
+                                "interpolation",
+                                "third-person",
+                                "orbit"),
+                        List.of(),
+                        ThirdPersonSandboxExample::create));
     }
 }

@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.game.examples;
 import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
-import io.github.glynch.jscene3d.controls.PointerLockControls;
+import io.github.glynch.jscene3d.controls.OrbitControls;
 import io.github.glynch.jscene3d.examples.framework.ExampleContext;
 import io.github.glynch.jscene3d.examples.framework.ExampleFrame;
 import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
@@ -31,6 +31,8 @@ import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.objects.Object3D;
+import io.github.glynch.jscene3d.objects.RotationOrder;
 import io.github.glynch.jscene3d.physics.CharacterController;
 import io.github.glynch.jscene3d.physics.KinematicBody;
 import io.github.glynch.jscene3d.physics.PhysicsWorld;
@@ -38,30 +40,28 @@ import io.github.glynch.jscene3d.physics.movement.CharacterMoveResult;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.platform.Key;
-import io.github.glynch.jscene3d.platform.MouseButton;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.time.Duration;
 import java.util.Locale;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-/** Demonstrates the complete game-runtime seam in a small first-person movement sandbox. */
-public final class FirstPersonSandboxExample {
+/** Demonstrates camera-relative character movement with an orbiting third-person camera. */
+public final class ThirdPersonSandboxExample {
     /** Prevents instantiation of this example entry point. */
-    private FirstPersonSandboxExample() {
-        throw new AssertionError("FirstPersonSandboxExample cannot be instantiated");
+    private ThirdPersonSandboxExample() {
+        throw new AssertionError("ThirdPersonSandboxExample cannot be instantiated");
     }
 
     /**
      * Opens the example until the window closes.
      *
-     * <p>Click the rendered view to capture the pointer, use W/S or Up/Down to move, A/D to
-     * strafe, Left/Right or the mouse to turn, Space to jump, and Escape to release the pointer.
+     * <p>Use W A S D or the arrow keys to move, drag to orbit, scroll to zoom, and Space to jump.
      *
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        ExampleLauncher.launch("JScene3D - First-Person Game Sandbox", FirstPersonSandboxExample::create);
+        ExampleLauncher.launch("JScene3D - Third-Person Game Sandbox", ThirdPersonSandboxExample::create);
     }
 
     /** Creates the shared hosted implementation used by browser and standalone launch modes. */
@@ -73,16 +73,13 @@ public final class FirstPersonSandboxExample {
 
     /** Builds live instructions and game-loop diagnostics. */
     private static ControlPanel createPanel(ExampleContext context, SandboxApplication application) {
-        ControlPanel panel = new ControlPanel(context.window(), "First-Person Game Sandbox");
+        ControlPanel panel = new ControlPanel(context.window(), "Third-Person Game Sandbox");
         ControlPanel.Section controls = panel.addSection("Controls");
-        controls.addText("capture pointer", () -> "click the rendered view");
-        controls.addText("forward / back", () -> "W S / Up Down");
-        controls.addText("strafe", () -> "A D");
-        controls.addText("turn", () -> "Left Right / mouse");
+        controls.addText("move", () -> "W A S D / arrow keys");
+        controls.addText("orbit camera", () -> "drag");
+        controls.addText("zoom", () -> "scroll");
         controls.addText("jump", () -> "Space");
-        controls.addText("release pointer", () -> "Escape");
-        controls.addButton("capture pointer", () -> !application.isPointerLocked(), application::lockPointer);
-        controls.addButton("reset player", application::reset);
+        controls.addButton("reset player and camera", application::reset);
         ControlPanel.Section runtime = panel.addSection("Runtime");
         runtime.addText("fixed tick", application::tickStatus);
         runtime.addText("fixed updates", application::fixedUpdateStatus);
@@ -116,10 +113,10 @@ public final class FirstPersonSandboxExample {
         @Override
         public void update(ExampleFrame frame) {
             panel.update();
-            capturePointer(frame.pointerCaptured());
-            InputCapture capture = new InputCapture(frame.keyboardCaptured(), panel.capturesPointer());
+            boolean pointerCaptured = frame.pointerCaptured() || panel.capturesPointer();
+            application.updateCamera(frame.elapsedSeconds(), pointerCaptured);
+            InputCapture capture = new InputCapture(frame.keyboardCaptured(), pointerCaptured);
             ActionSnapshot input = application.inputMap.sample(context.window().input(), capture);
-            application.updateView(input, frame.elapsedSeconds());
             runtime.advance(elapsed(frame.elapsedSeconds()), input);
         }
 
@@ -139,60 +136,49 @@ public final class FirstPersonSandboxExample {
             runtime.close();
         }
 
-        /** Captures a primary click in the rendered viewport when the host UI does not own it. */
-        private void capturePointer(boolean hostPointerCaptured) {
-            if (!application.isPointerLocked()
-                    && !hostPointerCaptured
-                    && !panel.capturesPointer()
-                    && context.containsPointer()
-                    && context.window().input().wasMouseButtonPressed(MouseButton.LEFT)) {
-                application.lockPointer();
-            }
-        }
-
         /** Converts the example host's finite seconds to nanosecond game-loop time. */
         private static Duration elapsed(float elapsedSeconds) {
             return Duration.ofNanos(Math.round(elapsedSeconds * 1_000_000_000.0));
         }
     }
 
-    /** Owns the example's game-specific world, rules, presentation, and resources. */
+    /** Owns the example's third-person world, rules, presentation, and resources. */
     private static final class SandboxApplication implements GameApplication {
         private static final InputAction MOVE_FORWARD = new InputAction("move-forward");
         private static final InputAction MOVE_BACKWARD = new InputAction("move-backward");
         private static final InputAction MOVE_LEFT = new InputAction("move-left");
         private static final InputAction MOVE_RIGHT = new InputAction("move-right");
-        private static final InputAction TURN_LEFT = new InputAction("turn-left");
-        private static final InputAction TURN_RIGHT = new InputAction("turn-right");
         private static final InputAction JUMP = new InputAction("jump");
-        private static final float MOVE_SPEED = 5.0F;
-        private static final float KEYBOARD_TURN_SPEED = 2.2F;
-        private static final float EYE_OFFSET = 0.62F;
+        private static final float MOVE_SPEED = 4.5F;
+        private static final float TARGET_HEIGHT = 0.75F;
 
         private final ExampleContext context;
         private final Scene scene = new Scene();
         private final PerspectiveCamera camera;
-        private final PointerLockControls pointerControls;
+        private final OrbitControls orbitControls;
         private final PhysicsWorld physicsWorld = new PhysicsWorld();
         private final KinematicBody playerBody;
         private final CharacterController characterController;
-        private final Mesh playerPresentation;
+        private final Object3D playerAnchor = new Object3D();
+        private final Object3D playerModel = new Object3D();
         private final PhysicsBinding playerBinding;
+        private final Vector3f followTarget = new Vector3f();
         private final BufferGeometry boxGeometry = BoxGeometry.create(1.0F, 1.0F, 1.0F);
         private final BufferGeometry playerGeometry = CylinderGeometry.create(0.45F, 1.9F);
         private final LambertMaterial floorMaterial = new LambertMaterial(Color.srgb(0x263746));
         private final LambertMaterial wallMaterial = new LambertMaterial(Color.srgb(0x2A9D8F));
         private final LambertMaterial landmarkMaterial = new LambertMaterial(Color.srgb(0xE9C46A));
         private final LambertMaterial playerMaterial = new LambertMaterial(Color.CYAN);
+        private final LambertMaterial facingMaterial = new LambertMaterial(Color.srgb(0xF72585));
         private final InputMap inputMap = InputMap.builder()
                 .bind(MOVE_FORWARD, Key.W)
                 .bind(MOVE_FORWARD, Key.UP)
                 .bind(MOVE_BACKWARD, Key.S)
                 .bind(MOVE_BACKWARD, Key.DOWN)
                 .bind(MOVE_LEFT, Key.A)
+                .bind(MOVE_LEFT, Key.LEFT)
                 .bind(MOVE_RIGHT, Key.D)
-                .bind(TURN_LEFT, Key.LEFT)
-                .bind(TURN_RIGHT, Key.RIGHT)
+                .bind(MOVE_RIGHT, Key.RIGHT)
                 .bind(JUMP, Key.SPACE)
                 .build();
 
@@ -206,24 +192,22 @@ public final class FirstPersonSandboxExample {
         private SandboxApplication(ExampleContext context) {
             this.context = context;
             camera = new PerspectiveCamera(PI_OVER_THREE, context.aspectRatio(), 0.05F, 100.0F);
-            camera.setPosition(0.0F, 1.57F, 6.0F);
-            camera.lookAt(0.0F, 1.2F, 0.0F);
-            pointerControls = new PointerLockControls(camera, context.window());
+            camera.setPosition(0.0F, 4.6F, 12.0F);
+            orbitControls = new OrbitControls(camera, context.window());
+            configureCamera();
             createScene();
             playerBody = physicsWorld.addKinematicBody(new Vector3f(0.0F, 0.951F, 6.0F), new Quaternionf());
             playerBody.addCollider(new CapsuleShape(0.45F, 1.0F));
             characterController = new CharacterController(physicsWorld, playerBody);
-            playerPresentation = new Mesh(playerGeometry, playerMaterial);
-            playerPresentation.setVisible(false);
-            scene.add(playerPresentation);
-            playerBinding = new PhysicsBinding(playerBody, playerPresentation);
+            createPlayerPresentation();
+            playerBinding = new PhysicsBinding(playerBody, playerAnchor);
             movement = characterController.move(new Vector3f(), 1.0F / 120.0F);
         }
 
         @Override
         public void start() {
             playerBinding.snap();
-            updateCameraPosition();
+            resetCamera();
         }
 
         @Override
@@ -233,6 +217,7 @@ public final class FirstPersonSandboxExample {
                 characterController.tryJump();
             }
             Vector3f velocity = movementVelocity(input);
+            faceMovement(velocity);
             float fixedSeconds = update.step().toNanos() / 1_000_000_000.0F;
             movement = characterController.move(velocity, fixedSeconds);
             playerBinding.capture();
@@ -249,7 +234,7 @@ public final class FirstPersonSandboxExample {
         @Override
         public void render(FrameUpdate update) {
             playerBinding.apply(update.interpolation());
-            updateCameraPosition();
+            followPlayer();
             context.renderer().render(scene, camera);
         }
 
@@ -258,7 +243,7 @@ public final class FirstPersonSandboxExample {
             if (closed) {
                 return;
             }
-            pointerControls.close();
+            facingMaterial.close();
             playerMaterial.close();
             landmarkMaterial.close();
             wallMaterial.close();
@@ -268,63 +253,47 @@ public final class FirstPersonSandboxExample {
             closed = true;
         }
 
+        /** Applies mouse orbit and zoom without letting orbit controls consume movement keys. */
+        private void updateCamera(float elapsedSeconds, boolean pointerCaptured) {
+            if (pointerCaptured) {
+                orbitControls.updateWithoutUserInput(elapsedSeconds);
+            } else {
+                orbitControls.updateWithoutKeyboardInput(elapsedSeconds);
+            }
+        }
+
+        /** Updates the projection after the hosted viewport changes. */
         private void resize() {
             camera.setAspectRatio(context.aspectRatio());
         }
 
-        private void updateView(ActionSnapshot actions, float elapsedSeconds) {
-            pointerControls.update();
-            float turn = actions.axis(TURN_RIGHT, TURN_LEFT);
-            if (turn != 0.0F) {
-                float yaw = pointerControls.yaw() + turn * KEYBOARD_TURN_SPEED * elapsedSeconds;
-                pointerControls.setAngles(yaw, pointerControls.pitch());
-            }
-        }
-
-        private boolean isPointerLocked() {
-            return pointerControls.isLocked();
-        }
-
-        private void lockPointer() {
-            pointerControls.lock();
-        }
-
+        /** Returns the player and camera to their initial transforms. */
         private void reset() {
             characterController.teleport(new Vector3f(0.0F, 0.951F, 6.0F), new Quaternionf());
+            playerModel.setRotationFromEuler(0.0F, 0.0F, 0.0F, RotationOrder.YXZ);
             playerBinding.snap();
-            pointerControls.setAngles(0.0F, 0.0F);
-            updateCameraPosition();
+            resetCamera();
         }
 
-        private String tickStatus() {
-            long tick = simulationNanos / frameStepNanos();
-            return Long.toString(tick);
+        /** Configures the camera as an orbiting follow camera rather than a scene editor camera. */
+        private void configureCamera() {
+            orbitControls.setPanningEnabled(false);
+            orbitControls.setDampingEnabled(true);
+            orbitControls.setDampingFactor(0.12F);
+            orbitControls.setDistanceLimits(3.5F, 10.0F);
+            orbitControls.setPolarAngleLimits(0.35F, 1.45F);
         }
 
-        private String fixedUpdateStatus() {
-            return Integer.toString(fixedUpdateCount);
-        }
-
-        private String interpolationStatus() {
-            return String.format(Locale.ROOT, "%.3f", interpolation);
-        }
-
-        private String positionStatus() {
-            Vector3f position = playerBody.position(new Vector3f());
-            return String.format(Locale.ROOT, "%.2f, %.2f, %.2f", position.x, position.y, position.z);
-        }
-
-        private String groundedStatus() {
-            return Boolean.toString(movement.isGrounded());
-        }
-
-        private String movementStatus() {
-            return String.format(
-                    Locale.ROOT,
-                    "strafe %.0f / forward %.0f / turn %.0f",
-                    input.axis(MOVE_LEFT, MOVE_RIGHT),
-                    input.axis(MOVE_BACKWARD, MOVE_FORWARD),
-                    input.axis(TURN_RIGHT, TURN_LEFT));
+        /** Builds a visible character with a magenta marker identifying its forward direction. */
+        private void createPlayerPresentation() {
+            Mesh body = new Mesh(playerGeometry, playerMaterial);
+            Mesh facingMarker = new Mesh(boxGeometry, facingMaterial);
+            facingMarker.setPosition(0.0F, 0.2F, -0.43F);
+            facingMarker.setScale(0.28F, 0.28F, 0.16F);
+            playerModel.add(body);
+            playerModel.add(facingMarker);
+            playerAnchor.add(playerModel);
+            scene.add(playerAnchor);
         }
 
         /** Builds the rendered room and matching static collision bodies. */
@@ -358,11 +327,9 @@ public final class FirstPersonSandboxExample {
             float strafe = actions.axis(MOVE_LEFT, MOVE_RIGHT);
             float forwardAmount = actions.axis(MOVE_BACKWARD, MOVE_FORWARD);
             Vector3f forward = new Vector3f(0.0F, 0.0F, -1.0F).rotate(camera.quaternion());
-            Vector3f right = new Vector3f(1.0F, 0.0F, 0.0F).rotate(camera.quaternion());
             forward.y = 0.0F;
-            right.y = 0.0F;
             forward.normalize();
-            right.normalize();
+            Vector3f right = new Vector3f(-forward.z, 0.0F, forward.x);
             Vector3f velocity = forward.mul(forwardAmount).add(right.mul(strafe));
             if (velocity.lengthSquared() > 1.0F) {
                 velocity.normalize();
@@ -370,17 +337,67 @@ public final class FirstPersonSandboxExample {
             return velocity.mul(MOVE_SPEED);
         }
 
-        /** Moves the first-person eye to the interpolated presentation position. */
-        private void updateCameraPosition() {
-            camera.setPosition(
-                    playerPresentation.position().x(),
-                    playerPresentation.position().y() + EYE_OFFSET,
-                    playerPresentation.position().z());
+        /** Turns the character model toward its requested horizontal travel direction. */
+        private void faceMovement(Vector3f velocity) {
+            if (velocity.lengthSquared() <= 1.0E-6F) {
+                return;
+            }
+            float yaw = (float) Math.atan2(-velocity.x, -velocity.z);
+            playerModel.setRotationFromEuler(0.0F, yaw, 0.0F, RotationOrder.YXZ);
         }
 
-        /** Returns the default fixed-step nanoseconds used by this example. */
-        private static long frameStepNanos() {
-            return GameLoopSettings.DEFAULT.fixedStep().toNanos();
+        /** Moves both orbit target and camera by the player's interpolated displacement. */
+        private void followPlayer() {
+            Vector3f nextTarget = new Vector3f(playerAnchor.position()).add(0.0F, TARGET_HEIGHT, 0.0F);
+            Vector3f targetMovement = nextTarget.sub(followTarget, new Vector3f());
+            camera.setPosition(new Vector3f(camera.position()).add(targetMovement));
+            followTarget.set(nextTarget);
+            orbitControls.setTarget(followTarget);
+            orbitControls.updateWithoutUserInput(0.0F);
+        }
+
+        /** Restores the follow camera at a stable offset behind the initial player pose. */
+        private void resetCamera() {
+            followTarget.set(playerAnchor.position()).add(0.0F, TARGET_HEIGHT, 0.0F);
+            camera.setPosition(followTarget.x, followTarget.y + 3.0F, followTarget.z + 6.0F);
+            orbitControls.setTarget(followTarget);
+            orbitControls.updateWithoutUserInput(0.0F);
+        }
+
+        /** Returns the current fixed simulation tick. */
+        private String tickStatus() {
+            long tick = simulationNanos / GameLoopSettings.DEFAULT.fixedStep().toNanos();
+            return Long.toString(tick);
+        }
+
+        /** Returns the number of fixed updates in the most recent rendered frame. */
+        private String fixedUpdateStatus() {
+            return Integer.toString(fixedUpdateCount);
+        }
+
+        /** Returns the current fixed-state interpolation fraction. */
+        private String interpolationStatus() {
+            return String.format(Locale.ROOT, "%.3f", interpolation);
+        }
+
+        /** Returns the authoritative player position. */
+        private String positionStatus() {
+            Vector3f position = playerBody.position(new Vector3f());
+            return String.format(Locale.ROOT, "%.2f, %.2f, %.2f", position.x, position.y, position.z);
+        }
+
+        /** Returns whether the character controller currently has walkable support. */
+        private String groundedStatus() {
+            return Boolean.toString(movement.isGrounded());
+        }
+
+        /** Returns the current semantic movement axes. */
+        private String movementStatus() {
+            return String.format(
+                    Locale.ROOT,
+                    "left/right %.0f / forward/back %.0f",
+                    input.axis(MOVE_LEFT, MOVE_RIGHT),
+                    input.axis(MOVE_BACKWARD, MOVE_FORWARD));
         }
     }
 }

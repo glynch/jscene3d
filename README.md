@@ -106,7 +106,7 @@ kinematic-movement`.
 
 Use `--suite game` for game-runtime examples, such as
 `./tools/scripts/capture-example-thumbnails.sh --suite game
-first-person-sandbox`.
+first-person-sandbox third-person-sandbox`.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
@@ -441,13 +441,16 @@ keyboard and mouse controls into named `InputAction` values while respecting
 input captured by a host interface. `PhysicsBinding` is the explicit game-layer
 adapter between renderer-independent collision objects and scene objects.
 
-The separate `jscene3d-game-examples` artifact demonstrates these seams in a
-small first-person sandbox. Click the rendered view to capture the pointer, use
-W A S D or the arrow keys to move, Space to jump, and Escape to release the
-pointer. Run it in the game example browser or directly with:
+The separate `jscene3d-game-examples` artifact demonstrates these seams with
+first- and third-person sandboxes. The first-person example uses W/S or Up/Down
+to move, A/D to strafe, Left/Right or captured mouse movement to turn, and Space
+to jump. The third-person example uses W A S D or the arrow keys for
+camera-relative movement, mouse dragging to orbit, scrolling to zoom, and Space
+to jump. Run them in the game example browser or directly with:
 
 ```shell
 ./tools/scripts/run-example.sh FirstPersonSandboxExample
+./tools/scripts/run-example.sh ThirdPersonSandboxExample
 ```
 
 ## Project structure

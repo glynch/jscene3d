@@ -52,33 +52,32 @@ debug visualization. The first game does not require PBR materials,
 environment lighting, skeletal animation, post-processing, or shadows, even
 though several are already supported.
 
-## Remaining reusable foundation
+## Reusable foundation status
 
 ### Platform input
 
-The LWJGL platform layer needs a captured or disabled cursor mode, optional raw
-mouse motion when GLFW supports it, observable focus state, and reliable input
-and cursor restoration on focus loss. A small pointer-lock control should prove
-yaw and pitch independently of any game.
+The LWJGL platform layer now provides a captured cursor mode, optional raw mouse
+motion when GLFW supports it, observable focus state, reliable input and cursor
+restoration on focus loss, and reusable pointer-lock controls.
 
 ### Physics Engine
 
-The first `jscene3d-physics` slice needs fixed updates, static collision,
+The first `jscene3d-physics` slice provides fixed updates, static collision,
 kinematic bodies, box, sphere, and capsule shapes, broad- and narrow-phase
 collision, ray and overlap queries, shape sweeps, gravity, floor detection, wall
-sliding, bounded step traversal, collision sensors, overlap events, and debug
-lines.
-These are general simulation capabilities; the player controller that combines
-them into a particular movement model belongs in the Game Application or in a
-general Game Engine controller only after its contract is proven reusable.
+sliding, bounded step traversal, collision sensors, overlap events, debug lines,
+and a reusable `CharacterController` proven by the physics obstacle course and
+game sandbox.
 
 ### Game Engine
 
-The first `jscene3d-game` slice needs a lifecycle with separate fixed and
-rendered updates, input action mapping, game-state transitions, asset lifetime
-management, Physics Bindings with render interpolation, and reusable support
-for sprite-frame animation and camera-facing billboard batches. It must not
-define sectors, weapons, enemies, damage rules, or a Doom level format.
+The initial `jscene3d-game` slice now provides a lifecycle with separate fixed
+and rendered updates, semantic input action mapping, bounded catch-up behavior,
+and Physics Bindings with render interpolation. The first-person sandbox proves
+these capabilities as a cohesive integration. Game-state transitions, asset
+lifetime management, sprite-frame animation, and camera-facing billboard
+batches remain later reusable slices. The artifact must not define sectors,
+weapons, enemies, damage rules, or a Doom level format.
 
 ### Audio
 
@@ -108,18 +107,21 @@ meshes, dynamic rigid-body props, multiple weapons, or complex enemy AI.
 
 ## Delivery sequence
 
-The first three reusable foundation slices are complete:
+The first four reusable foundation slices are complete:
 
 1. Cursor capture, raw mouse support, focus state, and pointer-lock controls.
 2. The collision-query foundation in `jscene3d-physics`.
 3. Explicit kinematic movement, collision-sensor overlap transitions, and
    renderer-independent physics debug snapshots, proven by an interactive
    obstacle-course example in the separate `jscene3d-physics-examples` suite.
+4. A game lifecycle, semantic input actions, and interpolated Physics Bindings,
+   proven by an interactive first-person sandbox in the separate
+   `jscene3d-game-examples` suite.
 
 The remaining sequence is:
 
-1. Implement the lifecycle, input actions, and Physics Bindings in
-   `jscene3d-game`.
+1. Define game-state and asset-lifetime requirements from the first playable
+   application rather than introducing speculative abstractions.
 2. Add reusable billboard animation and the initial audio artifact.
 3. Build a one-room combat prototype in the separate Game Application.
 4. Expand the prototype into the first compact level without broadening the

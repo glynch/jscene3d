@@ -54,7 +54,13 @@ Open the separate visual physics suite with:
 ./tools/scripts/run-example.sh PhysicsExampleBrowser
 ```
 
-Both browsers use `jscene3d-example-framework`, which keeps one native window
+Open the game-runtime suite with:
+
+```shell
+./tools/scripts/run-example.sh GameExampleBrowser
+```
+
+All three browsers use `jscene3d-example-framework`, which keeps one native window
 and renderer alive while examples are selected. Their left sidebars provide
 captured thumbnails, category and tag search, scrolling, and persistent
 selection; the right content area hosts the fully interactive example.
@@ -97,6 +103,10 @@ Select another suite with `--suite`. For example, refresh only the kinematic
 movement thumbnail with
 `./tools/scripts/capture-example-thumbnails.sh --suite physics
 kinematic-movement`.
+
+Use `--suite game` for game-runtime examples, such as
+`./tools/scripts/capture-example-thumbnails.sh --suite game
+first-person-sandbox`.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
@@ -420,6 +430,26 @@ snapshot with JScene3D lines without introducing a rendering dependency into
 120 Hz update, WASD movement, gravity, wall sliding, step traversal, a collision
 sensor, and live debug geometry.
 
+## Game runtime
+
+`GameRuntime` coordinates a caller-owned `GameApplication` without creating a
+window, render thread, or physics world. It separates deterministic Fixed
+Updates from rendered frame updates, clamps long frames, bounds catch-up work,
+buffers action transitions until simulation consumes them, and reports an
+interpolation factor for smooth presentation. `InputMap` translates physical
+keyboard and mouse controls into named `InputAction` values while respecting
+input captured by a host interface. `PhysicsBinding` is the explicit game-layer
+adapter between renderer-independent collision objects and scene objects.
+
+The separate `jscene3d-game-examples` artifact demonstrates these seams in a
+small first-person sandbox. Click the rendered view to capture the pointer, use
+W A S D or the arrow keys to move, Space to jump, and Escape to release the
+pointer. Run it in the game example browser or directly with:
+
+```shell
+./tools/scripts/run-example.sh FirstPersonSandboxExample
+```
+
 ## Project structure
 
 - `jscene3d-core`: renderer-independent scene, camera, geometry, material,
@@ -432,11 +462,14 @@ sensor, and live debug geometry.
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType
   text rendering.
 - `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
+- `jscene3d-game`: optional, genre-independent application lifecycle, Fixed
+  Updates, semantic input actions, and interpolated Physics Bindings.
 - `jscene3d-example-framework`: unpublished reusable native hosting, browsing,
   lifecycle, catalog, and thumbnail-capture support.
 - `jscene3d-examples`: unpublished rendering and asset-loading examples.
-- `jscene3d-physics-examples`: unpublished visual physics examples; this is the
-  only example suite that depends on `jscene3d-physics`.
+- `jscene3d-physics-examples`: unpublished visual physics examples.
+- `jscene3d-game-examples`: unpublished examples that integrate the Game
+  Engine, Physics Engine, renderer, and shared browser framework.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and
 `CONTEXT.md` for the accepted version 0.1 design and terminology.

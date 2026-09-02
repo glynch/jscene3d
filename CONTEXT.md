@@ -5,10 +5,11 @@ A public, general-purpose Java library for describing and rendering interactive 
 The public Java namespace is `io.github.glynch.jscene3d`. The published Maven
 coordinates are `io.github.glynch:jscene3d-core`,
 `io.github.glynch:jscene3d-lwjgl`, and the optional
-`io.github.glynch:jscene3d-gui`; the unpublished example reactor artifacts are
-`jscene3d-example-framework`, `jscene3d-examples`, and
-`jscene3d-physics-examples`. The first post-0.1 loader is published separately
-as `io.github.glynch:jscene3d-gltf`.
+`io.github.glynch:jscene3d-gui`; the post-foundation reusable artifacts include
+`io.github.glynch:jscene3d-gltf`, `io.github.glynch:jscene3d-physics`, and
+`io.github.glynch:jscene3d-game`. The unpublished example reactor artifacts are
+`jscene3d-example-framework`, `jscene3d-examples`,
+`jscene3d-physics-examples`, and `jscene3d-game-examples`.
 
 ## Language
 

@@ -35,12 +35,14 @@
     <modules>
         <module>jscene3d-core</module>
         <module>jscene3d-physics</module>
+        <module>jscene3d-game</module>
         <module>jscene3d-lwjgl</module>
         <module>jscene3d-gui</module>
         <module>jscene3d-gltf</module>
         <module>jscene3d-example-framework</module>
         <module>jscene3d-examples</module>
         <module>jscene3d-physics-examples</module>
+        <module>jscene3d-game-examples</module>
     </modules>
 
     <properties>
@@ -156,6 +158,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-physics</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-game</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

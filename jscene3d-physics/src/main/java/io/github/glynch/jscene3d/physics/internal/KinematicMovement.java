@@ -10,8 +10,10 @@ import io.github.glynch.jscene3d.physics.movement.KinematicMoveResult;
 import io.github.glynch.jscene3d.physics.movement.KinematicMoveSettings;
 import io.github.glynch.jscene3d.physics.queries.SweepHit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -21,6 +23,8 @@ import org.joml.Vector3fc;
 public final class KinematicMovement {
     private static final float MINIMUM_MOTION_SQUARED = 1.0E-10F;
     private static final float MINIMUM_STEP_PROGRESS_SQUARED = 1.0E-8F;
+    private static final float MINIMUM_CLOSING_SPEED = 1.0E-7F;
+    private static final float STEP_HEIGHT_TOLERANCE = 1.0E-5F;
 
     private final CollisionQueries queries;
 
@@ -83,11 +87,22 @@ public final class KinematicMovement {
             return false;
         }
         raisedPosition.add(upwardMotion);
-        StepAdvance advance = advanceStep(state.at(raisedPosition), horizontalMotion, settings, solidAcceptance);
-        if (advance.translation().lengthSquared() < MINIMUM_STEP_PROGRESS_SQUARED) {
+        Vector3f probeMotion = stepProbeMotion(state.at(raisedPosition), horizontalMotion, settings);
+        StepAdvance advance = advanceStep(state.at(raisedPosition), probeMotion, settings, solidAcceptance);
+        if (!advance.reaches(horizontalMotion)) {
             return false;
         }
-        return landStep(state, advance, up, settings, solidAcceptance);
+        return landStep(state, advance, horizontalMotion, up, settings, solidAcceptance);
+    }
+
+    private static Vector3f stepProbeMotion(
+            ShapePose raisedPose, Vector3fc horizontalMotion, KinematicMoveSettings settings) {
+        Vector3f direction = new Vector3f(horizontalMotion).normalize();
+        float shapeReach = ShapeGeometry.support(raisedPose, direction)
+                .sub(raisedPose.position())
+                .dot(direction);
+        float probeDistance = Math.max(horizontalMotion.length(), shapeReach + settings.skinWidth());
+        return direction.mul(probeDistance);
     }
 
     private StepAdvance advanceStep(
@@ -107,6 +122,7 @@ public final class KinematicMovement {
     private boolean landStep(
             MovementState state,
             StepAdvance advance,
+            Vector3fc horizontalMotion,
             Vector3f up,
             KinematicMoveSettings settings,
             Predicate<Collider> solidAcceptance) {
@@ -115,18 +131,20 @@ public final class KinematicMovement {
                 .add(advance.translation());
         float descentDistance = settings.maximumStepHeight() + settings.groundSnapDistance();
         Vector3f descent = new Vector3f(up).mul(-descentDistance);
-        Optional<SweepHit> landing = sweep(state.at(landingStart), descent, solidAcceptance);
+        Optional<SweepHit> landing = sweepWalkable(state.at(landingStart), descent, up, settings, solidAcceptance);
         if (landing.isEmpty()) {
             return false;
         }
         SweepHit ground = landing.orElseThrow();
         Vector3f normal = ground.normal(new Vector3f());
-        if (!isWalkable(normal, up, settings)) {
+        float travel = Math.clamp(ground.distance() - settings.skinWidth(), 0.0F, Float.POSITIVE_INFINITY);
+        Vector3f landingPosition = new Vector3f(landingStart).fma(-travel, up);
+        float stepHeight = new Vector3f(landingPosition).sub(state.position).dot(up);
+        if (stepHeight <= STEP_HEIGHT_TOLERANCE || stepHeight > settings.maximumStepHeight() + STEP_HEIGHT_TOLERANCE) {
             return false;
         }
-        float travel = Math.clamp(ground.distance() - settings.skinWidth(), 0.0F, Float.POSITIVE_INFINITY);
-        state.position.set(landingStart).fma(-travel, up);
-        state.removeHorizontalRemaining(up, advance.translation());
+        state.position.add(horizontalMotion).fma(stepHeight, up);
+        state.removeHorizontalRemaining(up, horizontalMotion);
         state.contacts.addAll(advance.contacts());
         state.contacts.add(contact(ground));
         state.grounded = true;
@@ -145,15 +163,12 @@ public final class KinematicMovement {
             return;
         }
         Vector3f probe = new Vector3f(up).mul(-probeDistance);
-        Optional<SweepHit> groundHit = sweep(state, probe, solidAcceptance);
+        Optional<SweepHit> groundHit = sweepWalkable(state.at(state.position), probe, up, settings, solidAcceptance);
         if (groundHit.isEmpty()) {
             return;
         }
         SweepHit ground = groundHit.orElseThrow();
         Vector3f normal = ground.normal(new Vector3f());
-        if (!isWalkable(normal, up, settings)) {
-            return;
-        }
         float snapDistance = Math.clamp(ground.distance() - settings.skinWidth(), 0.0F, Float.POSITIVE_INFINITY);
         state.position.fma(-snapDistance, up);
         state.grounded = true;
@@ -165,7 +180,48 @@ public final class KinematicMovement {
     }
 
     private Optional<SweepHit> sweep(ShapePose pose, Vector3fc translation, Predicate<Collider> solidAcceptance) {
-        return queries.sweepAccepted(pose, translation, solidAcceptance);
+        Set<Collider> nonBlockingContacts = new HashSet<>();
+        while (true) {
+            Optional<SweepHit> hit = queries.sweepAccepted(
+                    pose,
+                    translation,
+                    candidate -> solidAcceptance.test(candidate) && !nonBlockingContacts.contains(candidate));
+            if (hit.isEmpty()) {
+                return hit;
+            }
+            SweepHit contact = hit.orElseThrow();
+            if (isBlocking(translation, contact)) {
+                return hit;
+            }
+            nonBlockingContacts.add(contact.collider());
+        }
+    }
+
+    private Optional<SweepHit> sweepWalkable(
+            ShapePose pose,
+            Vector3fc translation,
+            Vector3fc up,
+            KinematicMoveSettings settings,
+            Predicate<Collider> solidAcceptance) {
+        Set<Collider> rejectedColliders = new HashSet<>();
+        while (true) {
+            Optional<SweepHit> hit = sweep(
+                    pose,
+                    translation,
+                    candidate -> solidAcceptance.test(candidate) && !rejectedColliders.contains(candidate));
+            if (hit.isEmpty()) {
+                return hit;
+            }
+            SweepHit contact = hit.orElseThrow();
+            if (isWalkable(contact.normal(new Vector3f()), up, settings)) {
+                return hit;
+            }
+            rejectedColliders.add(contact.collider());
+        }
+    }
+
+    private static boolean isBlocking(Vector3fc translation, SweepHit hit) {
+        return -translation.dot(hit.normal(new Vector3f())) > MINIMUM_CLOSING_SPEED;
     }
 
     private static boolean acceptsSolid(Collider movingCollider, Collider candidate) {
@@ -189,7 +245,10 @@ public final class KinematicMovement {
         if (length <= 0.0F) {
             return new Vector3f();
         }
-        float travel = Math.clamp(hit.distance() - skinWidth, 0.0F, Float.POSITIVE_INFINITY);
+        Vector3f normal = hit.normal(new Vector3f());
+        float closingSpeed = -translation.dot(normal);
+        float skinTravel = closingSpeed > MINIMUM_CLOSING_SPEED ? skinWidth * length / closingSpeed : 0.0F;
+        float travel = Math.clamp(hit.distance() - skinTravel, 0.0F, Float.POSITIVE_INFINITY);
         return new Vector3f(translation).mul(Math.clamp(travel / length, 0.0F, 1.0F));
     }
 
@@ -197,7 +256,12 @@ public final class KinematicMovement {
         return new KinematicContact(hit.collider(), hit.point(new Vector3f()), hit.normal(new Vector3f()));
     }
 
-    private record StepAdvance(Vector3f translation, List<KinematicContact> contacts) {}
+    private record StepAdvance(Vector3f translation, List<KinematicContact> contacts) {
+        private boolean reaches(Vector3fc requiredTranslation) {
+            Vector3f direction = new Vector3f(requiredTranslation).normalize();
+            return translation.dot(direction) + STEP_HEIGHT_TOLERANCE >= requiredTranslation.length();
+        }
+    }
 
     private static final class MovementState {
         private final Collider collider;

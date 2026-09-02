@@ -33,6 +33,7 @@ import io.github.glynch.jscene3d.physics.debug.PhysicsDebugLine;
 import io.github.glynch.jscene3d.physics.debug.PhysicsDebugSnapshot;
 import io.github.glynch.jscene3d.physics.examples.MovementDiagnostics.MovementKeys;
 import io.github.glynch.jscene3d.physics.movement.KinematicMoveResult;
+import io.github.glynch.jscene3d.physics.movement.TriggerEventType;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.platform.InputState;
@@ -105,8 +106,13 @@ public final class KinematicMovementExample {
         instructions.addText("player", () -> "cyan capsule");
         instructions.addText("move player", () -> "W A S D");
         instructions.addText("camera", () -> "drag / scroll");
-        instructions.addText("goal", () -> "yellow step, then magenta trigger");
+        instructions.addText("yellow step", () -> "reset, then hold D over it");
+        instructions.addText("magenta zone", () -> "walk completely inside it");
         instructions.addButton("reset player", state::reset);
+        ControlPanel.Section progress = panel.addSection("Progress");
+        progress.addText("yellow step crossed", state::stepProgressStatus);
+        progress.addText("trigger reached", state::triggerProgressStatus);
+        progress.addText("goal", state::goalProgressStatus);
         ControlPanel.Section diagnosticSection = panel.addSection("Diagnostics");
         diagnosticSection.addBoolean("enabled", diagnostics::isEnabled, diagnostics::setEnabled);
         diagnosticSection.addText("window", diagnostics::windowFocusStatus);
@@ -121,9 +127,10 @@ public final class KinematicMovementExample {
         ControlPanel.Section status = panel.addSection("Movement result");
         status.addText("position", state::positionStatus);
         status.addText("grounded", () -> Boolean.toString(state.grounded()));
-        status.addText("stepped", () -> Boolean.toString(state.stepped()));
+        status.addText("stepped this move", () -> Boolean.toString(state.stepped()));
         status.addText("contacts", () -> Integer.toString(state.contactCount()));
         status.addText("trigger", state::triggerStatus);
+        status.setExpanded(false);
         ControlPanel.Section visualization = panel.addSection("Visualization");
         visualization.addBoolean("physics debug lines", debugLines::isVisible, debugLines::setVisible);
         return panel;
@@ -169,8 +176,10 @@ public final class KinematicMovementExample {
         private final PhysicsWorld world = new PhysicsWorld();
         private final Collider player;
         private final Mesh playerMesh;
+        private final LambertMaterial triggerMaterial;
 
         private Course(Scene scene, Resources resources) {
+            triggerMaterial = resources.triggerMaterial;
             addBox(scene, resources, new Vector3f(2.0F, -0.5F, 0.0F), new Vector3f(16.0F, 1.0F, 12.0F), false);
             addBox(scene, resources, new Vector3f(0.5F, 0.2F, 0.0F), new Vector3f(2.0F, 0.4F, 3.0F), true);
             addBox(scene, resources, new Vector3f(4.0F, 0.65F, -2.5F), new Vector3f(1.0F, 1.3F, 5.0F), false);
@@ -211,6 +220,10 @@ public final class KinematicMovementExample {
         private PhysicsWorld world() {
             return world;
         }
+
+        private void setGoalReached(boolean reached) {
+            triggerMaterial.setColor(reached ? Color.GREEN : Color.MAGENTA);
+        }
     }
 
     /** Integrates caller-owned intent and gravity before each explicit world move. */
@@ -225,6 +238,8 @@ public final class KinematicMovementExample {
         private float accumulator;
         private float verticalVelocity;
         private KinematicMoveResult result;
+        private boolean stepCrossed;
+        private boolean triggerReached;
         private String triggerStatus = "outside";
 
         private MovementState(
@@ -264,29 +279,37 @@ public final class KinematicMovementExample {
             Vector3f desired = horizontal.add(0.0F, verticalVelocity * FIXED_SECONDS, 0.0F);
             result = course.world().move(course.player, desired);
             diagnostics.recordStep(desired, result.appliedTranslation(new Vector3f()));
+            stepCrossed |= result.stepped();
             if (result.isGrounded() && verticalVelocity < 0.0F) {
                 verticalVelocity = 0.0F;
             }
             updateTriggerStatus(result);
+            course.setGoalReached(goalReached());
             course.syncPlayerMesh();
             debugLines.update();
         }
 
         private void updateTriggerStatus(KinematicMoveResult movementResult) {
-            movementResult.triggerEvents().stream()
-                    .findFirst()
-                    .ifPresent(event -> triggerStatus = switch (event.type()) {
-                        case ENTER -> "entered trigger";
-                        case STAY -> "inside trigger";
-                        case EXIT -> "exited trigger";
-                    });
+            movementResult.triggerEvents().stream().findFirst().ifPresent(event -> {
+                triggerStatus = switch (event.type()) {
+                    case ENTER -> "entered trigger";
+                    case STAY -> "inside trigger";
+                    case EXIT -> "exited trigger";
+                };
+                if (event.type() != TriggerEventType.EXIT) {
+                    triggerReached = true;
+                }
+            });
         }
 
         private void reset() {
             course.player.setTransform(new Vector3f(-4.0F, 0.951F, 0.0F), new Quaternionf());
             verticalVelocity = 0.0F;
+            stepCrossed = false;
+            triggerReached = false;
             triggerStatus = "outside";
             result = course.world().move(course.player, new Vector3f());
+            course.setGoalReached(false);
             course.syncPlayerMesh();
             debugLines.update();
         }
@@ -307,6 +330,22 @@ public final class KinematicMovementExample {
             return triggerStatus;
         }
 
+        private String stepProgressStatus() {
+            return completionStatus(stepCrossed);
+        }
+
+        private String triggerProgressStatus() {
+            return completionStatus(triggerReached);
+        }
+
+        private String goalProgressStatus() {
+            return goalReached() ? "reached - trigger is green" : "cross step and enter trigger";
+        }
+
+        private boolean goalReached() {
+            return stepCrossed && triggerReached;
+        }
+
         private String positionStatus() {
             Vector3f position = course.player.position(new Vector3f());
             return String.format(Locale.ROOT, "%.2f, %.2f, %.2f", position.x, position.y, position.z);
@@ -325,6 +364,10 @@ public final class KinematicMovementExample {
 
         private static float axis(InputState input, Key positive, Key negative) {
             return (input.isKeyDown(positive) ? 1.0F : 0.0F) - (input.isKeyDown(negative) ? 1.0F : 0.0F);
+        }
+
+        private static String completionStatus(boolean complete) {
+            return complete ? "complete" : "not yet";
         }
     }
 

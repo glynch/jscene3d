@@ -18,10 +18,13 @@ import org.assertj.core.groups.Tuple;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class KinematicMovementTest {
     private static final Quaternionf IDENTITY = new Quaternionf();
-    private static final Offset<Float> TOLERANCE = Offset.offset(5.0E-3F);
+    private static final float TOLERANCE_VALUE = 5.0E-3F;
+    private static final Offset<Float> TOLERANCE = Offset.offset(TOLERANCE_VALUE);
     private static final KinematicMoveSettings NO_STEP =
             KinematicMoveSettings.DEFAULT.withMaximumStepHeight(0.0F).withGroundSnapDistance(0.0F);
 
@@ -67,6 +70,24 @@ final class KinematicMovementTest {
     }
 
     @Test
+    void preservesHorizontalMovementWhenGravityPressesAGroundedCapsuleIntoTheFloor() {
+        PhysicsWorld world = new PhysicsWorld();
+        Collider mover = world.addCollider(new CapsuleShape(0.45F, 1.0F), new Vector3f(-4.0F, 0.951F, 0.0F), IDENTITY);
+        world.addCollider(new BoxShape(16.0F, 1.0F, 12.0F), new Vector3f(2.0F, -0.5F, 0.0F), IDENTITY);
+        Vector3f fixedStepMovement = new Vector3f(-0.033333F, -0.00125F, 0.0F);
+
+        List<KinematicMoveResult> results = IntStream.range(0, 10)
+                .mapToObj(ignored -> world.move(mover, fixedStepMovement))
+                .toList();
+
+        assertThat(results)
+                .allSatisfy(result -> assertThat(result.appliedTranslation(new Vector3f()).x)
+                        .isCloseTo(fixedStepMovement.x, TOLERANCE));
+        assertThat(mover.position(new Vector3f()).x).isCloseTo(-4.33333F, TOLERANCE);
+        assertThat(mover.position(new Vector3f()).y).isCloseTo(0.951F, TOLERANCE);
+    }
+
+    @Test
     void traversesOnlyStepsWithinConfiguredHeight() {
         StepScenario low = stepWorld(0.4F);
         KinematicMoveResult lowResult = low.world().move(low.mover(), new Vector3f(3.0F, 0.0F, 0.0F));
@@ -79,6 +100,32 @@ final class KinematicMovementTest {
         assertThat(low.mover().position(new Vector3f()).y).isCloseTo(1.401F, TOLERANCE);
         assertThat(tallResult.stepped()).isFalse();
         assertThat(tall.mover().position(new Vector3f()).x).isLessThan(0.1F);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {60, 120, 240})
+    void crossesAReachableStepUsingRepeatedFixedStepMovementAndGravity(int updatesPerSecond) {
+        PhysicsWorld world = new PhysicsWorld();
+        Collider mover = world.addCollider(new CapsuleShape(0.45F, 1.0F), new Vector3f(-4.0F, 0.951F, 0.0F), IDENTITY);
+        world.addCollider(new BoxShape(16.0F, 1.0F, 12.0F), new Vector3f(2.0F, -0.5F, 0.0F), IDENTITY);
+        world.addCollider(new BoxShape(2.0F, 0.4F, 3.0F), new Vector3f(0.5F, 0.2F, 0.0F), IDENTITY);
+        float fixedSeconds = 1.0F / updatesPerSecond;
+        float verticalVelocity = 0.0F;
+        boolean stepped = false;
+
+        for (int step = 0; step < updatesPerSecond * 2; step++) {
+            verticalVelocity -= 18.0F * fixedSeconds;
+            Vector3f requested = new Vector3f(4.0F * fixedSeconds, verticalVelocity * fixedSeconds, 0.0F);
+            KinematicMoveResult result = world.move(mover, requested);
+            stepped |= result.stepped();
+            assertThat(result.appliedTranslation(new Vector3f()).x).isLessThanOrEqualTo(requested.x + TOLERANCE_VALUE);
+            if (result.isGrounded() && verticalVelocity < 0.0F) {
+                verticalVelocity = 0.0F;
+            }
+        }
+
+        assertThat(stepped).isTrue();
+        assertThat(mover.position(new Vector3f()).x).isGreaterThan(2.0F);
     }
 
     @Test

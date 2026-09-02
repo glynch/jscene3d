@@ -110,7 +110,7 @@ public final class AnimationBlendingExample {
     private static ControlPanel createPanel(ExampleContext context, BlendState settings) {
         ControlPanel panel = new ControlPanel(context.window(), "Animation Blending");
         ControlPanel.Section transition = panel.addSection("Transition");
-        transition.addChoice("motion", settings::motion, settings::setMotion, MOTION_CHOICES);
+        transition.addRadioGroup("motion", settings::motion, settings::setMotion, MOTION_CHOICES);
         transition.addFloat("cross-fade", settings::crossFadeDuration, settings::setCrossFadeDuration, 0.0f, 2.0f);
         transition.addBoolean("automatic", settings::automatic, settings::setAutomatic);
         transition.addButton("next motion", settings::nextMotion);

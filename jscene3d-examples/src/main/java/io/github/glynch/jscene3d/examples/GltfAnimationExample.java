@@ -96,7 +96,7 @@ public final class GltfAnimationExample {
         playback.addBoolean("playing", settings::isPlaying, settings::setPlaying);
         playback.addFloat("time", settings::time, settings::setTime, 0.0f, settings.duration());
         playback.addFloat("speed", settings::speed, settings::setSpeed, -2.0f, 3.0f);
-        playback.addChoice("loop", settings::loopMode, settings::setLoopMode, LOOP_CHOICES);
+        playback.addSelect("loop", settings::loopMode, settings::setLoopMode, LOOP_CHOICES);
         playback.addButton("restart", settings::restart);
         playback.addButton("stop", settings::stop);
         ControlPanel.Section imported = panel.addSection("Imported clips");

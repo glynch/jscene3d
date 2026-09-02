@@ -198,13 +198,13 @@ public final class ShadowsExample {
     private static ControlPanel createPanel(ExampleContext context, ShadowControls settings) {
         ControlPanel panel = new ControlPanel(context.window(), "Shadows");
         ControlPanel.Section light = panel.addSection("Light");
-        light.addChoice("type", settings::lightType, settings::setLightType, LIGHT_CHOICES);
+        light.addRadioGroup("type", settings::lightType, settings::setLightType, LIGHT_CHOICES);
         light.addBoolean("enabled", settings::shadowsEnabled, settings::setShadowsEnabled);
         ControlPanel.Section objects = panel.addSection("Objects");
         objects.addBoolean("cast shadows", settings::castersEnabled, settings::setCastersEnabled);
         objects.addBoolean("receive shadows", settings::receiversEnabled, settings::setReceiversEnabled);
         ControlPanel.Section map = panel.addSection("Shadow map");
-        map.addChoice("resolution", settings::mapSize, settings::setMapSize, MAP_SIZE_CHOICES);
+        map.addSelect("resolution", settings::mapSize, settings::setMapSize, MAP_SIZE_CHOICES);
         map.addFloat("bias", settings::bias, settings::setBias, -0.005f, 0.02f);
         map.addFloat("normal bias", settings::normalBias, settings::setNormalBias, 0.0f, 0.15f);
         map.addText("passes", () -> shadowPasses(context));

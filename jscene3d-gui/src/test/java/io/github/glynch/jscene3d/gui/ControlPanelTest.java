@@ -134,6 +134,81 @@ final class ControlPanelTest {
     }
 
     @Test
+    void exposesAndAppliesEveryRadioGroupOption() {
+        ControlPanel panel = new ControlPanel("Controls");
+        AtomicReference<String> shading = new AtomicReference<>("wireframe");
+        panel.addSection("Appearance")
+                .addRadioGroup(
+                        "shading",
+                        shading::get,
+                        shading::set,
+                        List.of(
+                                new ControlPanel.Choice<>("wireframe", "wireframe"),
+                                new ControlPanel.Choice<>("smooth", "smooth"),
+                                new ControlPanel.Choice<>("reflective", "reflective")));
+
+        assertThat(panel.update(pointer(520.0, 170.0), 800, 600)).isTrue();
+        assertThat(shading).hasValue("smooth");
+        panel.update(new ControlPanel.PointerFrame(520.0, 170.0, false, false, true), 800, 600);
+
+        assertThat(panel.update(pointer(520.0, 170.0), 800, 600)).isFalse();
+        assertThat(shading).hasValue("smooth");
+
+        RecordingGuiCanvas canvas = new RecordingGuiCanvas();
+        panel.paint(canvas, 800, 600);
+        assertThat(canvas.roundedRectangleCount()).isGreaterThan(8);
+    }
+
+    @Test
+    void expandsSelectOptionsAndReflowsFollowingControls() {
+        ControlPanel panel = new ControlPanel("Controls");
+        AtomicReference<String> shading = new AtomicReference<>("smooth");
+        AtomicInteger applyCount = new AtomicInteger();
+        ControlPanel.Section section = panel.addSection("Appearance");
+        section.addSelect(
+                "shading",
+                shading::get,
+                shading::set,
+                List.of(
+                        new ControlPanel.Choice<>("wireframe", "wireframe"),
+                        new ControlPanel.Choice<>("smooth", "smooth"),
+                        new ControlPanel.Choice<>("reflective", "reflective")));
+        section.addButton("apply", applyCount::incrementAndGet);
+
+        RecordingGuiCanvas closedCanvas = new RecordingGuiCanvas();
+        panel.paint(closedCanvas, 800, 600);
+        assertThat(panel.update(pointer(520.0, 100.0), 800, 600)).isTrue();
+        RecordingGuiCanvas expandedCanvas = new RecordingGuiCanvas();
+        panel.paint(expandedCanvas, 800, 600);
+        assertThat(expandedCanvas.commandCount()).isGreaterThan(closedCanvas.commandCount());
+        assertThat(panel.update(pointer(520.0, 200.0), 800, 600)).isTrue();
+        assertThat(shading).hasValue("reflective");
+        panel.update(new ControlPanel.PointerFrame(520.0, 200.0, false, false, true), 800, 600);
+
+        assertThat(panel.update(pointer(520.0, 140.0), 800, 600)).isTrue();
+        assertThat(applyCount).hasValue(1);
+    }
+
+    @Test
+    void closesAnExpandedSelectWhenThePointerPressesOutsideThePanel() {
+        ControlPanel panel = new ControlPanel("Controls");
+        AtomicReference<String> shading = new AtomicReference<>("smooth");
+        panel.addSection("Appearance")
+                .addSelect(
+                        "shading",
+                        shading::get,
+                        shading::set,
+                        List.of(
+                                new ControlPanel.Choice<>("wireframe", "wireframe"),
+                                new ControlPanel.Choice<>("smooth", "smooth")));
+
+        assertThat(panel.update(pointer(520.0, 100.0), 800, 600)).isTrue();
+        panel.update(new ControlPanel.PointerFrame(520.0, 100.0, false, false, true), 800, 600);
+        assertThat(panel.update(pointer(100.0, 100.0), 800, 600)).isTrue();
+        assertThat(panel.capturesPointer()).isFalse();
+    }
+
+    @Test
     void collapsesSectionsAndReleasesPointerOutsideThePanel() {
         ControlPanel panel = new ControlPanel("Controls");
         ControlPanel.Section section = panel.addSection("Camera");
@@ -163,6 +238,10 @@ final class ControlPanelTest {
                 .isThrownBy(() -> section.addInteger("segments", () -> 2, ignored -> {}, 50, 2));
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> section.addChoice("shading", () -> "smooth", ignored -> {}, List.of()));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> section.addRadioGroup("shading", () -> "smooth", ignored -> {}, List.of()));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> section.addSelect("shading", () -> "smooth", ignored -> {}, List.of()));
     }
 
     @Test
@@ -265,6 +344,7 @@ final class ControlPanelTest {
     void validatesControlBindingsAndSliderValues() {
         ControlPanel panel = new ControlPanel("Controls");
         ControlPanel.Section section = panel.addSection("Camera");
+        List<ControlPanel.Choice<String>> smoothChoices = List.of(new ControlPanel.Choice<>("smooth", "smooth"));
 
         assertThatNullPointerException().isThrownBy(() -> section.setEnabled(null));
         assertThatNullPointerException().isThrownBy(() -> section.addBoolean("enabled", null, ignored -> {}));
@@ -277,8 +357,11 @@ final class ControlPanelTest {
         assertThatNullPointerException().isThrownBy(() -> section.addText("selected", null));
         assertThatNullPointerException().isThrownBy(() -> section.addInteger("segments", null, ignored -> {}, 2, 50));
         assertThatNullPointerException()
-                .isThrownBy(() -> section.addChoice(
-                        "shading", null, ignored -> {}, List.of(new ControlPanel.Choice<>("smooth", "smooth"))));
+                .isThrownBy(() -> section.addChoice("shading", null, ignored -> {}, smoothChoices));
+        assertThatNullPointerException()
+                .isThrownBy(() -> section.addRadioGroup("shading", null, ignored -> {}, smoothChoices));
+        assertThatNullPointerException()
+                .isThrownBy(() -> section.addSelect("shading", null, ignored -> {}, smoothChoices));
         section.addFloat("invalid", () -> Float.NaN, ignored -> {}, 0.0f, 1.0f);
         RecordingGuiCanvas canvas = new RecordingGuiCanvas();
         assertThatIllegalArgumentException().isThrownBy(() -> panel.paint(canvas, 800, 600));

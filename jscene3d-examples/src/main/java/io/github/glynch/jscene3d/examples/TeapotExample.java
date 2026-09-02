@@ -127,14 +127,14 @@ public final class TeapotExample {
     private static ControlPanel createPanel(ExampleContext context, TeapotControls settings) {
         ControlPanel panel = new ControlPanel(context.window(), "Utah Teapot");
         ControlPanel.Section geometry = panel.addSection("Geometry");
-        geometry.addChoice("tessellation", settings::tessellation, settings::setTessellation, TESSELLATION_CHOICES);
+        geometry.addSelect("tessellation", settings::tessellation, settings::setTessellation, TESSELLATION_CHOICES);
         geometry.addBoolean("display lid", settings::includesLid, settings::setIncludeLid);
         geometry.addBoolean("display body", settings::includesBody, settings::setIncludeBody);
         geometry.addBoolean("display bottom", settings::includesBottom, settings::setIncludeBottom);
         geometry.addBoolean("fitted lid", settings::hasFittedLid, settings::setFittedLid);
         geometry.addBoolean("original scale", settings::hasOriginalProportions, settings::setOriginalProportions);
         ControlPanel.Section appearance = panel.addSection("Appearance");
-        appearance.addChoice("shading", settings::shading, settings::setShading, SHADING_CHOICES);
+        appearance.addSelect("shading", settings::shading, settings::setShading, SHADING_CHOICES);
         appearance.addBoolean("auto rotate", settings::isAutoRotating, settings::setAutoRotating);
         return panel;
     }

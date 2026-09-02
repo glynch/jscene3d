@@ -153,8 +153,8 @@ public final class FogExample {
     private static ControlPanel createPanel(ExampleContext context, FogSettings settings, OrbitControls controls) {
         ControlPanel panel = new ControlPanel(context.window(), "Distance Fog");
         ControlPanel.Section fog = panel.addSection("Fog");
-        fog.addChoice("mode", settings::mode, settings::setMode, MODE_CHOICES);
-        fog.addChoice("color", settings::palette, settings::setPalette, COLOR_CHOICES);
+        fog.addRadioGroup("mode", settings::mode, settings::setMode, MODE_CHOICES);
+        fog.addSelect("color", settings::palette, settings::setPalette, COLOR_CHOICES);
         ControlPanel.Section linear = panel.addSection("Linear");
         linear.setEnabled(() -> settings.mode() == FogMode.LINEAR);
         linear.addFloat("near", settings::nearDistance, settings::setNearDistance, 0.0f, 100.0f);

@@ -220,13 +220,14 @@ public final class AnimatedBillboardExample {
     private static ControlPanel createPanel(ExampleContext context, PlaybackControls playback, OrbitControls controls) {
         ControlPanel panel = new ControlPanel(context.window(), "Animated Billboards");
         ControlPanel.Section resource = panel.addSection("Animation resource");
+        resource.setExpanded(false);
         resource.addText("animations", () -> "idle / walk / celebrate");
         resource.addText("artwork", () -> "Kenney New Platformer Pack");
         resource.addText("storage", () -> "one atlas, three animation sets");
         ControlPanel.Section playbackSection = panel.addSection("Selected billboard");
-        playbackSection.addChoice(
+        playbackSection.addRadioGroup(
                 "character", playback::selectedCharacter, playback::selectCharacter, CHARACTER_CHOICES);
-        playbackSection.addChoice("animation", playback::animation, playback::setAnimation, ANIMATION_CHOICES);
+        playbackSection.addSelect("animation", playback::animation, playback::setAnimation, ANIMATION_CHOICES);
         playbackSection.addFloat("speed", playback::speed, playback::setSpeed, -2.0f, 3.0f);
         playbackSection.addButton("play / resume", playback::play);
         playbackSection.addButton("pause", playback::pause);

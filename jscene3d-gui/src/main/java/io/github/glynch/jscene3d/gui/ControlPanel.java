@@ -28,10 +28,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * Themed immediate control panel explicitly bound to application state.
  *
- * <p>Sections contain read-only text, checkboxes, floating-point and integer sliders, finite
- * choices, and action buttons. Bindings use Java method references or lambdas; the panel does not
- * use reflection or direct field access. Call {@link #update()} after {@link Window#pollEvents()},
- * then pass this overlay to the renderer after drawing the scene.
+ * <p>Sections contain read-only text, checkboxes, floating-point and integer sliders, steppers,
+ * radio groups, selects, and action buttons. Bindings use Java method references or lambdas; the
+ * panel does not use reflection or direct field access. Call {@link #update()} after {@link
+ * Window#pollEvents()}, then pass this overlay to the renderer after drawing the scene.
  *
  * <p>The panel owns no native or GPU resources. It is mutable, not thread-safe, and subject to its
  * window's thread affinity.
@@ -42,6 +42,7 @@ public final class ControlPanel implements Overlay {
     static final float TITLE_HEIGHT = 42.0f;
     static final float SECTION_HEIGHT = 30.0f;
     static final float ITEM_HEIGHT = 38.0f;
+    static final float OPTION_HEIGHT = 30.0f;
     static final float HORIZONTAL_PADDING = 12.0f;
     static final float SLIDER_X_OFFSET = 132.0f;
     static final float SLIDER_VALUE_WIDTH = 42.0f;
@@ -64,6 +65,7 @@ public final class ControlPanel implements Overlay {
     private final OverlayGuiCanvas overlayCanvas = new OverlayGuiCanvas();
 
     private @Nullable SliderItem activeSlider;
+    private @Nullable SelectItem<?> openSelect;
     private boolean visible = true;
     private boolean capturesPointer;
     private boolean ownsPointerPress;
@@ -136,6 +138,7 @@ public final class ControlPanel implements Overlay {
         this.visible = visible;
         if (!visible) {
             activeSlider = null;
+            closeOpenSelect();
             capturesPointer = false;
             ownsPointerPress = false;
         }
@@ -203,22 +206,35 @@ public final class ControlPanel implements Overlay {
         for (Section section : sections) {
             paintSection(canvas, section, x, y);
             y += SECTION_HEIGHT;
-            if (!section.expanded) {
-                continue;
-            }
-            boolean enabled = section.isEnabled();
-            for (Item item : section.items) {
-                boolean hovered = enabled && contains(pointerX, pointerY, x, y, WIDTH, ITEM_HEIGHT);
-                canvas.rectangle(
-                        x + 1.0f, y, WIDTH - 2.0f, ITEM_HEIGHT, hovered ? theme.rowHover() : theme.row(), 0.97f);
-                item.paint(canvas, x, y, hovered, theme);
-                if (!enabled) {
-                    canvas.rectangle(x + 1.0f, y, WIDTH - 2.0f, ITEM_HEIGHT, theme.panel(), 0.58f);
-                }
-                canvas.rectangle(x + 1.0f, y + ITEM_HEIGHT - 1.0f, WIDTH - 2.0f, 1.0f, theme.border(), 0.45f);
-                y += ITEM_HEIGHT;
-            }
+            y = paintItems(canvas, section, x, y);
         }
+    }
+
+    /** Paints one expanded section's controls and returns the following vertical position. */
+    private float paintItems(GuiCanvas canvas, Section section, float x, float y) {
+        if (!section.expanded) {
+            return y;
+        }
+        boolean enabled = section.isEnabled();
+        float nextY = y;
+        for (Item item : section.items) {
+            nextY = paintItem(canvas, item, x, nextY, enabled);
+        }
+        return nextY;
+    }
+
+    /** Paints one control, including hover, disabled, and separator layers. */
+    private float paintItem(GuiCanvas canvas, Item item, float x, float y, boolean enabled) {
+        float itemHeight = item.height();
+        boolean hovered = enabled && contains(pointerX, pointerY, x, y, WIDTH, itemHeight);
+        canvas.rectangle(x + 1.0f, y, WIDTH - 2.0f, itemHeight, hovered ? theme.rowHover() : theme.row(), 0.97f);
+        float pointerOffset = hovered ? (float) pointerY - y : -1.0f;
+        item.paint(canvas, x, y, pointerOffset, theme);
+        if (!enabled) {
+            canvas.rectangle(x + 1.0f, y, WIDTH - 2.0f, itemHeight, theme.panel(), 0.58f);
+        }
+        canvas.rectangle(x + 1.0f, y + itemHeight - 1.0f, WIDTH - 2.0f, 1.0f, theme.border(), 0.45f);
+        return y + itemHeight;
     }
 
     /** Paints one section header and its disclosure chevron. */
@@ -254,11 +270,15 @@ public final class ControlPanel implements Overlay {
         if (!visible) {
             capturesPointer = false;
             activeSlider = null;
+            closeOpenSelect();
             ownsPointerPress = false;
             return false;
         }
         if (activeSlider != null && !isEnabled(activeSlider)) {
             activeSlider = null;
+        }
+        if (openSelect != null && !isEnabled(openSelect)) {
+            closeOpenSelect();
         }
 
         float panelX = panelX(windowWidth);
@@ -273,7 +293,11 @@ public final class ControlPanel implements Overlay {
             changed |= applySlider(activeSlider, pointerX, panelX);
         }
         if (validPointer.pressed()) {
-            changed |= activate(pointerX, pointerY, panelX);
+            if (pointerOverPanel) {
+                changed |= activate(pointerX, pointerY, panelX);
+            } else {
+                changed |= closeOpenSelect();
+            }
         }
         if (validPointer.released()) {
             activeSlider = null;
@@ -287,6 +311,7 @@ public final class ControlPanel implements Overlay {
         float rowY = MARGIN + TITLE_HEIGHT;
         for (Section section : sections) {
             if (contains(x, y, panelX, rowY, WIDTH, SECTION_HEIGHT)) {
+                closeOpenSelect();
                 section.expanded = !section.expanded;
                 activeSlider = null;
                 return true;
@@ -296,16 +321,17 @@ public final class ControlPanel implements Overlay {
                 continue;
             }
             for (Item item : section.items) {
-                if (contains(x, y, panelX, rowY, WIDTH, ITEM_HEIGHT)) {
+                float itemHeight = item.height();
+                if (contains(x, y, panelX, rowY, WIDTH, itemHeight)) {
                     if (!section.isEnabled()) {
-                        return false;
+                        return closeOpenSelect();
                     }
-                    return activateItem(item, x, panelX);
+                    return activateItem(item, x, y, panelX, rowY);
                 }
-                rowY += ITEM_HEIGHT;
+                rowY += itemHeight;
             }
         }
-        return false;
+        return closeOpenSelect();
     }
 
     /** Returns whether the section containing an active item currently accepts input. */
@@ -319,30 +345,61 @@ public final class ControlPanel implements Overlay {
     }
 
     /** Applies the activation semantics for one concrete control type. */
-    private boolean activateItem(Item item, double x, float panelX) {
-        return switch (item) {
-            case BooleanItem booleanItem -> {
-                booleanItem.setter.accept(!booleanItem.getter.getAsBoolean());
-                yield true;
-            }
-            case SliderItem sliderItem -> {
-                float sliderX = panelX + SLIDER_X_OFFSET;
-                if (x < sliderX) {
-                    yield false;
-                }
-                activeSlider = sliderItem;
-                yield applySlider(sliderItem, x, panelX);
-            }
-            case ChoiceItem<?> choiceItem -> choiceItem.select(x >= panelX + WIDTH * 0.5f);
-            case ButtonItem buttonItem -> {
-                if (!buttonItem.enabled.getAsBoolean()) {
-                    yield false;
-                }
-                buttonItem.action.run();
-                yield true;
-            }
-            case TextItem ignored -> false;
-        };
+    private boolean activateItem(Item item, double x, double y, float panelX, float itemY) {
+        boolean closedSelect = item != openSelect && closeOpenSelect();
+        boolean activated =
+                switch (item) {
+                    case BooleanItem booleanItem -> {
+                        booleanItem.setter.accept(!booleanItem.getter.getAsBoolean());
+                        yield true;
+                    }
+                    case SliderItem sliderItem -> {
+                        float sliderX = panelX + SLIDER_X_OFFSET;
+                        if (x < sliderX) {
+                            yield false;
+                        }
+                        activeSlider = sliderItem;
+                        yield applySlider(sliderItem, x, panelX);
+                    }
+                    case ChoiceItem<?> choiceItem -> choiceItem.select(x >= panelX + WIDTH * 0.5f);
+                    case RadioGroupItem<?> radioGroupItem -> radioGroupItem.select((float) y - itemY);
+                    case SelectItem<?> selectItem -> {
+                        activateSelect(selectItem, (float) y - itemY);
+                        yield true;
+                    }
+                    case ButtonItem buttonItem -> {
+                        if (!buttonItem.enabled.getAsBoolean()) {
+                            yield false;
+                        }
+                        buttonItem.action.run();
+                        yield true;
+                    }
+                    case TextItem ignored -> false;
+                };
+        return closedSelect || activated;
+    }
+
+    /** Toggles one select or applies an option from its expanded list. */
+    private void activateSelect(SelectItem<?> selectItem, float pointerOffset) {
+        if (pointerOffset < ITEM_HEIGHT) {
+            boolean opens = openSelect != selectItem;
+            openSelect = opens ? selectItem : null;
+            selectItem.setExpanded(opens);
+            return;
+        }
+        selectItem.select(pointerOffset - ITEM_HEIGHT);
+        openSelect = null;
+        selectItem.setExpanded(false);
+    }
+
+    /** Closes the currently expanded select, if any. */
+    private boolean closeOpenSelect() {
+        if (openSelect == null) {
+            return false;
+        }
+        openSelect.setExpanded(false);
+        openSelect = null;
+        return true;
     }
 
     /** Maps a pointer position to one slider's configured interval. */
@@ -358,7 +415,9 @@ public final class ControlPanel implements Overlay {
         for (Section section : sections) {
             result += SECTION_HEIGHT;
             if (section.expanded) {
-                result += section.items.size() * ITEM_HEIGHT;
+                for (Item item : section.items) {
+                    result += item.height();
+                }
             }
         }
         return result;
@@ -471,6 +530,9 @@ public final class ControlPanel implements Overlay {
             if (!expanded && panel.activeSlider != null && items.contains(panel.activeSlider)) {
                 panel.activeSlider = null;
             }
+            if (!expanded && panel.openSelect != null && items.contains(panel.openSelect)) {
+                panel.closeOpenSelect();
+            }
         }
 
         /**
@@ -495,6 +557,9 @@ public final class ControlPanel implements Overlay {
             this.enabled = Objects.requireNonNull(enabled, "enabled");
             if (!isEnabled() && panel.activeSlider != null && items.contains(panel.activeSlider)) {
                 panel.activeSlider = null;
+            }
+            if (!isEnabled() && panel.openSelect != null && items.contains(panel.openSelect)) {
+                panel.closeOpenSelect();
             }
         }
 
@@ -601,15 +666,56 @@ public final class ControlPanel implements Overlay {
          * @throws IllegalArgumentException if the label is blank or choices are empty
          */
         public <T> void addChoice(String label, Supplier<T> getter, Consumer<T> setter, List<Choice<T>> choices) {
-            List<Choice<T>> validChoices = List.copyOf(Objects.requireNonNull(choices, "choices"));
-            if (validChoices.isEmpty()) {
-                throw new IllegalArgumentException("choices must not be empty");
-            }
             items.add(new ChoiceItem<>(
                     Preconditions.requireNonBlank(label, "label"),
                     Objects.requireNonNull(getter, "getter"),
                     Objects.requireNonNull(setter, "setter"),
-                    validChoices));
+                    validatedChoices(choices)));
+        }
+
+        /**
+         * Adds a group of visible radio buttons for a small exclusive choice set.
+         *
+         * <p>The current getter value must equal one of the supplied choices. Every option remains
+         * visible, making this presentation suitable when comparing the alternatives is useful.
+         *
+         * @param <T> value type
+         * @param label non-blank group label
+         * @param getter current-value supplier
+         * @param setter replacement-value consumer
+         * @param choices ordered non-empty choices
+         * @throws NullPointerException if an argument or choice is {@code null}
+         * @throws IllegalArgumentException if the label is blank or choices are empty
+         */
+        public <T> void addRadioGroup(String label, Supplier<T> getter, Consumer<T> setter, List<Choice<T>> choices) {
+            items.add(new RadioGroupItem<>(
+                    Preconditions.requireNonBlank(label, "label"),
+                    Objects.requireNonNull(getter, "getter"),
+                    Objects.requireNonNull(setter, "setter"),
+                    validatedChoices(choices)));
+        }
+
+        /**
+         * Adds a compact select control that reveals its finite options when opened.
+         *
+         * <p>The current getter value must equal one of the supplied choices. Opening the select
+         * expands its options within the panel so they remain readable and participate in pointer
+         * capture without a separate native popup.
+         *
+         * @param <T> value type
+         * @param label non-blank row label
+         * @param getter current-value supplier
+         * @param setter replacement-value consumer
+         * @param choices ordered non-empty choices
+         * @throws NullPointerException if an argument or choice is {@code null}
+         * @throws IllegalArgumentException if the label is blank or choices are empty
+         */
+        public <T> void addSelect(String label, Supplier<T> getter, Consumer<T> setter, List<Choice<T>> choices) {
+            items.add(new SelectItem<>(
+                    Preconditions.requireNonBlank(label, "label"),
+                    Objects.requireNonNull(getter, "getter"),
+                    Objects.requireNonNull(setter, "setter"),
+                    validatedChoices(choices)));
         }
 
         /**
@@ -646,15 +752,30 @@ public final class ControlPanel implements Overlay {
             items.add(new TextItem(
                     Preconditions.requireNonBlank(label, "label"), Objects.requireNonNull(getter, "getter")));
         }
+
+        /** Copies and validates a finite non-empty choice list. */
+        private static <T> List<Choice<T>> validatedChoices(List<Choice<T>> choices) {
+            List<Choice<T>> validChoices = List.copyOf(Objects.requireNonNull(choices, "choices"));
+            if (validChoices.isEmpty()) {
+                throw new IllegalArgumentException("choices must not be empty");
+            }
+            return validChoices;
+        }
     }
 
     /** One frame of primary-pointer state in logical window coordinates. */
     record PointerFrame(double x, double y, boolean pressed, boolean down, boolean released) {}
 
     /** Shared paint contract for one panel row. */
-    private sealed interface Item permits BooleanItem, SliderItem, ChoiceItem, ButtonItem, TextItem {
+    private sealed interface Item
+            permits BooleanItem, SliderItem, ChoiceItem, RadioGroupItem, SelectItem, ButtonItem, TextItem {
+        /** Returns this control's current logical height. */
+        default float height() {
+            return ITEM_HEIGHT;
+        }
+
         /** Paints row-specific visuals. */
-        void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme);
+        void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme);
     }
 
     /** Shared behavior of rows controlled by horizontal pointer dragging. */
@@ -666,7 +787,7 @@ public final class ControlPanel implements Overlay {
     /** Explicitly bound checkbox row. */
     private record BooleanItem(String label, BooleanSupplier getter, BooleanConsumer setter) implements Item {
         @Override
-        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
             FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
             float boxX = x + WIDTH - 31.0f;
             float boxY = y + 10.0f;
@@ -696,7 +817,7 @@ public final class ControlPanel implements Overlay {
         }
 
         @Override
-        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
             float value = Preconditions.requireFinite(getter.getAsFloat(), label);
             float fraction =
                     maximum == minimum ? 1.0f : Math.clamp((value - minimum) / (maximum - minimum), 0.0f, 1.0f);
@@ -734,7 +855,7 @@ public final class ControlPanel implements Overlay {
         }
 
         @Override
-        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
             int value = getter.getAsInt();
             long range = (long) maximum - minimum;
             float fraction = maximum == minimum
@@ -768,7 +889,7 @@ public final class ControlPanel implements Overlay {
         }
 
         @Override
-        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
             String value = choices.get(currentIndex()).label();
             FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
             float valueX = x + WIDTH - HORIZONTAL_PADDING - FONT.width(value, VALUE_FONT_SIZE);
@@ -779,13 +900,7 @@ public final class ControlPanel implements Overlay {
 
         /** Locates the bound value in the finite choice list. */
         private int currentIndex() {
-            T currentValue = Objects.requireNonNull(getter.get(), label + " value");
-            for (int index = 0; index < choices.size(); index++) {
-                if (choices.get(index).value().equals(currentValue)) {
-                    return index;
-                }
-            }
-            throw new IllegalStateException(label + " value is not one of the configured choices: " + currentValue);
+            return currentChoiceIndex(label, getter, choices);
         }
 
         /** Paints one previous/next chevron. */
@@ -797,10 +912,175 @@ public final class ControlPanel implements Overlay {
         }
     }
 
+    /** Explicitly bound visible radio-button group. */
+    private record RadioGroupItem<T>(String label, Supplier<T> getter, Consumer<T> setter, List<Choice<T>> choices)
+            implements Item {
+        @Override
+        public float height() {
+            return ITEM_HEIGHT + OPTION_HEIGHT * choices.size();
+        }
+
+        /** Selects the option under a pointer offset below the group heading. */
+        boolean select(float pointerOffset) {
+            if (pointerOffset < ITEM_HEIGHT) {
+                return false;
+            }
+            int index = Math.clamp((int) ((pointerOffset - ITEM_HEIGHT) / OPTION_HEIGHT), 0, choices.size() - 1);
+            if (index == currentChoiceIndex(label, getter, choices)) {
+                return false;
+            }
+            setter.accept(choices.get(index).value());
+            return true;
+        }
+
+        @Override
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
+            FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
+            int currentIndex = currentChoiceIndex(label, getter, choices);
+            for (int index = 0; index < choices.size(); index++) {
+                paintOption(
+                        canvas, x, y + ITEM_HEIGHT + index * OPTION_HEIGHT, index, currentIndex, pointerOffset, theme);
+            }
+        }
+
+        /** Paints one radio option with its selected and hovered state. */
+        private void paintOption(
+                GuiCanvas canvas, float x, float y, int index, int currentIndex, float pointerOffset, GuiTheme theme) {
+            boolean hovered = pointerOffset >= ITEM_HEIGHT + index * OPTION_HEIGHT
+                    && pointerOffset < ITEM_HEIGHT + (index + 1) * OPTION_HEIGHT;
+            if (hovered) {
+                canvas.rectangle(x + 1.0f, y, WIDTH - 2.0f, OPTION_HEIGHT, theme.rowHover(), 1.0f);
+            }
+            float radioX = x + HORIZONTAL_PADDING + 7.0f;
+            float radioY = y + OPTION_HEIGHT * 0.5f;
+            canvas.roundedRectangle(radioX - 7.0f, radioY - 7.0f, 14.0f, 14.0f, 7.0f, theme.border(), 1.0f);
+            canvas.roundedRectangle(
+                    radioX - 5.0f,
+                    radioY - 5.0f,
+                    10.0f,
+                    10.0f,
+                    5.0f,
+                    index == currentIndex ? theme.accent() : theme.control(),
+                    1.0f);
+            FONT.text(
+                    canvas,
+                    x + HORIZONTAL_PADDING + 25.0f,
+                    y + 7.0f,
+                    choices.get(index).label(),
+                    VALUE_FONT_SIZE,
+                    index == currentIndex ? theme.text() : theme.secondaryText());
+        }
+    }
+
+    /** Explicitly bound compact select with an inline expanded option list. */
+    private static final class SelectItem<T> implements Item {
+        private final String label;
+        private final Supplier<T> getter;
+        private final Consumer<T> setter;
+        private final List<Choice<T>> choices;
+
+        private boolean expanded;
+
+        /** Retains the validated select binding and immutable choices. */
+        private SelectItem(String label, Supplier<T> getter, Consumer<T> setter, List<Choice<T>> choices) {
+            this.label = label;
+            this.getter = getter;
+            this.setter = setter;
+            this.choices = choices;
+        }
+
+        /** Replaces the expanded state owned by the enclosing panel. */
+        private void setExpanded(boolean expanded) {
+            this.expanded = expanded;
+        }
+
+        @Override
+        public float height() {
+            return ITEM_HEIGHT + (expanded ? OPTION_HEIGHT * choices.size() : 0.0f);
+        }
+
+        /** Selects one expanded option from its local vertical offset. */
+        private void select(float optionOffset) {
+            int index = Math.clamp((int) (optionOffset / OPTION_HEIGHT), 0, choices.size() - 1);
+            if (index == currentChoiceIndex(label, getter, choices)) {
+                return;
+            }
+            setter.accept(choices.get(index).value());
+        }
+
+        @Override
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
+            FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
+            paintValue(canvas, x, y, theme);
+            if (expanded) {
+                paintOptions(canvas, x, y, pointerOffset, theme);
+            }
+        }
+
+        /** Paints the closed select field and disclosure chevron. */
+        private void paintValue(GuiCanvas canvas, float x, float y, GuiTheme theme) {
+            String value =
+                    choices.get(currentChoiceIndex(label, getter, choices)).label();
+            float fieldX = x + SLIDER_X_OFFSET - 8.0f;
+            float fieldWidth = WIDTH - (fieldX - x) - HORIZONTAL_PADDING;
+            canvas.roundedRectangle(fieldX, y + 6.0f, fieldWidth, 26.0f, 4.0f, theme.control(), 1.0f);
+            FONT.text(canvas, fieldX + 7.0f, y + 11.5f, value, VALUE_FONT_SIZE, theme.text());
+            float chevronX = fieldX + fieldWidth - 10.0f;
+            float chevronY = y + ITEM_HEIGHT * 0.5f;
+            float direction = expanded ? -1.0f : 1.0f;
+            canvas.line(
+                    chevronX - 3.0f,
+                    chevronY - direction * 2.0f,
+                    chevronX,
+                    chevronY + direction,
+                    1.5f,
+                    theme.mutedText(),
+                    1.0f);
+            canvas.line(
+                    chevronX,
+                    chevronY + direction,
+                    chevronX + 3.0f,
+                    chevronY - direction * 2.0f,
+                    1.5f,
+                    theme.mutedText(),
+                    1.0f);
+        }
+
+        /** Paints every expanded select option. */
+        private void paintOptions(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
+            int currentIndex = currentChoiceIndex(label, getter, choices);
+            for (int index = 0; index < choices.size(); index++) {
+                float optionY = y + ITEM_HEIGHT + index * OPTION_HEIGHT;
+                boolean hovered = pointerOffset >= ITEM_HEIGHT + index * OPTION_HEIGHT
+                        && pointerOffset < ITEM_HEIGHT + (index + 1) * OPTION_HEIGHT;
+                boolean selected = index == currentIndex;
+                canvas.rectangle(
+                        x + 1.0f, optionY, WIDTH - 2.0f, OPTION_HEIGHT, hovered ? theme.rowHover() : theme.row(), 1.0f);
+                FONT.text(
+                        canvas,
+                        x + HORIZONTAL_PADDING + 12.0f,
+                        optionY + 7.0f,
+                        choices.get(index).label(),
+                        VALUE_FONT_SIZE,
+                        selected ? theme.text() : theme.secondaryText());
+                if (selected) {
+                    canvas.roundedRectangle(
+                            x + HORIZONTAL_PADDING,
+                            optionY + OPTION_HEIGHT * 0.5f - 3.0f,
+                            6.0f,
+                            6.0f,
+                            3.0f,
+                            theme.accent(),
+                            1.0f);
+                }
+            }
+        }
+    }
+
     /** Action-button row. */
     private record ButtonItem(String label, BooleanSupplier enabled, Runnable action) implements Item {
         @Override
-        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
             float buttonX = x + HORIZONTAL_PADDING;
             float buttonY = y + 6.0f;
             float buttonWidth = WIDTH - HORIZONTAL_PADDING * 2.0f;
@@ -812,7 +1092,7 @@ public final class ControlPanel implements Overlay {
                     26.0f,
                     5.0f,
                     isEnabled ? theme.accent() : theme.control(),
-                    isEnabled && hovered ? 1.0f : 0.82f);
+                    isEnabled && pointerOffset >= 0.0f ? 1.0f : 0.82f);
             float textX = buttonX + (buttonWidth - FONT.width(label, ITEM_FONT_SIZE)) * 0.5f;
             FONT.text(canvas, textX, y + 11.0f, label, ITEM_FONT_SIZE, isEnabled ? theme.text() : theme.mutedText());
         }
@@ -821,11 +1101,22 @@ public final class ControlPanel implements Overlay {
     /** Explicitly bound read-only text row. */
     private record TextItem(String label, Supplier<String> getter) implements Item {
         @Override
-        public void paint(GuiCanvas canvas, float x, float y, boolean hovered, GuiTheme theme) {
+        public void paint(GuiCanvas canvas, float x, float y, float pointerOffset, GuiTheme theme) {
             String value = Objects.requireNonNull(getter.get(), label + " value");
             FONT.text(canvas, x + HORIZONTAL_PADDING, y + 11.0f, label, ITEM_FONT_SIZE, theme.secondaryText());
             float valueX = x + WIDTH - HORIZONTAL_PADDING - FONT.width(value, VALUE_FONT_SIZE);
             FONT.text(canvas, valueX, y + 11.5f, value, VALUE_FONT_SIZE, theme.text());
         }
+    }
+
+    /** Locates a bound value in its finite choice list. */
+    private static <T> int currentChoiceIndex(String label, Supplier<T> getter, List<Choice<T>> choices) {
+        T currentValue = Objects.requireNonNull(getter.get(), label + " value");
+        for (int index = 0; index < choices.size(); index++) {
+            if (choices.get(index).value().equals(currentValue)) {
+                return index;
+            }
+        }
+        throw new IllegalStateException(label + " value is not one of the configured choices: " + currentValue);
     }
 }

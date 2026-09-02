@@ -164,7 +164,7 @@ public final class InstancingExample {
     private static ControlPanel createPanel(ExampleContext context, InstancingDemo demo, OrbitControls controls) {
         ControlPanel panel = new ControlPanel(context.window(), "Instancing");
         ControlPanel.Section comparison = panel.addSection("Comparison");
-        comparison.addChoice("mode", demo::mode, demo::setMode, MODE_CHOICES);
+        comparison.addRadioGroup("mode", demo::mode, demo::setMode, MODE_CHOICES);
         comparison.addFloat("object count", demo::count, demo::setCount, 1.0f, CAPACITY);
         comparison.addBoolean("instance colors", demo::colorsEnabled, demo::setColorsEnabled);
         comparison.addBoolean("animate", demo::animated, demo::setAnimated);

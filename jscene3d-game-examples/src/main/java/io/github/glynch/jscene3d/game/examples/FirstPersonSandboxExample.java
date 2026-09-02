@@ -21,6 +21,8 @@ import io.github.glynch.jscene3d.game.input.ActionSnapshot;
 import io.github.glynch.jscene3d.game.input.InputAction;
 import io.github.glynch.jscene3d.game.input.InputCapture;
 import io.github.glynch.jscene3d.game.input.InputMap;
+import io.github.glynch.jscene3d.game.physics.CharacterMovementActions;
+import io.github.glynch.jscene3d.game.physics.CharacterMovementController;
 import io.github.glynch.jscene3d.game.physics.PhysicsBinding;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
@@ -165,6 +167,8 @@ public final class FirstPersonSandboxExample {
         private static final InputAction TURN_LEFT = new InputAction("turn-left");
         private static final InputAction TURN_RIGHT = new InputAction("turn-right");
         private static final InputAction JUMP = new InputAction("jump");
+        private static final CharacterMovementActions MOVEMENT_ACTIONS =
+                new CharacterMovementActions(MOVE_FORWARD, MOVE_BACKWARD, MOVE_LEFT, MOVE_RIGHT, JUMP);
         private static final float MOVE_SPEED = 5.0F;
         private static final float KEYBOARD_TURN_SPEED = 2.2F;
         private static final float EYE_OFFSET = 0.62F;
@@ -176,6 +180,7 @@ public final class FirstPersonSandboxExample {
         private final PhysicsWorld physicsWorld = new PhysicsWorld();
         private final KinematicBody playerBody;
         private final CharacterController characterController;
+        private final CharacterMovementController movementController;
         private final Mesh playerPresentation;
         private final PhysicsBinding playerBinding;
         private final BufferGeometry boxGeometry = BoxGeometry.create(1.0F, 1.0F, 1.0F);
@@ -213,6 +218,7 @@ public final class FirstPersonSandboxExample {
             playerBody = physicsWorld.addKinematicBody(new Vector3f(0.0F, 0.951F, 6.0F), new Quaternionf());
             playerBody.addCollider(new CapsuleShape(0.45F, 1.0F));
             characterController = new CharacterController(physicsWorld, playerBody);
+            movementController = new CharacterMovementController(characterController, MOVEMENT_ACTIONS, MOVE_SPEED);
             playerPresentation = new Mesh(playerGeometry, playerMaterial);
             playerPresentation.setVisible(false);
             scene.add(playerPresentation);
@@ -229,12 +235,8 @@ public final class FirstPersonSandboxExample {
         @Override
         public void fixedUpdate(FixedUpdate update) {
             input = update.input();
-            if (input.wasPressed(JUMP)) {
-                characterController.tryJump();
-            }
-            Vector3f velocity = movementVelocity(input);
-            float fixedSeconds = update.step().toNanos() / 1_000_000_000.0F;
-            movement = characterController.move(velocity, fixedSeconds);
+            Vector3f viewForward = new Vector3f(0.0F, 0.0F, -1.0F).rotate(camera.quaternion());
+            movement = movementController.move(input, viewForward, update.step());
             playerBinding.capture();
         }
 
@@ -338,6 +340,7 @@ public final class FirstPersonSandboxExample {
             addBox(new Vector3f(0.0F, 2.0F, -9.5F), new Vector3f(20.0F, 4.0F, 1.0F), wallMaterial);
             addBox(new Vector3f(-9.5F, 2.0F, 0.0F), new Vector3f(1.0F, 4.0F, 20.0F), wallMaterial);
             addBox(new Vector3f(9.5F, 2.0F, 0.0F), new Vector3f(1.0F, 4.0F, 20.0F), wallMaterial);
+            addBox(new Vector3f(0.0F, 0.15F, 3.0F), new Vector3f(3.0F, 0.3F, 1.0F), landmarkMaterial);
             addBox(new Vector3f(-3.0F, 1.0F, 0.0F), new Vector3f(2.0F, 2.0F, 2.0F), landmarkMaterial);
             addBox(new Vector3f(3.5F, 0.5F, -3.0F), new Vector3f(4.0F, 1.0F, 1.5F), landmarkMaterial);
         }
@@ -351,23 +354,6 @@ public final class FirstPersonSandboxExample {
             mesh.setPosition(position);
             mesh.setScale(dimensions);
             scene.add(mesh);
-        }
-
-        /** Converts camera-relative semantic actions to a planar world velocity. */
-        private Vector3f movementVelocity(ActionSnapshot actions) {
-            float strafe = actions.axis(MOVE_LEFT, MOVE_RIGHT);
-            float forwardAmount = actions.axis(MOVE_BACKWARD, MOVE_FORWARD);
-            Vector3f forward = new Vector3f(0.0F, 0.0F, -1.0F).rotate(camera.quaternion());
-            Vector3f right = new Vector3f(1.0F, 0.0F, 0.0F).rotate(camera.quaternion());
-            forward.y = 0.0F;
-            right.y = 0.0F;
-            forward.normalize();
-            right.normalize();
-            Vector3f velocity = forward.mul(forwardAmount).add(right.mul(strafe));
-            if (velocity.lengthSquared() > 1.0F) {
-                velocity.normalize();
-            }
-            return velocity.mul(MOVE_SPEED);
         }
 
         /** Moves the first-person eye to the interpolated presentation position. */

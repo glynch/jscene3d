@@ -73,11 +73,12 @@ game sandbox.
 
 The initial `jscene3d-game` slice now provides a lifecycle with separate fixed
 and rendered updates, semantic input action mapping, bounded catch-up behavior,
-and Physics Bindings with render interpolation. The first-person sandbox proves
-these capabilities as a cohesive integration. Game-state transitions, asset
-lifetime management, sprite-frame animation, and camera-facing billboard
-batches remain later reusable slices. The artifact must not define sectors,
-weapons, enemies, damage rules, or a Doom level format.
+camera-relative character movement, and Physics Bindings with render
+interpolation. First- and third-person sandboxes prove that the character
+movement interface remains independent of camera policy. Game-state
+transitions, asset lifetime management, sprite-frame animation, and
+camera-facing billboard batches remain later reusable slices. The artifact must
+not define sectors, weapons, enemies, damage rules, or a Doom level format.
 
 ### Audio
 

@@ -14,10 +14,11 @@ will extend that model in a later slice. Physics does not directly mutate
 
 `jscene3d-game` provides the higher-level 3D game runtime. Its initial slice
 coordinates application lifecycle, fixed and rendered updates, semantic input
-mapping, and interpolated Physics Bindings. Later slices may add game states and
-asset lifetime management when their concrete requirements are defined. It
-remains genre independent and does not contain the rules, world model, content
-formats, or assets of any particular game.
+mapping, reusable input-to-character movement, and interpolated Physics
+Bindings. Later slices may add game states and asset lifetime management when
+their concrete requirements are defined. It remains genre independent and does
+not contain the rules, world model, content formats, or assets of any particular
+game.
 
 Each playable title will be a separate Game Application artifact that depends on
 the reusable Game Engine and Physics Engine. The first planned title is a

@@ -440,13 +440,19 @@ interpolation factor for smooth presentation. `InputMap` translates physical
 keyboard and mouse controls into named `InputAction` values while respecting
 input captured by a host interface. `PhysicsBinding` is the explicit game-layer
 adapter between renderer-independent collision objects and scene objects.
+`CharacterMovementController` converts configurable semantic actions and a
+caller-supplied view direction into normalized camera-relative movement, jump
+requests, and fixed-step character physics without depending on a particular
+camera implementation.
 
 The separate `jscene3d-game-examples` artifact demonstrates these seams with
 first- and third-person sandboxes. The first-person example uses W/S or Up/Down
 to move, A/D to strafe, Left/Right or captured mouse movement to turn, and Space
 to jump. The third-person example uses W A S D or the arrow keys for
 camera-relative movement, mouse dragging to orbit, scrolling to zoom, and Space
-to jump. Run them in the game example browser or directly with:
+to jump. Both sandboxes use the same reusable movement controller and contain a
+low step, solid obstacles, and enclosing walls for exercising stepping, jumping,
+collision, and sliding. Run them in the game example browser or directly with:
 
 ```shell
 ./tools/scripts/run-example.sh FirstPersonSandboxExample

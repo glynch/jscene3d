@@ -6,6 +6,8 @@ package io.github.glynch.jscene3d.game.internal;
 
 import java.time.Duration;
 import java.util.Objects;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
 /** Shared argument checks for game-runtime values. */
 public final class Preconditions {
@@ -56,5 +58,34 @@ public final class Preconditions {
             throw new IllegalArgumentException(name + " must be finite and between zero and one: " + value);
         }
         return value;
+    }
+
+    /**
+     * Returns a positive finite floating-point value.
+     *
+     * @param value value to validate
+     * @param name argument name used in failures
+     * @return validated value
+     */
+    public static float requirePositive(float value, String name) {
+        if (!Float.isFinite(value) || value <= 0.0F) {
+            throw new IllegalArgumentException(name + " must be positive and finite: " + value);
+        }
+        return value;
+    }
+
+    /**
+     * Returns a finite copy of a three-dimensional vector.
+     *
+     * @param value vector to validate and copy
+     * @param name argument name used in failures
+     * @return finite vector copy
+     */
+    public static Vector3f requireFinite(Vector3fc value, String name) {
+        Vector3fc validValue = Objects.requireNonNull(value, name);
+        if (!Float.isFinite(validValue.x()) || !Float.isFinite(validValue.y()) || !Float.isFinite(validValue.z())) {
+            throw new IllegalArgumentException(name + " must be finite");
+        }
+        return new Vector3f(validValue);
     }
 }

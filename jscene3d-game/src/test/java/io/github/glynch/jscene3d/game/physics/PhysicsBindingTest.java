@@ -47,6 +47,7 @@ final class PhysicsBindingTest {
 
         PhysicsBinding binding = new PhysicsBinding(body, sceneObject);
 
+        assertThat(binding.sceneObject()).isSameAs(sceneObject);
         assertThat(sceneObject.position().x()).isCloseTo(2.0F, TOLERANCE);
         assertThat(sceneObject.worldPosition(new Vector3f()).x).isCloseTo(7.0F, TOLERANCE);
     }
@@ -65,7 +66,9 @@ final class PhysicsBindingTest {
         assertThatThrownBy(() -> binding.apply(Float.NaN)).isInstanceOf(IllegalArgumentException.class);
         world.remove(body);
         assertThatThrownBy(binding::capture).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new PhysicsBinding(body, new Object3D())).isInstanceOf(IllegalArgumentException.class);
+        Object3D unboundSceneObject = new Object3D();
+        assertThatThrownBy(() -> new PhysicsBinding(body, unboundSceneObject))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

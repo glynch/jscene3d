@@ -49,6 +49,8 @@ import io.github.glynch.jscene3d.materials.ShaderAttribute;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Billboard;
+import io.github.glynch.jscene3d.objects.BillboardAlignment;
 import io.github.glynch.jscene3d.objects.Bone;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.InstancedMesh;
@@ -356,6 +358,32 @@ final class RendererIT {
             assertThat(statistics.frame()).isEqualTo(4L);
             assertThat(statistics.drawCalls()).isEqualTo(1);
             assertThat(statistics.bufferUploads()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void rendersSphericalAndCylindricalBillboardsFromAnObliqueCamera() {
+        try (Window window = Window.create("Billboard integration test");
+                Renderer renderer = Renderer.create(window);
+                BasicMaterial material = new BasicMaterial(Color.RED);
+                Billboard billboard = new Billboard(material)) {
+            billboard.setScale(2.0f, 2.0f, 1.0f);
+            Scene scene = new Scene();
+            scene.add(billboard);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(3.0f, 2.0f, 3.0f);
+            camera.lookAt(0.0f, 0.0f, 0.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            billboard.setAlignment(BillboardAlignment.CYLINDRICAL);
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            assertThat(renderer.info().statistics().drawCalls()).isOne();
+            assertThat(renderer.info().statistics().triangles()).isEqualTo(2L);
         }
     }
 

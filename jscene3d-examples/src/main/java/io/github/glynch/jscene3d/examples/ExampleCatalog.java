@@ -412,6 +412,13 @@ public final class ExampleCatalog {
                         List.of("alpha", "blend", "sorting", "depth"),
                         TransparencyExample::create),
                 definition(
+                        "billboards",
+                        "Billboards",
+                        "Rendering",
+                        "Camera-facing sprites with spherical and upright cylindrical alignment.",
+                        List.of("billboard", "sprite", "camera facing", "spherical", "cylindrical", "anchor"),
+                        BillboardExample::create),
+                definition(
                         "render-callbacks",
                         "Render callbacks",
                         "Rendering",

@@ -17,6 +17,8 @@ import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.BoundingSphere;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Billboard;
+import io.github.glynch.jscene3d.objects.BillboardAlignment;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Line;
@@ -30,6 +32,33 @@ import org.joml.Matrix4f;
 import org.junit.jupiter.api.Test;
 
 final class RenderListTest {
+    @Test
+    void collectsBillboardsWithCameraDependentTransformsAndMaterialOrdering() {
+        try (BasicMaterial opaqueMaterial = new BasicMaterial(Color.RED);
+                BasicMaterial transparentMaterial = new BasicMaterial(Color.BLUE);
+                Billboard opaque = new Billboard(opaqueMaterial);
+                Billboard transparent = new Billboard(transparentMaterial)) {
+            opaque.setAlignment(BillboardAlignment.CYLINDRICAL);
+            opaque.setPosition(0.25f, 0.0f, -0.5f);
+            transparentMaterial.setTransparent(true);
+            transparent.setPosition(0.0f, 0.0f, -0.75f);
+            Scene scene = new Scene();
+            scene.add(opaque);
+            scene.add(transparent);
+            RenderList renderList = newRenderList();
+
+            build(renderList, scene);
+
+            assertThat(renderList.opaqueCount()).isOne();
+            assertThat(renderList.opaqueItem(0).object()).isSameAs(opaque);
+            assertThat(renderList.opaqueItem(0).geometry()).isSameAs(opaque.geometry());
+            assertThat(renderList.transparentCount()).isOne();
+            assertThat(renderList.transparentItem(0).object()).isSameAs(transparent);
+            assertThat(renderList.transparentItem(0).material()).isSameAs(transparentMaterial);
+            assertThat(renderList.opaqueItem(0).worldMatrix()).isNotEqualTo(opaque.matrixWorld());
+        }
+    }
+
     @Test
     void partitionsOpaqueAndStablySortsTransparentItemsBackToFront() {
         try (BufferGeometry geometry = createTriangle();

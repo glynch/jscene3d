@@ -77,8 +77,10 @@ camera-relative character movement, and Physics Bindings with render
 interpolation. First- and third-person sandboxes prove that the character
 movement interface remains independent of camera policy. Game-state
 transitions, asset lifetime management, sprite-frame animation, and
-camera-facing billboard batches remain later reusable slices. The artifact must
-not define sectors, weapons, enemies, damage rules, or a Doom level format.
+camera-facing billboard batches remain later reusable slices. Static spherical
+and upright cylindrical billboards are now part of the rendering foundation;
+the game module does not own their camera-facing transform policy. The artifact
+must not define sectors, weapons, enemies, damage rules, or a Doom level format.
 
 ### Audio
 

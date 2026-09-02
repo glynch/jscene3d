@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.RenderableObject;
 import java.util.Objects;
+import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 
@@ -17,7 +18,7 @@ public final class RenderItem {
     private @Nullable RenderableObject object;
     private @Nullable BufferGeometry geometry;
     private @Nullable Material material;
-    private @Nullable Matrix4fc worldMatrix;
+    private final Matrix4f worldMatrix;
     private @Nullable PrimitiveTopology topology;
     private int elementCount;
     private int instanceCount;
@@ -29,7 +30,7 @@ public final class RenderItem {
 
     /** Creates an inactive item ready for pooled assignment. */
     public RenderItem() {
-        // References are assigned when this pooled item participates in a frame.
+        worldMatrix = new Matrix4f();
     }
 
     /**
@@ -75,7 +76,7 @@ public final class RenderItem {
      * @param geometry submitted geometry
      * @param material submitted material
      * @param topology primitive topology
-     * @param elementCount selected element count
+     * @param worldMatrix submitted world transform, which may be camera-dependent
      * @param viewMatrix current view matrix
      * @param traversalOrder stable scene traversal position
      */
@@ -84,20 +85,19 @@ public final class RenderItem {
             BufferGeometry geometry,
             Material material,
             PrimitiveTopology topology,
-            int elementCount,
+            Matrix4fc worldMatrix,
             Matrix4fc viewMatrix,
             long traversalOrder) {
-        Matrix4fc assignedWorldMatrix = object.matrixWorld();
         this.object = object;
         this.geometry = geometry;
         this.material = material;
-        worldMatrix = assignedWorldMatrix;
+        this.worldMatrix.set(worldMatrix);
         this.topology = topology;
-        this.elementCount = elementCount;
+        elementCount = geometry.drawRangeCount();
         instanceCount = object instanceof InstancedMesh instancedMesh ? instancedMesh.count() : 1;
-        float worldX = assignedWorldMatrix.m30();
-        float worldY = assignedWorldMatrix.m31();
-        float worldZ = assignedWorldMatrix.m32();
+        float worldX = worldMatrix.m30();
+        float worldY = worldMatrix.m31();
+        float worldZ = worldMatrix.m32();
         cameraDepth =
                 viewMatrix.m02() * worldX + viewMatrix.m12() * worldY + viewMatrix.m22() * worldZ + viewMatrix.m32();
         materialSortKey = System.identityHashCode(material);
@@ -174,7 +174,7 @@ public final class RenderItem {
         object = null;
         geometry = null;
         material = null;
-        worldMatrix = null;
+        worldMatrix.identity();
         topology = null;
         elementCount = 0;
         instanceCount = 0;

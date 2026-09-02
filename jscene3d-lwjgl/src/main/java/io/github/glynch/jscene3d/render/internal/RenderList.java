@@ -15,6 +15,7 @@ import io.github.glynch.jscene3d.materials.PhongMaterial;
 import io.github.glynch.jscene3d.materials.ShaderMaterial;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.BoundingSphere;
+import io.github.glynch.jscene3d.objects.Billboard;
 import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Line;
 import io.github.glynch.jscene3d.objects.LineSegments;
@@ -25,7 +26,10 @@ import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.jspecify.annotations.Nullable;
 
 /** Reusable renderer-internal collection of opaque and transparent submissions. */
 public final class RenderList {
@@ -34,6 +38,12 @@ public final class RenderList {
     private final ArrayList<RenderItem> opaqueItems;
     private final ArrayList<RenderItem> transparentItems;
     private final LightCollection lights;
+    private final Matrix4f cameraWorldMatrix;
+    private final Matrix4f billboardWorldMatrix;
+    private final BillboardTransform billboardTransform;
+
+    private @Nullable Matrix4fc activeViewMatrix;
+    private @Nullable Frustum activeFrustum;
 
     private int activeItemCount;
     private int culledMeshes;
@@ -56,6 +66,9 @@ public final class RenderList {
         transparentItems = new ArrayList<>();
         lights = new LightCollection(
                 maximumPointLights, maximumDirectionalLights, maximumSpotLights, maximumHemisphereLights);
+        cameraWorldMatrix = new Matrix4f();
+        billboardWorldMatrix = new Matrix4f();
+        billboardTransform = new BillboardTransform();
     }
 
     /**
@@ -67,6 +80,9 @@ public final class RenderList {
      */
     public void build(Scene scene, Matrix4fc viewMatrix, Frustum frustum) {
         clear();
+        activeViewMatrix = viewMatrix;
+        activeFrustum = frustum;
+        viewMatrix.invert(cameraWorldMatrix);
         pendingObjects.push(scene);
         try {
             while (!pendingObjects.isEmpty()) {
@@ -74,10 +90,12 @@ public final class RenderList {
                 if (!object.isVisible()) {
                     continue;
                 }
-                if (object instanceof Mesh mesh) {
-                    collectMesh(mesh, viewMatrix, frustum);
+                if (object instanceof Billboard billboard) {
+                    collectBillboard(billboard);
+                } else if (object instanceof Mesh mesh) {
+                    collectMesh(mesh);
                 } else if (object instanceof Line line) {
-                    collectLine(line, viewMatrix, frustum);
+                    collectLine(line);
                 }
                 if (object instanceof Light light) {
                     lights.add(light);
@@ -92,6 +110,9 @@ public final class RenderList {
         } catch (RuntimeException exception) {
             clear();
             throw exception;
+        } finally {
+            activeViewMatrix = null;
+            activeFrustum = null;
         }
     }
 
@@ -176,7 +197,7 @@ public final class RenderList {
     }
 
     /** Validates and classifies one visible mesh. */
-    private void collectMesh(Mesh mesh, Matrix4fc viewMatrix, Frustum frustum) {
+    private void collectMesh(Mesh mesh) {
         BufferGeometry geometry = mesh.geometry();
         Material material = mesh.material();
         if (mesh instanceof InstancedMesh instancedMesh && instancedMesh.count() == 0) {
@@ -196,16 +217,27 @@ public final class RenderList {
             throw new IllegalStateException(
                     "Unsupported material type: " + material.getClass().getName());
         }
-        collect(mesh, geometry, material, PrimitiveTopology.TRIANGLES, viewMatrix, frustum);
+        collect(mesh, geometry, material, PrimitiveTopology.TRIANGLES, mesh.matrixWorld());
+    }
+
+    /** Resolves and classifies one visible billboard. */
+    private void collectBillboard(Billboard billboard) {
+        BasicMaterial material = billboard.material();
+        collect(
+                billboard,
+                billboard.geometry(),
+                material,
+                PrimitiveTopology.TRIANGLES,
+                billboardTransform.resolve(billboard, cameraWorldMatrix, billboardWorldMatrix));
     }
 
     /** Validates and classifies one visible line object. */
-    private void collectLine(Line line, Matrix4fc viewMatrix, Frustum frustum) {
+    private void collectLine(Line line) {
         BufferGeometry geometry = line.geometry();
         LineBasicMaterial material = line.material();
         PrimitiveTopology topology =
                 line instanceof LineSegments ? PrimitiveTopology.LINE_SEGMENTS : PrimitiveTopology.LINE_STRIP;
-        collect(line, geometry, material, topology, viewMatrix, frustum);
+        collect(line, geometry, material, topology, line.matrixWorld());
     }
 
     /** Classifies one visible renderable scene object, including optional frustum rejection. */
@@ -214,8 +246,7 @@ public final class RenderList {
             BufferGeometry geometry,
             Material material,
             PrimitiveTopology topology,
-            Matrix4fc viewMatrix,
-            Frustum frustum) {
+            Matrix4fc worldMatrix) {
         if (!material.visible()) {
             return;
         }
@@ -225,7 +256,7 @@ public final class RenderList {
             return;
         }
 
-        Matrix4fc worldMatrix = object.matrixWorld();
+        Frustum frustum = Objects.requireNonNull(activeFrustum, "No active render-list frustum");
         if (object.isFrustumCullingEnabled() && isOutsideFrustum(object, geometry, worldMatrix, frustum)) {
             if (topology.isLine()) {
                 culledLines++;
@@ -236,7 +267,8 @@ public final class RenderList {
         }
 
         RenderItem item = acquireItem();
-        item.assign(object, geometry, material, topology, elementCount, viewMatrix, traversalOrder++);
+        Matrix4fc viewMatrix = Objects.requireNonNull(activeViewMatrix, "No active render-list view matrix");
+        item.assign(object, geometry, material, topology, worldMatrix, viewMatrix, traversalOrder++);
         if (material.transparent()) {
             transparentItems.add(item);
         } else {

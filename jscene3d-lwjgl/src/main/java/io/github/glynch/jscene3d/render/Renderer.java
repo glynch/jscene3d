@@ -1188,6 +1188,10 @@ public final class Renderer implements AutoCloseable {
 
     /** Binds current morph data and uploads it to the basic program. */
     private void uploadMorphing(BasicProgram program, RenderItem item) {
+        if (!(item.object() instanceof Mesh)) {
+            program.uploadMorphing(false, 0, 0, false);
+            return;
+        }
         MorphResources.Binding binding = bindMorphResources(item);
         program.uploadMorphing(
                 binding.enabled(), binding.targetCount(), binding.vertexCount(), binding.instanceWeights());

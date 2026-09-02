@@ -110,7 +110,7 @@ first-person-sandbox third-person-sandbox`.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
-`TextureTransformsExample`, `TransparencyExample`, `ShaderMaterialExample`, `LightingExample`,
+`TextureTransformsExample`, `TransparencyExample`, `BillboardExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
 `KeyframeAnimationExample`, `AnimationBlendingExample`, `SoldierAnimationBlendingExample`,
@@ -242,6 +242,25 @@ within its opaque or transparent list. Render order does not bypass depth
 testing or move objects between those lists. Materials default to
 `DepthFunction.LESS_OR_EQUAL`, allowing a deliberately later coplanar object to
 replace equal-depth fragments while remaining occluded by closer geometry.
+
+## Billboards
+
+`Billboard` is an unlit rectangular scene object rendered through a shared
+`BasicMaterial`. `BillboardAlignment.SPHERICAL` follows both camera yaw and
+pitch, while `BillboardAlignment.CYLINDRICAL` turns only around the world-up
+axis so character and vegetation sprites remain upright. The inherited X and Y
+scale define world-space width and height. A configurable local anchor selects
+which point remains at the object's world position, such as `(0.5, 0)` for a
+sprite standing on the ground.
+
+The renderer resolves the camera-facing transform per camera without mutating
+the scene hierarchy, so rendering the same scene through multiple cameras does
+not change application state. A billboard owns its generated unit quad but
+retains its caller-owned material and textures. It is deliberately distinct
+from `Mesh`: billboards are not included in mesh raycasts or shadow-map caster
+passes. `BillboardExample` compares bottom-anchored cylindrical character
+cutouts with centred spherical markers. Sprite-frame animation and billboard
+batching remain separate later features.
 
 ## Texture transforms
 

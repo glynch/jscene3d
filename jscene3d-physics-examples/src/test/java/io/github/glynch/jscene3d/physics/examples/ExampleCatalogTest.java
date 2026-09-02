@@ -31,9 +31,9 @@ final class ExampleCatalogTest {
         });
     }
 
-    /** Keeps the initial suite focused on explicit kinematic movement. */
+    /** Keeps the initial suite focused on character-controlled kinematic movement. */
     @Test
-    void containsTheKinematicMovementExample() {
+    void containsTheCharacterControllerExample() {
         assertThat(ExampleCatalog.definitions())
                 .extracting(ExampleDefinition::id)
                 .containsExactly("kinematic-movement");

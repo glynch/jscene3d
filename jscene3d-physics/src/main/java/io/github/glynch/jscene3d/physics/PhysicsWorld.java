@@ -38,8 +38,6 @@ import org.joml.Vector3fc;
 public final class PhysicsWorld {
     private static final Vector3fc ZERO = new Vector3f();
     private static final Quaternionfc IDENTITY = new Quaternionf();
-    private static final float MINIMUM_DIRECTION_LENGTH_SQUARED = 1.0E-12F;
-    private static final float MINIMUM_ORIENTATION_LENGTH_SQUARED = 1.0E-12F;
 
     private final Set<CollisionObject> collisionObjects = new LinkedHashSet<>();
     private final Set<Collider> colliders = new LinkedHashSet<>();
@@ -203,8 +201,8 @@ public final class PhysicsWorld {
      */
     public Optional<RaycastHit> raycast(
             Vector3fc origin, Vector3fc direction, float maximumDistance, QueryFilter filter) {
-        Vector3f checkedOrigin = requireFinite(origin, "origin");
-        Vector3f normalizedDirection = requireDirection(direction);
+        Vector3f checkedOrigin = Preconditions.requireFinite(origin, "origin");
+        Vector3f normalizedDirection = Preconditions.requireDirection(direction, "direction");
         Preconditions.requirePositive(maximumDistance, "maximumDistance");
         return queries.raycast(
                 checkedOrigin, normalizedDirection, maximumDistance, Objects.requireNonNull(filter, "filter"));
@@ -266,7 +264,7 @@ public final class PhysicsWorld {
             Quaternionfc orientation,
             Vector3fc translation,
             QueryFilter filter) {
-        Vector3f checkedTranslation = requireFinite(translation, "translation");
+        Vector3f checkedTranslation = Preconditions.requireFinite(translation, "translation");
         return queries.sweep(
                 new ShapePose(shape, position, orientation),
                 checkedTranslation,
@@ -414,29 +412,9 @@ public final class PhysicsWorld {
     }
 
     private static ObjectTransform validatedTransform(Vector3fc position, Quaternionfc orientation) {
-        Vector3f checkedPosition = requireFinite(position, "position");
-        Objects.requireNonNull(orientation, "orientation");
-        float lengthSquared = orientation.lengthSquared();
-        if (!Float.isFinite(lengthSquared) || lengthSquared < MINIMUM_ORIENTATION_LENGTH_SQUARED) {
-            throw new IllegalArgumentException("orientation must be finite and non-zero");
-        }
-        return new ObjectTransform(checkedPosition, new Quaternionf(orientation).normalize());
-    }
-
-    private static Vector3f requireDirection(Vector3fc direction) {
-        Vector3f checked = requireFinite(direction, "direction");
-        if (checked.lengthSquared() < MINIMUM_DIRECTION_LENGTH_SQUARED) {
-            throw new IllegalArgumentException("direction must be non-zero");
-        }
-        return checked.normalize();
-    }
-
-    private static Vector3f requireFinite(Vector3fc value, String name) {
-        Objects.requireNonNull(value, name);
-        if (!value.isFinite()) {
-            throw new IllegalArgumentException(name + " must be finite");
-        }
-        return new Vector3f(value);
+        return new ObjectTransform(
+                Preconditions.requireFinite(position, "position"),
+                Preconditions.requireOrientation(orientation, "orientation"));
     }
 
     private record ObjectTransform(Vector3f position, Quaternionf orientation) {}

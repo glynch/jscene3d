@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.physics.movement;
 
 import io.github.glynch.jscene3d.physics.internal.Preconditions;
+import java.util.Objects;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
@@ -28,7 +29,7 @@ public final class KinematicMoveSettings {
             float maximumStepHeight,
             float groundSnapDistance,
             float maximumSlopeAngle) {
-        this.up = requireDirection(up);
+        this.up = Preconditions.requireDirection(up, "up");
         Preconditions.requireNonNegative(skinWidth, "skinWidth");
         if (maximumSlideIterations < 1) {
             throw new IllegalArgumentException("maximumSlideIterations must be positive");
@@ -138,6 +139,33 @@ public final class KinematicMoveSettings {
         return copy(up, skinWidth, maximumSlideIterations, maximumStepHeight, groundSnapDistance, newMaximumSlopeAngle);
     }
 
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        return other instanceof KinematicMoveSettings settings
+                && up.equals(settings.up)
+                && Float.compare(skinWidth, settings.skinWidth) == 0
+                && maximumSlideIterations == settings.maximumSlideIterations
+                && Float.compare(maximumStepHeight, settings.maximumStepHeight) == 0
+                && Float.compare(groundSnapDistance, settings.groundSnapDistance) == 0
+                && Float.compare(maximumSlopeAngle, settings.maximumSlopeAngle) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                up, skinWidth, maximumSlideIterations, maximumStepHeight, groundSnapDistance, maximumSlopeAngle);
+    }
+
+    @Override
+    public String toString() {
+        return "KinematicMoveSettings[up=" + up + ", skinWidth=" + skinWidth + ", maximumSlideIterations="
+                + maximumSlideIterations + ", maximumStepHeight=" + maximumStepHeight + ", groundSnapDistance="
+                + groundSnapDistance + ", maximumSlopeAngle=" + maximumSlopeAngle + ']';
+    }
+
     private static KinematicMoveSettings copy(
             Vector3fc up,
             float skinWidth,
@@ -147,12 +175,5 @@ public final class KinematicMoveSettings {
             float maximumSlopeAngle) {
         return new KinematicMoveSettings(
                 up, skinWidth, maximumSlideIterations, maximumStepHeight, groundSnapDistance, maximumSlopeAngle);
-    }
-
-    private static Vector3f requireDirection(Vector3fc direction) {
-        if (direction == null || !direction.isFinite() || direction.lengthSquared() < 1.0E-12F) {
-            throw new IllegalArgumentException("up must be finite and non-zero");
-        }
-        return new Vector3f(direction).normalize();
     }
 }

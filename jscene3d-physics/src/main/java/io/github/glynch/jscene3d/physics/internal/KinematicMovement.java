@@ -337,7 +337,7 @@ public final class KinematicMovement {
         private MovementState(KinematicBody body, Vector3fc requestedTranslation) {
             colliders = body.colliders();
             start = body.position(new Vector3f());
-            requested = requireFinite(requestedTranslation);
+            requested = Preconditions.requireFinite(requestedTranslation, "translation");
             orientation = body.orientation(new Quaternionf());
             position = new Vector3f(start);
             remaining = new Vector3f(requested);
@@ -372,13 +372,6 @@ public final class KinematicMovement {
         private KinematicMoveResult result() {
             return new KinematicMoveResult(
                     new Vector3f(position).sub(start), remaining, groundNormal, grounded, stepped, contacts, List.of());
-        }
-
-        private static Vector3f requireFinite(Vector3fc translation) {
-            if (translation == null || !translation.isFinite()) {
-                throw new IllegalArgumentException("translation must be finite");
-            }
-            return new Vector3f(translation);
         }
     }
 }

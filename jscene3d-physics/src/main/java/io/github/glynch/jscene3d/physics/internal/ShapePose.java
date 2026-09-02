@@ -13,8 +13,6 @@ import org.joml.Vector3fc;
 
 /** Validated shape and world transform used by the internal query engine. */
 public final class ShapePose {
-    private static final float MINIMUM_QUATERNION_LENGTH_SQUARED = 1.0E-12F;
-
     private final CollisionShape shape;
     private final Vector3f position;
     private final Quaternionf orientation;
@@ -28,8 +26,8 @@ public final class ShapePose {
      */
     public ShapePose(CollisionShape shape, Vector3fc position, Quaternionfc orientation) {
         this.shape = Objects.requireNonNull(shape, "shape");
-        this.position = requireFinite(position, "position");
-        this.orientation = normalized(orientation);
+        this.position = Preconditions.requireFinite(position, "position");
+        this.orientation = Preconditions.requireOrientation(orientation, "orientation");
     }
 
     /**
@@ -67,22 +65,5 @@ public final class ShapePose {
 
     Quaternionf orientation() {
         return orientation;
-    }
-
-    private static Vector3f requireFinite(Vector3fc value, String name) {
-        Objects.requireNonNull(value, name);
-        if (!value.isFinite()) {
-            throw new IllegalArgumentException(name + " must be finite");
-        }
-        return new Vector3f(value);
-    }
-
-    private static Quaternionf normalized(Quaternionfc value) {
-        Objects.requireNonNull(value, "orientation");
-        float lengthSquared = value.lengthSquared();
-        if (!Float.isFinite(lengthSquared) || lengthSquared < MINIMUM_QUATERNION_LENGTH_SQUARED) {
-            throw new IllegalArgumentException("orientation must be finite and non-zero");
-        }
-        return new Quaternionf(value).normalize();
     }
 }

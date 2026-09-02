@@ -27,13 +27,14 @@ import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.physics.CharacterController;
 import io.github.glynch.jscene3d.physics.CollisionSensor;
 import io.github.glynch.jscene3d.physics.KinematicBody;
 import io.github.glynch.jscene3d.physics.PhysicsWorld;
 import io.github.glynch.jscene3d.physics.debug.PhysicsDebugLine;
 import io.github.glynch.jscene3d.physics.debug.PhysicsDebugSnapshot;
 import io.github.glynch.jscene3d.physics.examples.MovementDiagnostics.MovementKeys;
-import io.github.glynch.jscene3d.physics.movement.KinematicMoveResult;
+import io.github.glynch.jscene3d.physics.movement.CharacterMoveResult;
 import io.github.glynch.jscene3d.physics.movement.OverlapPhase;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
@@ -45,13 +46,13 @@ import java.util.Locale;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-/** Demonstrates explicit fixed-step kinematic movement through a small obstacle course. */
-public final class KinematicMovementExample {
+/** Demonstrates a fixed-step character controller moving through a small obstacle course. */
+public final class CharacterControllerExample {
     private static final float FIXED_SECONDS = 1.0F / 120.0F;
 
     /** Prevents instantiation of this example entry point. */
-    private KinematicMovementExample() {
-        throw new AssertionError("KinematicMovementExample cannot be instantiated");
+    private CharacterControllerExample() {
+        throw new AssertionError("CharacterControllerExample cannot be instantiated");
     }
 
     /**
@@ -60,7 +61,7 @@ public final class KinematicMovementExample {
      * @param arguments ignored command-line arguments
      */
     public static void main(String[] arguments) {
-        ExampleLauncher.launch("JScene3D - Kinematic Movement", KinematicMovementExample::create);
+        ExampleLauncher.launch("JScene3D - Character Controller", CharacterControllerExample::create);
     }
 
     /** Creates the shared hosted implementation used by both launch modes. */
@@ -102,10 +103,11 @@ public final class KinematicMovementExample {
             MovementState state,
             PhysicsDebugLines debugLines,
             MovementDiagnostics diagnostics) {
-        ControlPanel panel = new ControlPanel(context.window(), "Kinematic Movement");
+        ControlPanel panel = new ControlPanel(context.window(), "Character Controller");
         ControlPanel.Section instructions = panel.addSection("Controls");
         instructions.addText("player", () -> "cyan capsule");
         instructions.addText("move player", () -> "W A S D");
+        instructions.addText("jump", () -> "Space");
         instructions.addText("camera", () -> "drag / scroll");
         instructions.addText("yellow step", () -> "reset, then hold D over it");
         instructions.addText("magenta zone", () -> "walk completely inside it");
@@ -128,6 +130,7 @@ public final class KinematicMovementExample {
         ControlPanel.Section status = panel.addSection("Movement result");
         status.addText("position", state::positionStatus);
         status.addText("grounded", () -> Boolean.toString(state.grounded()));
+        status.addText("jumped this move", () -> Boolean.toString(state.jumped()));
         status.addText("stepped this move", () -> Boolean.toString(state.stepped()));
         status.addText("contacts", () -> Integer.toString(state.contactCount()));
         status.addText("sensor", state::sensorStatus);
@@ -227,18 +230,17 @@ public final class KinematicMovementExample {
         }
     }
 
-    /** Integrates caller-owned intent and gravity before each explicit world move. */
+    /** Converts caller-owned input into fixed-step character-controller updates. */
     private static final class MovementState {
         private static final float SPEED = 4.0F;
-        private static final float GRAVITY = 18.0F;
 
         private final ExampleContext context;
         private final Course course;
+        private final CharacterController controller;
         private final PhysicsDebugLines debugLines;
         private final MovementDiagnostics diagnostics;
         private float accumulator;
-        private float verticalVelocity;
-        private KinematicMoveResult result;
+        private CharacterMoveResult result;
         private boolean stepCrossed;
         private boolean sensorReached;
         private String sensorStatus = "outside";
@@ -249,7 +251,8 @@ public final class KinematicMovementExample {
             this.course = course;
             this.debugLines = debugLines;
             this.diagnostics = diagnostics;
-            result = course.world().move(course.player, new Vector3f());
+            controller = new CharacterController(course.world(), course.player);
+            result = controller.move(new Vector3f(), FIXED_SECONDS);
         }
 
         private void update(float elapsedSeconds, boolean keyboardCaptured) {
@@ -258,6 +261,9 @@ public final class KinematicMovementExample {
             InputState input = context.window().input();
             Vector3f rawMovementInput = movementInput(input);
             Vector3f effectiveMovementInput = keyboardCaptured ? new Vector3f() : rawMovementInput;
+            if (!keyboardCaptured && input.wasKeyPressed(Key.SPACE)) {
+                controller.tryJump();
+            }
             diagnostics.beginFrame(
                     context.window().isFocused(),
                     keyboardCaptured,
@@ -275,22 +281,18 @@ public final class KinematicMovementExample {
             if (horizontal.lengthSquared() > 1.0F) {
                 horizontal.normalize();
             }
-            horizontal.mul(SPEED * FIXED_SECONDS);
-            verticalVelocity -= GRAVITY * FIXED_SECONDS;
-            Vector3f desired = horizontal.add(0.0F, verticalVelocity * FIXED_SECONDS, 0.0F);
-            result = course.world().move(course.player, desired);
-            diagnostics.recordStep(desired, result.appliedTranslation(new Vector3f()));
+            horizontal.mul(SPEED);
+            result = controller.move(horizontal, FIXED_SECONDS);
+            diagnostics.recordStep(
+                    result.requestedTranslation(new Vector3f()), result.appliedTranslation(new Vector3f()));
             stepCrossed |= result.stepped();
-            if (result.isGrounded() && verticalVelocity < 0.0F) {
-                verticalVelocity = 0.0F;
-            }
             updateSensorStatus(result);
             course.setGoalReached(goalReached());
             course.syncPlayerMesh();
             debugLines.update();
         }
 
-        private void updateSensorStatus(KinematicMoveResult movementResult) {
+        private void updateSensorStatus(CharacterMoveResult movementResult) {
             movementResult.overlapEvents().stream().findFirst().ifPresent(event -> {
                 sensorStatus = switch (event.phase()) {
                     case ENTER -> "entered sensor";
@@ -304,12 +306,11 @@ public final class KinematicMovementExample {
         }
 
         private void reset() {
-            course.player.setTransform(new Vector3f(-4.0F, 0.951F, 0.0F), new Quaternionf());
-            verticalVelocity = 0.0F;
+            controller.teleport(new Vector3f(-4.0F, 0.951F, 0.0F), new Quaternionf());
             stepCrossed = false;
             sensorReached = false;
             sensorStatus = "outside";
-            result = course.world().move(course.player, new Vector3f());
+            result = controller.move(new Vector3f(), FIXED_SECONDS);
             course.setGoalReached(false);
             course.syncPlayerMesh();
             debugLines.update();
@@ -321,6 +322,10 @@ public final class KinematicMovementExample {
 
         private boolean stepped() {
             return result.stepped();
+        }
+
+        private boolean jumped() {
+            return result.jumped();
         }
 
         private int contactCount() {

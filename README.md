@@ -404,17 +404,18 @@ geometry, `KinematicBody` is moved explicitly by its caller, and
 `CollisionSensor` reports non-blocking overlaps. Each object owns one or more
 `Collider` instances with local transforms, so compound collision shapes move
 as a unit. `PhysicsWorld.move(...)` resolves a registered kinematic body's
-desired translation against solid world geometry. The caller computes
-fixed-update intent, velocity, and gravity; physics applies the resolved
-transform and returns immutable applied and remaining translation, solid
-contacts, walkable ground state, bounded-step state, and deterministic sensor
-enter, stay, and exit events. Collision filtering remains mutual, and collision
-sensors never block movement.
+desired translation against solid world geometry. `CharacterController` builds
+on that primitive for common game-character behavior: the caller supplies
+planar velocity once per fixed update, while the controller owns gravity,
+vertical velocity, grounded state, jumping, wall sliding, and step traversal.
+Both APIs return immutable movement results containing contacts and
+deterministic sensor enter, stay, and exit events. Collision filtering remains
+mutual, and collision sensors never block movement.
 
 `PhysicsWorld.debugSnapshot()` exposes renderer-independent world-space line
 segments for box, sphere, and capsule colliders. Applications can render that
 snapshot with JScene3D lines without introducing a rendering dependency into
-`jscene3d-physics`. The separately compiled `KinematicMovementExample` in
+`jscene3d-physics`. The separately compiled character-controller example in
 `jscene3d-physics-examples` demonstrates the complete seam with a caller-owned
 120 Hz update, WASD movement, gravity, wall sliding, step traversal, a collision
 sensor, and live debug geometry.

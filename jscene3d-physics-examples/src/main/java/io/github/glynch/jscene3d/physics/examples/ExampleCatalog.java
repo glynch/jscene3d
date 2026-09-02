@@ -33,11 +33,11 @@ public final class ExampleCatalog {
     static List<ExampleDefinition> definitions() {
         return List.of(new ExampleDefinition(
                 "kinematic-movement",
-                "Kinematic movement",
+                "Character controller",
                 "Movement",
-                "Explicit fixed-step movement with gravity, wall sliding, steps, sensors, and debug lines.",
-                List.of("physics", "kinematic", "collision", "slide", "step", "sensor", "debug"),
+                "Reusable fixed-step character movement with gravity, wall sliding, steps, sensors, and debug lines.",
+                List.of("physics", "character", "controller", "kinematic", "slide", "step", "sensor", "debug"),
                 List.of(),
-                KinematicMovementExample::create));
+                CharacterControllerExample::create));
     }
 }

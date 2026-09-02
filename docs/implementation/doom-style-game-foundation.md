@@ -110,7 +110,7 @@ meshes, dynamic rigid-body props, multiple weapons, or complex enemy AI.
 
 ## Delivery sequence
 
-The first four reusable foundation slices are complete:
+The first five reusable foundation slices are complete:
 
 1. Cursor capture, raw mouse support, focus state, and pointer-lock controls.
 2. The collision-query foundation in `jscene3d-physics`.
@@ -120,12 +120,14 @@ The first four reusable foundation slices are complete:
 4. A game lifecycle, semantic input actions, and interpolated Physics Bindings,
    proven by an interactive first-person sandbox in the separate
    `jscene3d-game-examples` suite.
+5. Reusable named sprite-atlas animations, independent animated-billboard
+   playback, and observable frame, loop, and completion events.
 
 The remaining sequence is:
 
 1. Define game-state and asset-lifetime requirements from the first playable
    application rather than introducing speculative abstractions.
-2. Add reusable billboard animation and the initial audio artifact.
+2. Add the initial audio artifact.
 3. Build a one-room combat prototype in the separate Game Application.
 4. Expand the prototype into the first compact level without broadening the
    reusable artifacts with title-specific concepts.

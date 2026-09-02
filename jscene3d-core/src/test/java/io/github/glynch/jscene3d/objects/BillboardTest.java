@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.textures.TextureRegion;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ final class BillboardTest {
             assertThat(billboard.geometry().drawRangeCount()).isEqualTo(6);
             assertThat(billboard.alignment()).isEqualTo(BillboardAlignment.SPHERICAL);
             assertThat(billboard.anchor()).isEqualTo(new Vector2f(0.5f));
+            assertThat(billboard.textureRegion()).isEqualTo(TextureRegion.full());
             assertThat(billboard.scale()).isEqualTo(new Vector3f(1.0f));
         }
     }
@@ -35,10 +37,13 @@ final class BillboardTest {
             billboard.setAlignment(BillboardAlignment.CYLINDRICAL);
             billboard.setAnchor(new Vector2f(0.5f, 0.0f));
             billboard.setMaterial(secondMaterial);
+            TextureRegion region = new TextureRegion(0.25f, 0.5f, 0.25f, 0.5f);
+            billboard.setTextureRegion(region);
 
             assertThat(billboard.alignment()).isEqualTo(BillboardAlignment.CYLINDRICAL);
             assertThat(billboard.anchor()).isEqualTo(new Vector2f(0.5f, 0.0f));
             assertThat(billboard.material()).isSameAs(secondMaterial);
+            assertThat(billboard.textureRegion()).isSameAs(region);
         }
     }
 
@@ -79,6 +84,7 @@ final class BillboardTest {
             assertThatNullPointerException().isThrownBy(() -> new Billboard(null));
             assertThatNullPointerException().isThrownBy(() -> billboard.setMaterial(null));
             assertThatNullPointerException().isThrownBy(() -> billboard.setAlignment(null));
+            assertThatNullPointerException().isThrownBy(() -> billboard.setTextureRegion(null));
             assertThatNullPointerException().isThrownBy(() -> billboard.setAnchor(null));
         }
     }

@@ -13,6 +13,14 @@ import java.util.List;
 
 /** Declares the stable ordered catalogue rendered by {@link ExampleBrowser}. */
 public final class ExampleCatalog {
+    private static final List<GalleryAttribution> KENNEY_CHARACTER_ATTRIBUTION = List.of(new GalleryAttribution(
+            "New Platformer Pack character sprites",
+            "Kenney",
+            "Kenney — New Platformer Pack",
+            URI.create("https://kenney.nl/assets/new-platformer-pack"),
+            "CC0-1.0",
+            URI.create("https://creativecommons.org/publicdomain/zero/1.0/")));
+
     /** Prevents instantiation of this static catalogue. */
     private ExampleCatalog() {
         throw new AssertionError("ExampleCatalog cannot be instantiated");
@@ -417,7 +425,16 @@ public final class ExampleCatalog {
                         "Rendering",
                         "Camera-facing sprites with spherical and upright cylindrical alignment.",
                         List.of("billboard", "sprite", "camera facing", "spherical", "cylindrical", "anchor"),
+                        KENNEY_CHARACTER_ATTRIBUTION,
                         BillboardExample::create),
+                definition(
+                        "animated-billboards",
+                        "Animated billboards",
+                        "Animation",
+                        "CC0 character sprites with shared atlas data, independent playback, and events.",
+                        List.of("sprite", "billboard", "animation", "atlas", "frames", "signals"),
+                        KENNEY_CHARACTER_ATTRIBUTION,
+                        AnimatedBillboardExample::create),
                 definition(
                         "render-callbacks",
                         "Render callbacks",

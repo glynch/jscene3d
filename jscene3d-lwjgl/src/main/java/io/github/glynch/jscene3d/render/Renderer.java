@@ -77,6 +77,7 @@ import io.github.glynch.jscene3d.materials.ShaderUniform;
 import io.github.glynch.jscene3d.materials.ShaderUniformType;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.Billboard;
 import io.github.glynch.jscene3d.objects.InstancedMesh;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.RenderCallback;
@@ -92,6 +93,7 @@ import io.github.glynch.jscene3d.render.internal.RenderList;
 import io.github.glynch.jscene3d.render.internal.ShadowFrame;
 import io.github.glynch.jscene3d.render.internal.ShadowRenderer;
 import io.github.glynch.jscene3d.render.internal.ShadowResourceContext;
+import io.github.glynch.jscene3d.render.internal.TextureRegionTransform;
 import io.github.glynch.jscene3d.render.internal.programs.BasicProgram;
 import io.github.glynch.jscene3d.render.internal.programs.EnvironmentBackgroundProgram;
 import io.github.glynch.jscene3d.render.internal.programs.LambertProgram;
@@ -116,6 +118,7 @@ import io.github.glynch.jscene3d.textures.EnvironmentMap;
 import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
 import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
+import io.github.glynch.jscene3d.textures.TextureRegion;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
@@ -801,7 +804,11 @@ public final class Renderer implements AutoCloseable {
         uploadMatrix(program.viewMatrixLocation(), viewMatrix);
         uploadMatrix(program.projectionMatrixLocation(), projectionMatrix);
         if (colorMap != null) {
-            uploadTextureState(program.colorMapTransformLocation(), program.flipColorMapVerticallyLocation(), colorMap);
+            uploadTextureState(
+                    program.colorMapTransformLocation(),
+                    program.flipColorMapVerticallyLocation(),
+                    colorMap,
+                    textureRegion(item));
         }
         Color color = material.color();
         float alpha = resolvedAlpha(material);
@@ -1328,10 +1335,22 @@ public final class Renderer implements AutoCloseable {
 
     /** Uploads one built-in texture's UV transform and coordinate origin without allocating. */
     private void uploadTextureState(int transformLocation, int verticalFlipLocation, Texture texture) {
+        uploadTextureState(transformLocation, verticalFlipLocation, texture, TextureRegion.full());
+    }
+
+    /** Uploads a built-in texture's UV transform composed with one normalized atlas region. */
+    private void uploadTextureState(
+            int transformLocation, int verticalFlipLocation, Texture texture, TextureRegion textureRegion) {
         texture.transformMatrix(textureTransformMatrix);
+        TextureRegionTransform.apply(textureTransformMatrix, textureRegion);
         textureTransformMatrix.get(matrix3Values);
         glUniformMatrix3fv(transformLocation, false, matrix3Values);
         glUniform1i(verticalFlipLocation, texture.coordinateOrigin() == TextureCoordinateOrigin.BOTTOM_LEFT ? 1 : 0);
+    }
+
+    /** Returns the per-object atlas selection supported by built-in billboard rendering. */
+    private static TextureRegion textureRegion(RenderItem item) {
+        return item.object() instanceof Billboard billboard ? billboard.textureRegion() : TextureRegion.full();
     }
 
     /** Synchronizes and binds one active texture uniform to a consecutive texture unit. */

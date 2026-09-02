@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.PlaneGeometry;
 import io.github.glynch.jscene3d.internal.Preconditions;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
+import io.github.glynch.jscene3d.textures.TextureRegion;
 import java.util.Objects;
 import org.joml.Vector2f;
 import org.joml.Vector2fc;
@@ -20,12 +21,13 @@ import org.joml.Vector2fc;
  * {@link #alignment()} determines the rendered orientation. The material is shared and remains
  * caller-owned; this object owns only its generated geometry.
  */
-public final class Billboard extends RenderableObject implements AutoCloseable {
+public class Billboard extends RenderableObject implements AutoCloseable {
     private final BufferGeometry geometry;
     private final Vector2f anchor;
 
     private BasicMaterial material;
     private BillboardAlignment alignment;
+    private TextureRegion textureRegion;
 
     /**
      * Creates a centred spherical billboard retaining a shared unlit material.
@@ -39,6 +41,7 @@ public final class Billboard extends RenderableObject implements AutoCloseable {
         geometry = PlaneGeometry.create(1.0f, 1.0f);
         anchor = new Vector2f(0.5f);
         alignment = BillboardAlignment.SPHERICAL;
+        textureRegion = TextureRegion.full();
     }
 
     /**
@@ -104,6 +107,29 @@ public final class Billboard extends RenderableObject implements AutoCloseable {
     public void setAlignment(BillboardAlignment alignment) {
         geometry();
         this.alignment = Objects.requireNonNull(alignment, "alignment");
+    }
+
+    /**
+     * Returns the normalized material color-map region drawn by this billboard.
+     *
+     * @return immutable region, initially the complete texture
+     * @throws IllegalStateException if this billboard is closed
+     */
+    public TextureRegion textureRegion() {
+        geometry();
+        return textureRegion;
+    }
+
+    /**
+     * Selects a normalized region of the material's shared color map.
+     *
+     * @param textureRegion immutable replacement region
+     * @throws NullPointerException if {@code textureRegion} is {@code null}
+     * @throws IllegalStateException if this billboard is closed
+     */
+    public void setTextureRegion(TextureRegion textureRegion) {
+        geometry();
+        this.textureRegion = Objects.requireNonNull(textureRegion, "textureRegion");
     }
 
     /**

@@ -110,7 +110,8 @@ first-person-sandbox third-person-sandbox`.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
-`TextureTransformsExample`, `TransparencyExample`, `BillboardExample`, `ShaderMaterialExample`, `LightingExample`,
+`TextureTransformsExample`, `TransparencyExample`, `BillboardExample`,
+`AnimatedBillboardExample`, `ShaderMaterialExample`, `LightingExample`,
 `LineRenderingExample`, `HelpersExample`, `BoxHelperExample`,
 `GeneratedGeometriesExample`, `MaterialsExample`, `StandardMaterialExample`,
 `KeyframeAnimationExample`, `AnimationBlendingExample`, `SoldierAnimationBlendingExample`,
@@ -222,6 +223,22 @@ Soldier resource retains its Mixamo usage terms and attribution rather than
 being relicensed under JScene3D. `LittlestTokyoExample` loads Glen Fox's
 Draco-compressed, skeletally animated Littlest Tokyo scene.
 
+Sprite animation uses the same caller-driven timing model without forcing
+two-dimensional artwork through the general keyframe mixer. `SpriteAnimation`
+stores named, timed `SpriteFrame` values and loop behavior, while
+`SpriteAnimationSet` provides an immutable reusable collection. Each frame
+selects a normalized `TextureRegion` from an atlas. `TextureRegion.fromPixels`
+accepts the top-row-first coordinates used by image editors and future atlas
+import tools.
+
+`AnimatedBillboard` owns only its independent playback state. Multiple objects
+can therefore share one atlas, material, and animation set while using
+different animations, frame positions, and playback speeds. Applications
+advance each object explicitly, can seek by frame and within-frame progress,
+and can observe animation changes, frame changes, loops, and completion.
+Animation names such as idle, attack, or fly remain application-defined rather
+than engine-defined.
+
 ## Transparency
 
 Setting a material's opacity does not implicitly enable blending. Select
@@ -259,8 +276,12 @@ not change application state. A billboard owns its generated unit quad but
 retains its caller-owned material and textures. It is deliberately distinct
 from `Mesh`: billboards are not included in mesh raycasts or shadow-map caster
 passes. `BillboardExample` compares bottom-anchored cylindrical character
-cutouts with centred spherical markers. Sprite-frame animation and billboard
-batching remain separate later features.
+cutouts with centred spherical markers. `AnimatedBillboardExample` demonstrates
+named atlas animations, independent playback over shared resources, live
+events, and inspector-style controls. These stable runtime objects are also the
+data model a future GUI animation editor will inspect and modify; the GUI will
+not be required to construct or run them from Java. Billboard batching remains
+a separate later feature.
 
 ## Texture transforms
 

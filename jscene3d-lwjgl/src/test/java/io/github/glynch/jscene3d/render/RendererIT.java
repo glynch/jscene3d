@@ -70,6 +70,7 @@ import io.github.glynch.jscene3d.textures.Texture;
 import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
 import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import io.github.glynch.jscene3d.textures.TextureFilter;
+import io.github.glynch.jscene3d.textures.TextureRegion;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -384,6 +385,35 @@ final class RendererIT {
 
             assertThat(renderer.info().statistics().drawCalls()).isOne();
             assertThat(renderer.info().statistics().triangles()).isEqualTo(2L);
+        }
+    }
+
+    @Test
+    void rendersAndChangesABillboardsSelectedAtlasRegion() {
+        byte opaque = (byte) 0xff;
+        byte[] pixels = {opaque, 0, 0, opaque, 0, opaque, 0, opaque};
+        try (Window window = Window.create("Billboard atlas region integration test");
+                Renderer renderer = Renderer.create(window);
+                Texture texture = Texture.baseColor(2, 1, pixels);
+                BasicMaterial material = new BasicMaterial();
+                Billboard billboard = new Billboard(material)) {
+            material.setColorMap(texture);
+            billboard.setScale(2.0f, 2.0f, 1.0f);
+            billboard.setTextureRegion(TextureRegion.fromPixels(0, 0, 1, 1, 2, 1));
+            Scene scene = new Scene();
+            scene.add(billboard);
+            PerspectiveCamera camera =
+                    new PerspectiveCamera(toRadians(60.0f), window.framebufferAspectRatio(), 0.1f, 100.0f);
+            camera.setPosition(0.0f, 0.0f, 2.0f);
+
+            renderer.render(scene, camera);
+            assertCenterPixelIsRed(window);
+
+            billboard.setTextureRegion(TextureRegion.fromPixels(1, 0, 1, 1, 2, 1));
+            renderer.render(scene, camera);
+            assertPixelIsGreen(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+
+            assertThat(renderer.info().statistics().textureUploads()).isZero();
         }
     }
 

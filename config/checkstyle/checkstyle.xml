@@ -30,6 +30,9 @@
             <property name="illegalPkgs" value="com.sun, jdk.internal, sun" />
         </module>
         <module name="InnerAssignment" />
+        <module name="IllegalIdentifierName">
+            <property name="format" value="(?i)^(?!(when|record|yield|var|permits|sealed|open|transitive|_)$|(.*\$)).+$" />
+        </module>
         <module name="MatchXpath">
             <property name="query" value="//DOT[not(parent::DOT) and not(ancestor::IMPORT) and not(ancestor::STATIC_IMPORT) and not(ancestor::MODULE_DEF) and (not(ancestor::PACKAGE_DEF) or ancestor::ANNOTATION) and (descendant::IDENT[@text='java'] or descendant::IDENT[@text='javax'] or descendant::IDENT[@text='org'] or descendant::IDENT[@text='com'] or descendant::IDENT[@text='io'] or descendant::IDENT[@text='de'])]" />
             <message key="matchxpath.match" value="Use an import instead of a fully qualified class name in Java code." />

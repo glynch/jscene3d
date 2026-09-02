@@ -61,9 +61,10 @@ public final class AnimationBlendingExample {
 
     /** Creates the shared hosted implementation used by standalone and browser launch modes. */
     static HostedExample create(ExampleContext context) {
-        LoadedGltf loaded = GltfLoader.load(path(AnimationBlendingExample.class, MODEL_RESOURCE));
-        EnvironmentMap environmentMap =
-                EnvironmentMapLoader.load(path(AnimationBlendingExample.class, ENVIRONMENT_RESOURCE));
+        LoadedGltf loaded =
+                GltfLoader.load(path(AnimationBlendingExample.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE));
+        EnvironmentMap environmentMap = EnvironmentMapLoader.load(
+                path(AnimationBlendingExample.class.getResource(ENVIRONMENT_RESOURCE), ENVIRONMENT_RESOURCE));
         Scene scene = loaded.scene();
         scene.setBackground(BACKGROUND);
         scene.setEnvironment(environmentMap);

@@ -26,6 +26,8 @@ final class PhysicsModuleDescriptorTest {
         assertThat(exports)
                 .containsExactlyInAnyOrder(
                         "io.github.glynch.jscene3d.physics",
+                        "io.github.glynch.jscene3d.physics.debug",
+                        "io.github.glynch.jscene3d.physics.movement",
                         "io.github.glynch.jscene3d.physics.queries",
                         "io.github.glynch.jscene3d.physics.shapes");
     }

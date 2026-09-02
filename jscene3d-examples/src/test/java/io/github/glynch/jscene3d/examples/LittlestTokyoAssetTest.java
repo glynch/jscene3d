@@ -23,7 +23,8 @@ final class LittlestTokyoAssetTest {
 
     @Test
     void loadsBundledDracoMeshSkeletonAndAnimation() {
-        try (LoadedGltf loaded = GltfLoader.load(path(LittlestTokyoAssetTest.class, MODEL_RESOURCE))) {
+        try (LoadedGltf loaded =
+                GltfLoader.load(path(LittlestTokyoAssetTest.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE))) {
             SkinnedMesh skinnedMesh = firstSkinnedMesh(loaded.scene());
 
             assertThat(loaded.animations()).singleElement().satisfies(clip -> {
@@ -38,7 +39,8 @@ final class LittlestTokyoAssetTest {
 
     @Test
     void restoresAllDracoPositionOffsetsForTheBundledTrolley() {
-        try (LoadedGltf loaded = GltfLoader.load(path(LittlestTokyoAssetTest.class, MODEL_RESOURCE))) {
+        try (LoadedGltf loaded =
+                GltfLoader.load(path(LittlestTokyoAssetTest.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE))) {
             Object3D trolley = childAtPath(loaded.scene(), 0, 0, 0, 0, 0, 0, 20);
             BoundingBox bounds = firstMesh(trolley).geometry().computeBoundingBox();
 

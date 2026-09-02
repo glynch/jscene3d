@@ -32,7 +32,7 @@ final class BundledModelCompatibilityTest {
     /** Ensures Soldier retains the four skeletal clips used by the Three.js reference example. */
     @Test
     void loadsSoldierAnimationClips() {
-        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), SOLDIER_RESOURCE))) {
+        try (LoadedGltf loaded = GltfLoader.load(path(getClass().getResource(SOLDIER_RESOURCE), SOLDIER_RESOURCE))) {
             assertThat(loaded.animations())
                     .extracting(AnimationClip::name)
                     .containsExactlyInAnyOrder("Idle", "Run", "TPose", "Walk");
@@ -53,7 +53,7 @@ final class BundledModelCompatibilityTest {
     /** Ensures Fox retains the compatible idle, walking, and running skeletal clips. */
     @Test
     void loadsFoxAnimationClips() {
-        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), FOX_RESOURCE))) {
+        try (LoadedGltf loaded = GltfLoader.load(path(getClass().getResource(FOX_RESOURCE), FOX_RESOURCE))) {
             assertThat(loaded.animations())
                     .extracting(AnimationClip::name)
                     .containsExactlyInAnyOrder("Survey", "Walk", "Run");
@@ -81,7 +81,8 @@ final class BundledModelCompatibilityTest {
     /** Ensures the official interpolation fixture retains all imported transform clips. */
     @Test
     void loadsInterpolationTestAnimations() {
-        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), INTERPOLATION_TEST_RESOURCE))) {
+        try (LoadedGltf loaded = GltfLoader.load(
+                path(getClass().getResource(INTERPOLATION_TEST_RESOURCE), INTERPOLATION_TEST_RESOURCE))) {
             assertThat(loaded.animations())
                     .hasSize(9)
                     .extracting(AnimationClip::name)
@@ -111,7 +112,8 @@ final class BundledModelCompatibilityTest {
     /** Ensures Water Bottle exercises every currently supported StandardMaterial texture role. */
     @Test
     void loadsWaterBottleMaterialMaps() {
-        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), WATER_BOTTLE_RESOURCE))) {
+        try (LoadedGltf loaded =
+                GltfLoader.load(path(getClass().getResource(WATER_BOTTLE_RESOURCE), WATER_BOTTLE_RESOURCE))) {
             List<Mesh> meshes = new ArrayList<>();
             loaded.scene().traverse(object -> {
                 if (object instanceof Mesh mesh) {
@@ -134,7 +136,7 @@ final class BundledModelCompatibilityTest {
     /** Ensures Boom Box preserves its metallic, occlusion, normal, and glowing-panel material maps. */
     @Test
     void loadsBoomBoxMaterialMaps() {
-        try (LoadedGltf loaded = GltfLoader.load(path(getClass(), BOOM_BOX_RESOURCE))) {
+        try (LoadedGltf loaded = GltfLoader.load(path(getClass().getResource(BOOM_BOX_RESOURCE), BOOM_BOX_RESOURCE))) {
             List<Mesh> meshes = new ArrayList<>();
             loaded.scene().traverse(object -> {
                 if (object instanceof Mesh mesh) {

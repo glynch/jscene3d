@@ -4,7 +4,8 @@
  */
 package io.github.glynch.jscene3d.examples.tools;
 
-import io.github.glynch.jscene3d.examples.ThumbnailCaptureSupport;
+import io.github.glynch.jscene3d.examples.ExampleCatalog;
+import io.github.glynch.jscene3d.examples.framework.ThumbnailCaptureSupport;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -28,7 +29,7 @@ public final class ExampleThumbnailCapture {
      */
     public static void main(String[] arguments) {
         List<String> exampleIds = arguments.length == 0 ? configuredExampleIds() : List.of(arguments);
-        ThumbnailCaptureSupport.capture(DEFAULT_DIRECTORY, exampleIds);
+        ThumbnailCaptureSupport.capture(ExampleCatalog.suite(), DEFAULT_DIRECTORY, exampleIds);
     }
 
     /** Reads the Maven-launched comma-separated catalogue selection. */

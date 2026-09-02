@@ -4,17 +4,28 @@
  */
 package io.github.glynch.jscene3d.physics;
 
+import io.github.glynch.jscene3d.physics.debug.PhysicsDebugSnapshot;
 import io.github.glynch.jscene3d.physics.internal.CollisionQueries;
+import io.github.glynch.jscene3d.physics.internal.DebugGeometry;
+import io.github.glynch.jscene3d.physics.internal.KinematicMovement;
 import io.github.glynch.jscene3d.physics.internal.Preconditions;
 import io.github.glynch.jscene3d.physics.internal.ShapePose;
 import io.github.glynch.jscene3d.physics.internal.WorldIndex;
+import io.github.glynch.jscene3d.physics.movement.KinematicMoveResult;
+import io.github.glynch.jscene3d.physics.movement.KinematicMoveSettings;
+import io.github.glynch.jscene3d.physics.movement.TriggerEvent;
+import io.github.glynch.jscene3d.physics.movement.TriggerEventType;
 import io.github.glynch.jscene3d.physics.queries.OverlapHit;
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
 import io.github.glynch.jscene3d.physics.queries.RaycastHit;
 import io.github.glynch.jscene3d.physics.queries.SweepHit;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -32,6 +43,8 @@ public final class PhysicsWorld {
     private final Set<Collider> colliders;
     private final WorldIndex index;
     private final CollisionQueries queries;
+    private final KinematicMovement movement;
+    private final Map<Collider, Set<Collider>> activeTriggers = new IdentityHashMap<>();
     private long nextColliderId = 1L;
 
     /** Creates an empty physics world. */
@@ -39,6 +52,7 @@ public final class PhysicsWorld {
         colliders = new LinkedHashSet<>();
         index = new WorldIndex();
         queries = new CollisionQueries(index);
+        movement = new KinematicMovement(queries);
     }
 
     /**
@@ -81,6 +95,7 @@ public final class PhysicsWorld {
         requireOwnedAndRegistered(collider);
         index.remove(collider);
         colliders.remove(collider);
+        activeTriggers.remove(collider);
         collider.markRemoved();
     }
 
@@ -91,6 +106,7 @@ public final class PhysicsWorld {
         }
         colliders.clear();
         index.clear();
+        activeTriggers.clear();
     }
 
     /**
@@ -100,6 +116,15 @@ public final class PhysicsWorld {
      */
     public int colliderCount() {
         return colliders.size();
+    }
+
+    /**
+     * Captures renderer-independent line geometry for every registered collider.
+     *
+     * @return immutable debug snapshot ordered by collider identifier
+     */
+    public PhysicsDebugSnapshot debugSnapshot() {
+        return DebugGeometry.snapshot(colliders);
     }
 
     /**
@@ -195,6 +220,39 @@ public final class PhysicsWorld {
                 Objects.requireNonNull(filter, "filter"));
     }
 
+    /**
+     * Moves a registered collider using the default kinematic settings.
+     *
+     * <p>The requested translation is caller-owned and normally includes velocity, gravity, and
+     * other game-specific intent accumulated for one fixed update. The world applies the resolved
+     * transform immediately and reports contacts, grounding, step traversal, and trigger changes.
+     *
+     * @param collider registered collider to move
+     * @param translation desired world-space translation
+     * @return immutable resolved movement result
+     */
+    public KinematicMoveResult move(Collider collider, Vector3fc translation) {
+        return move(collider, translation, KinematicMoveSettings.DEFAULT);
+    }
+
+    /**
+     * Moves a registered collider with explicit collision-resolution settings.
+     *
+     * @param collider registered collider to move
+     * @param translation desired world-space translation
+     * @param settings immutable collision-resolution settings
+     * @return immutable resolved movement result
+     */
+    public KinematicMoveResult move(Collider collider, Vector3fc translation, KinematicMoveSettings settings) {
+        requireOwnedAndRegistered(collider);
+        KinematicMoveResult resolved =
+                movement.resolve(collider, translation, Objects.requireNonNull(settings, "settings"));
+        Vector3f position = collider.position(new Vector3f()).add(resolved.appliedTranslation(new Vector3f()));
+        updateTransform(collider, position, collider.orientation(new Quaternionf()));
+        List<TriggerEvent> triggerEvents = updateTriggers(collider);
+        return resolved.withTriggerEvents(triggerEvents);
+    }
+
     void updateTransform(Collider collider, Vector3fc position, Quaternionfc orientation) {
         requireOwnedAndRegistered(collider);
         ShapePose pose = new ShapePose(collider.shape(), position, orientation);
@@ -207,6 +265,43 @@ public final class PhysicsWorld {
         if (collider.world() != this || !collider.isRegistered()) {
             throw new IllegalArgumentException("collider is not registered with this world");
         }
+    }
+
+    private List<TriggerEvent> updateTriggers(Collider movingCollider) {
+        ShapePose pose = new ShapePose(
+                movingCollider.shape(),
+                movingCollider.position(new Vector3f()),
+                movingCollider.orientation(new Quaternionf()));
+        Set<Collider> current = new LinkedHashSet<>();
+        queries.overlapAccepted(pose, candidate -> acceptsTrigger(movingCollider, candidate)).stream()
+                .map(OverlapHit::collider)
+                .forEach(current::add);
+        Set<Collider> previous = activeTriggers.getOrDefault(movingCollider, Set.of());
+        List<TriggerEvent> events = new ArrayList<>();
+        current.stream()
+                .sorted(Comparator.comparingLong(Collider::id))
+                .map(trigger -> new TriggerEvent(
+                        trigger, previous.contains(trigger) ? TriggerEventType.STAY : TriggerEventType.ENTER))
+                .forEach(events::add);
+        previous.stream()
+                .filter(trigger -> !current.contains(trigger))
+                .sorted(Comparator.comparingLong(Collider::id))
+                .map(trigger -> new TriggerEvent(trigger, TriggerEventType.EXIT))
+                .forEach(events::add);
+        if (current.isEmpty()) {
+            activeTriggers.remove(movingCollider);
+        } else {
+            activeTriggers.put(movingCollider, current);
+        }
+        return List.copyOf(events);
+    }
+
+    private static boolean acceptsTrigger(Collider movingCollider, Collider candidate) {
+        return candidate != movingCollider
+                && candidate.isRegistered()
+                && candidate.isEnabled()
+                && candidate.isTrigger()
+                && movingCollider.collisionFilter().matches(candidate.collisionFilter());
     }
 
     private static Vector3f requireDirection(Vector3fc direction) {

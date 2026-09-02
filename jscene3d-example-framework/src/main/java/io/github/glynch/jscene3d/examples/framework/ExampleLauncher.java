@@ -49,7 +49,7 @@ public final class ExampleLauncher {
                     long nowNanos = System.nanoTime();
                     float elapsedSeconds = Math.max((nowNanos - previousNanos) / 1_000_000_000.0f, 0.0f);
                     previousNanos = nowNanos;
-                    example.update(new ExampleFrame(elapsedSeconds, false));
+                    example.update(new ExampleFrame(elapsedSeconds, false, false));
                     context.applyRendererViewport();
                     example.render();
                     window.swapBuffers();

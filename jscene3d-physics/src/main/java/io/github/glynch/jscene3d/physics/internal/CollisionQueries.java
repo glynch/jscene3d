@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -69,9 +70,18 @@ public final class CollisionQueries {
      * @return immutable accepted overlap hits
      */
     public List<OverlapHit> overlap(ShapePose queryPose, QueryFilter filter) {
+        return overlapAccepted(queryPose, collider -> accepts(collider, filter));
+    }
+
+    /** Finds all colliders accepted by movement-specific interaction filtering.
+     * @param queryPose query shape and transform
+     * @param acceptance movement-specific collider acceptance
+     * @return immutable accepted overlap hits
+     */
+    public List<OverlapHit> overlapAccepted(ShapePose queryPose, Predicate<Collider> acceptance) {
         List<OverlapHit> hits = new ArrayList<>();
         for (Collider collider : sorted(index.overlapCandidates(queryPose))) {
-            if (!accepts(collider, filter)) {
+            if (!acceptance.test(collider)) {
                 continue;
             }
             OverlapTests.contact(queryPose, pose(collider))
@@ -90,9 +100,20 @@ public final class CollisionQueries {
      * @return first accepted sweep hit, if present
      */
     public Optional<SweepHit> sweep(ShapePose queryPose, Vector3fc translation, QueryFilter filter) {
+        return sweepAccepted(queryPose, translation, collider -> accepts(collider, filter));
+    }
+
+    /** Finds the first collider accepted by movement-specific interaction filtering.
+     * @param queryPose starting query shape and transform
+     * @param translation world-space translation
+     * @param acceptance movement-specific collider acceptance
+     * @return first accepted hit, if present
+     */
+    public Optional<SweepHit> sweepAccepted(
+            ShapePose queryPose, Vector3fc translation, Predicate<Collider> acceptance) {
         List<SweepCandidate> hits = new ArrayList<>();
         for (Collider collider : sorted(index.sweepCandidates(queryPose, translation))) {
-            if (!accepts(collider, filter)) {
+            if (!acceptance.test(collider)) {
                 continue;
             }
             ShapeCast.cast(queryPose, translation, pose(collider))

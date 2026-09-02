@@ -26,24 +26,23 @@ public final class BundledResources {
     /**
      * Resolves one required resource to its build-time file path.
      *
-     * @param owner class whose loader resolves the resource
+     * @param resource resource resolved by its owning example module
      * @param resourceName absolute or owner-relative resource name
      * <p>File-backed development resources are returned directly. Resources inside a packaged
      * JAR are copied once to temporary storage and reused for the remainder of the process.
      *
      * @return resolved ordinary file path
-     * @throws NullPointerException if either argument is {@code null}, or the resource is absent
+     * @throws NullPointerException if either argument is {@code null}
      * @throws IllegalStateException if the resource cannot be represented or materialized
      */
-    public static Path path(Class<?> owner, String resourceName) {
-        Class<?> validOwner = Objects.requireNonNull(owner, "owner");
+    public static Path path(URL resource, String resourceName) {
+        URL validResource = Objects.requireNonNull(resource, resourceName);
         String validName = Objects.requireNonNull(resourceName, "resourceName");
-        URL resource = Objects.requireNonNull(validOwner.getResource(validName), validName);
-        if (!"file".equalsIgnoreCase(resource.getProtocol())) {
-            return materialize(resource, validName);
+        if (!"file".equalsIgnoreCase(validResource.getProtocol())) {
+            return materialize(validResource, validName);
         }
         try {
-            return Path.of(resource.toURI());
+            return Path.of(validResource.toURI());
         } catch (URISyntaxException exception) {
             throw new IllegalStateException("Invalid bundled resource URI: " + validName, exception);
         }

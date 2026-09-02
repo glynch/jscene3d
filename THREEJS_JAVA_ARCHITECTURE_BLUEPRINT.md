@@ -490,10 +490,12 @@ The `jscene3d-lwjgl` artifact depends on `jscene3d-core`. The optional
 implementation behind a generic logical overlay interface; GUI code never
 receives OpenGL handles or state.
 
-The Maven group is `io.github.glynch`. Examples use the reactor artifact name
-`jscene3d-examples`, depend on the three published artifacts, and are not published.
-GLFW remains in `jscene3d-lwjgl` until a real alternative host requires a
-separate integration.
+The Maven group is `io.github.glynch`. Reusable example hosting lives in the
+unpublished `jscene3d-example-framework` reactor artifact. Rendering and
+asset-loading examples live in `jscene3d-examples`, while visual physics
+examples live in `jscene3d-physics-examples`; the rendering suite does not
+depend on physics. GLFW remains in `jscene3d-lwjgl` until a real alternative
+host requires a separate integration.
 
 Each published artifact is a genuine JPMS module and also supports ordinary
 classpath consumption:

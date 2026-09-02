@@ -58,7 +58,8 @@ public final class SoldierAnimationBlendingExample {
 
     /** Creates the shared hosted implementation used by standalone and browser launch modes. */
     static HostedExample create(ExampleContext context) {
-        LoadedGltf loaded = GltfLoader.load(path(SoldierAnimationBlendingExample.class, MODEL_RESOURCE));
+        LoadedGltf loaded = GltfLoader.load(
+                path(SoldierAnimationBlendingExample.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE));
         Scene scene = loaded.scene();
         scene.setBackground(BACKGROUND);
         scene.setFog(new LinearFog(BACKGROUND, 10.0f, 50.0f));

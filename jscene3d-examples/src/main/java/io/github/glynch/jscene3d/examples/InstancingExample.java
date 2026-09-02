@@ -119,7 +119,7 @@ public final class InstancingExample {
         example.setPointerCapture(panel::capturesPointer);
         example.setFrameAction((ignored, frame) -> {
             panel.update();
-            if (!frame.inputCaptured() && !panel.capturesPointer()) {
+            if (!frame.pointerCaptured() && !panel.capturesPointer()) {
                 demo.selectFromPointer(context, camera, scene, raycaster);
             }
             demo.update(frame.elapsedSeconds());

@@ -36,6 +36,10 @@
             <artifactId>jscene3d-gltf</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-example-framework</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
         </dependency>
@@ -248,7 +252,7 @@
                                     <arguments>
                                         <argument>-classpath</argument>
                                         <argument>${project.build.testOutputDirectory}:${project.build.directory}/jpackage-macos-arm64/JScene3D Examples.app/Contents/app/${project.build.finalName}-macos-arm64.jar</argument>
-                                        <argument>io.github.glynch.jscene3d.examples.framework.BundledResourcesDistributionProbe</argument>
+                                        <argument>io.github.glynch.jscene3d.examples.BundledResourcesDistributionProbe</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

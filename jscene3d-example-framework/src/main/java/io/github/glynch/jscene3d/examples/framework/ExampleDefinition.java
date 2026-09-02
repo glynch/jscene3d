@@ -2,39 +2,42 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.examples;
+package io.github.glynch.jscene3d.examples.framework;
 
-import io.github.glynch.jscene3d.examples.framework.ExampleFactory;
 import io.github.glynch.jscene3d.gui.GalleryAttribution;
-import io.github.glynch.jscene3d.gui.GalleryItem;
-import io.github.glynch.jscene3d.render.OverlayImage;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable catalogue metadata and factory for one live example. */
-record ExampleDefinition(
+/**
+ * Immutable searchable metadata and factory for one hosted example.
+ *
+ * @param id stable identifier used for selection and thumbnail naming
+ * @param title human-readable gallery title
+ * @param category gallery category used for discovery
+ * @param description concise summary of the example
+ * @param tags additional searchable terms
+ * @param attributions asset and design credits displayed by the gallery
+ * @param factory factory that creates the hosted example
+ */
+public record ExampleDefinition(
         String id,
         String title,
         String category,
         String description,
         List<String> tags,
-        OverlayImage thumbnail,
         List<GalleryAttribution> attributions,
         ExampleFactory factory) {
-    /** Defensively validates and copies catalogue metadata. */
-    ExampleDefinition {
+    /** Defensively validates and copies all metadata. */
+    public ExampleDefinition {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(category, "category");
         Objects.requireNonNull(description, "description");
         tags = List.copyOf(Objects.requireNonNull(tags, "tags"));
-        Objects.requireNonNull(thumbnail, "thumbnail");
         attributions = List.copyOf(Objects.requireNonNull(attributions, "attributions"));
         Objects.requireNonNull(factory, "factory");
-    }
-
-    /** Creates the GUI-facing immutable item without exposing the example factory. */
-    GalleryItem galleryItem() {
-        return new GalleryItem(id, title, category, description, tags, thumbnail, attributions);
+        if (id.isBlank()) {
+            throw new IllegalArgumentException("id must not be blank");
+        }
     }
 }

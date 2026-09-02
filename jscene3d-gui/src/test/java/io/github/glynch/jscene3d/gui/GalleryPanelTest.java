@@ -54,11 +54,12 @@ final class GalleryPanelTest {
     }
 
     @Test
-    void navigatesFilteredResultsWhileFocusedAndReleasesKeyboardToContent() {
+    void navigatesFilteredResultsAndReacquiresKeyboardFocusOnNavigation() {
         GalleryPanel panel = new GalleryPanel("JScene3D", items());
 
-        assertThat(panel.capturesKeyboard()).isTrue();
+        assertThat(panel.capturesKeyboard()).isFalse();
         panel.update(navigation(GalleryPanel.Navigation.NEXT), 1000, 720);
+        assertThat(panel.capturesKeyboard()).isTrue();
         assertThat(panel.selectedItem().id()).isEqualTo("lights");
         panel.update(navigation(GalleryPanel.Navigation.LAST), 1000, 720);
         assertThat(panel.selectedItem().id()).isEqualTo("solar");
@@ -77,8 +78,33 @@ final class GalleryPanelTest {
 
         panel.update(new GalleryPanel.GalleryInput(500.0, 350.0, true, 0.0, false, ""), 1000, 720);
         panel.update(navigation(GalleryPanel.Navigation.LAST), 1000, 720);
-        assertThat(panel.capturesKeyboard()).isFalse();
+        assertThat(panel.capturesKeyboard()).isTrue();
         assertThat(panel.selectedItem().id()).isEqualTo("lights");
+    }
+
+    @Test
+    void releasesKeyboardToTheExampleAfterPointerSelection() {
+        GalleryPanel panel = new GalleryPanel("JScene3D", items());
+
+        panel.update(new GalleryPanel.GalleryInput(40.0, 180.0, true, 0.0, false, ""), 1000, 720);
+
+        assertThat(panel.capturesKeyboard()).isFalse();
+    }
+
+    @Test
+    void leavesKeyboardWithTheAutoSelectedExampleAtStartup() {
+        GalleryPanel panel = new GalleryPanel("JScene3D", List.of(items().getFirst()));
+
+        assertThat(panel.capturesKeyboard()).isFalse();
+    }
+
+    @Test
+    void leavesNonNavigationKeysWithTheExampleAfterSidebarWhitespaceIsClicked() {
+        GalleryPanel panel = new GalleryPanel("JScene3D", items());
+
+        panel.update(new GalleryPanel.GalleryInput(40.0, 120.0, true, 0.0, false, ""), 1000, 720);
+
+        assertThat(panel.capturesKeyboard()).isFalse();
     }
 
     @Test

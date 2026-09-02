@@ -248,6 +248,8 @@ final class OrbitControlsIT {
             assertThat(controls.updateWithoutPointerInput()).isFalse();
             Vector3f targetBeforeSuppressedKeyboard = new Vector3f(controls.target());
             InputStateTestDriver.press(input, Key.LEFT);
+            assertThat(controls.updateWithoutKeyboardInput()).isTrue();
+            assertThat(controls.target()).isEqualTo(targetBeforeSuppressedKeyboard);
             assertThat(controls.updateWithoutUserInput()).isFalse();
             assertThat(controls.target()).isEqualTo(targetBeforeSuppressedKeyboard);
             InputStateTestDriver.release(input, Key.LEFT);

@@ -34,7 +34,7 @@ The first useful physics slice will establish general collision and kinematic
 capabilities that can support many game genres while enabling the first Game
 Application:
 
-- A fixed-timestep Physics World
+- Caller-driven fixed updates with explicit kinematic moves
 - Static Colliders and Kinematic Bodies
 - Box, sphere, and capsule Collision Shapes
 - Broad-phase spatial queries and narrow-phase collision detection
@@ -43,6 +43,11 @@ Application:
 - Trigger volumes
 - Collision events
 - Debug visualization through JScene3D line rendering
+
+Visual physics examples live in the unpublished `jscene3d-physics-examples`
+artifact. They use the shared `jscene3d-example-framework` browser without
+introducing renderer or GUI dependencies into `jscene3d-physics`. Rendering and
+asset-loading examples remain isolated in `jscene3d-examples`.
 
 Dynamic Rigid Bodies, forces, mass, friction, restitution, contact resolution,
 constraints, continuous collision detection, sleeping, and more advanced

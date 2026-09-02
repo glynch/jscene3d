@@ -22,7 +22,8 @@ final class MorphStressTestAssetTest {
 
     @Test
     void loadsEightMorphTargetsAndAllWeightAnimations() {
-        try (LoadedGltf loaded = GltfLoader.load(path(MorphStressTestAssetTest.class, MODEL_RESOURCE))) {
+        try (LoadedGltf loaded =
+                GltfLoader.load(path(MorphStressTestAssetTest.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE))) {
             Mesh mesh = firstMorphMesh(loaded.scene());
 
             assertThat(mesh.morphTargetCount()).isEqualTo(8);

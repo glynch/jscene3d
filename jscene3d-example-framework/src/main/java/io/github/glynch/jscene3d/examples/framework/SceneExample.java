@@ -156,10 +156,13 @@ public final class SceneExample implements HostedExample {
         ExampleFrame validFrame = Objects.requireNonNull(frame, "frame");
         frameAction.update(this, validFrame);
         if (controls != null) {
-            if (validFrame.inputCaptured()) {
+            boolean pointerCaptured = validFrame.pointerCaptured() || pointerCapture.getAsBoolean();
+            if (pointerCaptured && validFrame.keyboardCaptured()) {
                 controls.updateWithoutUserInput(validFrame.elapsedSeconds());
-            } else if (pointerCapture.getAsBoolean()) {
+            } else if (pointerCaptured) {
                 controls.updateWithoutPointerInput(validFrame.elapsedSeconds());
+            } else if (validFrame.keyboardCaptured()) {
+                controls.updateWithoutKeyboardInput(validFrame.elapsedSeconds());
             } else {
                 controls.update(validFrame.elapsedSeconds());
             }

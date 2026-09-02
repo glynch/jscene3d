@@ -1,6 +1,7 @@
 target/
 **/target/
 **/target_test-classes/
+node_modules/
 
 .classpath
 .project

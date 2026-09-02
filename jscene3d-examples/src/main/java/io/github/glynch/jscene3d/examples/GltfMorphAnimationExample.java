@@ -50,7 +50,8 @@ public final class GltfMorphAnimationExample {
 
     /** Creates the shared hosted implementation used by standalone and browser launch modes. */
     static HostedExample create(ExampleContext context) {
-        LoadedGltf loaded = GltfLoader.load(path(GltfMorphAnimationExample.class, MODEL_RESOURCE));
+        LoadedGltf loaded =
+                GltfLoader.load(path(GltfMorphAnimationExample.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE));
         loaded.scene().setBackground(Color.srgb(0x080b12));
         loaded.scene().add(new AmbientLight(Color.srgb(0x8ca6d7), 0.45f));
         DirectionalLight key = new DirectionalLight(Color.srgb(0xffe1bd), 3.0f);

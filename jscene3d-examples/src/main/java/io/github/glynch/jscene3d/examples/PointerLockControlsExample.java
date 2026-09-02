@@ -76,7 +76,7 @@ public final class PointerLockControlsExample {
         example.setPointerCapture(panel::capturesPointer);
         example.setFrameAction((ignored, frame) -> {
             panel.update();
-            captureFromRenderedView(context, controls, panel, frame.inputCaptured());
+            captureFromRenderedView(context, controls, panel, frame.pointerCaptured());
             controls.update();
             fpsMonitor.update();
         });
@@ -114,10 +114,10 @@ public final class PointerLockControlsExample {
 
     /** Captures a primary click inside the rendered content when no overlay owns it. */
     private static void captureFromRenderedView(
-            ExampleContext context, PointerLockControls controls, ControlPanel panel, boolean inputCaptured) {
+            ExampleContext context, PointerLockControls controls, ControlPanel panel, boolean pointerCaptured) {
         InputState input = context.window().input();
         if (!controls.isLocked()
-                && !inputCaptured
+                && !pointerCaptured
                 && !panel.capturesPointer()
                 && context.containsPointer()
                 && input.wasMouseButtonPressed(MouseButton.LEFT)) {

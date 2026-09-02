@@ -55,7 +55,8 @@ public final class GalleryPanel implements Overlay {
     private int filteredCount;
     private int selectedIndex;
     private int firstVisibleIndex;
-    private Focus focus = Focus.LIST;
+    private Focus focus = Focus.NONE;
+    private boolean capturesKeyboard;
     private boolean capturesPointer;
     private double accumulatedScrollY;
     private double pointerX = Double.NEGATIVE_INFINITY;
@@ -121,7 +122,8 @@ public final class GalleryPanel implements Overlay {
                 input.scrollDeltaY(),
                 input.wasKeyPressed(Key.BACKSPACE),
                 typedText.toString(),
-                Navigation.from(input));
+                Navigation.from(input),
+                Navigation.isAnyDown(input));
         return update(galleryInput, validWindow.width(), validWindow.height());
     }
 
@@ -155,10 +157,10 @@ public final class GalleryPanel implements Overlay {
     /**
      * Returns whether keyboard input belongs to the gallery rather than the live example.
      *
-     * @return whether the gallery list or search field has keyboard focus
+     * @return whether search is focused or a gallery navigation key is held
      */
     public boolean capturesKeyboard() {
-        return focus != Focus.NONE;
+        return capturesKeyboard;
     }
 
     /**
@@ -374,6 +376,10 @@ public final class GalleryPanel implements Overlay {
         if (isSearchFocused()) {
             changed |= editQuery(validInput);
         }
+        if (focus == Focus.NONE && validInput.navigation() != Navigation.NONE) {
+            changed |= setFocus(Focus.LIST);
+        }
+        capturesKeyboard = isSearchFocused() || validInput.navigationHeld();
         if (capturesKeyboard() && validInput.navigation() != Navigation.NONE) {
             changed |= navigate(validInput.navigation(), windowHeight);
         }
@@ -408,6 +414,7 @@ public final class GalleryPanel implements Overlay {
         int replacement = filteredIndices[filteredIndex];
         changed |= replacement != selectedIndex;
         selectedIndex = replacement;
+        changed |= setFocus(Focus.NONE);
         return changed;
     }
 
@@ -639,6 +646,16 @@ public final class GalleryPanel implements Overlay {
             }
             return NONE;
         }
+
+        /** Returns whether any gallery navigation key is currently held. */
+        private static boolean isAnyDown(InputState input) {
+            for (Navigation navigation : values()) {
+                if (navigation.key != null && input.isKeyDown(navigation.key)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /** One headless-testable input snapshot. */
@@ -649,10 +666,23 @@ public final class GalleryPanel implements Overlay {
             double scrollDeltaY,
             boolean backspace,
             String typedText,
-            Navigation navigation) {
+            Navigation navigation,
+            boolean navigationHeld) {
         /** Creates a snapshot without keyboard navigation. */
         GalleryInput(double x, double y, boolean pressed, double scrollDeltaY, boolean backspace, String typedText) {
-            this(x, y, pressed, scrollDeltaY, backspace, typedText, Navigation.NONE);
+            this(x, y, pressed, scrollDeltaY, backspace, typedText, Navigation.NONE, false);
+        }
+
+        /** Creates a snapshot whose navigation command remains held for this update. */
+        GalleryInput(
+                double x,
+                double y,
+                boolean pressed,
+                double scrollDeltaY,
+                boolean backspace,
+                String typedText,
+                Navigation navigation) {
+            this(x, y, pressed, scrollDeltaY, backspace, typedText, navigation, navigation != Navigation.NONE);
         }
 
         /** Rejects a null text payload. */

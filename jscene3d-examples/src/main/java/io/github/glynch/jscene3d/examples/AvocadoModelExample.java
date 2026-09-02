@@ -50,9 +50,10 @@ public final class AvocadoModelExample {
 
     /** Creates the shared hosted implementation used by standalone and browser launch modes. */
     static HostedExample create(ExampleContext context) {
-        LoadedGltf loaded = GltfLoader.load(path(AvocadoModelExample.class, MODEL_RESOURCE));
-        EnvironmentMap environmentMap =
-                EnvironmentMapLoader.load(path(AvocadoModelExample.class, ENVIRONMENT_RESOURCE));
+        LoadedGltf loaded =
+                GltfLoader.load(path(AvocadoModelExample.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE));
+        EnvironmentMap environmentMap = EnvironmentMapLoader.load(
+                path(AvocadoModelExample.class.getResource(ENVIRONMENT_RESOURCE), ENVIRONMENT_RESOURCE));
         Scene scene = loaded.scene();
         scene.setEnvironment(environmentMap);
         scene.setBackground(BACKGROUND);

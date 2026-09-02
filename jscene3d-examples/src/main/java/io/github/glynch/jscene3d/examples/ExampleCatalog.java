@@ -4,27 +4,36 @@
  */
 package io.github.glynch.jscene3d.examples;
 
+import io.github.glynch.jscene3d.examples.framework.ExampleDefinition;
 import io.github.glynch.jscene3d.examples.framework.ExampleFactory;
+import io.github.glynch.jscene3d.examples.framework.ExampleSuite;
 import io.github.glynch.jscene3d.gui.GalleryAttribution;
-import io.github.glynch.jscene3d.loaders.OverlayImageLoader;
-import io.github.glynch.jscene3d.render.OverlayImage;
 import java.net.URI;
 import java.util.List;
 
 /** Declares the stable ordered catalogue rendered by {@link ExampleBrowser}. */
-final class ExampleCatalog {
+public final class ExampleCatalog {
     /** Prevents instantiation of this static catalogue. */
     private ExampleCatalog() {
         throw new AssertionError("ExampleCatalog cannot be instantiated");
     }
 
-    /** Returns all browser definitions after loading every required captured thumbnail. */
-    static List<ExampleDefinition> definitions() {
-        return entries().stream().map(ExampleCatalog::definition).toList();
+    /**
+     * Returns the complete rendering and asset-loading example suite.
+     *
+     * @return rendering and asset-loading suite metadata and factories
+     */
+    public static ExampleSuite suite() {
+        return new ExampleSuite(
+                "JScene3D Examples",
+                "JScene3D",
+                ExampleCatalog.class,
+                "/META-INF/jscene3d/examples/thumbnails",
+                definitions());
     }
 
-    /** Returns all thumbnail-independent catalogue entries in display order. */
-    static List<ExampleCatalogEntry> entries() {
+    /** Returns all definitions in stable display order. */
+    static List<ExampleDefinition> definitions() {
         return List.of(
                 definition(
                         "basic-triangle",
@@ -441,13 +450,13 @@ final class ExampleCatalog {
     }
 
     /** Creates one definition and loads its required captured thumbnail. */
-    private static ExampleCatalogEntry definition(
+    private static ExampleDefinition definition(
             String id, String title, String category, String description, List<String> tags, ExampleFactory factory) {
         return definition(id, title, category, description, tags, List.of(), factory);
     }
 
     /** Creates one definition with explicit third-party asset provenance. */
-    private static ExampleCatalogEntry definition(
+    private static ExampleDefinition definition(
             String id,
             String title,
             String category,
@@ -455,25 +464,6 @@ final class ExampleCatalog {
             List<String> tags,
             List<GalleryAttribution> attributions,
             ExampleFactory factory) {
-        return new ExampleCatalogEntry(id, title, category, description, tags, attributions, factory);
-    }
-
-    /** Loads the captured thumbnail required to promote one entry into a browser definition. */
-    private static ExampleDefinition definition(ExampleCatalogEntry entry) {
-        return new ExampleDefinition(
-                entry.id(),
-                entry.title(),
-                entry.category(),
-                entry.description(),
-                entry.tags(),
-                thumbnail(entry.id()),
-                entry.attributions(),
-                entry.factory());
-    }
-
-    /** Loads the captured classpath thumbnail, failing if it is absent or invalid. */
-    private static OverlayImage thumbnail(String id) {
-        String resourceName = "/META-INF/jscene3d/examples/thumbnails/" + id + ".png";
-        return OverlayImageLoader.loadResource(ExampleCatalog.class, resourceName);
+        return new ExampleDefinition(id, title, category, description, tags, attributions, factory);
     }
 }

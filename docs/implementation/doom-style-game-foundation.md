@@ -107,12 +107,19 @@ meshes, dynamic rigid-body props, multiple weapons, or complex enemy AI.
 
 ## Delivery sequence
 
-1. Add cursor capture, raw mouse support, focus state, and pointer-lock controls.
-2. Implement the collision-query foundation in `jscene3d-physics`.
-3. Add kinematic movement, triggers, and physics debug visualization.
-4. Implement the lifecycle, input actions, and Physics Bindings in
+The first three reusable foundation slices are complete:
+
+1. Cursor capture, raw mouse support, focus state, and pointer-lock controls.
+2. The collision-query foundation in `jscene3d-physics`.
+3. Explicit kinematic movement, trigger transitions, and renderer-independent
+   physics debug snapshots, proven by an interactive obstacle-course example
+   in the separate `jscene3d-physics-examples` suite.
+
+The remaining sequence is:
+
+1. Implement the lifecycle, input actions, and Physics Bindings in
    `jscene3d-game`.
-5. Add reusable billboard animation and the initial audio artifact.
-6. Build a one-room combat prototype in the separate Game Application.
-7. Expand the prototype into the first compact level without broadening the
+2. Add reusable billboard animation and the initial audio artifact.
+3. Build a one-room combat prototype in the separate Game Application.
+4. Expand the prototype into the first compact level without broadening the
    reusable artifacts with title-specific concepts.

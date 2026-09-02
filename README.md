@@ -18,6 +18,10 @@ Run the complete ordinary, headless verification lifecycle from a clean state:
 ./mvnw clean verify
 ```
 
+The root build provisions its pinned Markdown toolchain and validates every
+checked-in Markdown document alongside the Java formatting and static-analysis
+checks. A global Node.js or `markdownlint-cli2` installation is not required.
+
 OpenGL integration tests are isolated behind a separate profile:
 
 ```shell
@@ -44,16 +48,23 @@ Open the searchable native example browser with:
 ./tools/scripts/run-example.sh ExampleBrowser
 ```
 
-The browser keeps one native window and renderer alive while examples are
-selected. Its left sidebar provides captured thumbnails, category and tag
-search, scrolling, and persistent selection; the right content area hosts the
-fully interactive example. Switching cards closes the previous example's GPU
-resources before creating the replacement. The examples continue to run as
-independent applications through the same lifecycle. Use Up and Down to move
-through filtered results, Page Up and Page Down to move by a visible page, and
-Home or End to reach either boundary. Clicking the rendered example returns
-keyboard control to that example; clicking the gallery or search field returns
-it to the browser. For example, launch the Solar System Viewer directly with:
+Open the separate visual physics suite with:
+
+```shell
+./tools/scripts/run-example.sh PhysicsExampleBrowser
+```
+
+Both browsers use `jscene3d-example-framework`, which keeps one native window
+and renderer alive while examples are selected. Their left sidebars provide
+captured thumbnails, category and tag search, scrolling, and persistent
+selection; the right content area hosts the fully interactive example.
+Switching cards closes the previous example's resources before creating the
+replacement. Examples continue to run as independent applications through the
+same lifecycle. Use Up and Down to move through filtered results, Page Up and
+Page Down to move by a visible page, and Home or End to reach either boundary.
+Clicking the rendered example returns keyboard control to that example;
+clicking the gallery or search field returns it to the browser. For example,
+launch the Solar System Viewer directly with:
 
 ```shell
 ./tools/scripts/run-example.sh SolarSystemViewer
@@ -81,6 +92,11 @@ Pass one or more catalogue IDs to capture only those examples, for example
 `./tools/scripts/capture-example-thumbnails.sh shadows basic-triangle`. The
 capture command compiles incrementally; use the normal verification command
 when a clean build is required.
+
+Select another suite with `--suite`. For example, refresh only the kinematic
+movement thumbnail with
+`./tools/scripts/capture-example-thumbnails.sh --suite physics
+kinematic-movement`.
 
 `BasicTriangleExample`, `TransformsExample`, `HierarchyExample`,
 `CamerasExample`, `BufferGeometryExample`, `TexturedCubeExample`,
@@ -381,19 +397,41 @@ Line picking is not included in version 0.1 because it requires an explicit
 world- or screen-space distance tolerance rather than exact triangle
 intersection behavior.
 
+## Physics movement
+
+`PhysicsWorld.move(...)` explicitly resolves a registered collider's desired
+translation against solid world geometry. The caller computes fixed-update
+intent, velocity, and gravity; physics applies the resolved transform and
+returns immutable applied and remaining translation, solid contacts, walkable
+ground state, bounded-step state, and deterministic trigger enter, stay, and
+exit events. Collision filtering remains mutual, and trigger volumes never
+block movement.
+
+`PhysicsWorld.debugSnapshot()` exposes renderer-independent world-space line
+segments for box, sphere, and capsule colliders. Applications can render that
+snapshot with JScene3D lines without introducing a rendering dependency into
+`jscene3d-physics`. The separately compiled `KinematicMovementExample` in
+`jscene3d-physics-examples` demonstrates the complete seam with a caller-owned
+120 Hz update, WASD movement, gravity, wall sliding, step traversal, a trigger
+volume, and live debug geometry.
+
 ## Project structure
 
 - `jscene3d-core`: renderer-independent scene, camera, geometry, material,
   texture, and raycasting APIs.
 - `jscene3d-physics`: renderer-independent three-dimensional colliders,
-  collision filtering, raycasts, overlap queries, and convex shape sweeps.
+  collision filtering, spatial queries, explicit kinematic movement, trigger
+  transitions, and debug snapshots.
 - `jscene3d-lwjgl`: the OpenGL renderer, GLFW platform integration, controls,
   and the renderer-owned safe overlay canvas.
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType
   text rendering.
 - `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
-- `jscene3d-examples`: unpublished runnable examples depending on the public
-  artifacts.
+- `jscene3d-example-framework`: unpublished reusable native hosting, browsing,
+  lifecycle, catalog, and thumbnail-capture support.
+- `jscene3d-examples`: unpublished rendering and asset-loading examples.
+- `jscene3d-physics-examples`: unpublished visual physics examples; this is the
+  only example suite that depends on `jscene3d-physics`.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and
 `CONTEXT.md` for the accepted version 0.1 design and terminology.

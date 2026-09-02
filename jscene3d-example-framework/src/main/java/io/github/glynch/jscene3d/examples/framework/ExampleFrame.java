@@ -8,9 +8,10 @@ package io.github.glynch.jscene3d.examples.framework;
  * Immutable host state supplied to one example update.
  *
  * @param elapsedSeconds finite non-negative elapsed duration
- * @param inputCaptured whether host UI owns pointer and keyboard input for this frame
+ * @param pointerCaptured whether host UI owns pointer input for this frame
+ * @param keyboardCaptured whether host UI owns keyboard input for this frame
  */
-public record ExampleFrame(float elapsedSeconds, boolean inputCaptured) {
+public record ExampleFrame(float elapsedSeconds, boolean pointerCaptured, boolean keyboardCaptured) {
     /**
      * Validates the elapsed duration.
      *

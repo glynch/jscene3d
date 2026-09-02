@@ -1,0 +1,11 @@
+{
+  "globs": [
+    "**/*.md",
+    "!**/node_modules/**",
+    "!**/target/**"
+  ],
+  "config": {
+    // Prose, links, and wide capability tables intentionally exceed a fixed source width.
+    "MD013": false
+  }
+}

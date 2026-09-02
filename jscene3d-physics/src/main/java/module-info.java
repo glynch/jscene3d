@@ -8,6 +8,8 @@ module io.github.glynch.jscene3d.physics {
     requires static transitive org.jspecify;
 
     exports io.github.glynch.jscene3d.physics;
+    exports io.github.glynch.jscene3d.physics.debug;
+    exports io.github.glynch.jscene3d.physics.movement;
     exports io.github.glynch.jscene3d.physics.queries;
     exports io.github.glynch.jscene3d.physics.shapes;
 }

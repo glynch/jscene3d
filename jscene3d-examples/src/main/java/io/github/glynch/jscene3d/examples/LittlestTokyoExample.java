@@ -50,12 +50,14 @@ public final class LittlestTokyoExample {
 
     /** Creates the shared hosted implementation used by standalone and browser launch modes. */
     static HostedExample create(ExampleContext context) {
-        LoadedGltf loaded = GltfLoader.load(path(LittlestTokyoExample.class, MODEL_RESOURCE));
+        LoadedGltf loaded =
+                GltfLoader.load(path(LittlestTokyoExample.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE));
         if (loaded.animations().isEmpty()) {
             loaded.close();
             throw new IllegalStateException("Littlest Tokyo contains no animation clip");
         }
-        EnvironmentMap environment = EnvironmentMapLoader.load(path(LittlestTokyoExample.class, ENVIRONMENT_RESOURCE));
+        EnvironmentMap environment = EnvironmentMapLoader.load(
+                path(LittlestTokyoExample.class.getResource(ENVIRONMENT_RESOURCE), ENVIRONMENT_RESOURCE));
         Scene scene = loaded.scene();
         scene.setEnvironment(environment);
         scene.setBackgroundEnvironment(environment);

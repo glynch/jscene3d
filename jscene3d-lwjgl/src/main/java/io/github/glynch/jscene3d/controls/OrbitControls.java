@@ -767,6 +767,34 @@ public final class OrbitControls {
     }
 
     /**
+     * Applies pointer input and pending motion without reading keyboard input at a nominal 60 Hz.
+     *
+     * <p>This is intended for frames in which an overlaid interface has claimed the keyboard.
+     * Pointer rotation, panning, and zooming continue normally.
+     *
+     * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
+     */
+    public boolean updateWithoutKeyboardInput() {
+        return updateWithoutKeyboardInput(DEFAULT_SECONDS_PER_UPDATE);
+    }
+
+    /**
+     * Applies pointer input and pending motion without reading keyboard input, using an elapsed
+     * duration in seconds.
+     *
+     * @param elapsedSeconds finite non-negative time since the previous update
+     * @return {@code true} if the camera position, orientation, or zoom changed
+     * @throws IllegalArgumentException if {@code elapsedSeconds} is invalid
+     * @throws IllegalStateException if the enabled control cannot use the current camera or window
+     *     state
+     */
+    public boolean updateWithoutKeyboardInput(float elapsedSeconds) {
+        return update(elapsedSeconds, true, false);
+    }
+
+    /**
      * Applies pending motion without reading pointer or keyboard input at a nominal 60 Hz.
      *
      * <p>This is intended for frames in which a host interface has claimed all user input.

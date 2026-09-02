@@ -52,7 +52,8 @@ public final class GltfAnimationExample {
 
     /** Creates the shared hosted implementation used by standalone and browser launch modes. */
     static HostedExample create(ExampleContext context) {
-        LoadedGltf loaded = GltfLoader.load(path(GltfAnimationExample.class, MODEL_RESOURCE));
+        LoadedGltf loaded =
+                GltfLoader.load(path(GltfAnimationExample.class.getResource(MODEL_RESOURCE), MODEL_RESOURCE));
         loaded.scene().setBackground(Color.srgb(0x060a14));
         loaded.scene().add(new AmbientLight(Color.srgb(0x8aa2d0), 0.3f));
         DirectionalLight key = new DirectionalLight(Color.srgb(0xffe4c8), 2.6f);

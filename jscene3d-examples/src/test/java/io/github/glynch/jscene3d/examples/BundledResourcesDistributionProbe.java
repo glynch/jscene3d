@@ -2,8 +2,9 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.examples.framework;
+package io.github.glynch.jscene3d.examples;
 
+import io.github.glynch.jscene3d.examples.framework.BundledResources;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -23,8 +24,10 @@ public final class BundledResourcesDistributionProbe {
      * @throws Exception if the resource cannot be resolved or inspected
      */
     public static void main(String[] arguments) throws Exception {
-        Path first = BundledResources.path(BundledResourcesDistributionProbe.class, RESOURCE_NAME);
-        Path second = BundledResources.path(BundledResourcesDistributionProbe.class, RESOURCE_NAME);
+        Path first = BundledResources.path(
+                BundledResourcesDistributionProbe.class.getResource(RESOURCE_NAME), RESOURCE_NAME);
+        Path second = BundledResources.path(
+                BundledResourcesDistributionProbe.class.getResource(RESOURCE_NAME), RESOURCE_NAME);
         if (!Files.isRegularFile(first) || Files.size(first) == 0L) {
             throw new AssertionError("Bundled resource did not resolve to a readable file: " + first);
         }

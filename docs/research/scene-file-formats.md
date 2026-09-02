@@ -59,7 +59,7 @@ The following table summarizes what the formats can represent in principle.
 Individual exporters and loaders often support only subsets.
 
 | Format | Scene graph | Materials and textures | Animation and skinning | Cameras and lights | Main character |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | glTF 2.0 / GLB | Yes; multiple scenes, nodes, transforms, hierarchy | Yes; core metallic-roughness PBR, images, textures, samplers | Yes; keyframe animation, morph targets, skins | Core cameras; punctual lights through `KHR_lights_punctual` | Runtime delivery |
 | OBJ + MTL | Object/group partitioning, but no parenting or transforms | Basic companion MTL materials and texture references | No native skeletal or clip animation | No | Legacy static geometry interchange |
 | STL | No; geometry result only | No standard material/texture model; some binary color conventions exist | No | No | Triangle surfaces for CAD/printing |
@@ -252,7 +252,7 @@ This is an engineering survey, not legal advice. The relevant verified facts
 are:
 
 | Format or implementation path | Verified licensing/availability fact | Consequence for JScene3D |
-|---|---|---|
+| --- | --- | --- |
 | glTF 2.0 | Public Khronos specification and registry | A clean-room pure-Java loader is practical; dependency code still needs its own license review |
 | OBJ, STL, PLY | Publicly documented legacy formats, but no current governing standards body or modern format-license grant was identified in this survey | Implement from format descriptions and test files; do not copy parser code without checking that code's license |
 | COLLADA | Khronos says the specification and schema are free to use without royalties or fees | Pure-Java implementation is legally accessible, though technically broad |
@@ -377,7 +377,7 @@ JScene3D-specific parts.
 ## Decision matrix
 
 | Format | User value | Implementation/fidelity risk | Recommended position |
-|---|---:|---:|---|
+| --- | ---: | ---: | --- |
 | glTF 2.0 + GLB | Very high | Medium to high, but bounded by a public specification and declared profile | First loader |
 | OBJ + MTL | High for legacy static assets | Low to medium | Second tier |
 | STL | Medium for CAD/printing audiences | Low | Demand-driven geometry loader |

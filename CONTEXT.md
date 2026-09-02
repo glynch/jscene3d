@@ -190,13 +190,51 @@ distinct object properties.
 _Avoid_: Animation thread
 
 **Physics World**:
-A renderer-independent simulation containing Rigid Bodies and advancing them
-through explicit Fixed Updates.
+A renderer-independent owner of collision objects, their spatial index, and
+collision queries. Callers perform movement and future simulation through
+explicit Fixed Updates.
 _Avoid_: Scene, render world
 
+**Collision Object**:
+A world-owned physics object with a transform and one or more locally
+transformed Colliders. Its concrete kind determines whether it blocks movement
+or only observes overlaps.
+_Avoid_: Object3D, visible object
+
+**Collision Body**:
+A solid Collision Object whose Colliders block compatible movement. Current
+concrete forms are Static Body and Kinematic Body; dynamic Rigid Body simulation
+is a later extension.
+_Avoid_: Collision Sensor, Mesh
+
+**Static Body**:
+An immovable Collision Body used for floors, walls, and other fixed world
+geometry.
+_Avoid_: Static Collider
+
+**Kinematic Body**:
+A Collision Body moved explicitly by its caller and resolved against compatible
+solid Colliders by the Physics World.
+_Avoid_: Character Controller, Rigid Body
+
+**Collider**:
+One Collision Shape and local transform owned by a Collision Object. Collision
+queries report both the precise Collider and its owning object.
+_Avoid_: Collision Object, visible mesh
+
+**Collision Sensor**:
+A non-blocking Collision Object that observes overlaps and produces enter, stay,
+and exit Overlap Events.
+_Avoid_: Trigger, Trigger Volume, Area3D
+
+**Overlap Event**:
+A deterministic enter, stay, or exit transition between a moved Kinematic Body
+and a Collision Sensor.
+_Avoid_: Trigger Event, Collision Contact
+
 **Rigid Body**:
-A simulated body's motion state, mass properties, forces, and Collision Shape.
-It does not own or directly mutate a scene object.
+A dynamic Collision Body with simulated motion state, mass properties, forces,
+and one or more Colliders. It does not own or directly mutate a scene object.
 _Avoid_: Mesh, Object3D
 
 **Collision Shape**:

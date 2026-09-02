@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-/** Three-dimensional physics worlds, colliders, and collision filtering. */
+/** Three-dimensional physics worlds, collision objects, colliders, sensors, and filtering. */
 @NullMarked
 package io.github.glynch.jscene3d.physics;
 

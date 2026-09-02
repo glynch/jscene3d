@@ -6,9 +6,10 @@ package io.github.glynch.jscene3d.physics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.physics.movement.KinematicContact;
 import io.github.glynch.jscene3d.physics.movement.KinematicMoveResult;
 import io.github.glynch.jscene3d.physics.movement.KinematicMoveSettings;
-import io.github.glynch.jscene3d.physics.movement.TriggerEventType;
+import io.github.glynch.jscene3d.physics.movement.OverlapPhase;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import java.util.List;
@@ -29,23 +30,25 @@ final class KinematicMovementTest {
             KinematicMoveSettings.DEFAULT.withMaximumStepHeight(0.0F).withGroundSnapDistance(0.0F);
 
     @Test
-    void appliesUnobstructedTranslationAndUpdatesCollider() {
+    void appliesUnobstructedTranslationAndUpdatesTheBodyAndCollider() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.5F, 1.0F));
+        KinematicBody mover = addMover(world, new Vector3f());
+        Collider collider = mover.colliders().getFirst();
 
         KinematicMoveResult result = world.move(mover, new Vector3f(2.0F, 1.0F, -3.0F), NO_STEP);
 
         assertVector(result.appliedTranslation(new Vector3f()), 2.0F, 1.0F, -3.0F);
         assertVector(result.remainingTranslation(new Vector3f()), 0.0F, 0.0F, 0.0F);
         assertVector(mover.position(new Vector3f()), 2.0F, 1.0F, -3.0F);
+        assertVector(collider.position(new Vector3f()), 2.0F, 1.0F, -3.0F);
         assertThat(result.contacts()).isEmpty();
     }
 
     @Test
     void stopsAtWallAndSlidesAlongIt() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.5F, 1.0F));
-        Collider wall = world.addCollider(new BoxShape(1.0F, 5.0F, 10.0F), new Vector3f(2.0F, 0.0F, 0.0F), IDENTITY);
+        KinematicBody mover = addMover(world, new Vector3f());
+        Collider wall = addStatic(world, new BoxShape(1.0F, 5.0F, 10.0F), new Vector3f(2.0F, 0.0F, 0.0F));
 
         KinematicMoveResult result = world.move(mover, new Vector3f(4.0F, 0.0F, 3.0F), NO_STEP);
 
@@ -56,10 +59,24 @@ final class KinematicMovementTest {
     }
 
     @Test
+    void resolvesEveryColliderOnACompoundKinematicBody() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody mover = world.addKinematicBody();
+        mover.addCollider(new CapsuleShape(0.5F, 1.0F), new Vector3f(0.0F, 5.0F, 0.0F), IDENTITY);
+        mover.addCollider(new CapsuleShape(0.5F, 1.0F));
+        Collider wall = addStatic(world, new BoxShape(1.0F, 4.0F, 4.0F), new Vector3f(2.0F, 0.0F, 0.0F));
+
+        KinematicMoveResult result = world.move(mover, new Vector3f(4.0F, 0.0F, 0.0F), NO_STEP);
+
+        assertThat(mover.position(new Vector3f()).x).isCloseTo(0.999F, TOLERANCE);
+        assertThat(result.contacts()).extracting(KinematicContact::collider).contains(wall);
+    }
+
+    @Test
     void detectsGroundAndKeepsConfiguredSkinWidth() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.5F, 1.0F), new Vector3f(0.0F, 3.0F, 0.0F), IDENTITY);
-        Collider floor = world.addCollider(new BoxShape(20.0F, 1.0F, 20.0F), new Vector3f(0.0F, -0.5F, 0.0F), IDENTITY);
+        KinematicBody mover = addMover(world, new Vector3f(0.0F, 3.0F, 0.0F));
+        Collider floor = addStatic(world, new BoxShape(20.0F, 1.0F, 20.0F), new Vector3f(0.0F, -0.5F, 0.0F));
 
         KinematicMoveResult result = world.move(mover, new Vector3f(0.0F, -5.0F, 0.0F), NO_STEP);
 
@@ -72,8 +89,8 @@ final class KinematicMovementTest {
     @Test
     void preservesHorizontalMovementWhenGravityPressesAGroundedCapsuleIntoTheFloor() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.45F, 1.0F), new Vector3f(-4.0F, 0.951F, 0.0F), IDENTITY);
-        world.addCollider(new BoxShape(16.0F, 1.0F, 12.0F), new Vector3f(2.0F, -0.5F, 0.0F), IDENTITY);
+        KinematicBody mover = addMover(world, new Vector3f(-4.0F, 0.951F, 0.0F));
+        addStatic(world, new BoxShape(16.0F, 1.0F, 12.0F), new Vector3f(2.0F, -0.5F, 0.0F));
         Vector3f fixedStepMovement = new Vector3f(-0.033333F, -0.00125F, 0.0F);
 
         List<KinematicMoveResult> results = IntStream.range(0, 10)
@@ -106,9 +123,9 @@ final class KinematicMovementTest {
     @ValueSource(ints = {60, 120, 240})
     void crossesAReachableStepUsingRepeatedFixedStepMovementAndGravity(int updatesPerSecond) {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.45F, 1.0F), new Vector3f(-4.0F, 0.951F, 0.0F), IDENTITY);
-        world.addCollider(new BoxShape(16.0F, 1.0F, 12.0F), new Vector3f(2.0F, -0.5F, 0.0F), IDENTITY);
-        world.addCollider(new BoxShape(2.0F, 0.4F, 3.0F), new Vector3f(0.5F, 0.2F, 0.0F), IDENTITY);
+        KinematicBody mover = addMover(world, new Vector3f(-4.0F, 0.951F, 0.0F));
+        addStatic(world, new BoxShape(16.0F, 1.0F, 12.0F), new Vector3f(2.0F, -0.5F, 0.0F));
+        addStatic(world, new BoxShape(2.0F, 0.4F, 3.0F), new Vector3f(0.5F, 0.2F, 0.0F));
         float fixedSeconds = 1.0F / updatesPerSecond;
         float verticalVelocity = 0.0F;
         boolean stepped = false;
@@ -131,9 +148,9 @@ final class KinematicMovementTest {
     @Test
     void respectsMutualCollisionFilters() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.5F, 1.0F));
-        mover.setCollisionFilter(new CollisionFilter(1, 1));
-        Collider ignored = world.addCollider(new BoxShape(1.0F, 4.0F, 4.0F), new Vector3f(2.0F, 0.0F, 0.0F), IDENTITY);
+        KinematicBody mover = addMover(world, new Vector3f());
+        mover.colliders().getFirst().setCollisionFilter(new CollisionFilter(1, 1));
+        Collider ignored = addStatic(world, new BoxShape(1.0F, 4.0F, 4.0F), new Vector3f(2.0F, 0.0F, 0.0F));
         ignored.setCollisionFilter(new CollisionFilter(2, -1));
 
         KinematicMoveResult result = world.move(mover, new Vector3f(4.0F, 0.0F, 0.0F), NO_STEP);
@@ -143,24 +160,40 @@ final class KinematicMovementTest {
     }
 
     @Test
-    void reportsDeterministicTriggerLifecycleWithoutBlockingMovement() {
+    void reportsDeterministicOverlapLifecycleWithoutBlockingMovement() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.5F, 1.0F));
-        Collider firstTrigger = trigger(world, 2.0F);
-        Collider secondTrigger = trigger(world, 2.0F);
+        KinematicBody mover = addMover(world, new Vector3f());
+        CollisionSensor firstSensor = sensor(world, 2.0F);
+        CollisionSensor secondSensor = sensor(world, 2.0F);
 
         KinematicMoveResult entered = world.move(mover, new Vector3f(2.0F, 0.0F, 0.0F), NO_STEP);
         KinematicMoveResult stayed = world.move(mover, new Vector3f(), NO_STEP);
         KinematicMoveResult exited = world.move(mover, new Vector3f(3.0F, 0.0F, 0.0F), NO_STEP);
 
-        assertThat(entered.triggerEvents())
-                .extracting(event -> event.trigger(), event -> event.type())
+        assertThat(entered.overlapEvents())
+                .extracting(event -> event.sensor(), event -> event.phase())
                 .containsExactly(
-                        Tuple.tuple(firstTrigger, TriggerEventType.ENTER),
-                        Tuple.tuple(secondTrigger, TriggerEventType.ENTER));
-        assertThat(stayed.triggerEvents()).allMatch(event -> event.type() == TriggerEventType.STAY);
-        assertThat(exited.triggerEvents()).allMatch(event -> event.type() == TriggerEventType.EXIT);
+                        Tuple.tuple(firstSensor, OverlapPhase.ENTER), Tuple.tuple(secondSensor, OverlapPhase.ENTER));
+        assertThat(stayed.overlapEvents()).allMatch(event -> event.phase() == OverlapPhase.STAY);
+        assertThat(exited.overlapEvents()).allMatch(event -> event.phase() == OverlapPhase.EXIT);
         assertThat(mover.position(new Vector3f()).x).isCloseTo(5.0F, TOLERANCE);
+    }
+
+    @Test
+    void reportsOneSensorEventWhenCompoundObjectsHaveSeveralOverlappingColliders() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody mover = addMover(world, new Vector3f());
+        mover.addCollider(new CapsuleShape(0.25F, 0.5F), new Vector3f(0.25F, 0.0F, 0.0F), IDENTITY);
+        CollisionSensor sensor = world.addCollisionSensor();
+        sensor.addCollider(new BoxShape(3.0F, 3.0F, 3.0F));
+        sensor.addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
+
+        KinematicMoveResult result = world.move(mover, new Vector3f(), NO_STEP);
+
+        assertThat(result.overlapEvents()).singleElement().satisfies(event -> {
+            assertThat(event.sensor()).isSameAs(sensor);
+            assertThat(event.phase()).isEqualTo(OverlapPhase.ENTER);
+        });
     }
 
     @Test
@@ -168,8 +201,8 @@ final class KinematicMovementTest {
         List<Vector3f> positions = IntStream.range(0, 8)
                 .mapToObj(ignored -> {
                     PhysicsWorld world = new PhysicsWorld();
-                    Collider mover = world.addCollider(new CapsuleShape(0.5F, 1.0F));
-                    world.addCollider(new BoxShape(1.0F, 5.0F, 10.0F), new Vector3f(2.0F, 0.0F, 0.0F), IDENTITY);
+                    KinematicBody mover = addMover(world, new Vector3f());
+                    addStatic(world, new BoxShape(1.0F, 5.0F, 10.0F), new Vector3f(2.0F, 0.0F, 0.0F));
                     world.move(mover, new Vector3f(4.0F, 0.0F, 3.0F), NO_STEP);
                     return mover.position(new Vector3f());
                 })
@@ -180,16 +213,26 @@ final class KinematicMovementTest {
 
     private static StepScenario stepWorld(float stepHeight) {
         PhysicsWorld world = new PhysicsWorld();
-        Collider mover = world.addCollider(new CapsuleShape(0.5F, 1.0F), new Vector3f(0.0F, 1.001F, 0.0F), IDENTITY);
-        world.addCollider(new BoxShape(20.0F, 1.0F, 20.0F), new Vector3f(0.0F, -0.5F, 0.0F), IDENTITY);
-        world.addCollider(new BoxShape(3.0F, stepHeight, 4.0F), new Vector3f(2.0F, stepHeight * 0.5F, 0.0F), IDENTITY);
+        KinematicBody mover = addMover(world, new Vector3f(0.0F, 1.001F, 0.0F));
+        addStatic(world, new BoxShape(20.0F, 1.0F, 20.0F), new Vector3f(0.0F, -0.5F, 0.0F));
+        addStatic(world, new BoxShape(3.0F, stepHeight, 4.0F), new Vector3f(2.0F, stepHeight * 0.5F, 0.0F));
         return new StepScenario(world, mover);
     }
 
-    private static Collider trigger(PhysicsWorld world, float x) {
-        Collider trigger = world.addCollider(new BoxShape(2.0F, 4.0F, 4.0F), new Vector3f(x, 0.0F, 0.0F), IDENTITY);
-        trigger.setTrigger(true);
-        return trigger;
+    private static KinematicBody addMover(PhysicsWorld world, Vector3f position) {
+        KinematicBody mover = world.addKinematicBody(position, IDENTITY);
+        mover.addCollider(new CapsuleShape(0.5F, 1.0F));
+        return mover;
+    }
+
+    private static Collider addStatic(PhysicsWorld world, BoxShape shape, Vector3f position) {
+        return world.addStaticBody(position, IDENTITY).addCollider(shape);
+    }
+
+    private static CollisionSensor sensor(PhysicsWorld world, float x) {
+        CollisionSensor sensor = world.addCollisionSensor(new Vector3f(x, 0.0F, 0.0F), IDENTITY);
+        sensor.addCollider(new BoxShape(2.0F, 4.0F, 4.0F));
+        return sensor;
     }
 
     private static void assertVector(Vector3f actual, float x, float y, float z) {
@@ -198,5 +241,5 @@ final class KinematicMovementTest {
         assertThat(actual.z).isCloseTo(z, TOLERANCE);
     }
 
-    private record StepScenario(PhysicsWorld world, Collider mover) {}
+    private record StepScenario(PhysicsWorld world, KinematicBody mover) {}
 }

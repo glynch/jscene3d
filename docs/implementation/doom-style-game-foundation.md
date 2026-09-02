@@ -66,7 +66,8 @@ yaw and pitch independently of any game.
 The first `jscene3d-physics` slice needs fixed updates, static collision,
 kinematic bodies, box, sphere, and capsule shapes, broad- and narrow-phase
 collision, ray and overlap queries, shape sweeps, gravity, floor detection, wall
-sliding, bounded step traversal, triggers, collision events, and debug lines.
+sliding, bounded step traversal, collision sensors, overlap events, and debug
+lines.
 These are general simulation capabilities; the player controller that combines
 them into a particular movement model belongs in the Game Application or in a
 general Game Engine controller only after its contract is proven reusable.
@@ -97,7 +98,7 @@ The first playable milestone will contain:
 - One billboard enemy with a small state machine
 - One hitscan weapon
 - Health and ammunition pickups
-- One operable door and one exit trigger
+- One operable door and one exit sensor
 - Damage, death, restart, and level completion
 - A minimal health, ammunition, and weapon HUD
 
@@ -111,9 +112,9 @@ The first three reusable foundation slices are complete:
 
 1. Cursor capture, raw mouse support, focus state, and pointer-lock controls.
 2. The collision-query foundation in `jscene3d-physics`.
-3. Explicit kinematic movement, trigger transitions, and renderer-independent
-   physics debug snapshots, proven by an interactive obstacle-course example
-   in the separate `jscene3d-physics-examples` suite.
+3. Explicit kinematic movement, collision-sensor overlap transitions, and
+   renderer-independent physics debug snapshots, proven by an interactive
+   obstacle-course example in the separate `jscene3d-physics-examples` suite.
 
 The remaining sequence is:
 

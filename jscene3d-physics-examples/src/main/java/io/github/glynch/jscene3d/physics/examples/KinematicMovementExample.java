@@ -27,13 +27,14 @@ import io.github.glynch.jscene3d.materials.LineBasicMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.physics.Collider;
+import io.github.glynch.jscene3d.physics.CollisionSensor;
+import io.github.glynch.jscene3d.physics.KinematicBody;
 import io.github.glynch.jscene3d.physics.PhysicsWorld;
 import io.github.glynch.jscene3d.physics.debug.PhysicsDebugLine;
 import io.github.glynch.jscene3d.physics.debug.PhysicsDebugSnapshot;
 import io.github.glynch.jscene3d.physics.examples.MovementDiagnostics.MovementKeys;
 import io.github.glynch.jscene3d.physics.movement.KinematicMoveResult;
-import io.github.glynch.jscene3d.physics.movement.TriggerEventType;
+import io.github.glynch.jscene3d.physics.movement.OverlapPhase;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.platform.InputState;
@@ -111,7 +112,7 @@ public final class KinematicMovementExample {
         instructions.addButton("reset player", state::reset);
         ControlPanel.Section progress = panel.addSection("Progress");
         progress.addText("yellow step crossed", state::stepProgressStatus);
-        progress.addText("trigger reached", state::triggerProgressStatus);
+        progress.addText("sensor reached", state::sensorProgressStatus);
         progress.addText("goal", state::goalProgressStatus);
         ControlPanel.Section diagnosticSection = panel.addSection("Diagnostics");
         diagnosticSection.addBoolean("enabled", diagnostics::isEnabled, diagnostics::setEnabled);
@@ -129,7 +130,7 @@ public final class KinematicMovementExample {
         status.addText("grounded", () -> Boolean.toString(state.grounded()));
         status.addText("stepped this move", () -> Boolean.toString(state.stepped()));
         status.addText("contacts", () -> Integer.toString(state.contactCount()));
-        status.addText("trigger", state::triggerStatus);
+        status.addText("sensor", state::sensorStatus);
         status.setExpanded(false);
         ControlPanel.Section visualization = panel.addSection("Visualization");
         visualization.addBoolean("physics debug lines", debugLines::isVisible, debugLines::setVisible);
@@ -149,11 +150,11 @@ public final class KinematicMovementExample {
         private final LambertMaterial obstacleMaterial = new LambertMaterial(Color.srgb(0x2A9D8F));
         private final LambertMaterial stepMaterial = new LambertMaterial(Color.srgb(0xE9C46A));
         private final LambertMaterial playerMaterial = new LambertMaterial(Color.CYAN);
-        private final LambertMaterial triggerMaterial = triggerMaterial();
+        private final LambertMaterial sensorMaterial = sensorMaterial();
 
         @Override
         public void close() {
-            triggerMaterial.close();
+            sensorMaterial.close();
             playerMaterial.close();
             stepMaterial.close();
             obstacleMaterial.close();
@@ -162,7 +163,7 @@ public final class KinematicMovementExample {
             unitBox.close();
         }
 
-        private static LambertMaterial triggerMaterial() {
+        private static LambertMaterial sensorMaterial() {
             LambertMaterial material = new LambertMaterial(Color.MAGENTA);
             material.setTransparent(true);
             material.setOpacity(0.28F);
@@ -174,26 +175,27 @@ public final class KinematicMovementExample {
     /** Builds matching rendered and collision representations of the course. */
     private static final class Course {
         private final PhysicsWorld world = new PhysicsWorld();
-        private final Collider player;
+        private final KinematicBody player;
         private final Mesh playerMesh;
-        private final LambertMaterial triggerMaterial;
+        private final LambertMaterial sensorMaterial;
 
         private Course(Scene scene, Resources resources) {
-            triggerMaterial = resources.triggerMaterial;
+            sensorMaterial = resources.sensorMaterial;
             addBox(scene, resources, new Vector3f(2.0F, -0.5F, 0.0F), new Vector3f(16.0F, 1.0F, 12.0F), false);
             addBox(scene, resources, new Vector3f(0.5F, 0.2F, 0.0F), new Vector3f(2.0F, 0.4F, 3.0F), true);
             addBox(scene, resources, new Vector3f(4.0F, 0.65F, -2.5F), new Vector3f(1.0F, 1.3F, 5.0F), false);
             addBox(scene, resources, new Vector3f(5.5F, 1.0F, 2.0F), new Vector3f(4.0F, 2.0F, 1.0F), false);
-            addTrigger(scene, resources, new Vector3f(7.0F, 1.0F, -2.0F), new Vector3f(2.0F, 2.0F, 2.0F));
-            player = world.addCollider(
-                    new CapsuleShape(0.45F, 1.0F), new Vector3f(-4.0F, 0.951F, 0.0F), new Quaternionf());
+            addSensor(scene, resources, new Vector3f(7.0F, 1.0F, -2.0F), new Vector3f(2.0F, 2.0F, 2.0F));
+            player = world.addKinematicBody(new Vector3f(-4.0F, 0.951F, 0.0F), new Quaternionf());
+            player.addCollider(new CapsuleShape(0.45F, 1.0F));
             playerMesh = new Mesh(resources.playerGeometry, resources.playerMaterial);
             syncPlayerMesh();
             scene.add(playerMesh);
         }
 
         private void addBox(Scene scene, Resources resources, Vector3f position, Vector3f dimensions, boolean step) {
-            world.addCollider(new BoxShape(dimensions.x, dimensions.y, dimensions.z), position, new Quaternionf());
+            world.addStaticBody(position, new Quaternionf())
+                    .addCollider(new BoxShape(dimensions.x, dimensions.y, dimensions.z));
             Mesh mesh = new Mesh(resources.unitBox, step ? resources.stepMaterial : resources.obstacleMaterial);
             if (position.y < 0.0F) {
                 mesh.setMaterial(resources.floorMaterial);
@@ -203,11 +205,10 @@ public final class KinematicMovementExample {
             scene.add(mesh);
         }
 
-        private void addTrigger(Scene scene, Resources resources, Vector3f position, Vector3f dimensions) {
-            Collider trigger = world.addCollider(
-                    new BoxShape(dimensions.x, dimensions.y, dimensions.z), position, new Quaternionf());
-            trigger.setTrigger(true);
-            Mesh mesh = new Mesh(resources.unitBox, resources.triggerMaterial);
+        private void addSensor(Scene scene, Resources resources, Vector3f position, Vector3f dimensions) {
+            CollisionSensor sensor = world.addCollisionSensor(position, new Quaternionf());
+            sensor.addCollider(new BoxShape(dimensions.x, dimensions.y, dimensions.z));
+            Mesh mesh = new Mesh(resources.unitBox, resources.sensorMaterial);
             mesh.setPosition(position);
             mesh.setScale(dimensions);
             scene.add(mesh);
@@ -222,7 +223,7 @@ public final class KinematicMovementExample {
         }
 
         private void setGoalReached(boolean reached) {
-            triggerMaterial.setColor(reached ? Color.GREEN : Color.MAGENTA);
+            sensorMaterial.setColor(reached ? Color.GREEN : Color.MAGENTA);
         }
     }
 
@@ -239,8 +240,8 @@ public final class KinematicMovementExample {
         private float verticalVelocity;
         private KinematicMoveResult result;
         private boolean stepCrossed;
-        private boolean triggerReached;
-        private String triggerStatus = "outside";
+        private boolean sensorReached;
+        private String sensorStatus = "outside";
 
         private MovementState(
                 ExampleContext context, Course course, PhysicsDebugLines debugLines, MovementDiagnostics diagnostics) {
@@ -283,21 +284,21 @@ public final class KinematicMovementExample {
             if (result.isGrounded() && verticalVelocity < 0.0F) {
                 verticalVelocity = 0.0F;
             }
-            updateTriggerStatus(result);
+            updateSensorStatus(result);
             course.setGoalReached(goalReached());
             course.syncPlayerMesh();
             debugLines.update();
         }
 
-        private void updateTriggerStatus(KinematicMoveResult movementResult) {
-            movementResult.triggerEvents().stream().findFirst().ifPresent(event -> {
-                triggerStatus = switch (event.type()) {
-                    case ENTER -> "entered trigger";
-                    case STAY -> "inside trigger";
-                    case EXIT -> "exited trigger";
+        private void updateSensorStatus(KinematicMoveResult movementResult) {
+            movementResult.overlapEvents().stream().findFirst().ifPresent(event -> {
+                sensorStatus = switch (event.phase()) {
+                    case ENTER -> "entered sensor";
+                    case STAY -> "inside sensor";
+                    case EXIT -> "exited sensor";
                 };
-                if (event.type() != TriggerEventType.EXIT) {
-                    triggerReached = true;
+                if (event.phase() != OverlapPhase.EXIT) {
+                    sensorReached = true;
                 }
             });
         }
@@ -306,8 +307,8 @@ public final class KinematicMovementExample {
             course.player.setTransform(new Vector3f(-4.0F, 0.951F, 0.0F), new Quaternionf());
             verticalVelocity = 0.0F;
             stepCrossed = false;
-            triggerReached = false;
-            triggerStatus = "outside";
+            sensorReached = false;
+            sensorStatus = "outside";
             result = course.world().move(course.player, new Vector3f());
             course.setGoalReached(false);
             course.syncPlayerMesh();
@@ -326,24 +327,24 @@ public final class KinematicMovementExample {
             return result.contacts().size();
         }
 
-        private String triggerStatus() {
-            return triggerStatus;
+        private String sensorStatus() {
+            return sensorStatus;
         }
 
         private String stepProgressStatus() {
             return completionStatus(stepCrossed);
         }
 
-        private String triggerProgressStatus() {
-            return completionStatus(triggerReached);
+        private String sensorProgressStatus() {
+            return completionStatus(sensorReached);
         }
 
         private String goalProgressStatus() {
-            return goalReached() ? "reached - trigger is green" : "cross step and enter trigger";
+            return goalReached() ? "reached - sensor is green" : "cross step and enter sensor";
         }
 
         private boolean goalReached() {
-            return stepCrossed && triggerReached;
+            return stepCrossed && sensorReached;
         }
 
         private String positionStatus() {

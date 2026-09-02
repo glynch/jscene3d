@@ -35,8 +35,8 @@ public final class ExampleCatalog {
                 "kinematic-movement",
                 "Kinematic movement",
                 "Movement",
-                "Explicit fixed-step movement with gravity, wall sliding, steps, triggers, and debug lines.",
-                List.of("physics", "kinematic", "collision", "slide", "step", "trigger", "debug"),
+                "Explicit fixed-step movement with gravity, wall sliding, steps, sensors, and debug lines.",
+                List.of("physics", "kinematic", "collision", "slide", "step", "sensor", "debug"),
                 List.of(),
                 KinematicMovementExample::create));
     }

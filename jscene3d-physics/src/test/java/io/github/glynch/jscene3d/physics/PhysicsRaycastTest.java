@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.physics;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
-import io.github.glynch.jscene3d.physics.queries.TriggerMode;
+import io.github.glynch.jscene3d.physics.queries.SensorMode;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
@@ -22,8 +22,8 @@ final class PhysicsRaycastTest {
     @Test
     void returnsNearestSphereHitAndNormalizesDirection() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider farther = world.addCollider(new SphereShape(1.0F), new Vector3f(7.0F, 0.0F, 0.0F), new Quaternionf());
-        Collider nearer = world.addCollider(new SphereShape(1.0F), new Vector3f(4.0F, 0.0F, 0.0F), new Quaternionf());
+        Collider farther = addSphere(world, 7.0F, 1.0F);
+        Collider nearer = addSphere(world, 4.0F, 1.0F);
 
         assertThat(world.raycast(new Vector3f(), new Vector3f(2.0F, 0.0F, 0.0F), 10.0F))
                 .hasValueSatisfying(hit -> {
@@ -39,7 +39,7 @@ final class PhysicsRaycastTest {
     void intersectsRotatedBox() {
         PhysicsWorld world = new PhysicsWorld();
         Quaternionf orientation = new Quaternionf().rotateZ((float) (Math.PI * 0.25));
-        world.addCollider(new BoxShape(2.0F, 2.0F, 2.0F), new Vector3f(5.0F, 0.0F, 0.0F), orientation);
+        world.addStaticBody(new Vector3f(5.0F, 0.0F, 0.0F), orientation).addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
 
         assertThat(world.raycast(new Vector3f(), new Vector3f(1.0F, 0.0F, 0.0F), 10.0F))
                 .hasValueSatisfying(hit ->
@@ -49,7 +49,7 @@ final class PhysicsRaycastTest {
     @Test
     void intersectsCapsuleCylinderAndCap() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider capsule = world.addCollider(new CapsuleShape(1.0F, 4.0F));
+        Collider capsule = world.addStaticBody().addCollider(new CapsuleShape(1.0F, 4.0F));
 
         assertThat(world.raycast(new Vector3f(-3.0F, 0.0F, 0.0F), new Vector3f(1.0F, 0.0F, 0.0F), 10.0F))
                 .hasValueSatisfying(hit -> {
@@ -63,7 +63,7 @@ final class PhysicsRaycastTest {
     @Test
     void returnsImmediateHitWhenRayStartsInside() {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
+        world.addStaticBody().addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
 
         assertThat(world.raycast(new Vector3f(), new Vector3f(1.0F, 0.0F, 0.0F), 10.0F))
                 .hasValueSatisfying(hit -> {
@@ -73,12 +73,12 @@ final class PhysicsRaycastTest {
     }
 
     @Test
-    void appliesEnabledLayerTriggerAndExclusionFilters() {
+    void appliesEnabledLayerSensorAndExclusionFilters() {
         PhysicsWorld world = new PhysicsWorld();
         Collider disabled = addSphere(world, 2.0F);
         disabled.setEnabled(false);
-        Collider trigger = addSphere(world, 4.0F);
-        trigger.setTrigger(true);
+        CollisionSensor sensor = world.addCollisionSensor(new Vector3f(4.0F, 0.0F, 0.0F), new Quaternionf());
+        Collider sensorCollider = sensor.addCollider(new SphereShape(0.5F));
         Collider layerTwo = addSphere(world, 6.0F);
         layerTwo.setCollisionFilter(new CollisionFilter(0b0010, -1));
         Collider layerOne = addSphere(world, 8.0F);
@@ -89,10 +89,13 @@ final class PhysicsRaycastTest {
                 .hasValueSatisfying(hit -> assertThat(hit.collider()).isSameAs(layerTwo));
         assertThat(world.raycast(origin, direction, 20.0F, QueryFilter.layers(1)))
                 .hasValueSatisfying(hit -> assertThat(hit.collider()).isSameAs(layerOne));
-        assertThat(world.raycast(origin, direction, 20.0F, QueryFilter.DEFAULT.withTriggerMode(TriggerMode.ONLY)))
-                .hasValueSatisfying(hit -> assertThat(hit.collider()).isSameAs(trigger));
+        assertThat(world.raycast(origin, direction, 20.0F, QueryFilter.DEFAULT.withSensorMode(SensorMode.ONLY)))
+                .hasValueSatisfying(hit -> {
+                    assertThat(hit.collider()).isSameAs(sensorCollider);
+                    assertThat(hit.collisionObject()).isSameAs(sensor);
+                });
         assertThat(world.raycast(
-                        origin, direction, 20.0F, QueryFilter.layers(0b0010).excluding(layerTwo)))
+                        origin, direction, 20.0F, QueryFilter.layers(0b0010).excluding(layerTwo.collisionObject())))
                 .isEmpty();
     }
 
@@ -110,7 +113,7 @@ final class PhysicsRaycastTest {
     @Test
     void rejectsRayParallelToAndOutsideABoxSlab() {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
+        world.addStaticBody().addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
 
         assertThat(world.raycast(new Vector3f(2.0F, -3.0F, 0.0F), new Vector3f(0.0F, 1.0F, 0.0F), 10.0F))
                 .isEmpty();
@@ -119,14 +122,19 @@ final class PhysicsRaycastTest {
     @Test
     void treatsZeroLengthCapsuleAsSphereForRaycasts() {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(new CapsuleShape(1.0F, 0.0F));
+        world.addStaticBody().addCollider(new CapsuleShape(1.0F, 0.0F));
 
         assertThat(world.raycast(new Vector3f(-3.0F, 0.0F, 0.0F), new Vector3f(1.0F, 0.0F, 0.0F), 10.0F))
                 .hasValueSatisfying(hit -> assertThat(hit.distance()).isCloseTo(2.0F, TOLERANCE));
     }
 
     private static Collider addSphere(PhysicsWorld world, float x) {
-        return world.addCollider(new SphereShape(0.5F), new Vector3f(x, 0.0F, 0.0F), new Quaternionf());
+        return addSphere(world, x, 0.5F);
+    }
+
+    private static Collider addSphere(PhysicsWorld world, float x, float radius) {
+        return world.addStaticBody(new Vector3f(x, 0.0F, 0.0F), new Quaternionf())
+                .addCollider(new SphereShape(radius));
     }
 
     private static void assertVector(Vector3f value, float x, float y, float z) {

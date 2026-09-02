@@ -11,22 +11,32 @@ import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-/** A world-owned collision object and its transform and filtering state. */
+/** A collision shape attached to a world-owned body or sensor. */
 public final class Collider {
-    private final PhysicsWorld world;
+    private final CollisionObject collisionObject;
     private final long id;
     private final CollisionShape shape;
+    private final Vector3f localPosition;
+    private final Quaternionf localOrientation;
     private final Vector3f position;
     private final Quaternionf orientation;
     private CollisionFilter collisionFilter = CollisionFilter.DEFAULT;
-    private boolean trigger;
     private boolean enabled = true;
     private boolean registered = true;
 
-    Collider(PhysicsWorld world, long id, CollisionShape shape, Vector3fc position, Quaternionfc orientation) {
-        this.world = world;
+    Collider(
+            CollisionObject collisionObject,
+            long id,
+            CollisionShape shape,
+            Vector3fc localPosition,
+            Quaternionfc localOrientation,
+            Vector3fc position,
+            Quaternionfc orientation) {
+        this.collisionObject = Objects.requireNonNull(collisionObject, "collisionObject");
         this.id = id;
         this.shape = Objects.requireNonNull(shape, "shape");
+        this.localPosition = new Vector3f(localPosition);
+        this.localOrientation = new Quaternionf(localOrientation);
         this.position = new Vector3f(position);
         this.orientation = new Quaternionf(orientation);
     }
@@ -50,6 +60,35 @@ public final class Collider {
     }
 
     /**
+     * Returns the body or sensor that owns this collider.
+     *
+     * @return owning collision object
+     */
+    public CollisionObject collisionObject() {
+        return collisionObject;
+    }
+
+    /**
+     * Copies the position relative to the owning object into the destination.
+     *
+     * @param destination vector to receive the local position
+     * @return the supplied destination
+     */
+    public Vector3f localPosition(Vector3f destination) {
+        return destination.set(localPosition);
+    }
+
+    /**
+     * Copies the orientation relative to the owning object into the destination.
+     *
+     * @param destination quaternion to receive the local orientation
+     * @return the supplied destination
+     */
+    public Quaternionf localOrientation(Quaternionf destination) {
+        return destination.set(localOrientation);
+    }
+
+    /**
      * Copies the world-space position into the destination.
      *
      * @param destination vector to receive the position
@@ -70,17 +109,6 @@ public final class Collider {
     }
 
     /**
-     * Replaces the world-space transform and updates the spatial index.
-     *
-     * @param newPosition new world-space position
-     * @param newOrientation new world-space orientation; normalized internally
-     */
-    public void setTransform(Vector3fc newPosition, Quaternionfc newOrientation) {
-        requireRegistered();
-        world.updateTransform(this, newPosition, newOrientation);
-    }
-
-    /**
      * Returns the collision category and mask.
      *
      * @return collision filter
@@ -97,25 +125,6 @@ public final class Collider {
     public void setCollisionFilter(CollisionFilter newCollisionFilter) {
         requireRegistered();
         collisionFilter = Objects.requireNonNull(newCollisionFilter, "collisionFilter");
-    }
-
-    /**
-     * Returns whether this collider is a non-solid trigger.
-     *
-     * @return {@code true} for a trigger collider
-     */
-    public boolean isTrigger() {
-        return trigger;
-    }
-
-    /**
-     * Sets whether this collider is a non-solid trigger.
-     *
-     * @param newTrigger whether the collider is a trigger
-     */
-    public void setTrigger(boolean newTrigger) {
-        requireRegistered();
-        trigger = newTrigger;
     }
 
     /**
@@ -153,10 +162,6 @@ public final class Collider {
 
     void markRemoved() {
         registered = false;
-    }
-
-    PhysicsWorld world() {
-        return world;
     }
 
     private void requireRegistered() {

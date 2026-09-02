@@ -5,11 +5,12 @@
 package io.github.glynch.jscene3d.physics.internal;
 
 import io.github.glynch.jscene3d.physics.Collider;
+import io.github.glynch.jscene3d.physics.CollisionSensor;
 import io.github.glynch.jscene3d.physics.queries.OverlapHit;
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
 import io.github.glynch.jscene3d.physics.queries.RaycastHit;
+import io.github.glynch.jscene3d.physics.queries.SensorMode;
 import io.github.glynch.jscene3d.physics.queries.SweepHit;
-import io.github.glynch.jscene3d.physics.queries.TriggerMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -138,23 +139,28 @@ public final class CollisionQueries {
     }
 
     private static boolean accepts(Collider collider, QueryFilter filter) {
-        if (!collider.isRegistered() || !collider.isEnabled()) {
+        if (!collider.isRegistered()
+                || !collider.isEnabled()
+                || !collider.collisionObject().isEnabled()) {
             return false;
         }
         if ((filter.layerMask() & collider.collisionFilter().categoryBits()) == 0) {
             return false;
         }
-        if (filter.excludedCollider().filter(excluded -> excluded == collider).isPresent()) {
+        if (filter.excludedObject()
+                .filter(excluded -> excluded == collider.collisionObject())
+                .isPresent()) {
             return false;
         }
-        return acceptsTrigger(collider, filter.triggerMode());
+        return acceptsSensor(collider, filter.sensorMode());
     }
 
-    private static boolean acceptsTrigger(Collider collider, TriggerMode triggerMode) {
-        return switch (triggerMode) {
-            case EXCLUDE -> !collider.isTrigger();
+    private static boolean acceptsSensor(Collider collider, SensorMode sensorMode) {
+        boolean sensor = collider.collisionObject() instanceof CollisionSensor;
+        return switch (sensorMode) {
+            case EXCLUDE -> !sensor;
             case INCLUDE -> true;
-            case ONLY -> collider.isTrigger();
+            case ONLY -> sensor;
         };
     }
 

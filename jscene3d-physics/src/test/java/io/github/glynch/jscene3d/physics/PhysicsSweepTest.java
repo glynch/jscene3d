@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.physics;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
-import io.github.glynch.jscene3d.physics.queries.TriggerMode;
+import io.github.glynch.jscene3d.physics.queries.SensorMode;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
@@ -24,7 +24,8 @@ final class PhysicsSweepTest {
     @Test
     void sweepsSphereToSphereAndReturnsTravelFraction() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider target = world.addCollider(new SphereShape(1.0F), new Vector3f(5.0F, 0.0F, 0.0F), IDENTITY);
+        Collider target =
+                world.addStaticBody(new Vector3f(5.0F, 0.0F, 0.0F), IDENTITY).addCollider(new SphereShape(1.0F));
 
         assertThat(world.sweep(new SphereShape(1.0F), new Vector3f(), IDENTITY, new Vector3f(10.0F, 0.0F, 0.0F)))
                 .hasValueSatisfying(hit -> {
@@ -46,7 +47,7 @@ final class PhysicsSweepTest {
     @Test
     void startingOverlapReturnsZeroFractionEvenWithoutTranslation() {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(new SphereShape(2.0F));
+        world.addStaticBody().addCollider(new SphereShape(2.0F));
 
         assertThat(world.sweep(new SphereShape(1.0F), new Vector3f(), IDENTITY, new Vector3f()))
                 .hasValueSatisfying(hit -> {
@@ -58,8 +59,8 @@ final class PhysicsSweepTest {
     @Test
     void ignoresObjectsBehindOrBeyondTheTranslation() {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(new SphereShape(1.0F), new Vector3f(-3.0F, 0.0F, 0.0F), IDENTITY);
-        world.addCollider(new SphereShape(1.0F), new Vector3f(20.0F, 0.0F, 0.0F), IDENTITY);
+        world.addStaticBody(new Vector3f(-3.0F, 0.0F, 0.0F), IDENTITY).addCollider(new SphereShape(1.0F));
+        world.addStaticBody(new Vector3f(20.0F, 0.0F, 0.0F), IDENTITY).addCollider(new SphereShape(1.0F));
 
         assertThat(world.sweep(new SphereShape(1.0F), new Vector3f(), IDENTITY, new Vector3f(10.0F, 0.0F, 0.0F)))
                 .isEmpty();
@@ -68,9 +69,10 @@ final class PhysicsSweepTest {
     @Test
     void returnsNearestAcceptedSweepHit() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider trigger = world.addCollider(new SphereShape(1.0F), new Vector3f(3.0F, 0.0F, 0.0F), IDENTITY);
-        trigger.setTrigger(true);
-        Collider solid = world.addCollider(new SphereShape(1.0F), new Vector3f(6.0F, 0.0F, 0.0F), IDENTITY);
+        CollisionSensor sensor = world.addCollisionSensor(new Vector3f(3.0F, 0.0F, 0.0F), IDENTITY);
+        Collider sensorCollider = sensor.addCollider(new SphereShape(1.0F));
+        Collider solid =
+                world.addStaticBody(new Vector3f(6.0F, 0.0F, 0.0F), IDENTITY).addCollider(new SphereShape(1.0F));
 
         Vector3f translation = new Vector3f(10.0F, 0.0F, 0.0F);
         assertThat(world.sweep(new SphereShape(0.5F), new Vector3f(), IDENTITY, translation))
@@ -80,13 +82,16 @@ final class PhysicsSweepTest {
                         new Vector3f(),
                         IDENTITY,
                         translation,
-                        QueryFilter.DEFAULT.withTriggerMode(TriggerMode.INCLUDE)))
-                .hasValueSatisfying(hit -> assertThat(hit.collider()).isSameAs(trigger));
+                        QueryFilter.DEFAULT.withSensorMode(SensorMode.INCLUDE)))
+                .hasValueSatisfying(hit -> {
+                    assertThat(hit.collider()).isSameAs(sensorCollider);
+                    assertThat(hit.collisionObject()).isSameAs(sensor);
+                });
     }
 
     private static void assertSweepHits(CollisionShape query, CollisionShape target) {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(target, new Vector3f(5.0F, 0.0F, 0.0F), IDENTITY);
+        world.addStaticBody(new Vector3f(5.0F, 0.0F, 0.0F), IDENTITY).addCollider(target);
         assertThat(world.sweep(query, new Vector3f(), IDENTITY, new Vector3f(10.0F, 0.0F, 0.0F)))
                 .isPresent();
     }

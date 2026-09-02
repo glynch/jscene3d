@@ -6,9 +6,12 @@ library. It is not a version 0.1 commitment or a fixed release schedule.
 ## Artifact direction
 
 `jscene3d-physics` will provide an original, pure-Java, renderer-independent
-physics engine. Its public model will center on a Physics World, Rigid Bodies,
-Collision Shapes, and explicit Fixed Updates. It will not directly mutate
-`Object3D` or treat rendered geometry as an implicit collision shape.
+physics engine. Its public model begins with `PhysicsWorld`, `StaticBody`,
+`KinematicBody`, `Collider`, `CollisionSensor`, Collision Shapes, and explicit
+Fixed Updates. Dynamic `RigidBody` simulation and a reusable
+`CharacterController` will extend that model in later slices. Physics will not
+directly mutate `Object3D` or treat rendered geometry as an implicit collision
+shape.
 
 `jscene3d-game` will provide the higher-level 3D game runtime. It will coordinate
 application lifecycle, fixed and rendered updates, game states, input mapping,
@@ -35,13 +38,14 @@ capabilities that can support many game genres while enabling the first Game
 Application:
 
 - Caller-driven fixed updates with explicit kinematic moves
-- Static Colliders and Kinematic Bodies
+- Static Bodies and Kinematic Bodies that own one or more Colliders
 - Box, sphere, and capsule Collision Shapes
 - Broad-phase spatial queries and narrow-phase collision detection
 - Ray, overlap, and shape-sweep queries
 - Gravity, floor detection, wall sliding, and bounded step traversal
-- Trigger volumes
-- Collision events
+- Non-blocking Collision Sensors with deterministic overlap events
+- Collision contacts and overlap events that identify the Collider and its
+  owning collision object
 - Debug visualization through JScene3D line rendering
 
 Visual physics examples live in the unpublished `jscene3d-physics-examples`

@@ -19,9 +19,10 @@ final class PhysicsDebugSnapshotTest {
     @Test
     void snapshotsEveryShapeInColliderOrder() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider box = world.addCollider(new BoxShape(2.0F, 4.0F, 6.0F));
-        Collider sphere = world.addCollider(new SphereShape(1.0F));
-        Collider capsule = world.addCollider(new CapsuleShape(0.5F, 2.0F));
+        StaticBody body = world.addStaticBody();
+        Collider box = body.addCollider(new BoxShape(2.0F, 4.0F, 6.0F));
+        Collider sphere = body.addCollider(new SphereShape(1.0F));
+        Collider capsule = body.addCollider(new CapsuleShape(0.5F, 2.0F));
 
         PhysicsDebugSnapshot snapshot = world.debugSnapshot();
 
@@ -33,10 +34,9 @@ final class PhysicsDebugSnapshotTest {
     @Test
     void capturesWorldTransformAndDefensivelyCopiesEndpoints() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider box = world.addCollider(
-                new BoxShape(2.0F, 2.0F, 2.0F),
-                new Vector3f(5.0F, 6.0F, 7.0F),
-                new Quaternionf().rotateY((float) Math.PI * 0.5F));
+        Collider box = world.addStaticBody(
+                        new Vector3f(5.0F, 6.0F, 7.0F), new Quaternionf().rotateY((float) Math.PI * 0.5F))
+                .addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
 
         PhysicsDebugLine line = world.debugSnapshot().lines().getFirst();
         Vector3f firstRead = line.start(new Vector3f());

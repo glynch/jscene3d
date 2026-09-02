@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.physics;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
-import io.github.glynch.jscene3d.physics.queries.TriggerMode;
+import io.github.glynch.jscene3d.physics.queries.SensorMode;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
@@ -25,12 +25,14 @@ final class PhysicsOverlapTest {
     @Test
     void reportsSphereSphereContactDepthAndNormal() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider collider = world.addCollider(new SphereShape(1.0F), new Vector3f(1.5F, 0.0F, 0.0F), IDENTITY);
+        StaticBody body = world.addStaticBody(new Vector3f(1.5F, 0.0F, 0.0F), IDENTITY);
+        Collider collider = body.addCollider(new SphereShape(1.0F));
 
         assertThat(world.overlap(new SphereShape(1.0F), new Vector3f(), IDENTITY))
                 .singleElement()
                 .satisfies(hit -> {
                     assertThat(hit.collider()).isSameAs(collider);
+                    assertThat(hit.collisionObject()).isSameAs(body);
                     assertThat(hit.penetrationDepth()).isCloseTo(0.5F, TOLERANCE);
                     assertThat(hit.normal(new Vector3f()).x).isCloseTo(-1.0F, TOLERANCE);
                 });
@@ -39,7 +41,7 @@ final class PhysicsOverlapTest {
     @Test
     void touchingShapesCountAsOverlapping() {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(new BoxShape(2.0F, 2.0F, 2.0F), new Vector3f(2.0F, 0.0F, 0.0F), IDENTITY);
+        world.addStaticBody(new Vector3f(2.0F, 0.0F, 0.0F), IDENTITY).addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
 
         assertThat(world.overlap(new SphereShape(1.0F), new Vector3f(), IDENTITY))
                 .singleElement()
@@ -56,7 +58,7 @@ final class PhysicsOverlapTest {
 
         PhysicsWorld world = new PhysicsWorld();
         Quaternionf rotation = new Quaternionf().rotateY((float) (Math.PI * 0.25));
-        world.addCollider(new BoxShape(2.0F, 2.0F, 2.0F), new Vector3f(1.5F, 0.0F, 0.0F), rotation);
+        world.addStaticBody(new Vector3f(1.5F, 0.0F, 0.0F), rotation).addCollider(new BoxShape(2.0F, 2.0F, 2.0F));
         assertThat(world.overlap(new BoxShape(2.0F, 2.0F, 2.0F), new Vector3f(), IDENTITY))
                 .hasSize(1);
     }
@@ -64,40 +66,40 @@ final class PhysicsOverlapTest {
     @Test
     void doesNotReportSeparatedPairs() {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(new CapsuleShape(0.5F, 2.0F), new Vector3f(10.0F, 0.0F, 0.0F), IDENTITY);
+        world.addStaticBody(new Vector3f(10.0F, 0.0F, 0.0F), IDENTITY).addCollider(new CapsuleShape(0.5F, 2.0F));
 
         assertThat(world.overlap(new BoxShape(1.0F, 1.0F, 1.0F), new Vector3f(), IDENTITY))
                 .isEmpty();
     }
 
     @Test
-    void returnsHitsInStableColliderOrderAndHonorsTriggerPolicy() {
+    void returnsHitsInStableColliderOrderAndHonorsSensorPolicy() {
         PhysicsWorld world = new PhysicsWorld();
-        Collider first = world.addCollider(new SphereShape(2.0F));
-        Collider trigger = world.addCollider(new SphereShape(2.0F));
-        trigger.setTrigger(true);
-        Collider third = world.addCollider(new SphereShape(2.0F));
+        Collider first = world.addStaticBody().addCollider(new SphereShape(2.0F));
+        CollisionSensor sensor = world.addCollisionSensor();
+        Collider sensorCollider = sensor.addCollider(new SphereShape(2.0F));
+        Collider third = world.addStaticBody().addCollider(new SphereShape(2.0F));
 
         List<Collider> defaults = world.overlap(new SphereShape(1.0F), new Vector3f(), IDENTITY).stream()
                 .map(hit -> hit.collider())
                 .toList();
         assertThat(defaults).containsExactly(first, third);
 
-        List<Collider> triggers = world
+        List<Collider> sensors = world
                 .overlap(
                         new SphereShape(1.0F),
                         new Vector3f(),
                         IDENTITY,
-                        QueryFilter.DEFAULT.withTriggerMode(TriggerMode.ONLY))
+                        QueryFilter.DEFAULT.withSensorMode(SensorMode.ONLY))
                 .stream()
                 .map(hit -> hit.collider())
                 .toList();
-        assertThat(triggers).containsExactly(trigger);
+        assertThat(sensors).containsExactly(sensorCollider);
     }
 
     private static void assertOverlap(CollisionShape query, CollisionShape target, Vector3f targetPosition) {
         PhysicsWorld world = new PhysicsWorld();
-        world.addCollider(target, targetPosition, IDENTITY);
+        world.addStaticBody(targetPosition, IDENTITY).addCollider(target);
         assertThat(world.overlap(query, new Vector3f(), IDENTITY)).hasSize(1);
     }
 }

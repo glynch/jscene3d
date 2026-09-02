@@ -399,29 +399,33 @@ intersection behavior.
 
 ## Physics movement
 
-`PhysicsWorld.move(...)` explicitly resolves a registered collider's desired
-translation against solid world geometry. The caller computes fixed-update
-intent, velocity, and gravity; physics applies the resolved transform and
-returns immutable applied and remaining translation, solid contacts, walkable
-ground state, bounded-step state, and deterministic trigger enter, stay, and
-exit events. Collision filtering remains mutual, and trigger volumes never
-block movement.
+`PhysicsWorld` owns collision objects. `StaticBody` represents immovable world
+geometry, `KinematicBody` is moved explicitly by its caller, and
+`CollisionSensor` reports non-blocking overlaps. Each object owns one or more
+`Collider` instances with local transforms, so compound collision shapes move
+as a unit. `PhysicsWorld.move(...)` resolves a registered kinematic body's
+desired translation against solid world geometry. The caller computes
+fixed-update intent, velocity, and gravity; physics applies the resolved
+transform and returns immutable applied and remaining translation, solid
+contacts, walkable ground state, bounded-step state, and deterministic sensor
+enter, stay, and exit events. Collision filtering remains mutual, and collision
+sensors never block movement.
 
 `PhysicsWorld.debugSnapshot()` exposes renderer-independent world-space line
 segments for box, sphere, and capsule colliders. Applications can render that
 snapshot with JScene3D lines without introducing a rendering dependency into
 `jscene3d-physics`. The separately compiled `KinematicMovementExample` in
 `jscene3d-physics-examples` demonstrates the complete seam with a caller-owned
-120 Hz update, WASD movement, gravity, wall sliding, step traversal, a trigger
-volume, and live debug geometry.
+120 Hz update, WASD movement, gravity, wall sliding, step traversal, a collision
+sensor, and live debug geometry.
 
 ## Project structure
 
 - `jscene3d-core`: renderer-independent scene, camera, geometry, material,
   texture, and raycasting APIs.
-- `jscene3d-physics`: renderer-independent three-dimensional colliders,
-  collision filtering, spatial queries, explicit kinematic movement, trigger
-  transitions, and debug snapshots.
+- `jscene3d-physics`: renderer-independent collision objects and colliders,
+  collision filtering, spatial queries, explicit kinematic movement, sensor
+  overlap transitions, and debug snapshots.
 - `jscene3d-lwjgl`: the OpenGL renderer, GLFW platform integration, controls,
   and the renderer-owned safe overlay canvas.
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType

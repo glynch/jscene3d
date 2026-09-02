@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.physics.queries;
 
 import io.github.glynch.jscene3d.physics.Collider;
+import io.github.glynch.jscene3d.physics.CollisionObject;
 import java.util.Objects;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -35,6 +36,15 @@ public final class OverlapHit {
      */
     public Collider collider() {
         return collider;
+    }
+
+    /**
+     * Returns the body or sensor that owns the overlapping collider.
+     *
+     * @return owning collision object
+     */
+    public CollisionObject collisionObject() {
+        return collider.collisionObject();
     }
 
     /**

@@ -4,24 +4,24 @@
  */
 package io.github.glynch.jscene3d.physics.queries;
 
-import io.github.glynch.jscene3d.physics.Collider;
+import io.github.glynch.jscene3d.physics.CollisionObject;
 import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /** Immutable filtering options shared by spatial queries. */
 public final class QueryFilter {
-    /** Default query filter: all layers, excluding triggers. */
-    public static final QueryFilter DEFAULT = new QueryFilter(-1, TriggerMode.EXCLUDE, null);
+    /** Default query filter: all layers, excluding collision sensors. */
+    public static final QueryFilter DEFAULT = new QueryFilter(-1, SensorMode.EXCLUDE, null);
 
     private final int layerMask;
-    private final TriggerMode triggerMode;
-    private final @Nullable Collider excludedCollider;
+    private final SensorMode sensorMode;
+    private final @Nullable CollisionObject excludedObject;
 
-    private QueryFilter(int layerMask, TriggerMode triggerMode, @Nullable Collider excludedCollider) {
+    private QueryFilter(int layerMask, SensorMode sensorMode, @Nullable CollisionObject excludedObject) {
         this.layerMask = layerMask;
-        this.triggerMode = Objects.requireNonNull(triggerMode, "triggerMode");
-        this.excludedCollider = excludedCollider;
+        this.sensorMode = Objects.requireNonNull(sensorMode, "sensorMode");
+        this.excludedObject = excludedObject;
     }
 
     /**
@@ -31,7 +31,7 @@ public final class QueryFilter {
      * @return immutable query filter
      */
     public static QueryFilter layers(int layerMask) {
-        return new QueryFilter(layerMask, TriggerMode.EXCLUDE, null);
+        return new QueryFilter(layerMask, SensorMode.EXCLUDE, null);
     }
 
     /**
@@ -44,21 +44,21 @@ public final class QueryFilter {
     }
 
     /**
-     * Returns how this query treats trigger colliders.
+     * Returns how this query treats collision sensors.
      *
-     * @return trigger policy
+     * @return collision-sensor policy
      */
-    public TriggerMode triggerMode() {
-        return triggerMode;
+    public SensorMode sensorMode() {
+        return sensorMode;
     }
 
     /**
-     * Returns the collider excluded from this query, if any.
+     * Returns the collision object excluded from this query, if any.
      *
-     * @return optional excluded collider
+     * @return optional excluded collision object
      */
-    public Optional<Collider> excludedCollider() {
-        return Optional.ofNullable(excludedCollider);
+    public Optional<CollisionObject> excludedObject() {
+        return Optional.ofNullable(excludedObject);
     }
 
     /**
@@ -68,35 +68,35 @@ public final class QueryFilter {
      * @return updated immutable filter
      */
     public QueryFilter withLayerMask(int newLayerMask) {
-        return new QueryFilter(newLayerMask, triggerMode, excludedCollider);
+        return new QueryFilter(newLayerMask, sensorMode, excludedObject);
     }
 
     /**
-     * Returns a copy using the supplied trigger policy.
+     * Returns a copy using the supplied collision-sensor policy.
      *
-     * @param newTriggerMode replacement trigger policy
+     * @param newSensorMode replacement collision-sensor policy
      * @return updated immutable filter
      */
-    public QueryFilter withTriggerMode(TriggerMode newTriggerMode) {
-        return new QueryFilter(layerMask, newTriggerMode, excludedCollider);
+    public QueryFilter withSensorMode(SensorMode newSensorMode) {
+        return new QueryFilter(layerMask, newSensorMode, excludedObject);
     }
 
     /**
-     * Returns a copy that excludes the supplied collider.
+     * Returns a copy that excludes every collider owned by the supplied object.
      *
-     * @param collider collider to exclude by identity
+     * @param collisionObject collision object to exclude by identity
      * @return updated immutable filter
      */
-    public QueryFilter excluding(Collider collider) {
-        return new QueryFilter(layerMask, triggerMode, Objects.requireNonNull(collider, "collider"));
+    public QueryFilter excluding(CollisionObject collisionObject) {
+        return new QueryFilter(layerMask, sensorMode, Objects.requireNonNull(collisionObject, "collisionObject"));
     }
 
     /**
-     * Returns a copy that does not exclude a particular collider.
+     * Returns a copy that does not exclude a particular collision object.
      *
      * @return filter without a collider exclusion
      */
     public QueryFilter withoutExclusion() {
-        return excludedCollider == null ? this : new QueryFilter(layerMask, triggerMode, null);
+        return excludedObject == null ? this : new QueryFilter(layerMask, sensorMode, null);
     }
 }

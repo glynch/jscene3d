@@ -13,8 +13,8 @@ import io.github.glynch.jscene3d.physics.internal.ShapePose;
 import io.github.glynch.jscene3d.physics.internal.WorldIndex;
 import io.github.glynch.jscene3d.physics.movement.KinematicMoveResult;
 import io.github.glynch.jscene3d.physics.movement.KinematicMoveSettings;
-import io.github.glynch.jscene3d.physics.movement.TriggerEvent;
-import io.github.glynch.jscene3d.physics.movement.TriggerEventType;
+import io.github.glynch.jscene3d.physics.movement.OverlapEvent;
+import io.github.glynch.jscene3d.physics.movement.OverlapPhase;
 import io.github.glynch.jscene3d.physics.queries.OverlapHit;
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
 import io.github.glynch.jscene3d.physics.queries.RaycastHit;
@@ -34,79 +34,132 @@ import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-/** Owns colliders and answers deterministic three-dimensional collision queries. */
+/** Owns collision objects and answers deterministic three-dimensional collision queries. */
 public final class PhysicsWorld {
     private static final Vector3fc ZERO = new Vector3f();
     private static final Quaternionfc IDENTITY = new Quaternionf();
     private static final float MINIMUM_DIRECTION_LENGTH_SQUARED = 1.0E-12F;
+    private static final float MINIMUM_ORIENTATION_LENGTH_SQUARED = 1.0E-12F;
 
-    private final Set<Collider> colliders;
-    private final WorldIndex index;
-    private final CollisionQueries queries;
-    private final KinematicMovement movement;
-    private final Map<Collider, Set<Collider>> activeTriggers = new IdentityHashMap<>();
-    private long nextColliderId = 1L;
+    private final Set<CollisionObject> collisionObjects = new LinkedHashSet<>();
+    private final Set<Collider> colliders = new LinkedHashSet<>();
+    private final WorldIndex index = new WorldIndex();
+    private final CollisionQueries queries = new CollisionQueries(index);
+    private final KinematicMovement movement = new KinematicMovement(queries);
+    private final Map<KinematicBody, Set<CollisionSensor>> activeOverlaps = new IdentityHashMap<>();
+    private long nextObjectId;
+    private long nextColliderId;
 
     /** Creates an empty physics world. */
     public PhysicsWorld() {
-        colliders = new LinkedHashSet<>();
-        index = new WorldIndex();
-        queries = new CollisionQueries(index);
-        movement = new KinematicMovement(queries);
+        nextObjectId = 1L;
+        nextColliderId = 1L;
     }
 
     /**
-     * Adds a collider at the world origin with identity orientation.
+     * Adds a static body at the world origin.
      *
-     * @param shape immutable collision shape
-     * @return world-owned collider handle
+     * @return world-owned static body
      */
-    public Collider addCollider(CollisionShape shape) {
-        return addCollider(shape, ZERO, IDENTITY);
+    public StaticBody addStaticBody() {
+        return addStaticBody(ZERO, IDENTITY);
     }
 
     /**
-     * Adds a collider and copies the supplied world transform.
+     * Adds an immovable body at the supplied world transform.
      *
-     * @param shape immutable collision shape
      * @param position world-space position
      * @param orientation world-space orientation; normalized internally
-     * @return world-owned collider handle
+     * @return world-owned static body
      */
-    public Collider addCollider(CollisionShape shape, Vector3fc position, Quaternionfc orientation) {
-        ShapePose pose = new ShapePose(shape, position, orientation);
-        Collider collider = new Collider(
-                this,
-                nextColliderId++,
-                pose.shape(),
-                pose.position(new Vector3f()),
-                pose.orientation(new Quaternionf()));
-        colliders.add(collider);
-        index.add(collider, pose);
-        return collider;
+    public StaticBody addStaticBody(Vector3fc position, Quaternionfc orientation) {
+        ObjectTransform transform = validatedTransform(position, orientation);
+        StaticBody body = new StaticBody(this, nextObjectId++, transform.position(), transform.orientation());
+        collisionObjects.add(body);
+        return body;
     }
 
     /**
-     * Removes a collider. Its readable state remains available, but it can no longer be mutated.
+     * Adds a kinematic body at the world origin.
      *
-     * @param collider registered collider owned by this world
+     * @return world-owned kinematic body
      */
-    public void remove(Collider collider) {
-        requireOwnedAndRegistered(collider);
-        index.remove(collider);
-        colliders.remove(collider);
-        activeTriggers.remove(collider);
-        collider.markRemoved();
+    public KinematicBody addKinematicBody() {
+        return addKinematicBody(ZERO, IDENTITY);
     }
 
-    /** Removes every collider and invalidates every outstanding handle. */
-    public void clear() {
-        for (Collider collider : colliders) {
-            collider.markRemoved();
+    /**
+     * Adds a caller-moved body at the supplied world transform.
+     *
+     * @param position world-space position
+     * @param orientation world-space orientation; normalized internally
+     * @return world-owned kinematic body
+     */
+    public KinematicBody addKinematicBody(Vector3fc position, Quaternionfc orientation) {
+        ObjectTransform transform = validatedTransform(position, orientation);
+        KinematicBody body = new KinematicBody(this, nextObjectId++, transform.position(), transform.orientation());
+        collisionObjects.add(body);
+        return body;
+    }
+
+    /**
+     * Adds a collision sensor at the world origin.
+     *
+     * @return world-owned collision sensor
+     */
+    public CollisionSensor addCollisionSensor() {
+        return addCollisionSensor(ZERO, IDENTITY);
+    }
+
+    /**
+     * Adds a non-blocking collision sensor at the supplied world transform.
+     *
+     * @param position world-space position
+     * @param orientation world-space orientation; normalized internally
+     * @return world-owned collision sensor
+     */
+    public CollisionSensor addCollisionSensor(Vector3fc position, Quaternionfc orientation) {
+        ObjectTransform transform = validatedTransform(position, orientation);
+        CollisionSensor sensor =
+                new CollisionSensor(this, nextObjectId++, transform.position(), transform.orientation());
+        collisionObjects.add(sensor);
+        return sensor;
+    }
+
+    /**
+     * Removes a collision object and all of its colliders.
+     *
+     * @param collisionObject registered object owned by this world
+     */
+    public void remove(CollisionObject collisionObject) {
+        requireOwnedAndRegistered(collisionObject);
+        List.copyOf(collisionObject.colliders()).forEach(collider -> removeCollider(collisionObject, collider));
+        collisionObjects.remove(collisionObject);
+        if (collisionObject instanceof KinematicBody body) {
+            activeOverlaps.remove(body);
         }
+        if (collisionObject instanceof CollisionSensor sensor) {
+            activeOverlaps.values().forEach(overlaps -> overlaps.remove(sensor));
+        }
+        collisionObject.markRemoved();
+    }
+
+    /** Removes every collision object and invalidates every outstanding handle. */
+    public void clear() {
+        collisionObjects.forEach(CollisionObject::markRemoved);
+        collisionObjects.clear();
         colliders.clear();
         index.clear();
-        activeTriggers.clear();
+        activeOverlaps.clear();
+    }
+
+    /**
+     * Returns the number of registered collision objects.
+     *
+     * @return registered collision-object count
+     */
+    public int collisionObjectCount() {
+        return collisionObjects.size();
     }
 
     /**
@@ -221,87 +274,153 @@ public final class PhysicsWorld {
     }
 
     /**
-     * Moves a registered collider using the default kinematic settings.
+     * Moves a registered kinematic body using the default settings.
      *
-     * <p>The requested translation is caller-owned and normally includes velocity, gravity, and
-     * other game-specific intent accumulated for one fixed update. The world applies the resolved
-     * transform immediately and reports contacts, grounding, step traversal, and trigger changes.
-     *
-     * @param collider registered collider to move
+     * @param body registered kinematic body to move
      * @param translation desired world-space translation
      * @return immutable resolved movement result
      */
-    public KinematicMoveResult move(Collider collider, Vector3fc translation) {
-        return move(collider, translation, KinematicMoveSettings.DEFAULT);
+    public KinematicMoveResult move(KinematicBody body, Vector3fc translation) {
+        return move(body, translation, KinematicMoveSettings.DEFAULT);
     }
 
     /**
-     * Moves a registered collider with explicit collision-resolution settings.
+     * Moves a registered kinematic body with explicit collision-resolution settings.
      *
-     * @param collider registered collider to move
+     * @param body registered kinematic body to move
      * @param translation desired world-space translation
      * @param settings immutable collision-resolution settings
      * @return immutable resolved movement result
      */
-    public KinematicMoveResult move(Collider collider, Vector3fc translation, KinematicMoveSettings settings) {
-        requireOwnedAndRegistered(collider);
+    public KinematicMoveResult move(KinematicBody body, Vector3fc translation, KinematicMoveSettings settings) {
+        requireOwnedAndRegistered(body);
         KinematicMoveResult resolved =
-                movement.resolve(collider, translation, Objects.requireNonNull(settings, "settings"));
-        Vector3f position = collider.position(new Vector3f()).add(resolved.appliedTranslation(new Vector3f()));
-        updateTransform(collider, position, collider.orientation(new Quaternionf()));
-        List<TriggerEvent> triggerEvents = updateTriggers(collider);
-        return resolved.withTriggerEvents(triggerEvents);
+                movement.resolve(body, translation, Objects.requireNonNull(settings, "settings"));
+        Vector3f position = body.position(new Vector3f()).add(resolved.appliedTranslation(new Vector3f()));
+        updateTransform(body, position, body.orientation(new Quaternionf()));
+        return resolved.withOverlapEvents(updateOverlaps(body));
     }
 
-    void updateTransform(Collider collider, Vector3fc position, Quaternionfc orientation) {
-        requireOwnedAndRegistered(collider);
-        ShapePose pose = new ShapePose(collider.shape(), position, orientation);
-        collider.applyTransform(pose.position(new Vector3f()), pose.orientation(new Quaternionf()));
-        index.update(collider, pose);
+    Collider addCollider(
+            CollisionObject collisionObject,
+            CollisionShape shape,
+            Vector3fc localPosition,
+            Quaternionfc localOrientation) {
+        requireOwnedAndRegistered(collisionObject);
+        ShapePose localPose = new ShapePose(shape, localPosition, localOrientation);
+        ShapePose worldPose = worldPose(collisionObject, localPose);
+        Collider collider = new Collider(
+                collisionObject,
+                nextColliderId++,
+                shape,
+                localPose.position(new Vector3f()),
+                localPose.orientation(new Quaternionf()),
+                worldPose.position(new Vector3f()),
+                worldPose.orientation(new Quaternionf()));
+        collisionObject.attach(collider);
+        colliders.add(collider);
+        index.add(collider, worldPose);
+        return collider;
     }
 
-    private void requireOwnedAndRegistered(Collider collider) {
+    void removeCollider(CollisionObject collisionObject, Collider collider) {
+        requireOwnedAndRegistered(collisionObject);
         Objects.requireNonNull(collider, "collider");
-        if (collider.world() != this || !collider.isRegistered()) {
-            throw new IllegalArgumentException("collider is not registered with this world");
+        if (collider.collisionObject() != collisionObject || !collider.isRegistered()) {
+            throw new IllegalArgumentException("collider is not registered with this collision object");
+        }
+        index.remove(collider);
+        colliders.remove(collider);
+        collisionObject.detach(collider);
+        collider.markRemoved();
+    }
+
+    void updateTransform(CollisionObject collisionObject, Vector3fc position, Quaternionfc orientation) {
+        requireOwnedAndRegistered(collisionObject);
+        ObjectTransform transform = validatedTransform(position, orientation);
+        collisionObject.applyTransform(transform.position(), transform.orientation());
+        for (Collider collider : collisionObject.colliders()) {
+            ShapePose pose = worldPose(collisionObject, localPose(collider));
+            collider.applyTransform(pose.position(new Vector3f()), pose.orientation(new Quaternionf()));
+            index.update(collider, pose);
         }
     }
 
-    private List<TriggerEvent> updateTriggers(Collider movingCollider) {
-        ShapePose pose = new ShapePose(
-                movingCollider.shape(),
-                movingCollider.position(new Vector3f()),
-                movingCollider.orientation(new Quaternionf()));
-        Set<Collider> current = new LinkedHashSet<>();
-        queries.overlapAccepted(pose, candidate -> acceptsTrigger(movingCollider, candidate)).stream()
-                .map(OverlapHit::collider)
-                .forEach(current::add);
-        Set<Collider> previous = activeTriggers.getOrDefault(movingCollider, Set.of());
-        List<TriggerEvent> events = new ArrayList<>();
+    private void requireOwnedAndRegistered(CollisionObject collisionObject) {
+        Objects.requireNonNull(collisionObject, "collisionObject");
+        if (collisionObject.world() != this || !collisionObject.isRegistered()) {
+            throw new IllegalArgumentException("collision object is not registered with this world");
+        }
+    }
+
+    private List<OverlapEvent> updateOverlaps(KinematicBody body) {
+        Set<CollisionSensor> current = new LinkedHashSet<>();
+        for (Collider movingCollider : body.colliders()) {
+            if (!movingCollider.isEnabled()) {
+                continue;
+            }
+            queries
+                    .overlapAccepted(worldPose(movingCollider), candidate -> acceptsSensor(movingCollider, candidate))
+                    .stream()
+                    .map(OverlapHit::collisionObject)
+                    .map(CollisionSensor.class::cast)
+                    .forEach(current::add);
+        }
+        Set<CollisionSensor> previous = activeOverlaps.getOrDefault(body, Set.of());
+        List<OverlapEvent> events = new ArrayList<>();
         current.stream()
-                .sorted(Comparator.comparingLong(Collider::id))
-                .map(trigger -> new TriggerEvent(
-                        trigger, previous.contains(trigger) ? TriggerEventType.STAY : TriggerEventType.ENTER))
+                .sorted(Comparator.comparingLong(CollisionObject::id))
+                .map(sensor ->
+                        new OverlapEvent(sensor, previous.contains(sensor) ? OverlapPhase.STAY : OverlapPhase.ENTER))
                 .forEach(events::add);
         previous.stream()
-                .filter(trigger -> !current.contains(trigger))
-                .sorted(Comparator.comparingLong(Collider::id))
-                .map(trigger -> new TriggerEvent(trigger, TriggerEventType.EXIT))
+                .filter(sensor -> !current.contains(sensor))
+                .sorted(Comparator.comparingLong(CollisionObject::id))
+                .map(sensor -> new OverlapEvent(sensor, OverlapPhase.EXIT))
                 .forEach(events::add);
         if (current.isEmpty()) {
-            activeTriggers.remove(movingCollider);
+            activeOverlaps.remove(body);
         } else {
-            activeTriggers.put(movingCollider, current);
+            activeOverlaps.put(body, current);
         }
         return List.copyOf(events);
     }
 
-    private static boolean acceptsTrigger(Collider movingCollider, Collider candidate) {
-        return candidate != movingCollider
+    private static boolean acceptsSensor(Collider movingCollider, Collider candidate) {
+        return candidate.collisionObject() instanceof CollisionSensor
                 && candidate.isRegistered()
                 && candidate.isEnabled()
-                && candidate.isTrigger()
+                && candidate.collisionObject().isEnabled()
                 && movingCollider.collisionFilter().matches(candidate.collisionFilter());
+    }
+
+    private static ShapePose localPose(Collider collider) {
+        return new ShapePose(
+                collider.shape(), collider.localPosition(new Vector3f()), collider.localOrientation(new Quaternionf()));
+    }
+
+    private static ShapePose worldPose(Collider collider) {
+        return new ShapePose(
+                collider.shape(), collider.position(new Vector3f()), collider.orientation(new Quaternionf()));
+    }
+
+    private static ShapePose worldPose(CollisionObject collisionObject, ShapePose localPose) {
+        Quaternionf objectOrientation = collisionObject.orientation(new Quaternionf());
+        Vector3f position = objectOrientation
+                .transform(localPose.position(new Vector3f()))
+                .add(collisionObject.position(new Vector3f()));
+        Quaternionf orientation = objectOrientation.mul(localPose.orientation(new Quaternionf()), new Quaternionf());
+        return new ShapePose(localPose.shape(), position, orientation);
+    }
+
+    private static ObjectTransform validatedTransform(Vector3fc position, Quaternionfc orientation) {
+        Vector3f checkedPosition = requireFinite(position, "position");
+        Objects.requireNonNull(orientation, "orientation");
+        float lengthSquared = orientation.lengthSquared();
+        if (!Float.isFinite(lengthSquared) || lengthSquared < MINIMUM_ORIENTATION_LENGTH_SQUARED) {
+            throw new IllegalArgumentException("orientation must be finite and non-zero");
+        }
+        return new ObjectTransform(checkedPosition, new Quaternionf(orientation).normalize());
     }
 
     private static Vector3f requireDirection(Vector3fc direction) {
@@ -319,4 +438,6 @@ public final class PhysicsWorld {
         }
         return new Vector3f(value);
     }
+
+    private record ObjectTransform(Vector3f position, Quaternionf orientation) {}
 }

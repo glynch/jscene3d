@@ -8,7 +8,7 @@ import java.util.List;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-/** Immutable outcome of one explicit collider move. */
+/** Immutable outcome of one explicit kinematic-body move. */
 public final class KinematicMoveResult {
     private final Vector3f appliedTranslation;
     private final Vector3f remainingTranslation;
@@ -16,18 +16,18 @@ public final class KinematicMoveResult {
     private final boolean grounded;
     private final boolean stepped;
     private final List<KinematicContact> contacts;
-    private final List<TriggerEvent> triggerEvents;
+    private final List<OverlapEvent> overlapEvents;
 
     /**
      * Creates an immutable result and copies its vectors and lists.
      *
-     * @param appliedTranslation translation applied to the moving collider
+     * @param appliedTranslation translation applied to the moving body
      * @param remainingTranslation requested translation left unresolved
      * @param groundNormal final walkable ground normal, or zero
      * @param grounded whether walkable ground was detected
      * @param stepped whether a bounded step was traversed
      * @param contacts solid contacts encountered while resolving movement
-     * @param triggerEvents trigger lifecycle changes at the final pose
+     * @param overlapEvents collision-sensor transitions at the final pose
      */
     public KinematicMoveResult(
             Vector3fc appliedTranslation,
@@ -36,18 +36,18 @@ public final class KinematicMoveResult {
             boolean grounded,
             boolean stepped,
             List<KinematicContact> contacts,
-            List<TriggerEvent> triggerEvents) {
+            List<OverlapEvent> overlapEvents) {
         this.appliedTranslation = new Vector3f(appliedTranslation);
         this.remainingTranslation = new Vector3f(remainingTranslation);
         this.groundNormal = new Vector3f(groundNormal);
         this.grounded = grounded;
         this.stepped = stepped;
         this.contacts = List.copyOf(contacts);
-        this.triggerEvents = List.copyOf(triggerEvents);
+        this.overlapEvents = List.copyOf(overlapEvents);
     }
 
     /**
-     * Copies the translation actually applied to the collider.
+     * Copies the translation actually applied to the body.
      *
      * @param destination vector to receive the translation
      * @return the supplied destination
@@ -69,7 +69,7 @@ public final class KinematicMoveResult {
     /**
      * Returns whether the final pose has walkable ground within snap distance.
      *
-     * @return whether the collider is grounded
+     * @return whether the body is grounded
      */
     public boolean isGrounded() {
         return grounded;
@@ -104,22 +104,22 @@ public final class KinematicMoveResult {
     }
 
     /**
-     * Returns trigger transitions ordered by trigger identifier.
+     * Returns collision-sensor transitions ordered by sensor identifier.
      *
-     * @return immutable trigger event list
+     * @return immutable overlap event list
      */
-    public List<TriggerEvent> triggerEvents() {
-        return triggerEvents;
+    public List<OverlapEvent> overlapEvents() {
+        return overlapEvents;
     }
 
     /**
-     * Returns a copy with replacement trigger transitions.
+     * Returns a copy with replacement collision-sensor transitions.
      *
-     * @param newTriggerEvents replacement trigger events
+     * @param newOverlapEvents replacement overlap events
      * @return updated immutable result
      */
-    public KinematicMoveResult withTriggerEvents(List<TriggerEvent> newTriggerEvents) {
+    public KinematicMoveResult withOverlapEvents(List<OverlapEvent> newOverlapEvents) {
         return new KinematicMoveResult(
-                appliedTranslation, remainingTranslation, groundNormal, grounded, stepped, contacts, newTriggerEvents);
+                appliedTranslation, remainingTranslation, groundNormal, grounded, stepped, contacts, newOverlapEvents);
     }
 }

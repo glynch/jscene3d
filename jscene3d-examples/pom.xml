@@ -79,6 +79,8 @@
         <profile>
             <id>example-distribution-macos-arm64</id>
             <properties>
+                <!-- jpackage requires the first macOS bundle-version component to be positive. -->
+                <jscene3d.examples.bundleVersion>1.0.0</jscene3d.examples.bundleVersion>
                 <jscene3d.examples.natives>natives-macos-arm64</jscene3d.examples.natives>
             </properties>
             <build>
@@ -105,43 +107,27 @@
                         </executions>
                     </plugin>
                     <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
                         <executions>
                             <execution>
-                                <id>create-macos-arm64-runtime</id>
+                                <id>prepare-macos-arm64-jpackage-input</id>
                                 <phase>prepare-package</phase>
                                 <goals>
-                                    <goal>exec</goal>
+                                    <goal>copy-resources</goal>
                                 </goals>
                                 <configuration>
-                                    <executable>${java.home}/bin/jlink</executable>
-                                    <arguments>
-                                        <argument>--add-modules</argument>
-                                        <argument>java.base,java.desktop,java.logging,java.management,java.naming,java.sql,java.xml,jdk.incubator.vector,jdk.unsupported</argument>
-                                        <argument>--compress</argument>
-                                        <argument>zip-6</argument>
-                                        <argument>--no-header-files</argument>
-                                        <argument>--no-man-pages</argument>
-                                        <argument>--strip-debug</argument>
-                                        <argument>--output</argument>
-                                        <argument>${project.build.directory}/runtime-macos-arm64</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>verify-macos-arm64-bundled-resources</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <executable>${project.build.directory}/runtime-macos-arm64/bin/java</executable>
-                                    <arguments>
-                                        <argument>-classpath</argument>
-                                        <argument>${project.build.testOutputDirectory}:${project.build.directory}/${project.build.finalName}-macos-arm64.jar</argument>
-                                        <argument>io.github.glynch.jscene3d.examples.framework.BundledResourcesDistributionProbe</argument>
-                                    </arguments>
+                                    <outputDirectory>${project.build.directory}/jpackage-input-macos-arm64</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${maven.multiModuleProjectDirectory}</directory>
+                                            <filtering>false</filtering>
+                                            <includes>
+                                                <include>LICENSE</include>
+                                                <include>THIRD_PARTY_NOTICES.md</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
                                 </configuration>
                             </execution>
                         </executions>
@@ -158,8 +144,7 @@
                                 </goals>
                                 <configuration>
                                     <createDependencyReducedPom>false</createDependencyReducedPom>
-                                    <shadedArtifactAttached>true</shadedArtifactAttached>
-                                    <shadedClassifierName>macos-arm64</shadedClassifierName>
+                                    <outputFile>${project.build.directory}/jpackage-input-macos-arm64/${project.build.finalName}-macos-arm64.jar</outputFile>
                                     <filters>
                                         <filter>
                                             <artifact>*:*</artifact>
@@ -196,6 +181,107 @@
                                             <mainClass>io.github.glynch.jscene3d.examples.ExampleBrowser</mainClass>
                                         </transformer>
                                     </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>create-macos-arm64-example-browser</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                                <configuration>
+                                    <type>APP_IMAGE</type>
+                                    <name>JScene3D Examples</name>
+                                    <appVersion>${jscene3d.examples.bundleVersion}</appVersion>
+                                    <vendor>JScene3D</vendor>
+                                    <description>Interactive examples for the JScene3D rendering library.</description>
+                                    <copyright>Copyright 2026 Graham Lynch</copyright>
+                                    <input>${project.build.directory}/jpackage-input-macos-arm64</input>
+                                    <mainJar>${project.build.finalName}-macos-arm64.jar</mainJar>
+                                    <mainClass>io.github.glynch.jscene3d.examples.ExampleBrowser</mainClass>
+                                    <destination>${project.build.directory}/jpackage-macos-arm64</destination>
+                                    <removeDestination>true</removeDestination>
+                                    <addModules>
+                                        <module>java.base</module>
+                                        <module>java.desktop</module>
+                                        <module>java.logging</module>
+                                        <module>java.management</module>
+                                        <module>java.naming</module>
+                                        <module>java.sql</module>
+                                        <module>java.xml</module>
+                                        <module>jdk.incubator.vector</module>
+                                        <module>jdk.unsupported</module>
+                                    </addModules>
+                                    <jLink>
+                                        <noHeaderFiles>true</noHeaderFiles>
+                                        <noManPages>true</noManPages>
+                                        <stripDebug>true</stripDebug>
+                                    </jLink>
+                                    <javaOptions>
+                                        <option>-XstartOnFirstThread</option>
+                                    </javaOptions>
+                                    <macAppCategory>developer-tools</macAppCategory>
+                                    <macPackageIdentifier>io.github.glynch.jscene3d.examples</macPackageIdentifier>
+                                    <macPackageName>JScene3D</macPackageName>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>verify-macos-arm64-bundled-resources</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${project.build.directory}/jpackage-macos-arm64/JScene3D Examples.app/Contents/runtime/Contents/Home/bin/java</executable>
+                                    <arguments>
+                                        <argument>-classpath</argument>
+                                        <argument>${project.build.testOutputDirectory}:${project.build.directory}/jpackage-macos-arm64/JScene3D Examples.app/Contents/app/${project.build.finalName}-macos-arm64.jar</argument>
+                                        <argument>io.github.glynch.jscene3d.examples.framework.BundledResourcesDistributionProbe</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>verify-macos-arm64-first-thread-option</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>/usr/bin/grep</executable>
+                                    <arguments>
+                                        <argument>-F</argument>
+                                        <argument>-q</argument>
+                                        <argument>java-options=-XstartOnFirstThread</argument>
+                                        <argument>${project.build.directory}/jpackage-macos-arm64/JScene3D Examples.app/Contents/app/JScene3D Examples.cfg</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>verify-macos-arm64-code-signature</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>/usr/bin/codesign</executable>
+                                    <arguments>
+                                        <argument>--verify</argument>
+                                        <argument>--deep</argument>
+                                        <argument>--strict</argument>
+                                        <argument>${project.build.directory}/jpackage-macos-arm64/JScene3D Examples.app</argument>
+                                    </arguments>
                                 </configuration>
                             </execution>
                         </executions>

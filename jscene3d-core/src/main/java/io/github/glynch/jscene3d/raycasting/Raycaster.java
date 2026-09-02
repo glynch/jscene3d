@@ -31,15 +31,22 @@ import org.joml.Vector4f;
 public final class Raycaster {
     private static final Comparator<RaycastHit> BY_DISTANCE = Comparator.comparingDouble(RaycastHit::distance);
 
-    private final RayState ray = new RayState();
-    private final MeshIntersector meshIntersector = new MeshIntersector();
-    private final ArrayDeque<Object3D> pendingObjects = new ArrayDeque<>();
-    private final ArrayList<RaycastHit> hits = new ArrayList<>();
-    private final Vector4f unprojectedPoint = new Vector4f();
-    private final Vector3f cameraPoint = new Vector3f();
+    private final RayState ray;
+    private final MeshIntersector meshIntersector;
+    private final ArrayDeque<Object3D> pendingObjects;
+    private final ArrayList<RaycastHit> hits;
+    private final Vector4f unprojectedPoint;
+    private final Vector3f cameraPoint;
 
     /** Creates a raycaster at the origin directed along negative Z. */
-    public Raycaster() {}
+    public Raycaster() {
+        ray = new RayState();
+        meshIntersector = new MeshIntersector();
+        pendingObjects = new ArrayDeque<>();
+        hits = new ArrayList<>();
+        unprojectedPoint = new Vector4f();
+        cameraPoint = new Vector3f();
+    }
 
     /**
      * Creates a raycaster from copied origin and direction values.
@@ -50,6 +57,7 @@ public final class Raycaster {
      * @throws IllegalArgumentException if a component is not finite or the direction is zero
      */
     public Raycaster(Vector3fc origin, Vector3fc direction) {
+        this();
         setRay(origin, direction);
     }
 

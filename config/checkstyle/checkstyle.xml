@@ -8,6 +8,10 @@
         <property name="matchAcrossLines" value="true" />
         <property name="message" value="Arrays must not be record components; use an immutable class with deliberate equality semantics." />
     </module>
+    <module name="SuppressionSingleFilter">
+        <property name="files" value="^(?!.*[/\\]physics[/\\]shapes[/\\]).*$" />
+        <property name="id" value="physicsShapeDirectFiniteValidation" />
+    </module>
     <module name="TreeWalker">
         <module name="ArrayTypeStyle" />
         <module name="AvoidStarImport" />
@@ -30,10 +34,28 @@
             <property name="query" value="//DOT[not(parent::DOT) and not(ancestor::IMPORT) and not(ancestor::STATIC_IMPORT) and not(ancestor::MODULE_DEF) and (not(ancestor::PACKAGE_DEF) or ancestor::ANNOTATION) and (descendant::IDENT[@text='java'] or descendant::IDENT[@text='javax'] or descendant::IDENT[@text='org'] or descendant::IDENT[@text='com'] or descendant::IDENT[@text='io'] or descendant::IDENT[@text='de'])]" />
             <message key="matchxpath.match" value="Use an import instead of a fully qualified class name in Java code." />
         </module>
+        <module name="MatchXpath">
+            <property name="query" value="//CTOR_DEF[(./MODIFIERS/LITERAL_PUBLIC or ./MODIFIERS/LITERAL_PROTECTED) and ./SLIST[count(*) = 1]] | //METHOD_DEF[(./MODIFIERS/LITERAL_PUBLIC or ./MODIFIERS/LITERAL_PROTECTED) and ./SLIST[count(*) = 1]]" />
+            <message key="matchxpath.match" value="Public and protected methods and constructors must not have an empty body." />
+        </module>
+        <module name="MatchXpath">
+            <property name="query" value="//METHOD_DEF[./IDENT[@text='requirePositiveFinite' or @text='requireNonNegativeFinite']]" />
+            <message key="matchxpath.match" value="Use the module or package Preconditions class instead of declaring a local finite-number validation helper." />
+        </module>
+        <module name="MatchXpath">
+            <property name="query" value="//METHOD_CALL[./DOT[./IDENT[@text='Math'] and ./IDENT[@text='min']] and ./ELIST/EXPR//METHOD_CALL[./DOT[./IDENT[@text='Math'] and ./IDENT[@text='max']]]] | //METHOD_CALL[./DOT[./IDENT[@text='Math'] and ./IDENT[@text='max']] and ./ELIST/EXPR//METHOD_CALL[./DOT[./IDENT[@text='Math'] and ./IDENT[@text='min']]]]" />
+            <message key="matchxpath.match" value="Use Math.clamp instead of nesting Math.min and Math.max." />
+        </module>
         <module name="MissingOverride" />
         <module name="ModifiedControlVariable" />
         <module name="NoFinalizer" />
         <module name="OneTopLevelClass" />
+        <module name="RegexpSinglelineJava">
+            <property name="id" value="physicsShapeDirectFiniteValidation" />
+            <property name="format" value="\bFloat\.isFinite\s*\(" />
+            <property name="ignoreComments" value="true" />
+            <property name="message" value="Physics shapes must use the shared physics Preconditions validation methods." />
+        </module>
         <module name="SimplifyBooleanExpression" />
         <module name="SimplifyBooleanReturn" />
         <module name="StringLiteralEquality" />

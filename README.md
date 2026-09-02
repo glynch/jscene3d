@@ -146,21 +146,23 @@ Build the standalone macOS ARM64 example-browser distribution with:
 
 The resulting distribution is
 `jscene3d-examples/target/jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64.zip`.
-It contains an uber JAR with the examples, assets, runtime dependencies, macOS
-ARM64 LWJGL native libraries, and a trimmed Java 21 runtime. Extract it and run
-its launcher:
+It contains a native `JScene3D Examples.app` application image with the examples,
+assets, runtime dependencies, macOS ARM64 LWJGL native libraries, and a trimmed
+Java runtime. Extract it and open the application:
 
 ```shell
 unzip jscene3d-examples/target/jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64.zip
-cd jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64
-./run.sh
+open "JScene3D Examples.app"
 ```
 
-The script validates the host architecture, uses the included runtime, and
-supplies `-XstartOnFirstThread`. If the included runtime is unavailable, it can
-fall back to an installed Java 21 or newer runtime with a warning. Future
-platform distributions can provide their own launcher while sharing the same
-uber-JAR packaging configuration.
+The native launcher uses the included runtime and supplies
+`-XstartOnFirstThread` automatically. The platform profile is structured so
+future macOS x64, Windows x64, and Linux x64 distributions can provide their
+own native libraries and launcher settings while sharing the shaded example
+application. The macOS bundle uses a separate positive `1.0.0` launcher build
+version because `jpackage` does not accept the project's pre-1.0 version as a
+macOS application version; the JScene3D artifact version remains
+`0.1.0-SNAPSHOT`.
 
 ## Animation
 
@@ -383,6 +385,8 @@ intersection behavior.
 
 - `jscene3d-core`: renderer-independent scene, camera, geometry, material,
   texture, and raycasting APIs.
+- `jscene3d-physics`: renderer-independent three-dimensional colliders,
+  collision filtering, raycasts, overlap queries, and convex shape sweeps.
 - `jscene3d-lwjgl`: the OpenGL renderer, GLFW platform integration, controls,
   and the renderer-owned safe overlay canvas.
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType

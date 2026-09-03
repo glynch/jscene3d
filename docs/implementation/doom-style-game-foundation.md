@@ -1,8 +1,11 @@
-# Doom-style game foundation
+# Doom-compatible game foundation
 
-This document defines the minimum reusable foundation for JScene3D's first Game
-Application. "Doom-style" describes the intended first-person action and does
-not name the eventual game or imply compatibility with Doom data or behavior.
+This document records the reusable foundation for JScene3D's first Game
+Application. The earlier proposal for a small original Doom-style level without
+WAD compatibility has been superseded by the project and import direction in
+[`game-projects-and-wad-import.md`](game-projects-and-wad-import.md). Doomed
+Corridors now intends to load a pinned Freedoom Phase 2 WAD and progressively
+implement vanilla Doom II data and gameplay semantics.
 
 ## Artifact boundaries
 
@@ -15,6 +18,9 @@ The implementation will be divided by responsibility:
   lifecycle, fixed and rendered updates, input actions, assets, game states,
   physics bindings, animation, audio, and rendering without defining a
   particular game's world or rules.
+- `jscene3d-project` is a headless, genre-independent project definition and
+  loading artifact. It exposes validated metadata and runtime configuration to
+  standalone launchers, tools, and the future editor without executing a game.
 - A separately named Game Application artifact owns the first playable title.
   It contains the level representation, player rules, weapons, enemies,
   pickups, doors, combat, HUD composition, selected third-party content, and
@@ -35,12 +41,13 @@ retain its copyright notice and disclaimer, and show appropriate attribution.
 Assets will be stored or converted into formats consumed directly by JScene3D;
 they will not be downloaded at runtime.
 
-The first game will use an original compact level rather than load Freedoom WAD
-levels. Direct WAD support would additionally require palette and colormap
-decoding, texture patch composition, flats, sprites, map lumps, sectors,
-linedefs, BSP nodes, blockmaps, actions, and compatibility behavior. If pursued
-later, that work belongs in a separate optional WAD artifact or in the Game
-Application, not in the Physics Engine or Game Engine.
+The pinned `freedoom2.wad` will remain the authoritative source for its levels
+and content. A headless reader will validate and expose WAD lumps before later
+import slices convert maps and resources into engine-native runtime
+representations. Doom-specific import and compatibility behavior initially
+belongs in Doomed Corridors, not in the Physics Engine or Game Engine. A WAD
+importer can move to a separate optional artifact once another consumer proves
+that reusable seam.
 
 ## Existing rendering foundation
 
@@ -92,23 +99,21 @@ public interface exposes application audio concepts rather than native handles.
 A multi-backend adapter hierarchy will not be added until a second backend
 creates a real integration seam.
 
-## First Game Application slice
+## First Game Application slices
 
-The first playable milestone will contain:
+The first headless milestone will contain:
 
-- One original room-and-corridor level
-- Selected and attributed Freedoom textures, sprites, sounds, and music
-- Captured first-person camera movement and collision
-- One billboard enemy with a small state machine
-- One hitscan weapon
-- Health and ammunition pickups
-- One operable door and one exit sensor
-- Damage, death, restart, and level completion
-- A minimal health, ammunition, and weapon HUD
+- A versioned JScene3D Project Manifest
+- A validated Doomed Corridors project descriptor
+- A pinned and attributed Freedoom Phase 2 WAD source
+- Headless WAD inspection and map/resource enumeration
 
-It will not initially include WAD compatibility, a BSP or portal renderer,
-multiplayer, save games, scripting, mod support, jumping, crouching, navigation
-meshes, dynamic rigid-body props, multiple weapons, or complex enemy AI.
+The first visual milestone will import and render Freedoom Phase 2 `MAP01`.
+Collision, thing spawning, combat, Doom actor behavior, sector actions, HUD, and
+campaign progression then proceed as independently verifiable vertical slices.
+The initial compatibility target excludes Boom, MBF, Hexen-format, UDMF, and
+GZDoom extensions. Multiplayer, save games, scripting, generalized mod support,
+and exact software-renderer reproduction also remain later work.
 
 ## Delivery sequence
 
@@ -130,8 +135,10 @@ The first six reusable foundation slices are complete:
 
 The remaining sequence is:
 
-1. Define game-state and asset-lifetime requirements from the first playable
-   application rather than introducing speculative abstractions.
-2. Build a one-room combat prototype in the separate Game Application.
-3. Expand the prototype into the first compact level without broadening the
-   reusable artifacts with title-specific concepts.
+1. Establish Project Manifest version 1 and prove it with the separate Game
+   Application.
+2. Read and inspect the pinned Freedoom Phase 2 WAD headlessly.
+3. Import and render `MAP01`, then add collision and thing spawning.
+4. Build one complete combat loop before expanding Doom compatibility.
+5. Progressively support the complete pinned Freedoom campaign without
+   broadening reusable artifacts with title-specific concepts.

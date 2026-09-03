@@ -25,6 +25,7 @@ public final class MorphResources implements AutoCloseable {
     private final Map<Mesh, MorphWeightResource> weights;
     private final Set<BufferGeometry> activeTargets;
     private final Set<Mesh> activeWeights;
+    private final DefaultMorphBuffers defaults;
 
     /** Creates an empty unrealized cache. */
     public MorphResources() {
@@ -32,6 +33,7 @@ public final class MorphResources implements AutoCloseable {
         weights = new IdentityHashMap<>();
         activeTargets = Collections.newSetFromMap(new IdentityHashMap<>());
         activeWeights = Collections.newSetFromMap(new IdentityHashMap<>());
+        defaults = new DefaultMorphBuffers();
     }
 
     /** Starts a frame in which bindings establish the retained active set. */
@@ -48,6 +50,7 @@ public final class MorphResources implements AutoCloseable {
      */
     public Binding bind(Mesh mesh) {
         if (mesh.morphTargetCount() == 0) {
+            defaults.bind();
             return Binding.DISABLED;
         }
         BufferGeometry geometry = mesh.geometry();
@@ -93,6 +96,7 @@ public final class MorphResources implements AutoCloseable {
         weights.clear();
         activeTargets.clear();
         activeWeights.clear();
+        defaults.close();
     }
 
     /** Removes entries whose identity keys are absent from a frame's active set. */

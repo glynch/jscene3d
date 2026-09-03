@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -33,10 +34,10 @@ import org.lwjgl.system.MemoryUtil;
 /**
  * Owns one OpenAL device and context, decoded clips, playback sources, volume groups, and listener.
  *
- * <p>The engine currently buffers complete Ogg Vorbis resources in native memory before uploading
- * them to OpenAL. Streaming is intentionally outside this first interface. Every engine and its
- * child objects are thread-confined: all methods must be called on the thread that called {@link
- * #create()}.
+ * <p>The engine buffers complete clips before uploading them to OpenAL. It can decode Ogg Vorbis
+ * resources or accept immutable signed 16-bit PCM produced by application asset pipelines.
+ * Streaming is intentionally outside this interface. Every engine and its child objects are
+ * thread-confined: all methods must be called on the thread that called {@link #create()}.
  */
 public final class AudioEngine implements AutoCloseable {
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
@@ -122,6 +123,25 @@ public final class AudioEngine implements AutoCloseable {
             }
         } finally {
             MemoryUtil.memFree(encodedAudio);
+        }
+    }
+
+    /**
+     * Uploads complete in-memory signed 16-bit PCM into a reusable OpenAL buffer.
+     *
+     * @param audio immutable mono or stereo PCM
+     * @return engine-owned clip
+     */
+    public AudioClip createClip(PcmAudio audio) {
+        requireUsable();
+        PcmAudio validAudio = Objects.requireNonNull(audio, "audio");
+        short[] samples = validAudio.samples();
+        ShortBuffer nativeSamples = MemoryUtil.memAllocShort(samples.length);
+        try {
+            nativeSamples.put(samples).flip();
+            return uploadClip(nativeSamples, validAudio.channels(), validAudio.sampleRate());
+        } finally {
+            MemoryUtil.memFree(nativeSamples);
         }
     }
 
@@ -331,15 +351,19 @@ public final class AudioEngine implements AutoCloseable {
 
     /** Uploads validated decoded PCM and records its immutable format metadata. */
     private AudioClip uploadClip(DecodedAudio decodedAudio) {
-        long durationNanos =
-                Math.multiplyExact((long) decodedAudio.frameCount(), NANOS_PER_SECOND) / decodedAudio.sampleRate();
+        return uploadClip(decodedAudio.samples(), decodedAudio.channels(), decodedAudio.sampleRate());
+    }
+
+    /** Uploads a native signed 16-bit PCM view and records its immutable format metadata. */
+    private AudioClip uploadClip(ShortBuffer samples, int channels, int sampleRate) {
+        int frameCount = samples.remaining() / channels;
+        long durationNanos = Math.multiplyExact(frameCount, NANOS_PER_SECOND) / sampleRate;
         int bufferId = AL10.alGenBuffers();
-        AudioClip clip = new AudioClip(
-                this, bufferId, decodedAudio.channels(), decodedAudio.sampleRate(), Duration.ofNanos(durationNanos));
+        AudioClip clip = new AudioClip(this, bufferId, channels, sampleRate, Duration.ofNanos(durationNanos));
         try {
             checkOpenAl("create audio clip buffer");
-            int format = decodedAudio.channels() == 1 ? AL10.AL_FORMAT_MONO16 : AL10.AL_FORMAT_STEREO16;
-            AL10.alBufferData(bufferId, format, decodedAudio.samples(), decodedAudio.sampleRate());
+            int format = channels == 1 ? AL10.AL_FORMAT_MONO16 : AL10.AL_FORMAT_STEREO16;
+            AL10.alBufferData(bufferId, format, samples, sampleRate);
             checkOpenAl("upload decoded audio clip");
             clips.add(clip);
             return clip;

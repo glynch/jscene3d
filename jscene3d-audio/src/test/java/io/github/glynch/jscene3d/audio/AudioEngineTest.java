@@ -15,6 +15,21 @@ import org.junit.jupiter.api.Test;
 final class AudioEngineTest {
     private static final String FIXTURE = "/io/github/glynch/jscene3d/audio/confirmation_001.ogg";
 
+    /** Uploads in-memory signed 16-bit PCM without an encoded resource intermediary. */
+    @Test
+    void uploadsInMemoryPcm() {
+        short[] samples = new short[800];
+        try (AudioEngine engine = AudioEngine.create()) {
+            AudioClip clip = engine.createClip(PcmAudio.mono16(8_000, samples));
+
+            assertThat(clip.channels()).isOne();
+            assertThat(clip.sampleRate()).isEqualTo(8_000);
+            assertThat(clip.duration()).isEqualTo(Duration.ofMillis(100));
+
+            clip.close();
+        }
+    }
+
     /** Loads a clip and drives source, category, listener, and cleanup behavior. */
     @Test
     void controlsBufferedPlaybackAndSpatialState() {

@@ -512,8 +512,9 @@ collision, and sliding. Run them in the game example browser or directly with:
 
 ## Audio
 
-The optional `jscene3d-audio` artifact provides buffered Ogg Vorbis clips,
-independent playback sources, three-dimensional distance attenuation,
+The optional `jscene3d-audio` artifact provides buffered clips from Ogg Vorbis
+resources or in-memory signed 16-bit PCM, independent playback sources,
+three-dimensional distance attenuation,
 camera-listener updates, and separate master, music, and effects gains through
 an OpenAL implementation. The public interface remains focused on application
 audio concepts; OpenAL handles and decoder details stay encapsulated.

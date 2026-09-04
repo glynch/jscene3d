@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Exercises strict conversion from portable project values to renderer values. */
-final class ProjectValuesTest {
+final class Scene3dValuesTest {
     /** Converts every supported representation without weakening its source type. */
     @Test
     void convertsSupportedValues(@TempDir Path temporaryDirectory) {
@@ -32,11 +32,11 @@ final class ProjectValuesTest {
                 "vector", vector(number("1"), number("2"), number("3")),
                 "color", new ProjectValue.TextValue("#123abc"));
 
-        assertThat(ProjectValues.number(properties, "number")).isEqualTo(1.25f);
-        assertThat(ProjectValues.bool(properties, "boolean")).isTrue();
-        assertThat(ProjectValues.reference(properties, "reference")).isEqualTo(reference);
-        assertThat(ProjectValues.vector3(properties, "vector")).isEqualTo(new Vector3f(1.0f, 2.0f, 3.0f));
-        assertThat(ProjectValues.color(properties, "color")).isEqualTo(Color.srgb(0x123abc));
+        assertThat(Scene3dValues.number(properties, "number")).isEqualTo(1.25f);
+        assertThat(Scene3dValues.bool(properties, "boolean")).isTrue();
+        assertThat(Scene3dValues.reference(properties, "reference")).isEqualTo(reference);
+        assertThat(Scene3dValues.vector3(properties, "vector")).isEqualTo(new Vector3f(1.0f, 2.0f, 3.0f));
+        assertThat(Scene3dValues.color(properties, "color")).isEqualTo(Color.srgb(0x123abc));
     }
 
     /** Rejects numbers outside the finite single-precision range. */
@@ -44,7 +44,7 @@ final class ProjectValuesTest {
     void rejectsNonFiniteFloat() {
         Map<String, ProjectValue> properties = Map.of("value", number("1e1000"));
 
-        assertThatThrownBy(() -> ProjectValues.number(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.number(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("value must be representable as a finite float");
     }
@@ -54,7 +54,7 @@ final class ProjectValuesTest {
     void rejectsWrongVectorSize() {
         Map<String, ProjectValue> properties = Map.of("value", vector(number("1"), number("2")));
 
-        assertThatThrownBy(() -> ProjectValues.vector3(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.vector3(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("value must contain exactly three numbers");
     }
@@ -65,9 +65,9 @@ final class ProjectValuesTest {
         Map<String, ProjectValue> properties =
                 Map.of("value", vector(number("1"), new ProjectValue.TextValue("two"), number("3")));
 
-        assertThatThrownBy(() -> ProjectValues.vector3(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.vector3(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("value must contain only numbers");
+                .hasMessage("value[1] must be a number");
     }
 
     /** Rejects vector entries outside the finite single-precision range. */
@@ -75,9 +75,9 @@ final class ProjectValuesTest {
     void rejectsNonFiniteVectorEntry() {
         Map<String, ProjectValue> properties = Map.of("value", vector(number("1"), number("1e1000"), number("3")));
 
-        assertThatThrownBy(() -> ProjectValues.vector3(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.vector3(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("value must contain only finite float values");
+                .hasMessage("value[1] must be representable as a finite float");
     }
 
     /** Rejects color text that does not have the required shape. */
@@ -85,7 +85,7 @@ final class ProjectValuesTest {
     void rejectsMalformedColorShape() {
         Map<String, ProjectValue> properties = Map.of("value", new ProjectValue.TextValue("123abc"));
 
-        assertThatThrownBy(() -> ProjectValues.color(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.color(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("value must use #RRGGBB syntax");
     }
@@ -95,7 +95,7 @@ final class ProjectValuesTest {
     void rejectsColorWithoutMarker() {
         Map<String, ProjectValue> properties = Map.of("value", new ProjectValue.TextValue("x123abc"));
 
-        assertThatThrownBy(() -> ProjectValues.color(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.color(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("value must use #RRGGBB syntax");
     }
@@ -105,7 +105,7 @@ final class ProjectValuesTest {
     void rejectsMalformedColorDigits() {
         Map<String, ProjectValue> properties = Map.of("value", new ProjectValue.TextValue("#12zzzz"));
 
-        assertThatThrownBy(() -> ProjectValues.color(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.color(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("value must use #RRGGBB syntax")
                 .hasCauseInstanceOf(NumberFormatException.class);
@@ -116,9 +116,9 @@ final class ProjectValuesTest {
     void rejectsWrongValueKind() {
         Map<String, ProjectValue> properties = Map.of("value", new ProjectValue.TextValue("true"));
 
-        assertThatThrownBy(() -> ProjectValues.bool(properties, "value"))
+        assertThatThrownBy(() -> Scene3dValues.bool(properties, "value"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("value must be a BooleanValue");
+                .hasMessage("value must be boolean");
     }
 
     /** Creates one arbitrary-precision number value. */

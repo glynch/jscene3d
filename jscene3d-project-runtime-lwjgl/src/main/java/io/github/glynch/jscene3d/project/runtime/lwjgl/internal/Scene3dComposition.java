@@ -79,7 +79,7 @@ public final class Scene3dComposition {
                 throw new IllegalStateException("the declarative scene already has a root");
             }
             rootCreated = true;
-            scene.setBackground(ProjectValues.color(properties, "background"));
+            scene.setBackground(Scene3dValues.color(properties, "background"));
             object = scene;
             runtimeObject = new SceneRootRuntimeObject(scene, this);
         } else {
@@ -94,9 +94,9 @@ public final class Scene3dComposition {
     /** Creates a mesh that retains shared geometry and material resources. */
     private ProjectRuntimeObject createMesh(SceneNodeContext context) {
         BufferGeometry geometry = context.resolveResource(
-                ProjectValues.reference(context.properties(), "geometry"), BufferGeometry.class);
+                Scene3dValues.reference(context.properties(), "geometry"), BufferGeometry.class);
         Material material =
-                context.resolveResource(ProjectValues.reference(context.properties(), "material"), Material.class);
+                context.resolveResource(Scene3dValues.reference(context.properties(), "material"), Material.class);
         Mesh mesh = new Mesh(geometry, material);
         configureSpatial(mesh, context.properties(), context.isEnabled());
         attach(context, mesh);
@@ -107,17 +107,17 @@ public final class Scene3dComposition {
     private ProjectRuntimeObject createCamera(SceneNodeContext context) {
         Map<String, ProjectValue> properties = context.properties();
         PerspectiveCamera camera = new PerspectiveCamera(
-                ProjectValues.number(properties, "field-of-view-degrees") * DEGREES_TO_RADIANS,
+                Scene3dValues.number(properties, "field-of-view-degrees") * DEGREES_TO_RADIANS,
                 1.0f,
-                ProjectValues.number(properties, "near"),
-                ProjectValues.number(properties, "far"));
-        camera.setPosition(ProjectValues.vector3(properties, "position"));
-        camera.setScale(ProjectValues.vector3(properties, "scale"));
+                Scene3dValues.number(properties, "near"),
+                Scene3dValues.number(properties, "far"));
+        camera.setPosition(Scene3dValues.vector3(properties, "position"));
+        camera.setScale(Scene3dValues.vector3(properties, "scale"));
         camera.setVisible(context.isEnabled());
-        Vector3f target = ProjectValues.vector3(properties, "target");
+        Vector3f target = Scene3dValues.vector3(properties, "target");
         camera.lookAt(target);
         attach(context, camera);
-        if (ProjectValues.bool(properties, "active")) {
+        if (Scene3dValues.bool(properties, "active")) {
             selectCamera(camera);
         }
         return new SpatialRuntimeObject(camera);
@@ -127,7 +127,7 @@ public final class Scene3dComposition {
     private ProjectRuntimeObject createAmbientLight(SceneNodeContext context) {
         Map<String, ProjectValue> properties = context.properties();
         AmbientLight light = new AmbientLight(
-                ProjectValues.color(properties, "color"), ProjectValues.number(properties, "intensity"));
+                Scene3dValues.color(properties, "color"), Scene3dValues.number(properties, "intensity"));
         light.setVisible(context.isEnabled());
         attach(context, light);
         return new SpatialRuntimeObject(light);
@@ -137,21 +137,21 @@ public final class Scene3dComposition {
     private Object createBoxGeometry(ResourceFactoryContext context) {
         Map<String, ProjectValue> properties = context.properties();
         return BoxGeometry.create(
-                ProjectValues.number(properties, "width"),
-                ProjectValues.number(properties, "height"),
-                ProjectValues.number(properties, "depth"));
+                Scene3dValues.number(properties, "width"),
+                Scene3dValues.number(properties, "height"),
+                Scene3dValues.number(properties, "depth"));
     }
 
     /** Creates one runtime-owned diffuse material. */
     private Object createLambertMaterial(ResourceFactoryContext context) {
-        return new LambertMaterial(ProjectValues.color(context.properties(), "color"));
+        return new LambertMaterial(Scene3dValues.color(context.properties(), "color"));
     }
 
     /** Applies the common authored transform and effective visibility. */
     private static void configureSpatial(Object3D object, Map<String, ProjectValue> properties, boolean visible) {
-        Vector3f position = ProjectValues.vector3(properties, "position");
-        Vector3f rotation = ProjectValues.vector3(properties, "rotation-degrees");
-        Vector3f scale = ProjectValues.vector3(properties, "scale");
+        Vector3f position = Scene3dValues.vector3(properties, "position");
+        Vector3f rotation = Scene3dValues.vector3(properties, "rotation-degrees");
+        Vector3f scale = Scene3dValues.vector3(properties, "scale");
         object.setPosition(position);
         object.setRotationFromEuler(
                 rotation.x * DEGREES_TO_RADIANS,

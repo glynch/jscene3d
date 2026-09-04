@@ -63,6 +63,11 @@ automatically.
 - Do not declare arrays as record components. Java records compare arrays by
   identity, which is almost never the intended value semantics. Use an immutable
   class with defensive copies and deliberately implemented equality instead.
+- Promote at least one operand before integral arithmetic whose result is
+  consumed as `float`, `double`, or `long`. Casting or assigning the completed
+  result is too late to prevent overflow or truncation during the operation.
+  Centralize repeated domain-unit and coordinate conversions in a focused type
+  so callers cannot accidentally perform the arithmetic in the source type.
 - Original source files use this short license header with the appropriate
   comment syntax:
 

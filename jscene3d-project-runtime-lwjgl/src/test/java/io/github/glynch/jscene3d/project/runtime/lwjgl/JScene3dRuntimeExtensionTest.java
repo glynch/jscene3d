@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.runtime.lwjgl;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.data.Offset.offset;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
@@ -14,6 +15,7 @@ import io.github.glynch.jscene3d.lights.AmbientLight;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Mesh;
+import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntime;
@@ -94,6 +96,11 @@ final class JScene3dRuntimeExtensionTest {
                       "geometry": {"$ref": "project:resources/cube.geometry.json"},
                       "material": {"$ref": "project:resources/cyan.material.json"}
                     }
+                  },
+                  {
+                    "id": "nested-group",
+                    "type": "io.github.glynch.jscene3d/group-3d",
+                    "typeVersion": 1
                   }
                 ]
               }
@@ -152,7 +159,8 @@ final class JScene3dRuntimeExtensionTest {
             assertThat(scene.background()).isEqualTo(Color.srgb(0x102030));
             assertThat(scene.children())
                     .extracting(Object::getClass)
-                    .containsExactly(PerspectiveCamera.class, AmbientLight.class, Mesh.class, Mesh.class);
+                    .containsExactly(
+                            PerspectiveCamera.class, AmbientLight.class, Mesh.class, Mesh.class, Object3D.class);
             PerspectiveCamera camera = host.camera();
             assertThat(camera.position()).isEqualTo(new Vector3f(4.0f, 3.0f, 6.0f));
             assertThat(camera.fieldOfView()).isCloseTo((float) Math.toRadians(55.0), offset(0.0001f));
@@ -207,6 +215,24 @@ final class JScene3dRuntimeExtensionTest {
         try (GameRuntime gameRuntime = new GameRuntime(result.runtime().orElseThrow())) {
             gameRuntime.start();
             gameRuntime.render();
+        }
+    }
+
+    /** Rejects a composed scene whose only camera is explicitly inactive. */
+    @Test
+    void rejectsSceneWithoutActiveCamera() throws IOException {
+        runtime.close();
+        write(
+                "application/main.scene.json",
+                SCENE.replace("\"field-of-view-degrees\": 55", "\"field-of-view-degrees\": 55, \"active\": false"));
+        ProjectRuntimeLoadResult result = new ProjectRuntimeLoader(VERSION)
+                .load(loadedProject, getClass().getClassLoader(), List.of(new JScene3dRuntimeExtension(host)));
+
+        assertThat(result.diagnostics()).isEmpty();
+        try (GameRuntime gameRuntime = new GameRuntime(result.runtime().orElseThrow())) {
+            assertThatThrownBy(gameRuntime::start)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("the declarative 3d scene has no active camera");
         }
     }
 

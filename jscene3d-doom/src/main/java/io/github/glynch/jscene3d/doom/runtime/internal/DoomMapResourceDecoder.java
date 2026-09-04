@@ -4,12 +4,12 @@
  */
 package io.github.glynch.jscene3d.doom.runtime.internal;
 
-import static io.github.glynch.jscene3d.doom.runtime.internal.ProjectValues.array;
-import static io.github.glynch.jscene3d.doom.runtime.internal.ProjectValues.bool;
-import static io.github.glynch.jscene3d.doom.runtime.internal.ProjectValues.integer;
-import static io.github.glynch.jscene3d.doom.runtime.internal.ProjectValues.object;
-import static io.github.glynch.jscene3d.doom.runtime.internal.ProjectValues.property;
-import static io.github.glynch.jscene3d.doom.runtime.internal.ProjectValues.text;
+import static io.github.glynch.jscene3d.project.runtime.extension.ProjectValues.array;
+import static io.github.glynch.jscene3d.project.runtime.extension.ProjectValues.bool;
+import static io.github.glynch.jscene3d.project.runtime.extension.ProjectValues.integer;
+import static io.github.glynch.jscene3d.project.runtime.extension.ProjectValues.object;
+import static io.github.glynch.jscene3d.project.runtime.extension.ProjectValues.required;
+import static io.github.glynch.jscene3d.project.runtime.extension.ProjectValues.text;
 
 import io.github.glynch.jscene3d.doom.map.DoomMap;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContext;
@@ -28,12 +28,12 @@ final class DoomMapResourceDecoder {
     /** Creates one immutable runtime map from effective resource properties. */
     static DoomMap decode(ResourceFactoryContext context) {
         Map<String, ProjectValue> properties = context.properties();
-        String name = text(property(properties, "name", "properties"), "properties/name");
-        List<DoomMap.Thing> things = things(property(properties, "things", "properties"));
-        DoomMap.Geometry geometry = geometry(property(properties, "geometry", "properties"));
-        DoomMap.Bsp bsp = bsp(property(properties, "bsp", "properties"));
-        List<Integer> reject = integers(property(properties, "reject", "properties"), "properties/reject");
-        DoomMap.Blockmap blockmap = blockmap(property(properties, "blockmap", "properties"));
+        String name = text(required(properties, "name", "properties"), "properties/name");
+        List<DoomMap.Thing> things = things(required(properties, "things", "properties"));
+        DoomMap.Geometry geometry = geometry(required(properties, "geometry", "properties"));
+        DoomMap.Bsp bsp = bsp(required(properties, "bsp", "properties"));
+        List<Integer> reject = integers(required(properties, "reject", "properties"), "properties/reject");
+        DoomMap.Blockmap blockmap = blockmap(required(properties, "blockmap", "properties"));
         return new DoomMap(name, things, geometry, bsp, reject, blockmap);
     }
 
@@ -59,10 +59,10 @@ final class DoomMapResourceDecoder {
         String location = "properties/geometry";
         Map<String, ProjectValue> geometry = object(value, location);
         return new DoomMap.Geometry(
-                vertices(property(geometry, "vertices", location)),
-                linedefs(property(geometry, "linedefs", location)),
-                sidedefs(property(geometry, "sidedefs", location)),
-                sectors(property(geometry, "sectors", location)));
+                vertices(required(geometry, "vertices", location)),
+                linedefs(required(geometry, "linedefs", location)),
+                sidedefs(required(geometry, "sidedefs", location)),
+                sectors(required(geometry, "sectors", location)));
     }
 
     /** Decodes map vertices in source order. */
@@ -142,9 +142,9 @@ final class DoomMapResourceDecoder {
         String location = "properties/bsp";
         Map<String, ProjectValue> bsp = object(value, location);
         return new DoomMap.Bsp(
-                segs(property(bsp, "segs", location)),
-                subsectors(property(bsp, "subsectors", location)),
-                nodes(property(bsp, "nodes", location)));
+                segs(required(bsp, "segs", location)),
+                subsectors(required(bsp, "subsectors", location)),
+                nodes(required(bsp, "nodes", location)));
     }
 
     /** Decodes BSP segments in source order. */
@@ -189,9 +189,9 @@ final class DoomMapResourceDecoder {
             String location = base + '/' + index;
             Map<String, ProjectValue> node = object(values.get(index), location);
             result.add(new DoomMap.Node(
-                    partition(property(node, "partition", location), location + "/partition"),
-                    nodeSide(property(node, "right", location), location + "/right"),
-                    nodeSide(property(node, "left", location), location + "/left")));
+                    partition(required(node, "partition", location), location + "/partition"),
+                    nodeSide(required(node, "right", location), location + "/right"),
+                    nodeSide(required(node, "left", location), location + "/left")));
         }
         return List.copyOf(result);
     }
@@ -210,8 +210,8 @@ final class DoomMapResourceDecoder {
     private static DoomMap.NodeSide nodeSide(ProjectValue value, String location) {
         Map<String, ProjectValue> side = object(value, location);
         return new DoomMap.NodeSide(
-                bounds(property(side, "bounds", location), location + "/bounds"),
-                child(property(side, "child", location), location + "/child"));
+                bounds(required(side, "bounds", location), location + "/bounds"),
+                child(required(side, "child", location), location + "/child"));
     }
 
     /** Decodes one BSP bounding box. */
@@ -239,7 +239,7 @@ final class DoomMapResourceDecoder {
                 intProperty(blockmap, "originY", location),
                 intProperty(blockmap, "columns", location),
                 intProperty(blockmap, "rows", location),
-                cells(property(blockmap, "cells", location)));
+                cells(required(blockmap, "cells", location)));
     }
 
     /** Decodes row-major blockmap cells. */
@@ -265,16 +265,16 @@ final class DoomMapResourceDecoder {
 
     /** Reads one required integer property. */
     private static int intProperty(Map<String, ProjectValue> values, String name, String location) {
-        return integer(property(values, name, location), location + '/' + name);
+        return integer(required(values, name, location), location + '/' + name);
     }
 
     /** Reads one required text property. */
     private static String textProperty(Map<String, ProjectValue> values, String name, String location) {
-        return text(property(values, name, location), location + '/' + name);
+        return text(required(values, name, location), location + '/' + name);
     }
 
     /** Reads one required boolean property. */
     private static boolean boolProperty(Map<String, ProjectValue> values, String name, String location) {
-        return bool(property(values, name, location), location + '/' + name);
+        return bool(required(values, name, location), location + '/' + name);
     }
 }

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.glynch.jscene3d.wad",
+  "version": "0.1.0-SNAPSHOT",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "JScene3D WAD Import",
+  "types": [
+    {
+      "id": "io.github.glynch.jscene3d.wad/source",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "WAD Archive Source"
+    },
+    {
+      "id": "io.github.glynch.jscene3d.wad/archive",
+      "typeVersion": 1,
+      "scope": "importer",
+      "displayName": "WAD Archive"
+    }
+  ]
+}

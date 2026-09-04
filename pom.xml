@@ -46,6 +46,7 @@
         <module>jscene3d-gui</module>
         <module>jscene3d-gltf</module>
         <module>jscene3d-wad</module>
+        <module>jscene3d-wad-import</module>
         <module>jscene3d-example-framework</module>
         <module>jscene3d-examples</module>
         <module>jscene3d-physics-examples</module>
@@ -218,6 +219,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-wad</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-wad-import</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -2059,6 +2059,27 @@ archive layers. It does not invent a `WadReader` interface or multiple
 interchangeable readers. Supporting WAD files does not itself require an
 adapter hierarchy.
 
+### Generic WAD project import
+
+The separate `jscene3d-wad-import` adapter connects that archive capability to
+the generic project import lifecycle. Its registered importer identity is
+`io.github.glynch.jscene3d.wad/archive`; it is discoverable as both a JPMS
+provider and a class-path service.
+
+Inspection returns one selectable `archive` root with `contains` relationships
+to every directory entry, plus one selectable item for each opaque lump. Lump
+identities combine the zero-padded directory index with the hexadecimal WAD
+name, for example `lumps/00000042/5448494E4753`. The index distinguishes
+duplicate names, and including the name prevents a reordered archive from
+silently resolving an authored selection to unrelated content.
+
+Selecting the archive root imports all contained lumps. Selecting individual
+lump items imports only those payloads. Each preparation also writes an
+`archive/index` JSON artifact containing the archive kind, portable source
+provenance, complete directory order, lump metadata, and the artifact identity
+of each selected lump. Absolute source paths are deliberately excluded from
+the artifact. This layer interprets neither Doom structures nor lump names.
+
 ### Doom content interpretation
 
 The following capabilities are necessarily Doom-family-specific even though

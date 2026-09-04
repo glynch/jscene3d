@@ -38,6 +38,10 @@ automatically.
   require `--enable-preview`.
 - Use UTF-8 explicitly for source, resources, reports, and runtime text
   conversion.
+- Write generated JSON documents using deterministic, human-readable
+  indentation and terminate them with a newline. Compact JSON is appropriate
+  only when an external protocol or measured performance requirement demands
+  it.
 - Spotless with a pinned Palantir Java Format version is the only mechanical
   Java formatter.
 - Spotless removes unused imports. Checkstyle forbids wildcard imports.

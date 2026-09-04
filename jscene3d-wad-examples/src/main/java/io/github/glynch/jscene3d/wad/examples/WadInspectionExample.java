@@ -12,10 +12,7 @@ import io.github.glynch.jscene3d.wad.WadLoadResult;
 import io.github.glynch.jscene3d.wad.WadLoader;
 import io.github.glynch.jscene3d.wad.WadLumpReference;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.logging.Logger;
@@ -57,9 +54,10 @@ public final class WadInspectionExample {
     /** Creates two small archives and resolves a duplicate name from the later layer. */
     private static void demonstrateLayers() throws IOException {
         try (TemporaryWorkspace workspace = TemporaryWorkspace.create("jscene3d-wad-example-")) {
-            Path baseSource = writeSingleLump(workspace.root().resolve("base.wad"), WadKind.IWAD, "MESSAGE", "base");
-            Path patchSource =
-                    writeSingleLump(workspace.root().resolve("patch.wad"), WadKind.PWAD, "MESSAGE", "patched");
+            Path baseSource = ExampleWadFiles.writeSingleLump(
+                    workspace.root().resolve("base.wad"), WadKind.IWAD, "MESSAGE", "base");
+            Path patchSource = ExampleWadFiles.writeSingleLump(
+                    workspace.root().resolve("patch.wad"), WadKind.PWAD, "MESSAGE", "patched");
             WadArchive base = requireArchive(WadLoader.load(baseSource));
             WadArchive patch = requireArchive(WadLoader.load(patchSource));
             WadArchiveLayers layers = WadArchiveLayers.of(List.of(base, patch));
@@ -73,23 +71,5 @@ public final class WadInspectionExample {
     private static WadArchive requireArchive(WadLoadResult result) {
         return result.archive()
                 .orElseThrow(() -> new IllegalArgumentException("WAD could not be loaded: " + result.diagnostics()));
-    }
-
-    /** Writes one small fixture archive used only by the self-contained example. */
-    private static Path writeSingleLump(Path target, WadKind kind, String name, String content) throws IOException {
-        byte[] encodedContent = content.getBytes(StandardCharsets.US_ASCII);
-        int directoryOffset = 12 + encodedContent.length;
-        ByteBuffer bytes = ByteBuffer.allocate(directoryOffset + 16).order(ByteOrder.LITTLE_ENDIAN);
-        bytes.put(kind.name().getBytes(StandardCharsets.US_ASCII));
-        bytes.putInt(1);
-        bytes.putInt(directoryOffset);
-        bytes.put(encodedContent);
-        bytes.putInt(12);
-        bytes.putInt(encodedContent.length);
-        byte[] encodedName = name.getBytes(StandardCharsets.US_ASCII);
-        bytes.put(encodedName);
-        bytes.put(new byte[8 - encodedName.length]);
-        Files.write(target, bytes.array());
-        return target;
     }
 }

@@ -224,10 +224,26 @@ WAD failures use the feature-owned `WadDiagnosticCode` enum. Its stable codes
 act as localization keys, its default messages provide English fallbacks, and
 variable failure values remain available as structured diagnostic details.
 
+The optional `jscene3d-wad-import` artifact exposes WAD content through the
+generic project import system. Its service-discovered
+`io.github.glynch.jscene3d.wad/archive` importer reports one selectable archive
+item and one selectable item per ordered lump. Selecting `archive` imports every
+lump; selecting lump identities imports only those opaque payloads. Every import
+also produces an `archive/index` JSON artifact containing portable source
+provenance, complete directory order, duplicate-preserving names, and the
+artifact identity of each imported lump. The adapter assigns no Doom-specific
+meaning to lump names or content.
+
 Run the self-contained archive and layering example with:
 
 ```shell
 ./mvnw -pl jscene3d-wad-examples -am -Prun-wad-example compile
+```
+
+Run the self-contained project-import example with:
+
+```shell
+./mvnw -pl jscene3d-wad-examples -am -Prun-wad-import-example compile
 ```
 
 ## Animation
@@ -574,6 +590,8 @@ license notices, and exact selected filenames are recorded beside the assets in
 - `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
+- `jscene3d-wad-import`: optional project-import adapter exposing WAD archives
+  and opaque lumps as selectable source items and cached artifacts.
 - `jscene3d-game`: optional, genre-independent application lifecycle, Fixed
   Updates, semantic input actions, and interpolated Physics Bindings.
 - `jscene3d-audio`: optional OpenAL-backed clips, playback sources, positional
@@ -586,7 +604,8 @@ license notices, and exact selected filenames are recorded beside the assets in
   Engine, Physics Engine, renderer, and shared browser framework.
 - `jscene3d-audio-examples`: unpublished positional-audio and mixing examples
   using attributed CC0 sounds and music.
-- `jscene3d-wad-examples`: unpublished headless archive and layering examples.
+- `jscene3d-wad-examples`: unpublished headless archive, layering, and project
+  import examples.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and
 `CONTEXT.md` for the accepted version 0.1 design and terminology.

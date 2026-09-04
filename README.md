@@ -246,6 +246,29 @@ Run the self-contained project-import example with:
 ./mvnw -pl jscene3d-wad-examples -am -Prun-wad-import-example compile
 ```
 
+## Doom content
+
+The optional `jscene3d-doom` artifact interprets classic Doom map data over the
+generic WAD API. `DoomMapDecoder` discovers conventional `MAP##` and `E#M#`
+markers and decodes things, vertices, linedefs, sidedefs, sectors, segs,
+subsectors, BSP nodes, reject tables, and blockmaps into an immutable model.
+Unsupported or malformed data is reported through typed `DoomDiagnosticCode`
+values with stable localization keys, English fallback messages, and structured
+details.
+
+Its service-discovered `io.github.glynch.jscene3d.doom/maps` project importer
+exposes the maps in a WAD as selectable source items. Each selected map produces
+a deterministic, pretty-printed resource of type
+`io.github.glynch.jscene3d.doom/map`. This first content slice preserves the
+classic map records and source provenance; geometry, materials, sprites, audio,
+and gameplay interpretation remain separate later concerns.
+
+Run the self-contained Doom project-import example with:
+
+```shell
+./mvnw -pl jscene3d-doom-examples -am -Prun-doom-import-example compile
+```
+
 ## Animation
 
 The renderer-independent `io.github.glynch.jscene3d.animation` package provides
@@ -592,6 +615,8 @@ license notices, and exact selected filenames are recorded beside the assets in
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives
   and opaque lumps as selectable source items and cached artifacts.
+- `jscene3d-doom`: optional classic Doom map discovery, decoding, validation,
+  and project import over the generic WAD capability.
 - `jscene3d-game`: optional, genre-independent application lifecycle, Fixed
   Updates, semantic input actions, and interpolated Physics Bindings.
 - `jscene3d-audio`: optional OpenAL-backed clips, playback sources, positional
@@ -605,6 +630,8 @@ license notices, and exact selected filenames are recorded beside the assets in
 - `jscene3d-audio-examples`: unpublished positional-audio and mixing examples
   using attributed CC0 sounds and music.
 - `jscene3d-wad-examples`: unpublished headless archive, layering, and project
+  import examples.
+- `jscene3d-doom-examples`: unpublished headless Doom decoding and project
   import examples.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and

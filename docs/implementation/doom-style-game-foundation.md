@@ -42,12 +42,13 @@ Assets will be stored or converted into formats consumed directly by JScene3D;
 they will not be downloaded at runtime.
 
 The pinned `freedoom2.wad` will remain the authoritative source for its levels
-and content. A headless reader will validate and expose WAD lumps before later
-import slices convert maps and resources into engine-native runtime
-representations. Doom-specific import and compatibility behavior initially
-belongs in Doomed Corridors, not in the Physics Engine or Game Engine. A WAD
-importer can move to a separate optional artifact once another consumer proves
-that reusable seam.
+and content. `jscene3d-wad` validates and exposes ordered opaque WAD lumps, and
+the optional `jscene3d-doom` extension discovers and decodes classic map data
+without graphics, audio, physics, or gameplay dependencies. Its project
+importer emits typed map resources while retaining source provenance. Later
+import slices convert additional Doom content into engine-native runtime
+representations. Doom-compatible gameplay behavior remains in Doomed Corridors,
+not in the Physics Engine or Game Engine.
 
 ## Existing rendering foundation
 

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.glynch.jscene3d.doom",
+  "version": "0.1.0-SNAPSHOT",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "JScene3D Doom Content",
+  "types": [
+    {
+      "id": "io.github.glynch.jscene3d.doom/maps",
+      "typeVersion": 1,
+      "scope": "importer",
+      "displayName": "Classic Doom Maps"
+    },
+    {
+      "id": "io.github.glynch.jscene3d.doom/map",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Classic Doom Map",
+      "properties": [
+        {
+          "id": "name",
+          "valueKind": "text",
+          "required": true,
+          "displayName": "Map Name"
+        },
+        {
+          "id": "source",
+          "valueKind": "object",
+          "required": true,
+          "displayName": "Source"
+        },
+        {
+          "id": "things",
+          "valueKind": "array",
+          "required": true,
+          "displayName": "Things"
+        },
+        {
+          "id": "geometry",
+          "valueKind": "object",
+          "required": true,
+          "displayName": "Geometry"
+        },
+        {
+          "id": "bsp",
+          "valueKind": "object",
+          "required": true,
+          "displayName": "BSP"
+        },
+        {
+          "id": "reject",
+          "valueKind": "array",
+          "required": true,
+          "displayName": "Reject Table"
+        },
+        {
+          "id": "blockmap",
+          "valueKind": "object",
+          "required": true,
+          "displayName": "Blockmap"
+        }
+      ]
+    }
+  ]
+}

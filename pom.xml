@@ -47,6 +47,7 @@
         <module>jscene3d-gltf</module>
         <module>jscene3d-wad</module>
         <module>jscene3d-wad-import</module>
+        <module>jscene3d-doom</module>
         <module>jscene3d-example-framework</module>
         <module>jscene3d-examples</module>
         <module>jscene3d-physics-examples</module>
@@ -54,6 +55,7 @@
         <module>jscene3d-project-examples</module>
         <module>jscene3d-audio-examples</module>
         <module>jscene3d-wad-examples</module>
+        <module>jscene3d-doom-examples</module>
     </modules>
 
     <properties>
@@ -224,6 +226,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-wad-import</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-doom</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

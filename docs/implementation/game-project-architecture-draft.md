@@ -2093,10 +2093,15 @@ they are reusable by more than one game:
 - map markers and Doom naming conventions;
 - vanilla Doom and Doom II compatibility diagnostics.
 
-These belong in a separate optional Doom extension layered over the WAD
-archive capability. Its artifact name is `jscene3d-doom`. It should describe
-and import this content without adding Doom concepts to the
-Game Engine or Physics Engine.
+These belong in the optional `jscene3d-doom` extension layered over the WAD
+archive capability. Its first implemented slice discovers conventional
+`MAP##` and `E#M#` markers, decodes every classic map record into an immutable
+model, validates cross-record references and binary structures, and exposes a
+service-discovered project importer. A selected map produces a deterministic,
+pretty-printed resource of type `io.github.glynch.jscene3d.doom/map` with
+portable WAD provenance. Material, image, audio, geometry, collision, and
+gameplay conversion remain later slices. Doom concepts do not enter the Game
+Engine or Physics Engine.
 
 ### Doom gameplay interpretation
 
@@ -2601,11 +2606,13 @@ combat rules, presentation rules, player, enemies, HUD, input, audio, and
 renderer. The Project Manifest points directly at a WAD asset and map rather
 than at an engine-native application scene.
 
-The current code should not be discarded. It supplies the concrete behavior
-needed to design and test registered types, import adapters, project systems,
-and scene composition. The migration should move authored choices and
-relationships behind those interfaces while retaining the proven headless
-implementations.
+The reusable `DoomMap`, `DoomMapDecodeResult`, and `DoomMapDecoder` in
+`jscene3d-doom` supersede the corresponding Doomed Corridors classes. The game
+copies remain temporarily so the existing application stays runnable until its
+import path is migrated. Material, sprite, sound, presentation, and gameplay
+classes are not superseded by this slice. They supply the concrete behavior
+needed to design and test later registered types, import adapters, project
+systems, and scene composition.
 
 ## Incremental design and implementation sequence
 

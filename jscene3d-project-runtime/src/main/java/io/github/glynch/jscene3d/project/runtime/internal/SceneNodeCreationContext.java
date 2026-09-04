@@ -27,9 +27,10 @@ final class SceneNodeCreationContext extends AbstractCreationContext implements 
             Map<String, ProjectValue> properties,
             RegisteredTypeDescriptor descriptor,
             EndpointRouter router,
+            ProjectResourceResolver resources,
             BooleanSupplier enabled,
             Optional<RuntimeNode> parent) {
-        super(project, scene, node, properties, descriptor, router, enabled);
+        super(project, scene, node, properties, descriptor, router, resources, enabled);
         this.parent = parent;
     }
 

@@ -16,6 +16,7 @@ import io.github.glynch.jscene3d.project.runtime.internal.FactoryBindings;
 import io.github.glynch.jscene3d.project.runtime.internal.Preconditions;
 import io.github.glynch.jscene3d.project.runtime.internal.ProjectRuntimeComposer;
 import io.github.glynch.jscene3d.project.runtime.internal.RuntimeCompositionException;
+import io.github.glynch.jscene3d.project.runtime.internal.RuntimeDiagnosticsException;
 import io.github.glynch.jscene3d.project.runtime.internal.RuntimeRegistry;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneLoadResult;
@@ -108,8 +109,11 @@ public final class ProjectRuntimeLoader {
             return ProjectRuntimeLoadResult.failure(diagnostics);
         }
         try {
-            ProjectRuntime runtime = new ProjectRuntimeComposer(project, scene, catalog, bindings).compose();
+            ProjectRuntime runtime =
+                    new ProjectRuntimeComposer(project, scene, catalog, bindings, diagnostics).compose();
             return ProjectRuntimeLoadResult.success(runtime, diagnostics);
+        } catch (RuntimeDiagnosticsException exception) {
+            diagnostics.addAll(exception.diagnostics());
         } catch (RuntimeCompositionException exception) {
             diagnostics.add(error(
                     scene.source().toUri(),

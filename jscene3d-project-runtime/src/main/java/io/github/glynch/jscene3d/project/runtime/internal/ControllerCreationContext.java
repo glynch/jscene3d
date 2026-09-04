@@ -25,8 +25,9 @@ final class ControllerCreationContext extends AbstractCreationContext implements
             Map<String, ProjectValue> properties,
             RegisteredTypeDescriptor descriptor,
             EndpointRouter router,
+            ProjectResourceResolver resources,
             BooleanSupplier enabled) {
-        super(project, scene, node.definition(), properties, descriptor, router, enabled);
+        super(project, scene, node.definition(), properties, descriptor, router, resources, enabled);
         this.node = node;
     }
 

@@ -5,6 +5,8 @@
 package io.github.glynch.jscene3d.project.extension;
 
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
+import io.github.glynch.jscene3d.project.resource.internal.ResourceCatalogValidator;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.internal.SceneCatalogValidator;
 import java.util.Collections;
@@ -69,5 +71,15 @@ public final class RegisteredTypeCatalog {
      */
     public List<ProjectDiagnostic> validate(SceneDefinition scene) {
         return SceneCatalogValidator.validate(Objects.requireNonNull(scene, "scene"), this);
+    }
+
+    /**
+     * Validates the registered type and properties in one loaded resource.
+     *
+     * @param resource structurally valid resource definition
+     * @return ordered catalog-aware diagnostics
+     */
+    public List<ProjectDiagnostic> validate(ResourceDefinition resource) {
+        return ResourceCatalogValidator.validate(Objects.requireNonNull(resource, "resource"), this);
     }
 }

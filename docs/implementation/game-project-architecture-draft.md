@@ -168,12 +168,41 @@ reconciled as the grill progresses rather than relying on memory at its end.
 - Runtime signals dispatch synchronously in scene-connection declaration order.
   Payload-bearing endpoints use an exact registered payload identity and do
   not perform runtime conversion.
-- Nested-scene expansion, project-system definitions, resources, and built-in
-  rendering adapters remain subsequent runtime slices. Encountering a
-  configured but unsupported feature produces a terminal diagnostic rather
+- Native project resources and their runtime ownership are part of the first
+  executable kernel. Nested-scene expansion, project-system definitions, and
+  built-in rendering adapters remain subsequent runtime slices. Encountering
+  a configured but unsupported feature produces a terminal diagnostic rather
   than silently ignoring project data.
 - Annotation-processing ownership may be separated later if build-time
   dependency direction requires it; that does not change the runtime seam.
+
+### Native resource version 1 and runtime ownership
+
+- A native resource document contains `schemaVersion`, an exact registered
+  resource `type` and `typeVersion`, and an ordered `properties` object. Its
+  canonical project-confined source path is its runtime identity.
+- `ResourceLoader` performs strict, headless JSON loading, validates reference
+  syntax and file containment, and returns either an immutable
+  `ResourceDefinition` or ordered structured diagnostics. It does not execute
+  extension code.
+- `RegisteredTypeCatalog` validates the resource's authored properties against
+  the descriptor for its exact resource type, including defaults, required
+  values, and reference-kind constraints.
+- A trusted extension registers a `ResourceFactory` for each executable
+  resource type. The factory receives the owning project, immutable resource
+  definition, effective properties, and a bounded resource-lookup capability.
+- Version 1 runtime lookup resolves `project:` references. It loads dependencies
+  recursively, preserves sharing through a canonical-path cache, reports a
+  project-relative dependency cycle as a terminal diagnostic, and verifies the
+  Java value type requested by its consumer.
+- A resource factory returns a newly owned runtime value. Values implementing
+  `AutoCloseable` are closed once in reverse creation order after scene nodes
+  and controllers. Scene objects may retain resolved values but do not own or
+  close them.
+- `asset:` and `import:` remain valid portable reference namespaces in project
+  data. Runtime materialization for those namespaces belongs to importer and
+  source-asset integration slices; requesting either through the native
+  resource resolver currently produces a terminal unsupported-kind diagnostic.
 
 ### Scene composition and identity decisions
 
@@ -884,6 +913,30 @@ necessary.
 Scenes should reference resources by stable logical reference. Loading the same
 resource reference twice should preserve sharing where the resource's ownership
 and mutability interface permits it.
+
+A native resource has its own registered resource type and portable property
+values:
+
+```json
+{
+  "$schema": "../schema/resource-1.schema.json",
+  "schemaVersion": 1,
+  "type": "io.github.glynch.doomed-corridors/actor-animation-set",
+  "typeVersion": 1,
+  "properties": {
+    "source": {
+      "$ref": "asset:freedoom"
+    },
+    "idle": {
+      "$ref": "import:freedoom-sprites/zombieman/idle"
+    }
+  }
+}
+```
+
+The resource file's canonical project-relative path provides identity. Its
+registered type provides semantics and factory selection; a Java class name is
+never persisted in the document.
 
 ```json
 {

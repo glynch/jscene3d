@@ -23,4 +23,12 @@ public interface ProjectRuntimeRegistry {
      * @param factory trusted runtime factory
      */
     void registerNodeController(RegisteredType type, NodeControllerFactory factory);
+
+    /**
+     * Registers the factory for one reusable resource type.
+     *
+     * @param type exact descriptor-declared type identity
+     * @param factory trusted runtime factory
+     */
+    void registerResource(RegisteredType type, ResourceFactory factory);
 }

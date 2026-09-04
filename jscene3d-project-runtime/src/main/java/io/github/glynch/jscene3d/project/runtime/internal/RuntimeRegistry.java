@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeFactory;
 import java.util.Objects;
 
@@ -43,6 +44,12 @@ public final class RuntimeRegistry implements ProjectRuntimeRegistry {
     public void registerNodeController(RegisteredType type, NodeControllerFactory factory) {
         requireScope(type, RegisteredTypeScope.NODE_CONTROLLER);
         bindings.addController(type, Objects.requireNonNull(factory, "factory"));
+    }
+
+    @Override
+    public void registerResource(RegisteredType type, ResourceFactory factory) {
+        requireScope(type, RegisteredTypeScope.RESOURCE);
+        bindings.addResource(type, Objects.requireNonNull(factory, "factory"));
     }
 
     /** Prevents a retained registry from being mutated after contribution returns. */

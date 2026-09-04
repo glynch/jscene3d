@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
-import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
@@ -19,7 +19,6 @@ import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +31,7 @@ public final class ProjectRuntimeComposer {
     private final SceneDefinition scene;
     private final RegisteredTypeCatalog catalog;
     private final FactoryBindings factories;
+    private final ProjectResourceResolver resources;
     private final EndpointRouter router = new EndpointRouter();
     private final List<LifecycleEntry> lifecycle = new ArrayList<>();
     private final Map<String, RuntimeNode> nodes = new LinkedHashMap<>();
@@ -43,13 +43,19 @@ public final class ProjectRuntimeComposer {
      * @param scene validated entry scene
      * @param catalog validated registered-type catalog
      * @param factories trusted factory index
+     * @param diagnostics destination for non-terminal runtime diagnostics
      */
     public ProjectRuntimeComposer(
-            GameProject project, SceneDefinition scene, RegisteredTypeCatalog catalog, FactoryBindings factories) {
+            GameProject project,
+            SceneDefinition scene,
+            RegisteredTypeCatalog catalog,
+            FactoryBindings factories,
+            List<ProjectDiagnostic> diagnostics) {
         this.project = Objects.requireNonNull(project, "project");
         this.scene = Objects.requireNonNull(scene, "scene");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.factories = Objects.requireNonNull(factories, "factories");
+        resources = new ProjectResourceResolver(project, scene.source().toUri(), catalog, factories, diagnostics);
     }
 
     /**
@@ -61,7 +67,7 @@ public final class ProjectRuntimeComposer {
         try {
             InternalRuntimeNode root = createNode(scene.root(), Optional.empty(), true, "/root");
             router.connect(scene.connections());
-            return new InternalProjectRuntime(project, scene, root, lifecycle, nodes, router);
+            return new InternalProjectRuntime(project, scene, root, lifecycle, nodes, router, resources);
         } catch (RuntimeException exception) {
             closeCreated(exception);
             throw exception;
@@ -80,7 +86,7 @@ public final class ProjectRuntimeComposer {
         boolean enabled = parentEnabled && definition.enabled();
         RegisteredTypeDescriptor descriptor = requireDescriptor(typedNode.type(), location + "/type");
         SceneNodeFactory factory = factories.requireSceneNode(typedNode.type(), location + "/type");
-        Map<String, ProjectValue> properties = effectiveProperties(descriptor, typedNode.properties());
+        Map<String, ProjectValue> properties = EffectiveProperties.merge(descriptor, typedNode.properties());
         ProjectRuntimeObject object =
                 createNodeObject(factory, definition, properties, descriptor, parent, enabled, location);
         InternalRuntimeNode runtimeNode = new InternalRuntimeNode(definition, enabled, object, parent);
@@ -106,9 +112,9 @@ public final class ProjectRuntimeComposer {
         ControllerDefinition definition = optionalDefinition.orElseThrow();
         RegisteredTypeDescriptor descriptor = requireDescriptor(definition.type(), location + "/controller/type");
         NodeControllerFactory factory = factories.requireController(definition.type(), location + "/controller/type");
-        Map<String, ProjectValue> properties = effectiveProperties(descriptor, definition.properties());
-        ControllerCreationContext context =
-                new ControllerCreationContext(project, scene, node, properties, descriptor, router, node::isEnabled);
+        Map<String, ProjectValue> properties = EffectiveProperties.merge(descriptor, definition.properties());
+        ControllerCreationContext context = new ControllerCreationContext(
+                project, scene, node, properties, descriptor, router, resources, node::isEnabled);
         ProjectRuntimeObject controller;
         try {
             controller = Objects.requireNonNull(factory.create(context), "controller factory result");
@@ -129,7 +135,7 @@ public final class ProjectRuntimeComposer {
             boolean enabled,
             String location) {
         SceneNodeCreationContext context = new SceneNodeCreationContext(
-                project, scene, definition, properties, descriptor, router, () -> enabled, parent);
+                project, scene, definition, properties, descriptor, router, resources, () -> enabled, parent);
         try {
             return Objects.requireNonNull(factory.create(context), "scene-node factory result");
         } catch (RuntimeException exception) {
@@ -146,20 +152,12 @@ public final class ProjectRuntimeComposer {
                         location));
     }
 
-    /** Applies descriptor defaults before authored values while retaining declaration order. */
-    private static Map<String, ProjectValue> effectiveProperties(
-            RegisteredTypeDescriptor descriptor, Map<String, ProjectValue> authored) {
-        Map<String, ProjectValue> effective = new LinkedHashMap<>();
-        for (PropertyDescriptor property : descriptor.properties().values()) {
-            property.defaultValue().ifPresent(value -> effective.put(property.id(), value));
-        }
-        effective.putAll(authored);
-        return Collections.unmodifiableMap(effective);
-    }
-
     /** Creates one diagnostic-ready factory failure without leaking implementation internals. */
-    private static RuntimeCompositionException factoryFailure(
+    private static RuntimeException factoryFailure(
             RegisteredType type, String nodeId, RuntimeException exception, String location) {
+        if (exception instanceof RuntimeDiagnosticsException diagnosticsException) {
+            return diagnosticsException;
+        }
         String detail = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
         return new RuntimeCompositionException(
                 "runtime.factory.create",
@@ -176,6 +174,11 @@ public final class ProjectRuntimeComposer {
             } catch (RuntimeException closeFailure) {
                 failure.addSuppressed(closeFailure);
             }
+        }
+        try {
+            resources.close();
+        } catch (RuntimeException closeFailure) {
+            failure.addSuppressed(closeFailure);
         }
     }
 }

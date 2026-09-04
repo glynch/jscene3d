@@ -23,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,6 +55,7 @@ final class ProjectRuntimeLoaderTest {
               ]
             }
             """;
+    private static final String RESOURCE_TYPE_PREFIX = "io.github.glynch.runtime-test/";
     private static final String SCENE = """
             {
               "$schema": "https://jscene3d.org/schemas/scene-1.json",
@@ -248,6 +251,129 @@ final class ProjectRuntimeLoaderTest {
                 .contains("runtime.scene-instance.unsupported");
     }
 
+    /** Shares one canonical resource value across nodes and closes it once after scene objects. */
+    @Test
+    void sharesAndOwnsResolvedProjectResources() throws IOException {
+        write("resources/dependency.resource.json", resource("shared-data", "Dependency", null));
+        write(
+                "resources/shared.resource.json",
+                resource("shared-data", "Shared value", "resources/dependency.resource.json"));
+        write("application/main.scene.json", resourceScene("resources/shared.resource.json", true));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.diagnostics()).isEmpty();
+        ProjectRuntime runtime = result.runtime().orElseThrow();
+        TestRuntimeExtension.ResourceConsumerObject first = consumer(runtime, "first");
+        TestRuntimeExtension.ResourceConsumerObject second = consumer(runtime, "second");
+        assertThat(first.resource()).isSameAs(second.resource());
+        assertThat(first.resource().label()).isEqualTo("Shared value");
+        TestRuntimeExtension.SharedData dependency =
+                first.resource().dependency().orElseThrow();
+        assertThat(dependency.label()).isEqualTo("Dependency");
+
+        runtime.close();
+        runtime.close();
+
+        assertThat(first.resource().closeCount()).isOne();
+        assertThat(dependency.closeCount()).isOne();
+        assertThat(TestRuntimeState.EVENTS)
+                .endsWith(
+                        "close:second",
+                        "close:first",
+                        "close:root",
+                        "close-resource:Shared value",
+                        "close-resource:Dependency");
+    }
+
+    /** Reports a complete project-relative dependency cycle as a terminal resource diagnostic. */
+    @Test
+    void reportsResourceDependencyCycle() throws IOException {
+        write("resources/first.resource.json", resource("shared-data", "First", "resources/second.resource.json"));
+        write("resources/second.resource.json", resource("shared-data", "Second", "resources/first.resource.json"));
+        write("application/main.scene.json", resourceScene("resources/first.resource.json", false));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code()).isEqualTo("runtime.resource.cycle");
+            assertThat(diagnostic.message())
+                    .contains("resources/first.resource.json -> resources/second.resource.json"
+                            + " -> resources/first.resource.json");
+        });
+    }
+
+    /** Preserves native resource loading diagnostics without invoking a factory. */
+    @Test
+    void reportsInvalidResourceDocument() throws IOException {
+        String invalid = resource("shared-data", "Invalid", null).replace("\"typeVersion\": 1", "\"typeVersion\": 0");
+        write("resources/invalid.resource.json", invalid);
+        write("application/main.scene.json", resourceScene("resources/invalid.resource.json", false));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code())
+                .containsExactly("resource.type.version");
+    }
+
+    /** Rejects a registered type whose descriptor does not have resource scope. */
+    @Test
+    void reportsResourceDescriptorWithWrongScope() throws IOException {
+        write("resources/wrong-scope.resource.json", resource("group-3d", "Wrong scope", null));
+        write("application/main.scene.json", resourceScene("resources/wrong-scope.resource.json", false));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code())
+                .containsExactly("resource.catalog.type.scope");
+    }
+
+    /** Reports a resource descriptor that its executable extension did not bind. */
+    @Test
+    void reportsMissingResourceFactory() throws IOException {
+        write("resources/unbound.resource.json", resource("unbound-data", "Unbound", null));
+        write("application/main.scene.json", resourceScene("resources/unbound.resource.json", false));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code())
+                .containsExactly("runtime.factory.resource.missing");
+    }
+
+    /** Verifies the requested Java value type at the resource-consumer boundary. */
+    @Test
+    void reportsResourceRuntimeValueTypeMismatch() throws IOException {
+        write("resources/text.resource.json", resource("text-data", "Text", null));
+        write("application/main.scene.json", resourceScene("resources/text.resource.json", false));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code())
+                .containsExactly("runtime.resource.value.type");
+    }
+
+    /** Reports portable reference namespaces whose runtime adapter is not implemented yet. */
+    @Test
+    void reportsUnsupportedRuntimeResourceNamespace() throws IOException {
+        write("application/main.scene.json", resourceSceneReference("import:test/output", false));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code())
+                .containsExactly("runtime.resource.kind.unsupported");
+    }
+
     /** Verifies tree identity, authored order, parent views, and descriptor defaults. */
     private static void assertRuntimeTree(ProjectRuntime runtime) {
         assertThat(runtime.project()).isNotNull();
@@ -261,6 +387,69 @@ final class ProjectRuntimeLoaderTest {
         assertThat(runtime.findNode("indicator").orElseThrow().controller()).isPresent();
         assertThat(TestRuntimeState.rootLabel).isEqualTo("Default root");
         assertThat(TestRuntimeState.timerParent).isEqualTo("root");
+    }
+
+    /** Returns one resource-consuming runtime node object. */
+    private static TestRuntimeExtension.ResourceConsumerObject consumer(ProjectRuntime runtime, String nodeId) {
+        return (TestRuntimeExtension.ResourceConsumerObject)
+                runtime.findNode(nodeId).orElseThrow().object();
+    }
+
+    /** Creates one typed resource document with an optional dependency. */
+    private static String resource(String type, String label, @Nullable String dependency) {
+        String dependencyProperty =
+                dependency == null ? "" : ",\n    \"dependency\": {\"$ref\": \"project:" + dependency + "\"}";
+        return String.format(Locale.ROOT, """
+                {
+                  "schemaVersion": 1,
+                  "type": "%s",
+                  "typeVersion": 1,
+                  "properties": {
+                    "label": "%s"%s
+                  }
+                }
+                """, RESOURCE_TYPE_PREFIX + type, label, dependencyProperty);
+    }
+
+    /** Creates a scene containing one or two nodes referencing the same resource path. */
+    private static String resourceScene(String resourcePath, boolean includeSecond) {
+        return resourceSceneReference("project:" + resourcePath, includeSecond);
+    }
+
+    /** Creates a scene containing one or two nodes using one complete resource reference. */
+    private static String resourceSceneReference(String reference, boolean includeSecond) {
+        String second = includeSecond ? String.format(Locale.ROOT, """
+                        ,
+                                {
+                                  "id": "second",
+                                  "type": "io.github.glynch.runtime-test/resource-consumer-3d",
+                                  "typeVersion": 1,
+                                  "properties": {
+                                    "resource": {"$ref": "%s"}
+                                  }
+                                }
+                        """, reference) : "";
+        return String.format(Locale.ROOT, """
+                {
+                  "schemaVersion": 1,
+                  "id": "resource-scene",
+                  "root": {
+                    "id": "root",
+                    "type": "io.github.glynch.runtime-test/group-3d",
+                    "typeVersion": 1,
+                    "children": [
+                      {
+                        "id": "first",
+                        "type": "io.github.glynch.runtime-test/resource-consumer-3d",
+                        "typeVersion": 1,
+                        "properties": {
+                          "resource": {"$ref": "%s"}
+                        }
+                      }%s
+                    ]
+                  }
+                }
+                """, reference, second);
     }
 
     /** Resolves safe metadata independently, then supplies one trusted implementation explicitly. */

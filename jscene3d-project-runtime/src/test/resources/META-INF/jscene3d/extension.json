@@ -56,6 +56,68 @@
           "displayName": "Toggle"
         }
       ]
+    },
+    {
+      "id": "io.github.glynch.runtime-test/resource-consumer-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Resource Consumer 3d",
+      "properties": [
+        {
+          "id": "resource",
+          "valueKind": "reference",
+          "required": true,
+          "displayName": "Resource",
+          "acceptedReferences": ["project", "import"]
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.runtime-test/shared-data",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Shared Data",
+      "properties": [
+        {
+          "id": "label",
+          "valueKind": "text",
+          "defaultValue": "Default data",
+          "displayName": "Label"
+        },
+        {
+          "id": "dependency",
+          "valueKind": "reference",
+          "displayName": "Dependency",
+          "acceptedReferences": ["project"]
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.runtime-test/unbound-data",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Unbound Data",
+      "properties": [
+        {
+          "id": "label",
+          "valueKind": "text",
+          "displayName": "Label"
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.runtime-test/text-data",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Text Data",
+      "properties": [
+        {
+          "id": "label",
+          "valueKind": "text",
+          "defaultValue": "Default text",
+          "displayName": "Label"
+        }
+      ]
     }
   ]
 }

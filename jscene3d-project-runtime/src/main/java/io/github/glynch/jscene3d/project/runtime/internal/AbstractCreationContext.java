@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.RuntimeCreationContex
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +29,7 @@ abstract class AbstractCreationContext implements RuntimeCreationContext {
     private final Map<String, ProjectValue> properties;
     private final RegisteredTypeDescriptor descriptor;
     private final EndpointRouter router;
+    private final ProjectResourceResolver resources;
     private final BooleanSupplier enabled;
 
     AbstractCreationContext(
@@ -37,6 +39,7 @@ abstract class AbstractCreationContext implements RuntimeCreationContext {
             Map<String, ProjectValue> properties,
             RegisteredTypeDescriptor descriptor,
             EndpointRouter router,
+            ProjectResourceResolver resources,
             BooleanSupplier enabled) {
         this.project = Objects.requireNonNull(project, "project");
         this.scene = Objects.requireNonNull(scene, "scene");
@@ -44,6 +47,7 @@ abstract class AbstractCreationContext implements RuntimeCreationContext {
         this.properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
         this.router = Objects.requireNonNull(router, "router");
+        this.resources = Objects.requireNonNull(resources, "resources");
         this.enabled = Objects.requireNonNull(enabled, "enabled");
     }
 
@@ -65,6 +69,11 @@ abstract class AbstractCreationContext implements RuntimeCreationContext {
     @Override
     public final Map<String, ProjectValue> properties() {
         return properties;
+    }
+
+    @Override
+    public final <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
+        return resources.resolve(reference, valueType);
     }
 
     @Override

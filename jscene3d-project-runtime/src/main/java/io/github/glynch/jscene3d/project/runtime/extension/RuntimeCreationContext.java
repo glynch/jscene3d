@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.runtime.extension;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.RuntimeAction;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayloadAction;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
@@ -14,7 +15,7 @@ import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Map;
 
 /** Capabilities shared by scene-node and controller factories. */
-public interface RuntimeCreationContext {
+public interface RuntimeCreationContext extends RuntimeResourceLookup {
     /**
      * Returns the project being composed.
      *

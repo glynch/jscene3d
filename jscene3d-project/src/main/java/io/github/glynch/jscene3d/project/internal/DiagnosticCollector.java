@@ -56,6 +56,15 @@ public final class DiagnosticCollector {
     }
 
     /**
+     * Appends existing diagnostics in their supplied order.
+     *
+     * @param values diagnostics to append
+     */
+    public void addAll(List<ProjectDiagnostic> values) {
+        diagnostics.addAll(List.copyOf(values));
+    }
+
+    /**
      * Returns whether any error prevents a validated project.
      *
      * @return {@code true} when an error has been collected

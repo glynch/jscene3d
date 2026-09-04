@@ -10,9 +10,12 @@ import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeContext;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Executable test contribution discovered through the production service boundary. */
 public final class TestRuntimeExtension implements ProjectRuntimeExtension {
@@ -21,6 +24,9 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
     private static final RegisteredType TIMER = new RegisteredType(PREFIX + "timer", 1);
     private static final RegisteredType INDICATOR = new RegisteredType(PREFIX + "indicator-3d", 1);
     private static final RegisteredType CONTROLLER = new RegisteredType(PREFIX + "toggle-controller", 1);
+    private static final RegisteredType RESOURCE_CONSUMER = new RegisteredType(PREFIX + "resource-consumer-3d", 1);
+    private static final RegisteredType SHARED_DATA = new RegisteredType(PREFIX + "shared-data", 1);
+    private static final RegisteredType TEXT_DATA = new RegisteredType(PREFIX + "text-data", 1);
 
     @Override
     public String id() {
@@ -33,6 +39,9 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
         registry.registerSceneNode(TIMER, this::createTimer);
         registry.registerSceneNode(INDICATOR, this::createIndicator);
         registry.registerNodeController(CONTROLLER, this::createController);
+        registry.registerSceneNode(RESOURCE_CONSUMER, this::createResourceConsumer);
+        registry.registerResource(SHARED_DATA, this::createSharedData);
+        registry.registerResource(TEXT_DATA, context -> "text");
     }
 
     /** Creates a root object that also proves frame and render participation. */
@@ -63,6 +72,28 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
         IndicatorObject indicator = (IndicatorObject) context.node().object();
         context.action("toggle", indicator::toggle);
         return new RecordingObject("controller");
+    }
+
+    /** Creates one node retaining a shared resolved resource. */
+    private ProjectRuntimeObject createResourceConsumer(SceneNodeContext context) {
+        ResourceReference reference = ((ProjectValue.ReferenceValue)
+                        Objects.requireNonNull(context.properties().get("resource"), "resource"))
+                .reference();
+        return new ResourceConsumerObject(
+                context.nodeDefinition().id(), context.resolveResource(reference, SharedData.class));
+    }
+
+    /** Creates one resource and resolves its optional declared dependency. */
+    private Object createSharedData(ResourceFactoryContext context) {
+        String label = ((ProjectValue.TextValue)
+                        Objects.requireNonNull(context.properties().get("label"), "label"))
+                .value();
+        ProjectValue dependencyValue = context.properties().get("dependency");
+        Optional<SharedData> dependency = Optional.empty();
+        if (dependencyValue instanceof ProjectValue.ReferenceValue referenceValue) {
+            dependency = Optional.of(context.resolveResource(referenceValue.reference(), SharedData.class));
+        }
+        return new SharedData(label, dependency);
     }
 
     /** Records common lifecycle callbacks. */
@@ -134,6 +165,50 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
         void toggle() {
             active = !active;
             TestRuntimeState.EVENTS.add("toggle:" + active);
+        }
+    }
+
+    /** Scene object retaining but not owning one resolved resource. */
+    static final class ResourceConsumerObject extends RecordingObject {
+        private final SharedData resource;
+
+        ResourceConsumerObject(String id, SharedData resource) {
+            super(id);
+            this.resource = resource;
+        }
+
+        SharedData resource() {
+            return resource;
+        }
+    }
+
+    /** Owned resource value used to observe sharing, dependencies, and closure. */
+    static final class SharedData implements AutoCloseable {
+        private final String label;
+        private final Optional<SharedData> dependency;
+        private int closeCount;
+
+        SharedData(String label, Optional<SharedData> dependency) {
+            this.label = label;
+            this.dependency = dependency;
+        }
+
+        String label() {
+            return label;
+        }
+
+        Optional<SharedData> dependency() {
+            return dependency;
+        }
+
+        int closeCount() {
+            return closeCount;
+        }
+
+        @Override
+        public void close() {
+            closeCount++;
+            TestRuntimeState.EVENTS.add("close-resource:" + label);
         }
     }
 }

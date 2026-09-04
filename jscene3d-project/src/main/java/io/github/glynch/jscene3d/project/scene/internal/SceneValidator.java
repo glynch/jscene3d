@@ -4,8 +4,6 @@
  */
 package io.github.glynch.jscene3d.project.scene.internal;
 
-import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isLocalId;
-import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isPortableLocator;
 import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isRegisteredTypeId;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,6 +11,8 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.internal.ProjectPathResolver;
+import io.github.glynch.jscene3d.project.internal.ProjectReferenceDecoder;
+import io.github.glynch.jscene3d.project.internal.ProjectSchemaReferences;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.scene.ControllerDefinition;
@@ -20,9 +20,7 @@ import io.github.glynch.jscene3d.project.scene.SceneConnection;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -53,7 +51,8 @@ public final class SceneValidator {
         diagnostics = new DiagnosticCollector(source);
         paths = new ProjectPathResolver(project.root(), diagnostics, "scene");
         fields = new ValidationContext(diagnostics, "scene");
-        values = ProjectValueDecoder.withReferences(this::validateReferenceValue);
+        ProjectReferenceDecoder references = new ProjectReferenceDecoder(project, paths, diagnostics, "scene");
+        values = ProjectValueDecoder.withReferences(references::decode);
     }
 
     /**
@@ -90,31 +89,11 @@ public final class SceneValidator {
                     "schemaVersion must be " + SCHEMA_VERSION + ": " + schemaVersion,
                     "/schemaVersion");
         }
-        if (schema != null && !isSupportedSchemaReference(schema)) {
+        if (schema != null
+                && !ProjectSchemaReferences.matches(
+                        project.root(), source, schema, SCHEMA_URI, LOCAL_SCHEMA_REFERENCE)) {
             diagnostics.warning(
                     "scene.schema.uri", "$schema does not identify the bundled Scene version 1 schema", "/$schema");
-        }
-    }
-
-    /** Recognizes the canonical URI or a project-local schema path relative to this scene. */
-    private boolean isSupportedSchemaReference(String schema) {
-        if (SCHEMA_URI.equals(schema) || LOCAL_SCHEMA_REFERENCE.equals(schema)) {
-            return true;
-        }
-        if (schema.indexOf('\\') >= 0) {
-            return false;
-        }
-        try {
-            Path reference = Path.of(schema);
-            Path sourceParent = source.getParent();
-            return !reference.isAbsolute()
-                    && sourceParent != null
-                    && sourceParent
-                            .resolve(reference)
-                            .normalize()
-                            .equals(project.root().resolve(LOCAL_SCHEMA_REFERENCE));
-        } catch (InvalidPathException ignored) {
-            return false;
         }
     }
 
@@ -267,81 +246,6 @@ public final class SceneValidator {
             return Map.of();
         }
         return values.decodeObject(raw, location).values();
-    }
-
-    /** Converts the reserved single-property resource-reference object. */
-    private ProjectValue.ReferenceValue validateReferenceValue(JsonNode raw, String location) {
-        JsonNode referenceNode = raw.get("$ref");
-        if (raw.size() != 1 || !referenceNode.isTextual()) {
-            diagnostics.error(
-                    "scene.reference.object",
-                    "a resource reference must contain only one textual $ref property",
-                    location);
-            return new ProjectValue.ReferenceValue(ResourceReference.asset("invalid"));
-        }
-        return new ProjectValue.ReferenceValue(validateReference(referenceNode.textValue(), location + "/$ref"));
-    }
-
-    /** Validates a namespaced resource reference. */
-    private ResourceReference validateReference(String value, String location) {
-        for (ResourceReference.Kind kind : ResourceReference.Kind.values()) {
-            if (value.startsWith(kind.prefix())) {
-                return validateReference(kind, value.substring(kind.prefix().length()), location);
-            }
-        }
-        diagnostics.error(
-                "scene.reference.scheme", "resource reference must use project:, asset:, or import:", location);
-        return ResourceReference.asset("invalid");
-    }
-
-    /** Validates one resource reference according to its namespace. */
-    private ResourceReference validateReference(ResourceReference.Kind kind, String locator, String location) {
-        if (locator.isBlank()) {
-            diagnostics.error("scene.reference.locator", "resource reference locator must not be blank", location);
-            return ResourceReference.asset("invalid");
-        }
-        return switch (kind) {
-            case PROJECT -> validateProjectReference(locator, location);
-            case ASSET -> validateAssetReference(locator, location);
-            case IMPORT -> validateImportReference(locator, location);
-        };
-    }
-
-    /** Validates a project-file reference. */
-    private ResourceReference validateProjectReference(String locator, String location) {
-        Optional<Path> path = paths.resolve(locator, location, true);
-        if (path.isEmpty()) {
-            return ResourceReference.project("invalid.resource", project.root().resolve("invalid.resource"));
-        }
-        return ResourceReference.project(locator, path.orElseThrow());
-    }
-
-    /** Validates a source-asset reference. */
-    private ResourceReference validateAssetReference(String locator, String location) {
-        if (!isLocalId(locator)) {
-            diagnostics.error("scene.reference.asset", "asset reference must contain a local asset id", location);
-            return ResourceReference.asset("invalid");
-        } else if (project.assets().stream().noneMatch(asset -> asset.id().equals(locator))) {
-            diagnostics.error("scene.reference.asset.missing", "asset is not declared: " + locator, location);
-        }
-        return ResourceReference.asset(locator);
-    }
-
-    /** Validates an imported-output reference. */
-    private ResourceReference validateImportReference(String locator, String location) {
-        int separator = locator.indexOf('/');
-        boolean valid = separator > 0
-                && separator < locator.length() - 1
-                && isLocalId(locator.substring(0, separator))
-                && isPortableLocator(locator.substring(separator + 1));
-        if (!valid) {
-            diagnostics.error(
-                    "scene.reference.import",
-                    "import reference must contain an import id and portable output locator",
-                    location);
-            return ResourceReference.imported("invalid/output");
-        }
-        return ResourceReference.imported(locator);
     }
 
     /** Creates a safe placeholder node while collecting a required-field error. */

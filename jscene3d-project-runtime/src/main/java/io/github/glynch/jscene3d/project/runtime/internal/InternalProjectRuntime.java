@@ -28,6 +28,7 @@ final class InternalProjectRuntime implements ProjectRuntime {
     private final List<LifecycleEntry> lifecycle;
     private final Map<String, RuntimeNode> nodes;
     private final EndpointRouter router;
+    private final ProjectResourceResolver resources;
     private boolean started;
     private boolean closed;
 
@@ -38,13 +39,15 @@ final class InternalProjectRuntime implements ProjectRuntime {
             RuntimeNode root,
             List<LifecycleEntry> lifecycle,
             Map<String, RuntimeNode> nodes,
-            EndpointRouter router) {
+            EndpointRouter router,
+            ProjectResourceResolver resources) {
         this.project = Objects.requireNonNull(project, "project");
         this.scene = Objects.requireNonNull(scene, "scene");
         this.root = Objects.requireNonNull(root, "root");
         this.lifecycle = List.copyOf(lifecycle);
         this.nodes = Collections.unmodifiableMap(new LinkedHashMap<>(nodes));
         this.router = Objects.requireNonNull(router, "router");
+        this.resources = Objects.requireNonNull(resources, "resources");
     }
 
     @Override
@@ -135,6 +138,15 @@ final class InternalProjectRuntime implements ProjectRuntime {
                 } else {
                     failure.addSuppressed(exception);
                 }
+            }
+        }
+        try {
+            resources.close();
+        } catch (RuntimeException exception) {
+            if (failure == null) {
+                failure = exception;
+            } else {
+                failure.addSuppressed(exception);
             }
         }
         if (failure != null) {

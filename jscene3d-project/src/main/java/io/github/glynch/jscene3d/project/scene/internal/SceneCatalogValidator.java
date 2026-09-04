@@ -6,12 +6,11 @@ package io.github.glynch.jscene3d.project.scene.internal;
 
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
-import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
-import io.github.glynch.jscene3d.project.internal.JsonPointers;
+import io.github.glynch.jscene3d.project.extension.internal.RegisteredPropertyValidator;
 import io.github.glynch.jscene3d.project.scene.ControllerDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneConnection;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
@@ -100,26 +99,7 @@ public final class SceneCatalogValidator {
     /** Validates authored properties against one registered type descriptor. */
     private void validateProperties(
             Map<String, ProjectValue> authored, RegisteredTypeDescriptor type, String location) {
-        for (Map.Entry<String, ProjectValue> entry : authored.entrySet()) {
-            PropertyDescriptor property = type.properties().get(entry.getKey());
-            String propertyLocation = location + "/" + JsonPointers.escapeSegment(entry.getKey());
-            if (property == null) {
-                error(
-                        "scene.catalog.property.unknown",
-                        "property is not declared by " + type.type() + ": " + entry.getKey(),
-                        propertyLocation);
-            } else if (!property.accepts(entry.getValue())) {
-                error(
-                        "scene.catalog.property.value",
-                        "property does not satisfy descriptor " + property.id(),
-                        propertyLocation);
-            }
-        }
-        for (PropertyDescriptor property : type.properties().values()) {
-            if (property.isRequired() && !authored.containsKey(property.id())) {
-                error("scene.catalog.property.required", "required property is missing: " + property.id(), location);
-            }
-        }
+        diagnostics.addAll(RegisteredPropertyValidator.validate(authored, type, source, location, "scene.catalog"));
     }
 
     /** Validates every signal-to-action connection. */

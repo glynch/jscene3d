@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerFactory;
+import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeFactory;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -14,11 +15,13 @@ import java.util.Map;
 public final class FactoryBindings {
     private final Map<RegisteredType, SceneNodeFactory> sceneNodes;
     private final Map<RegisteredType, NodeControllerFactory> controllers;
+    private final Map<RegisteredType, ResourceFactory> resources;
 
     /** Creates an empty composition-time factory index. */
     public FactoryBindings() {
         sceneNodes = new LinkedHashMap<>();
         controllers = new LinkedHashMap<>();
+        resources = new LinkedHashMap<>();
     }
 
     /**
@@ -42,6 +45,18 @@ public final class FactoryBindings {
     public void addController(RegisteredType type, NodeControllerFactory factory) {
         if (controllers.putIfAbsent(type, factory) != null) {
             throw new IllegalArgumentException("node-controller factory is already registered: " + type);
+        }
+    }
+
+    /**
+     * Adds one uniquely registered resource factory.
+     *
+     * @param type exact registered type identity
+     * @param factory trusted runtime factory
+     */
+    public void addResource(RegisteredType type, ResourceFactory factory) {
+        if (resources.putIfAbsent(type, factory) != null) {
+            throw new IllegalArgumentException("resource factory is already registered: " + type);
         }
     }
 
@@ -73,6 +88,22 @@ public final class FactoryBindings {
         if (factory == null) {
             throw new RuntimeCompositionException(
                     "runtime.factory.controller.missing", "no runtime factory is registered for " + type, location);
+        }
+        return factory;
+    }
+
+    /**
+     * Returns the required resource factory.
+     *
+     * @param type exact registered type identity
+     * @param location diagnostic location used when absent
+     * @return registered resource factory
+     */
+    public ResourceFactory requireResource(RegisteredType type, String location) {
+        ResourceFactory factory = resources.get(type);
+        if (factory == null) {
+            throw new RuntimeCompositionException(
+                    "runtime.factory.resource.missing", "no runtime factory is registered for " + type, location);
         }
         return factory;
     }

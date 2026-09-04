@@ -31,6 +31,7 @@ final class ProjectModuleDescriptorTest {
                         "io.github.glynch.jscene3d.project.diagnostic",
                         "io.github.glynch.jscene3d.project.extension",
                         "io.github.glynch.jscene3d.project.manifest",
+                        "io.github.glynch.jscene3d.project.resource",
                         "io.github.glynch.jscene3d.project.scene",
                         "io.github.glynch.jscene3d.project.value");
     }

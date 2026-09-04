@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeObject;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeContext;
+import io.github.glynch.jscene3d.project.runtime.lwjgl.Scene3dRuntimeObject;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.Map;
@@ -167,10 +168,10 @@ public final class Scene3dComposition {
             return;
         }
         ProjectRuntimeObject parentObject = context.parent().orElseThrow().object();
-        if (!(parentObject instanceof SpatialRuntimeObject spatialParent)) {
-            throw new IllegalArgumentException("3d scene nodes require a built-in spatial parent");
+        if (!(parentObject instanceof Scene3dRuntimeObject spatialParent)) {
+            throw new IllegalArgumentException("3d scene nodes require a spatial runtime parent");
         }
-        spatialParent.object().add(object);
+        spatialParent.object3d().add(object);
     }
 
     /** Selects exactly one active perspective camera. */

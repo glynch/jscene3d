@@ -197,6 +197,19 @@ final class JScene3dRuntimeExtensionTest {
                 .containsExactly("runtime.extension.registration");
     }
 
+    /** Composes and renders safely when a host needs scene objects without a render target. */
+    @Test
+    void supportsHeadlessSceneComposition() {
+        ProjectRuntimeLoadResult result = new ProjectRuntimeLoader(VERSION)
+                .load(loadedProject, getClass().getClassLoader(), List.of(JScene3dRuntimeExtension.headless()));
+
+        assertThat(result.diagnostics()).isEmpty();
+        try (GameRuntime gameRuntime = new GameRuntime(result.runtime().orElseThrow())) {
+            gameRuntime.start();
+            gameRuntime.render();
+        }
+    }
+
     /** Writes one UTF-8 project file below the temporary project root. */
     private void write(String relativePath, String content) throws IOException {
         Path target = projectDirectory.resolve(relativePath);

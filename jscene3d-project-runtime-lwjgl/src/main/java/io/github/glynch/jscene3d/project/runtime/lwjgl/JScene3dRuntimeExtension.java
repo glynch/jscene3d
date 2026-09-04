@@ -34,6 +34,17 @@ public final class JScene3dRuntimeExtension implements ProjectRuntimeExtension {
         this(new LwjglScene3dRenderHost(window, renderer));
     }
 
+    /**
+     * Creates a built-in 3d extension that composes scene objects without submitting frames.
+     *
+     * @return single-use headless extension instance
+     */
+    public static JScene3dRuntimeExtension headless() {
+        return new JScene3dRuntimeExtension((scene, camera) -> {
+            // Headless composition deliberately has no render target.
+        });
+    }
+
     /** Creates an extension around one internal render-host adapter. */
     JScene3dRuntimeExtension(Scene3dRenderHost host) {
         composition = new Scene3dComposition(Objects.requireNonNull(host, "host"));

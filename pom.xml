@@ -45,12 +45,14 @@
         <module>jscene3d-project-runtime-lwjgl</module>
         <module>jscene3d-gui</module>
         <module>jscene3d-gltf</module>
+        <module>jscene3d-wad</module>
         <module>jscene3d-example-framework</module>
         <module>jscene3d-examples</module>
         <module>jscene3d-physics-examples</module>
         <module>jscene3d-game-examples</module>
         <module>jscene3d-project-examples</module>
         <module>jscene3d-audio-examples</module>
+        <module>jscene3d-wad-examples</module>
     </modules>
 
     <properties>
@@ -211,6 +213,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-gltf</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-wad</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -165,6 +165,22 @@ JScene3D scenes, objects, and Resource Descriptions. glTF 2.0 and GLB are the
 primary formats.
 _Avoid_: Scene Persistence
 
+**WAD Archive**:
+An IWAD or PWAD container whose header and ordered opaque Lump directory have
+been validated independently of Doom maps, assets, or gameplay semantics.
+_Avoid_: Doom level, Doom game data
+
+**WAD Lump**:
+One named opaque byte range in a WAD Archive. Directory position is part of its
+identity because duplicate names are valid.
+_Avoid_: File, unique resource
+
+**WAD Archive Layers**:
+An explicit low-to-high precedence ordering of independently validated WAD
+Archives. Name lookup selects the last matching Lump without interpreting the
+name or content.
+_Avoid_: Automatic mod discovery, Doom resource namespace
+
 **glTF Support Profile**:
 The explicit, versioned list of glTF core capabilities and extensions that a
 JScene3D loader represents correctly. Unsupported required capabilities fail

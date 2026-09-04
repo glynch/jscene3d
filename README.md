@@ -202,6 +202,31 @@ version because `jpackage` does not accept the project's pre-1.0 version as a
 macOS application version; the JScene3D artifact version remains
 `0.1.0-SNAPSHOT`.
 
+## WAD archives
+
+The optional `jscene3d-wad` artifact validates IWAD and PWAD containers without
+interpreting Doom maps, assets, or gameplay. Directory ordering and duplicate
+lump names are preserved, and every archive records its source path, size, and
+SHA-256 provenance:
+
+```java
+WadLoadResult result = WadLoader.load(Path.of("content.wad"));
+WadArchive archive = result.archive().orElseThrow();
+WadLump lump = archive.lastLumpNamed("NAME").orElseThrow();
+byte[] content = archive.readAllBytes(lump, 1024 * 1024);
+```
+
+Large content can be consumed through `archive.openStream(lump)`, which returns an
+independent caller-owned stream bounded to the validated lump range. Explicit
+low-to-high precedence composition is available through `WadArchiveLayers`;
+the library never discovers layers or assigns meaning to lump names itself.
+
+Run the self-contained archive and layering example with:
+
+```shell
+./mvnw -pl jscene3d-wad-examples -am -Prun-wad-example compile
+```
+
 ## Animation
 
 The renderer-independent `io.github.glynch.jscene3d.animation` package provides
@@ -544,6 +569,8 @@ license notices, and exact selected filenames are recorded beside the assets in
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType
   text rendering.
 - `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
+- `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
+  bounded lump access, and explicit archive layering.
 - `jscene3d-game`: optional, genre-independent application lifecycle, Fixed
   Updates, semantic input actions, and interpolated Physics Bindings.
 - `jscene3d-audio`: optional OpenAL-backed clips, playback sources, positional
@@ -556,6 +583,7 @@ license notices, and exact selected filenames are recorded beside the assets in
   Engine, Physics Engine, renderer, and shared browser framework.
 - `jscene3d-audio-examples`: unpublished positional-audio and mixing examples
   using attributed CC0 sounds and music.
+- `jscene3d-wad-examples`: unpublished headless archive and layering examples.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and
 `CONTEXT.md` for the accepted version 0.1 design and terminology.

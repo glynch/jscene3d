@@ -381,11 +381,11 @@ reconciled as the grill progresses rather than relying on memory at its end.
   create connections, and change display names or tags. It does not delete,
   reparent, or rewrite generated source data.
 - Generic WAD archive access belongs in an optional `jscene3d-wad` module.
-  Doom-format maps, patches, palettes, textures, flats, sprites, and DMX sound
-  decoding belong in an optional `jscene3d-doom-format` module.
+  Doom maps, patches, palettes, textures, flats, sprites, and DMX sound
+  decoding belong in an optional `jscene3d-doom` module.
 - Actor-to-sprite selection, combat presentation, rules, inventory, campaign,
   and other game semantics remain in Doomed Corridors.
-- Standard editor and SDK distributions include WAD archive and Doom-format
+- Standard editor and SDK distributions include WAD archive and Doom-content
   support out of the box, but core, game, and physics modules do not depend on
   Doom concepts.
 - A WAD import declaration contains an explicit ordered archive stack with base
@@ -803,14 +803,14 @@ A possible final version 1 shape is:
       "requires": ">=0.1.0 <0.2.0"
     },
     {
-      "id": "io.github.glynch.jscene3d.doom-format",
+      "id": "io.github.glynch.jscene3d.doom",
       "requires": ">=0.1.0 <0.2.0"
     }
   ],
   "assets": [
     {
       "id": "freedoom",
-      "type": "io.github.glynch.jscene3d.doom-format/wad",
+      "type": "io.github.glynch.jscene3d.doom/wad",
       "path": "assets/freedoom2.wad",
       "sha256": "..."
     }
@@ -1669,7 +1669,7 @@ fingerprints, cache transactions, diagnostics, progress, cancellation, and
 provenance. A format adapter receives an import context and definition and
 returns named artifacts. It does not select cache paths, mutate authored
 project files, or publish its own results. This keeps editor and command-line
-behavior identical while allowing glTF and Doom-format adapters to produce
+behavior identical while allowing glTF and Doom adapters to produce
 different registered resource types.
 
 ### Imported artifact kinds
@@ -1693,7 +1693,7 @@ chooses physical staging and cache paths. This permits large payloads to be
 written directly to staging instead of being retained as byte arrays, while
 keeping physical machine paths out of the portable project model.
 
-For example, one Doom-format import may publish:
+For example, one Doom import may publish:
 
 ```text
 import:freedoom-map01/map
@@ -1832,7 +1832,7 @@ without authored settings use the importer defaults declared for their kind.
   "schemaVersion": 1,
   "id": "freedoom-map01",
   "source": "asset:freedoom",
-  "importer": "io.github.glynch.jscene3d.doom-format/map",
+  "importer": "io.github.glynch.jscene3d.doom/map",
   "selection": ["maps/MAP01"],
   "settings": {
     "skill": "hurt-me-plenty",
@@ -2052,14 +2052,14 @@ genre-neutral responsibilities are:
 - retain source provenance;
 - avoid graphics, audio, physics, and game-rule dependencies.
 
-This can be a deep concrete library without inventing a `WadReader` interface
-and multiple interchangeable readers. Supporting WAD files does not itself
-require an adapter hierarchy.
+This is the `jscene3d-wad` artifact. Its public interface exposes validated
+archive provenance, ordered opaque lump metadata, bounded caller-owned streams,
+allocation-limited convenience reads, and explicit low-to-high precedence
+archive layers. It does not invent a `WadReader` interface or multiple
+interchangeable readers. Supporting WAD files does not itself require an
+adapter hierarchy.
 
-An illustrative artifact name is `jscene3d-wad`. The name and publication plan
-remain open decisions.
-
-### Doom-format interpretation
+### Doom content interpretation
 
 The following capabilities are necessarily Doom-family-specific even though
 they are reusable by more than one game:
@@ -2072,9 +2072,9 @@ they are reusable by more than one game:
 - map markers and Doom naming conventions;
 - vanilla Doom and Doom II compatibility diagnostics.
 
-These belong in a separate optional Doom-format extension layered over the WAD
-archive capability. An illustrative artifact name is `jscene3d-doom-format`.
-It should describe and import the format without adding Doom concepts to the
+These belong in a separate optional Doom extension layered over the WAD
+archive capability. Its artifact name is `jscene3d-doom`. It should describe
+and import this content without adding Doom concepts to the
 Game Engine or Physics Engine.
 
 ### Doom gameplay interpretation
@@ -2092,7 +2092,7 @@ repository.
 ### Meaning of out-of-the-box support
 
 Out-of-the-box WAD support should mean that a standard JScene3D tool or editor
-distribution can include the WAD archive and Doom-format extensions, recognize
+distribution can include the WAD archive and Doom extensions, recognize
 supported WAD sources, inspect their contents, offer applicable importers, and
 create native/imported resources without requiring each developer to write a
 WAD parser.
@@ -2514,7 +2514,7 @@ The following is a first allocation for discussion:
 | Import orchestration, provenance, and cache policy | A reusable import artifact justified by glTF and WAD adapters |
 | glTF format interpretation | `jscene3d-gltf` adapter |
 | Generic WAD archive access | Optional `jscene3d-wad` artifact |
-| Doom-format decoding and import | Optional `jscene3d-doom-format` artifact |
+| Doom content decoding and import | Optional `jscene3d-doom` artifact |
 | Doom gameplay semantics | Doomed Corridors application extension and project resources |
 | General 2d and 3d physics model | `jscene3d-physics` with certified solver backends |
 | Descriptor-driven 2d and 3d edit viewports and editor-only aids | Editor application using renderer adapters |
@@ -2596,7 +2596,7 @@ decisions are recorded.
    fixtures and an engine-owned runnable example.
 7. Design import orchestration using both the existing glTF loader and current
    WAD pipeline so the seam is based on two real adapters.
-8. Separate generic WAD archive behavior from Doom-format interpretation and
+8. Separate generic WAD archive behavior from Doom content interpretation and
    decide which existing Doomed Corridors classes should migrate.
 9. Give Doomed Corridors an application extension, entry scene, project systems,
    registered types, and generic-launcher path, reusing existing domain and

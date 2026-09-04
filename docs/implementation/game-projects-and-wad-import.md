@@ -28,11 +28,13 @@ import source assets.
 - `jscene3d-game` continues to own only genre-independent lifecycle, fixed and
   rendered updates, semantic input, character movement integration, and
   Physics Bindings.
-- Source-format importers convert external content into engine-native runtime
-  representations. An importer interface will be promoted into a reusable
-  artifact only after at least two concrete formats demonstrate the seam.
-- Doomed Corridors initially owns its WAD reader, Doom map model, WAD import,
-  Doom-compatible rules, campaign state, presentation, and Freedoom content.
+- `jscene3d-project-import` owns deterministic import orchestration, source
+  inspection, generated-artifact publication, provenance, and cache policy.
+- `jscene3d-wad` owns generic validated WAD archive access and explicit archive
+  layering without interpreting lump contents.
+- Doomed Corridors owns its Doom map model and decoding until those move into
+  `jscene3d-doom`; it continues to own Doom-compatible rules, campaign state,
+  presentation, and Freedoom content.
 - The future editor is a separate application over the project, import, scene,
   and runtime interfaces. It does not own alternate implementations of them.
 
@@ -120,28 +122,25 @@ sounds, music, palettes, and other Freedoom content. It is not downloaded at
 runtime. The project records its pinned release, digest, license, notices, and
 credits. The importer never mutates the WAD.
 
-WAD parsing and Doom compatibility are separate responsibilities. The reader
-first exposes validated lump and map data without rendering or game rules. The
-importer later converts that data into engine-native geometry, textures, audio,
-collision descriptions, and Doom-specific metadata. The Doomed Corridors Game
-Provider interprets object types, actor state machines, weapons, inventory,
-linedef specials, sector behavior, exits, and campaign progression.
+WAD parsing and Doom compatibility are separate responsibilities.
+`jscene3d-wad` exposes only validated archive provenance and opaque ordered
+lumps. `jscene3d-doom` discovers maps and converts Doom content into
+engine-native geometry, textures, audio, collision descriptions, and
+Doom-specific metadata. The Doomed Corridors Game Provider interprets object
+types, actor state machines, weapons, inventory, linedef specials, sector
+behavior, exits, and campaign progression.
 
 ## Delivery sequence
 
-1. Implement Project Manifest version 1 and its headless loader in
-   `jscene3d-project`.
-2. Load a real Doomed Corridors project as the first external consumer.
-3. Pin Freedoom Phase 2 and implement headless WAD inspection with synthetic
-   fixtures and a real-WAD integration test.
-4. Decode `MAP01` into an immutable Doom map model.
-5. Generate and render static level geometry and textures.
-6. Generate collision and spawn the player from WAD thing data.
-7. Implement one complete enemy and weapon combat loop.
-8. Add doors, switches, lifts, teleports, exits, and sector effects.
-9. Complete actors, weapons, inventory, HUD, and campaign progression required
-   by the pinned Freedoom campaign.
-10. Introduce the disposable imported-resource cache from demonstrated import
-    requirements.
-11. Build the authoring GUI over the proven project, import, scene, and runtime
-    interfaces.
+1. Complete generic WAD archive access in `jscene3d-wad`.
+2. Move reusable Doom content inspection and decoding into `jscene3d-doom`,
+   implemented as a project-import extension over `jscene3d-wad`.
+3. Migrate Doomed Corridors to an application extension, authored entry scene,
+   project systems, and the generic launcher while retaining its proven game
+   behavior.
+4. Reproduce MAP01 rendering, movement, combat, enemies, HUD, audio, and
+   pickups through the new runtime.
+5. Represent ammunition drops, doors, switches, lifts, teleports, exits, and
+   sector effects through project data and registered game types.
+6. Build the authoring GUI over the proven project, import, scene, and runtime
+   interfaces.

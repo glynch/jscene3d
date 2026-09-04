@@ -18,7 +18,10 @@ import org.jspecify.annotations.Nullable;
  * @param legal nullable raw legal references
  * @param engine nullable raw engine compatibility
  * @param runtime nullable raw runtime configuration
+ * @param extensions nullable raw extension requirements
  * @param assets nullable raw source assets
+ * @param imports nullable raw import definitions
+ * @param exportPresets nullable raw export presets
  * @param catalog nullable raw catalog metadata
  */
 public record RawManifest(
@@ -30,7 +33,10 @@ public record RawManifest(
         @Nullable Legal legal,
         @Nullable Engine engine,
         @Nullable RuntimeConfiguration runtime,
+        @Nullable List<@Nullable ExtensionRequirement> extensions,
         @Nullable List<@Nullable Asset> assets,
+        @Nullable List<@Nullable String> imports,
+        @Nullable List<@Nullable String> exportPresets,
         @Nullable Catalog catalog) {
     /** Nullable raw identity. */
     record Identity(
@@ -67,14 +73,16 @@ public record RawManifest(
     /** Nullable raw engine compatibility. */
     record Engine(@Nullable String requires, @Nullable String authoredWith) {}
 
-    /** Nullable raw startup target. */
-    record Startup(@Nullable String asset, @Nullable String target) {}
-
     /** Nullable raw runtime configuration. */
     record RuntimeConfiguration(
-            @Nullable String gameProvider,
-            @Nullable Startup startup,
+            @Nullable String applicationExtension,
+            @Nullable String entryScene,
+            @Nullable String projectSystems,
             @Nullable String inputMap) {}
+
+    /** Nullable raw extension requirement. */
+    record ExtensionRequirement(
+            @Nullable String id, @Nullable String requires) {}
 
     /** Nullable raw asset source. */
     record Asset(

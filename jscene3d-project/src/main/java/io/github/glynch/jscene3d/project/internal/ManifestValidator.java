@@ -66,14 +66,18 @@ public final class ManifestValidator {
         GameProject.Legal legal = validateLegal(raw.legal());
         GameProject.EngineCompatibility engine = validateEngine(raw.engine());
         GameProject.RuntimeConfiguration runtime = validateRuntime(raw.runtime());
+        List<GameProject.ExtensionRequirement> extensions = validateExtensions(raw.extensions());
         List<GameProject.AssetSource> assets = validateAssets(raw.assets());
+        List<Path> imports = validatePathList(raw.imports(), "/imports");
+        List<Path> exportPresets = validatePathList(raw.exportPresets(), "/exportPresets");
         GameProject.Catalog catalog = validateCatalog(raw.catalog());
-        validateStartupAsset(runtime.startup(), assets);
+        validateApplicationExtension(runtime.applicationExtension(), extensions);
         if (diagnostics.hasErrors()) {
             return Optional.empty();
         }
         GameProject.Metadata metadata = new GameProject.Metadata(identity, authors, links, legal, catalog);
-        return Optional.of(new GameProject(root, metadata, engine, runtime, assets));
+        GameProject.ProjectFiles files = new GameProject.ProjectFiles(assets, imports, exportPresets);
+        return Optional.of(new GameProject(root, metadata, engine, runtime, extensions, files));
     }
 
     /** Validates the authoritative integer schema version and optional schema URI. */
@@ -209,41 +213,77 @@ public final class ManifestValidator {
         return new GameProject.EngineCompatibility(safeRequirement, authoredWith);
     }
 
-    /** Validates the Game Provider, startup target, and optional input map. */
+    /** Validates application startup and optional project-level definitions. */
     private GameProject.RuntimeConfiguration validateRuntime(RawManifest.@Nullable RuntimeConfiguration raw) {
         if (raw == null) {
             diagnostics.error("project.field.required", "runtime is required", "/runtime");
-            raw = new RawManifest.RuntimeConfiguration(null, null, null);
+            raw = new RawManifest.RuntimeConfiguration(null, null, null, null);
         }
-        String provider = requiredText(raw.gameProvider(), "/runtime/gameProvider");
-        if (!provider.isEmpty() && !isProjectId(provider)) {
+        String extension = requiredText(raw.applicationExtension(), "/runtime/applicationExtension");
+        if (!extension.isEmpty() && !isProjectId(extension)) {
             diagnostics.error(
-                    "project.runtime.provider",
-                    "runtime.gameProvider must be a lowercase reverse-domain identifier",
-                    "/runtime/gameProvider");
+                    "project.runtime.extension",
+                    "runtime.applicationExtension must be a lowercase reverse-domain identifier",
+                    "/runtime/applicationExtension");
         }
-        GameProject.StartupTarget startup = validateStartup(raw.startup());
+        Optional<Path> entryScene = requiredPath(raw.entryScene(), "/runtime/entryScene", true);
+        Optional<Path> projectSystems = optionalPath(raw.projectSystems(), "/runtime/projectSystems", true);
         Optional<Path> inputMap = optionalPath(raw.inputMap(), "/runtime/inputMap", true);
-        String safeProvider = provider.isEmpty() ? "invalid.provider" : provider;
-        return new GameProject.RuntimeConfiguration(safeProvider, startup, inputMap);
+        String safeExtension = extension.isEmpty() ? "invalid.extension" : extension;
+        Path safeEntryScene = entryScene.orElse(root.resolve("invalid.scene.json"));
+        return new GameProject.RuntimeConfiguration(safeExtension, safeEntryScene, projectSystems, inputMap);
     }
 
-    /** Validates the generic startup source and importer-specific target. */
-    private GameProject.StartupTarget validateStartup(RawManifest.@Nullable Startup raw) {
-        if (raw == null) {
-            diagnostics.error("project.field.required", "runtime.startup is required", "/runtime/startup");
-            raw = new RawManifest.Startup(null, null);
+    /** Validates extension identifiers, version requirements, and uniqueness. */
+    private List<GameProject.ExtensionRequirement> validateExtensions(
+            @Nullable List<RawManifest.@Nullable ExtensionRequirement> rawExtensions) {
+        if (rawExtensions == null || rawExtensions.isEmpty()) {
+            diagnostics.error("project.field.required", "at least one extension is required", "/extensions");
+            return List.of();
         }
-        String asset = requiredLocalId(raw.asset(), "/runtime/startup/asset");
-        String target = requiredText(raw.target(), "/runtime/startup/target");
-        return new GameProject.StartupTarget(
-                asset.isEmpty() ? "invalid" : asset, target.isEmpty() ? "invalid" : target);
+        List<GameProject.ExtensionRequirement> extensions = new ArrayList<>();
+        Set<String> identifiers = new HashSet<>();
+        for (int index = 0; index < rawExtensions.size(); index++) {
+            validateExtension(rawExtensions.get(index), index, identifiers).ifPresent(extensions::add);
+        }
+        return List.copyOf(extensions);
+    }
+
+    /** Validates one extension declaration. */
+    private Optional<GameProject.ExtensionRequirement> validateExtension(
+            RawManifest.@Nullable ExtensionRequirement raw, int index, Set<String> identifiers) {
+        String location = "/extensions/" + index;
+        if (raw == null) {
+            diagnostics.error("project.field.required", "extension must be an object", location);
+            return Optional.empty();
+        }
+        String id = requiredText(raw.id(), location + "/id");
+        if (!id.isEmpty() && !isProjectId(id)) {
+            diagnostics.error(
+                    "project.extension.id",
+                    "extension id must be a lowercase reverse-domain identifier",
+                    location + "/id");
+        }
+        if (!id.isEmpty() && !identifiers.add(id)) {
+            diagnostics.error("project.extension.duplicate", "extension id is duplicated: " + id, location + "/id");
+        }
+        String requirement = requiredText(raw.requires(), location + "/requires");
+        if (!requirement.isEmpty()
+                && EngineVersionRequirement.parse(requirement).isEmpty()) {
+            diagnostics.error(
+                    "project.extension.requirement",
+                    "extension requires must contain semantic-version comparisons",
+                    location + "/requires");
+        }
+        if (id.isEmpty() || requirement.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new GameProject.ExtensionRequirement(id, requirement));
     }
 
     /** Validates source-asset identity, path containment, and optional digest. */
     private List<GameProject.AssetSource> validateAssets(@Nullable List<RawManifest.@Nullable Asset> rawAssets) {
-        if (rawAssets == null || rawAssets.isEmpty()) {
-            diagnostics.error("project.field.required", "at least one asset source is required", "/assets");
+        if (rawAssets == null) {
             return List.of();
         }
         List<GameProject.AssetSource> assets = new ArrayList<>();
@@ -259,7 +299,7 @@ public final class ManifestValidator {
             if (!id.isEmpty() && !identifiers.add(id)) {
                 diagnostics.error("project.asset.duplicate", "asset source id is duplicated: " + id, location + "/id");
             }
-            String type = requiredLocalId(raw.type(), location + "/type");
+            String type = requiredRegisteredType(raw.type(), location + "/type");
             Optional<Path> path = requiredPath(raw.path(), location + "/path", true);
             Optional<String> digest = validateDigest(raw.sha256(), location + "/sha256");
             if (!id.isEmpty() && !type.isEmpty() && path.isPresent()) {
@@ -294,15 +334,36 @@ public final class ManifestValidator {
         return Optional.of(new GameProject.PlayerRange(raw.minimum(), raw.maximum()));
     }
 
-    /** Requires the startup source identifier to resolve inside the project descriptor. */
-    private void validateStartupAsset(GameProject.StartupTarget startup, List<GameProject.AssetSource> assets) {
-        boolean present = assets.stream().anyMatch(asset -> asset.id().equals(startup.asset()));
+    /** Requires the application extension to be declared by the project. */
+    private void validateApplicationExtension(
+            String applicationExtension, List<GameProject.ExtensionRequirement> extensions) {
+        boolean present =
+                extensions.stream().anyMatch(extension -> extension.id().equals(applicationExtension));
         if (!present) {
             diagnostics.error(
-                    "project.startup.asset",
-                    "startup asset does not identify a declared source: " + startup.asset(),
-                    "/runtime/startup/asset");
+                    "project.runtime.extension.missing",
+                    "application extension is not declared: " + applicationExtension,
+                    "/runtime/applicationExtension");
         }
+    }
+
+    /** Validates one optional list of unique project-relative paths. */
+    private List<Path> validatePathList(@Nullable List<@Nullable String> values, String location) {
+        if (values == null) {
+            return List.of();
+        }
+        List<Path> paths = new ArrayList<>();
+        Set<Path> unique = new HashSet<>();
+        for (int index = 0; index < values.size(); index++) {
+            String itemLocation = location + "/" + index;
+            Optional<Path> path = requiredPath(values.get(index), itemLocation, true);
+            if (path.isPresent() && !unique.add(path.orElseThrow())) {
+                diagnostics.error("project.path.duplicate", "project path is duplicated", itemLocation);
+            } else {
+                path.ifPresent(paths::add);
+            }
+        }
+        return List.copyOf(paths);
     }
 
     /** Validates one optional SHA-256 digest and normalizes it to lowercase. */
@@ -331,6 +392,28 @@ public final class ManifestValidator {
             diagnostics.error("project.field.identifier", "value must be a portable lowercase identifier", location);
         }
         return identifier;
+    }
+
+    /** Requires a fully qualified registered type identifier. */
+    private String requiredRegisteredType(@Nullable String value, String location) {
+        String identifier = requiredText(value, location);
+        if (!identifier.isEmpty() && !isRegisteredType(identifier)) {
+            diagnostics.error(
+                    "project.field.type",
+                    "value must contain an extension id and local type separated by one slash",
+                    location);
+        }
+        return identifier;
+    }
+
+    /** Recognizes an extension-qualified registered type identifier. */
+    private static boolean isRegisteredType(String value) {
+        int separator = value.indexOf('/');
+        return separator > 0
+                && separator == value.lastIndexOf('/')
+                && separator < value.length() - 1
+                && isProjectId(value.substring(0, separator))
+                && isLocalId(value.substring(separator + 1));
     }
 
     /** Recognizes a lowercase dotted identifier without regex backtracking. */
@@ -369,7 +452,7 @@ public final class ManifestValidator {
     /** Recognizes a portable lowercase identifier. */
     private static boolean isLocalId(String value) {
         if (value.isEmpty()
-                || !isAsciiLowercase(value.charAt(0))
+                || !isAsciiAlphaNumeric(value.charAt(0))
                 || !isAsciiAlphaNumeric(value.charAt(value.length() - 1))) {
             return false;
         }

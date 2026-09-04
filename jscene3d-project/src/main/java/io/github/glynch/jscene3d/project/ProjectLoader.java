@@ -43,7 +43,7 @@ public final class ProjectLoader {
     }
 
     /**
-     * Loads and validates a project without executing Game Provider or asset-import code.
+     * Loads and validates a project without loading extensions or executing asset-import code.
      *
      * @param projectDirectory existing project directory containing {@value #MANIFEST_NAME}
      * @return validated project or structured loading errors

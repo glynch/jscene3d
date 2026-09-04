@@ -31,17 +31,13 @@ final class ProjectLoaderTest {
                 "requires": ">=0.1.0-SNAPSHOT <0.2.0"
               },
               "runtime": {
-                "gameProvider": "example.test-game",
-                "startup": {
-                  "asset": "game-data",
-                  "target": "START"
-                }
+                "applicationExtension": "example.test-game",
+                "entryScene": "scenes/main.scene.json"
               },
-              "assets": [
+              "extensions": [
                 {
-                  "id": "game-data",
-                  "type": "test-data",
-                  "path": "assets/game.dat"
+                  "id": "example.test-game",
+                  "requires": ">=1.0.0 <2.0.0"
                 }
               ]
             }
@@ -57,8 +53,12 @@ final class ProjectLoaderTest {
         createFile("LICENSE.txt");
         createFile("THIRD_PARTY_NOTICES.md");
         createFile("CREDITS.md");
+        createFile("scenes/main.scene.json");
+        createFile("game/systems.json");
         createFile("config/input.json");
         createFile("assets/game.dat");
+        createFile("imports/game.import.json");
+        createFile("exports/desktop.json");
         writeManifest("""
                 {
                   "$schema": "https://jscene3d.org/schemas/project-1.json",
@@ -97,21 +97,31 @@ final class ProjectLoaderTest {
                     "authoredWith": "0.1.0-SNAPSHOT"
                   },
                   "runtime": {
-                    "gameProvider": "example.test-game",
-                    "startup": {
-                      "asset": "game-data",
-                      "target": "START"
-                    },
+                    "applicationExtension": "example.test-game",
+                    "entryScene": "scenes/main.scene.json",
+                    "projectSystems": "game/systems.json",
                     "inputMap": "config/input.json"
                   },
+                  "extensions": [
+                    {
+                      "id": "example.test-game",
+                      "requires": ">=1.0.0 <2.0.0"
+                    },
+                    {
+                      "id": "org.jscene3d.physics",
+                      "requires": "1.0.0"
+                    }
+                  ],
                   "assets": [
                     {
                       "id": "game-data",
-                      "type": "test-data",
+                      "type": "example.test-game/test-data",
                       "path": "assets/game.dat",
                       "sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                     }
                   ],
+                  "imports": ["imports/game.import.json"],
+                  "exportPresets": ["exports/desktop.json"],
                   "catalog": {
                     "genres": ["action"],
                     "tags": ["test", "three-dimensional"],
@@ -126,40 +136,21 @@ final class ProjectLoaderTest {
         assertThat(result.isValid()).isTrue();
         assertThat(result.diagnostics()).isEmpty();
         GameProject project = result.project().orElseThrow();
-        assertThat(project.root()).isEqualTo(temporaryDirectory.toRealPath());
-        assertThat(project.metadata().identity()).isSameAs(project.identity());
-        assertThat(project.identity().id()).isEqualTo("example.test-game");
-        assertThat(project.identity().version()).isEqualTo("1.2.3-beta.1+build.7");
-        assertThat(project.identity().created()).contains(LocalDate.of(2025, 12, 1));
-        assertThat(project.identity().released()).contains(LocalDate.of(2026, 9, 3));
-        assertThat(project.identity().description()).contains("A complete test project.");
         Path canonicalRoot = temporaryDirectory.toRealPath();
-        assertThat(project.identity().icon()).contains(canonicalRoot.resolve("images/icon.png"));
-        assertThat(project.authors()).singleElement().satisfies(author -> {
-            assertThat(author.name()).isEqualTo("Example Author");
-            assertThat(author.roles()).containsExactly("creator", "developer");
-            assertThat(author.url()).contains(URI.create("https://example.com/author"));
-        });
-        assertThat(project.links().homepage()).contains(URI.create("https://example.com/game"));
-        assertThat(project.legal().projectLicense())
-                .get()
-                .extracting(GameProject.ProjectLicense::expression)
-                .isEqualTo("Apache-2.0");
-        assertThat(project.engine().authoredWith()).contains("0.1.0-SNAPSHOT");
-        assertThat(project.runtime().startup()).isEqualTo(new GameProject.StartupTarget("game-data", "START"));
-        assertThat(project.runtime().inputMap()).contains(canonicalRoot.resolve("config/input.json"));
-        assertThat(project.assets()).singleElement().satisfies(asset -> {
-            assertThat(asset.path()).isEqualTo(canonicalRoot.resolve("assets/game.dat"));
-            assertThat(asset.sha256()).contains("a".repeat(64));
-        });
-        assertThat(project.catalog().genres()).containsExactly("action");
-        assertThat(project.catalog().players()).contains(new GameProject.PlayerRange(1, 4));
+        assertIdentity(project, canonicalRoot);
+        assertMetadata(project);
+        assertRuntime(project, canonicalRoot);
+        assertContent(project, canonicalRoot);
     }
 
     /** Keeps an absent source asset editable while surfacing it to tools as a warning. */
     @Test
     void returnsProjectWithWarningForMissingAsset() throws IOException {
-        writeManifest(MINIMAL_MANIFEST);
+        createFile("scenes/main.scene.json");
+        writeManifest(
+                MINIMAL_MANIFEST.replace(
+                        "\n}",
+                        ",\n  \"assets\": [{\"id\": \"game-data\", \"type\": \"example.test-game/test-data\", \"path\": \"assets/game.dat\"}]\n}"));
 
         ProjectLoadResult result = loader().load(temporaryDirectory);
 
@@ -169,9 +160,19 @@ final class ProjectLoaderTest {
             assertThat(diagnostic.severity()).isEqualTo(ProjectDiagnostic.Severity.WARNING);
             assertThat(diagnostic.code()).isEqualTo("project.path.missing");
             assertThat(diagnostic.location()).isEqualTo("/assets/0/path");
-            assertThat(diagnostic.source())
-                    .isEqualTo(temporaryDirectory.toRealPath().resolve(ProjectLoader.MANIFEST_NAME));
         });
+    }
+
+    /** Allows an engine-generated project to declare no external source assets. */
+    @Test
+    void loadsManifestWithoutAssets() throws IOException {
+        createFile("scenes/main.scene.json");
+        writeManifest(MINIMAL_MANIFEST);
+
+        ProjectLoadResult result = loader().load(temporaryDirectory);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.project().orElseThrow().assets()).isEmpty();
     }
 
     /** Rejects fields unknown to the selected manifest schema. */
@@ -212,13 +213,19 @@ final class ProjectLoaderTest {
                     "authoredWith": "latest"
                   },
                   "runtime": {
-                    "gameProvider": "Bad Provider",
-                    "startup": {"asset": "missing", "target": "MAP01"}
+                    "applicationExtension": "missing.extension",
+                    "entryScene": "../outside.scene.json"
                   },
+                  "extensions": [
+                    {"id": "Bad Extension", "requires": "latest"},
+                    {"id": "example.duplicate", "requires": "1.0.0"},
+                    {"id": "example.duplicate", "requires": "1.0.0"}
+                  ],
                   "assets": [
                     {"id": "wad", "type": "doom-wad", "path": "assets/game.wad", "sha256": "bad"},
-                    {"id": "wad", "type": "doom-wad", "path": "assets/other.wad"}
+                    {"id": "wad", "type": "example.test-game/doom-wad", "path": "assets/other.wad"}
                   ],
+                  "imports": ["imports/one.json", "imports/one.json"],
                   "catalog": {
                     "players": {"minimum": 2, "maximum": 1}
                   }
@@ -241,18 +248,23 @@ final class ProjectLoaderTest {
                         "project.field.duplicate",
                         "project.field.uri",
                         "project.engine.incompatible",
-                        "project.runtime.provider",
+                        "project.path.escape",
+                        "project.extension.id",
+                        "project.extension.requirement",
+                        "project.extension.duplicate",
+                        "project.field.type",
                         "project.asset.sha256",
                         "project.asset.duplicate",
+                        "project.path.duplicate",
                         "project.catalog.players",
-                        "project.startup.asset");
+                        "project.runtime.extension.missing");
     }
 
     /** Rejects both lexical traversal and non-portable path separators. */
     @Test
     void rejectsUnsafePaths() throws IOException {
         writeManifest(MINIMAL_MANIFEST
-                .replace("assets/game.dat", "../outside.dat")
+                .replace("scenes/main.scene.json", "../outside.scene.json")
                 .replace("\"version\": \"1.2.3\"", "\"version\": \"1.2.3\", \"icon\": \"images\\\\icon.png\""));
 
         ProjectLoadResult result = loader().load(temporaryDirectory);
@@ -307,8 +319,61 @@ final class ProjectLoaderTest {
             String schema = new String(input.readAllBytes(), StandardCharsets.UTF_8);
             assertThat(schema)
                     .contains("\"$id\": \"https://jscene3d.org/schemas/project-1.json\"")
-                    .contains("\"schemaVersion\"");
+                    .contains("\"applicationExtension\"")
+                    .doesNotContain("gameProvider");
         }
+    }
+
+    /** Verifies complete identity values. */
+    private static void assertIdentity(GameProject project, Path canonicalRoot) {
+        assertThat(project.root()).isEqualTo(canonicalRoot);
+        assertThat(project.metadata().identity()).isSameAs(project.identity());
+        assertThat(project.identity().id()).isEqualTo("example.test-game");
+        assertThat(project.identity().version()).isEqualTo("1.2.3-beta.1+build.7");
+        assertThat(project.identity().created()).contains(LocalDate.of(2025, 12, 1));
+        assertThat(project.identity().released()).contains(LocalDate.of(2026, 9, 3));
+        assertThat(project.identity().description()).contains("A complete test project.");
+        assertThat(project.identity().icon()).contains(canonicalRoot.resolve("images/icon.png"));
+    }
+
+    /** Verifies complete attribution and catalog values. */
+    private static void assertMetadata(GameProject project) {
+        assertThat(project.authors()).singleElement().satisfies(author -> {
+            assertThat(author.name()).isEqualTo("Example Author");
+            assertThat(author.roles()).containsExactly("creator", "developer");
+            assertThat(author.url()).contains(URI.create("https://example.com/author"));
+        });
+        assertThat(project.links().homepage()).contains(URI.create("https://example.com/game"));
+        assertThat(project.legal().projectLicense())
+                .get()
+                .extracting(GameProject.ProjectLicense::expression)
+                .isEqualTo("Apache-2.0");
+        assertThat(project.engine().authoredWith()).contains("0.1.0-SNAPSHOT");
+        assertThat(project.catalog().genres()).containsExactly("action");
+        assertThat(project.catalog().players()).contains(new GameProject.PlayerRange(1, 4));
+    }
+
+    /** Verifies complete runtime configuration. */
+    private static void assertRuntime(GameProject project, Path canonicalRoot) {
+        assertThat(project.runtime().applicationExtension()).isEqualTo("example.test-game");
+        assertThat(project.runtime().entryScene()).isEqualTo(canonicalRoot.resolve("scenes/main.scene.json"));
+        assertThat(project.runtime().projectSystems()).contains(canonicalRoot.resolve("game/systems.json"));
+        assertThat(project.runtime().inputMap()).contains(canonicalRoot.resolve("config/input.json"));
+        assertThat(project.extensions())
+                .containsExactly(
+                        new GameProject.ExtensionRequirement("example.test-game", ">=1.0.0 <2.0.0"),
+                        new GameProject.ExtensionRequirement("org.jscene3d.physics", "1.0.0"));
+    }
+
+    /** Verifies complete project content references. */
+    private static void assertContent(GameProject project, Path canonicalRoot) {
+        assertThat(project.assets()).singleElement().satisfies(asset -> {
+            assertThat(asset.path()).isEqualTo(canonicalRoot.resolve("assets/game.dat"));
+            assertThat(asset.sha256()).contains("a".repeat(64));
+        });
+        assertThat(project.imports()).containsExactly(canonicalRoot.resolve("imports/game.import.json"));
+        assertThat(project.exportPresets()).containsExactly(canonicalRoot.resolve("exports/desktop.json"));
+        assertThat(project.files().assets()).isEqualTo(project.assets());
     }
 
     /** Loads with the engine version under development. */

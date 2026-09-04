@@ -1,8 +1,10 @@
 # Game project, scene, extension, and import architecture
 
-Status: first discussion draft. This document is intentionally non-normative.
-It records a proposed direction for review and interrogation before any of the
-described interfaces or formats are implemented. It does not supersede
+Status: active discussion draft. This document is intentionally non-normative.
+It records a proposed direction and the decisions accepted during the design
+grill before any of the described interfaces or formats are implemented. The
+agreed-decision section is updated throughout the grill; later exploratory
+sections must be reconciled with it before implementation. It does not supersede
 [`game-projects-and-wad-import.md`](game-projects-and-wad-import.md) or approve
 implementation work.
 
@@ -28,8 +30,8 @@ write that same data rather than maintain a parallel editor-only model.
 This principle does not mean that arbitrary Java algorithms must be converted
 into visual graphs. Java remains a first-class way to implement behavior. The
 project records that a registered Java-backed type is used and records its
-editable configuration. The provider of that type supplies its implementation,
-validation schema, defaults, and editor metadata.
+editable configuration. The extension that owns that type supplies its
+implementation, validation schema, defaults, and editor metadata.
 
 Consequently:
 
@@ -40,17 +42,475 @@ Consequently:
 - headless and graphical callers observe the same project definitions;
 - running or editing a project never depends on reverse-engineering Java code.
 
+## Agreed design decisions
+
+This section is the incremental decision record for the design grill. It is
+authoritative within this draft when an older exploratory passage below still
+describes an unresolved alternative. The rest of the document will be
+reconciled as the grill progresses rather than relying on memory at its end.
+
+### Delivery sequencing decisions
+
+- The architecture is developed incrementally and does not need every long-term
+  engine or editor question settled before coding resumes.
+- The next implementation milestone is the generic JScene3D project framework,
+  implemented and proven inside the JScene3D repository before Doomed Corridors
+  is migrated to it.
+- The framework proof uses small synthetic project fixtures and an engine-owned
+  runnable example. It must demonstrate safe project and scene loading,
+  extension descriptors, type registration, resource resolution, runtime
+  composition, controller or system lifecycle, connections, and the generic
+  launcher without depending on Doom code.
+- The first runnable acceptance project contains a `Group3d` root, `Camera3d`,
+  a supported `Light3d` family, and `MeshInstance3d`. A repeating `Timer` signal
+  invokes a declared action on an engine-owned example controller so the proof
+  exercises descriptor discovery, controller lifecycle, stable endpoint
+  resolution, and visible state change rather than merely loading static JSON.
+- Automated tests load and exercise the same acceptance project headlessly. A
+  manual smoke test launches it through `project.json` with the generic launcher
+  and confirms the camera, lit mesh, and timer-driven change are visible.
+- Existing engine modules such as `jscene3d-core`, `jscene3d-lwjgl`,
+  `jscene3d-game`, `jscene3d-physics`, and `jscene3d-audio` are changed where the
+  framework proof demonstrates a missing generic capability. The design must
+  not pre-emptively add speculative features or move Doom-specific code into
+  those modules.
+- Only after the engine-owned framework proof passes does Doomed Corridors adopt
+  the new Project Manifest, application extension, entry scene, registered
+  types, and generic launcher.
+- The first Doomed Corridors milestone is behavioral parity with the current
+  MAP01 launcher. Ammunition drops, doors, switches, and other new interactions
+  follow parity rather than serving as the framework bootstrap.
+- Only decisions that affect that milestone are immediate implementation gates.
+  Property API names, complete node catalogs, advanced animation, alternate
+  renderer capabilities, and other unneeded branches may remain parked.
+- First-class world-2d support remains an architectural requirement. A later 2d
+  platformer project will validate the paired 2d APIs and editor workflow, but
+  that project is not a prerequisite for the next Doomed Corridors slice.
+- Near-term work must avoid assumptions that make the later 2d implementation
+  unnecessarily incompatible, while also avoiding speculative 2d code that the
+  current game does not exercise.
+- Coordinated migration work uses a `feature/project-runtime` branch in both
+  JScene3D and Doomed Corridors. Each repository's `main` branch remains the
+  stable baseline for the currently playable game.
+- The current repositories are private pre-release code. The feature branches
+  do not preserve provisional schemas, interfaces, or launch paths merely for
+  backward compatibility. Existing implementations are reused only where they
+  fit the agreed architecture.
+- The `main` branches and their tests remain available as a behavioral reference
+  while the feature branches replace the old composition path.
+- Integration proceeds in dependency order: the required JScene3D foundation
+  is integrated before the corresponding Doomed Corridors migration.
+
+### Project composition and extension loading decisions
+
+- All Java contributions use one extension model. There is no privileged
+  `GameProvider` abstraction with a separate registration mechanism.
+- A project designates exactly one extension as its application extension, but
+  that extension implements the same contracts as every other extension.
+- Project data and the entry scene own composition. The application extension
+  must not imperatively assemble relationships that should be visible in the
+  editor.
+- Maven is the initial extension-resolution authority. After the user trusts a
+  project, the editor invokes the project's Maven Wrapper in a child JVM to
+  resolve dependencies and discover extension descriptors.
+- Version 0.1 does not require a separate extension marketplace or installed
+  extension catalog.
+- Before trust, the editor may parse and display bounded declarative metadata,
+  including schema version, identity, descriptive metadata, authors, dates,
+  links, legal information, engine requirements, extension requirements, entry
+  references, source assets, and resource catalogs.
+- Before trust, project-relative paths are checked for containment and only a
+  bounded local raster project icon may be decoded. Maven, Java code, importers,
+  shaders, scene instantiation, play, and export remain disabled.
+- A malformed manifest remains inspectable through a raw view with structured
+  diagnostics.
+- The Project Manifest uses explicit typed references for its entry scene,
+  project systems, input map, import recipes, and export presets. It does not
+  contain one generic `runtime.configuration` property.
+- The current provisional Project Manifest is replaced in place. The finished
+  format remains schema version 1; no parallel version 2 loader or migration
+  path is required for private pre-release data.
+
+### Project module seam decisions
+
+- `jscene3d-project` is deepened as the renderer-independent project-data
+  module. It owns safe manifest and scene loading, resource references, type
+  descriptors, structural validation, migrations, and diagnostics.
+- `jscene3d-project` must remain usable in restricted mode without graphics,
+  audio, import execution, Maven resolution, or extension instantiation.
+- A new `jscene3d-project-runtime` module owns trusted executable composition.
+  It resolves registered types, instantiates nodes and controllers, shares
+  resources, connects signals and actions, orders project-system lifecycles,
+  and integrates with game, rendering, physics, and audio capabilities.
+- The safe loader and executable runtime each expose a small interface that
+  hides parsing, resolution, registration, factory ordering, connection setup,
+  and lifecycle details from Doomed Corridors, the editor, headless tools, and
+  exported launchers.
+- Annotation-processing ownership may be separated later if build-time
+  dependency direction requires it; that does not change the runtime seam.
+
+### Scene composition and identity decisions
+
+- One reusable scene-definition format represents complete screens, worlds,
+  actors, menus, HUD fragments, and other reusable compositions. Version 0.1
+  does not introduce a separate prefab format.
+- Every scene has one logical root and an ordered scene tree.
+- The universal scene-node model contains stable identity, registered type,
+  optional display name, parent and ordered children, enabled state, lifecycle,
+  an optional Java controller, and declared connection endpoints.
+- Spatial transforms are node properties shown as an Inspector section. A
+  transform is never represented as a child node.
+- A node may have at most one registered Java controller in version 0.1. This is
+  analogous to attaching one script to a node, but the controller type and its
+  authored properties are registered and inspectable.
+- Reusable functional objects such as timers, sensors, audio sources, and
+  animators may be child nodes. Project-wide Java code is a project system, not
+  a controller attached to a dummy root.
+- Resource types are not scene nodes. Meshes, textures, materials, animation
+  clips, audio clips, collision shapes, and similar immutable definitions are
+  reusable resources referenced by nodes.
+- Authored nodes have persistent scene-local identifiers that are separate from
+  editable display names. Renaming, reordering, or moving a node preserves its
+  identifier.
+- The editor generates opaque UUID-like identifiers by default. Hand-authored
+  readable identifiers are permitted. Duplicating a subtree generates new
+  identifiers and rewrites references internal to that duplicate.
+- Connections and animation tracks address stable identifiers rather than node
+  names or list positions. Identifiers remain hidden during ordinary editing.
+- Imported-node identifiers are deterministic combinations of the import
+  declaration identity and a source structural locator. Examples include
+  `import:freedoom-map01/sector/12` and source mesh indices in a glTF import.
+- Content hashes are not identities and version 0.1 does not perform fuzzy
+  matching when a source structure changes. An authored overlay whose target
+  disappears produces an explicit diagnostic.
+- Scene-instance overrides are limited initially to basic instance properties
+  and explicitly exported scene parameters or controller project properties.
+  Arbitrary editing of internal child structure is deferred.
+- A reusable scene owns its internal connections. Its parent may connect only
+  to explicitly exposed properties, signals, and actions on the scene instance,
+  not directly to private internal children.
+
+### Registered type and property decisions
+
+- Serialized type identifiers are always fully qualified as
+  `extension-identity/local-type`. Project data never contains Java class names
+  or unqualified type names.
+- Extensions package generated, versioned descriptors as JAR resources. The
+  editor can inspect these descriptors without instantiating runtime classes or
+  running static initializers.
+- A descriptor records type identity and scope, property metadata and defaults,
+  signals, actions, required capabilities, schema and migration information,
+  and editor presentation metadata.
+- Annotation processing is the normal way to generate descriptors and binding
+  code. An explicit descriptor is available as an advanced escape hatch.
+- Each registered type has an independent integer `typeVersion`, separate from
+  the project schema version and extension version.
+- Type migrations are deterministic, data-only, and headless. The editor
+  applies them in memory, previews their effect, and writes them only through an
+  explicit save. Unsupported values remain preserved as unresolved data with
+  diagnostics.
+- A controller's authoring properties should be declared from Java and exposed
+  in the Inspector through generated metadata, serving the same purpose as
+  Godot's exported script properties without copying its syntax.
+- Saved base values and effective runtime values are distinct. Runtime drivers,
+  including animation, temporarily affect the effective value without
+  overwriting the authored base value.
+- Property metadata must distinguish at least authoring editability, runtime
+  drivability, keyframe support, and unsaved live read-only output. These are
+  independent capabilities rather than one `editable` or `readonly` flag.
+- The annotation and enum names for those property capabilities are parked.
+  Names such as `animatable`, `RuntimeAccess`, and `ProjectOutput` are examples,
+  not accepted API terminology.
+
+### Signals, events, and actions decisions
+
+- A direct node signal represents a relationship from one specific scene
+  emitter to one or more explicitly connected targets.
+- A project event channel is a declared, typed project resource for
+  cross-scene or system-wide notifications. It is not a global static event bus
+  or a service locator.
+- A targeted action or command is distinct from an event. An event announces
+  something that happened; an action asks a known target to do something.
+- Direct node signals are delivered synchronously on the game-loop thread.
+- Project event channels use queued FIFO delivery at a defined event phase.
+  Background threads enqueue work and never dispatch directly into scene code.
+- Dispatch uses a subscription snapshot and detects runaway event cycles. There
+  is no per-connection delivery mode in version 0.1.
+- Version 0.1 supports exact payload matching, no-payload connections, and a
+  receiver explicitly ignoring a payload. It does not perform implicit
+  conversion, bound-argument insertion, filtering, mapping, or expressions.
+- A visible adapter controller or node performs any required conversion.
+- Connections are stored in one scene-owned connection list. The Inspector may
+  present incoming and outgoing views without changing that ownership model.
+- Java implementations may use private listeners for implementation details.
+  Relationships that a developer should be able to reconnect in the editor
+  belong in project data.
+
+### Project-system decisions
+
+- Project systems are developer-written and may be game-specific. A
+  `DoomCombatSystem` is valid; JScene3D does not pretend combat rules are a
+  generic engine concern.
+- A project system has one instance per running session and may survive scene
+  transitions. It is comparable to an explicit project-scoped service, not a
+  process-global singleton.
+- The base lifecycle is `start` and `close`. Fixed-step and frame-step work use
+  opt-in participant interfaces rather than forcing every system to implement
+  empty callbacks. Systems do not receive renderer callbacks.
+- Systems declare whether they run while paused.
+- System definitions declare dependencies by project-system instance identity.
+  Startup uses a deterministic topological order, declaration order breaks
+  otherwise equal ties, and closure runs in reverse order. Missing dependencies
+  and cycles are errors.
+- A dependency establishes lifecycle order but does not grant access to another
+  system's concrete object. Systems communicate through typed events, actions,
+  and deliberately narrow service contracts.
+- Systems explicitly declare required generic JScene3D capabilities. The
+  runtime supplies narrow dependencies rather than a universal engine object.
+
+### Import and WAD decisions
+
+- The shared import API standardizes orchestration rather than forcing every
+  source format into one universal content model.
+- The common workflow is inspect source, present selection and settings,
+  validate the request, produce typed artifacts through a controlled output
+  sink, and report provenance and diagnostics.
+- Importers declare identity, version, supported source types, settings schema,
+  safe source access, progress and cancellation behavior, deterministic output
+  identities, and dependency information. An importer does not choose cache
+  paths or mutate authored files.
+- Generated output combines a lightweight serialized manifest with type-specific
+  JSON or binary payloads. The manifest records logical identifiers, types and
+  versions, dependencies, payload locations and encodings, fingerprints,
+  provenance, and diagnostics.
+- Runtime representations are immutable and may be loaded lazily. Import output
+  is not limited to either direct Java objects or all-JSON serialization.
+- Large imports provide a lightweight browse index. The editor uses virtualized
+  trees, paging, lazy previews, and imported/read-only status rather than
+  loading the complete graph.
+- The source and generated output remain read-only. Authored changes are stored
+  separately and reapplied so the effective scene is the original import plus
+  an authored overlay.
+- A version 0.1 overlay may edit allowed properties, disable imported nodes,
+  attach a project controller, add authored child nodes or scene instances,
+  create connections, and change display names or tags. It does not delete,
+  reparent, or rewrite generated source data.
+- Generic WAD archive access belongs in an optional `jscene3d-wad` module.
+  Doom-format maps, patches, palettes, textures, flats, sprites, and DMX sound
+  decoding belong in an optional `jscene3d-doom-format` module.
+- Actor-to-sprite selection, combat presentation, rules, inventory, campaign,
+  and other game semantics remain in Doomed Corridors.
+- Standard editor and SDK distributions include WAD archive and Doom-format
+  support out of the box, but core, game, and physics modules do not depend on
+  Doom concepts.
+- A WAD import declaration contains an explicit ordered archive stack with base
+  and patch roles. Later archives have higher priority according to Doom
+  semantics, output retains source provenance, and changes to order or
+  fingerprints invalidate affected output. Version 0.1 does not scan arbitrary
+  directories for patches.
+
+### Editor, trust, and local-state decisions
+
+- The desktop editor is a separate `jscene3d-editor` application written in
+  Java. The existing `jscene3d-gui` module remains an in-game UI and overlay
+  library rather than becoming the desktop shell.
+- SWT is the leading desktop-toolkit choice, subject to a focused spike proving
+  menus, trees, an Inspector, a resizable OpenGL canvas, input, DPI behavior,
+  and cleanup on macOS followed by Windows and Linux.
+- Version 0.1 does not require Eclipse RCP. Small JFace components may be
+  considered later where they materially reduce editor code.
+- The renderer gains a context or render-surface seam. Standalone games retain
+  GLFW while the editor uses SWT's OpenGL canvas.
+- Project trust is explicit and applies to a canonical project directory.
+  Trust data is local to the machine and is never committed with a cloned
+  project.
+- Restricted mode permits safe metadata, structural data, raw properties,
+  connection inspection, and non-executable editing. Trusted mode enables
+  Maven, extension code, importers, shaders, play, and export.
+- Child processes provide crash isolation but are not described as a security
+  sandbox. New executable dependencies produce a renewed warning.
+- When an extension is missing, the editor preserves unresolved nodes and data,
+  shows structural and raw views with diagnostics, and permits safe file and
+  structural operations. It does not guess a specialized Inspector or discard
+  unknown values.
+- Missing required runtime types block affected play or export. A missing
+  editor-only extension need not block the game.
+- Editor-local state is stored in the operating system's application-data area,
+  keyed by stable project identity and canonical path. It includes window and
+  panel state, open documents, selection, tree expansion, editor cameras,
+  recent files, trust, and local toolchain or destination overrides.
+- Team-visible settings are explicit project resources. Generated caches are
+  separate from both project data and local editor preferences.
+- Round trips are semantically lossless rather than byte-for-byte identical.
+  Unknown valid subtrees, extension metadata, connections, values, and ordering
+  are preserved. Unsupported newer schemas open read-only or raw and are never
+  silently rewritten to an older form. Saves are atomic.
+- The edit viewport uses built-in capabilities and descriptors without running
+  project controllers. It can show meshes, instances, sprites, cameras, lights,
+  environments, collision and sensor debug shapes, audio icons and ranges, UI,
+  and descriptor-supplied placeholders.
+
+### Play, build, and export decisions
+
+- Play Current Scene and Play Project use the same application extension,
+  systems, input, resources, event processing, physics, audio, and other
+  services. They differ only in the selected entry scene.
+- A reusable scene may declare an explicit preview or test scene in project
+  data. The editor does not invent a camera, player, light, or hidden test
+  harness when required content is missing.
+- Version 0.1 play runs in a separate GLFW child process and game window. The
+  editor and child exchange a small versioned control protocol for lifecycle
+  state and structured failures. The editor does not infer state from console
+  text.
+- Embedded play, runtime inspection, and hot synchronization are later
+  capabilities.
+- The Project Manifest selects a build adapter. The initial Maven adapter uses
+  the project Maven Wrapper and fixed operations for describing, compiling,
+  discovering, playing, and preparing export. It does not search for a main
+  class, assume one POM layout, execute arbitrary shell text, or parse logs as a
+  protocol.
+- Version 0.1 uses a generic JScene3D launcher and `jpackage`-style
+  self-contained application images with a bundled Java runtime.
+- True ahead-of-time native executables for macOS, Windows, and Linux, with no
+  installed or bundled JVM, are a long-term architectural requirement rather
+  than a synonym for `jpackage`.
+- Extensions used by a true-native export are known at build time and must
+  provide required native-image metadata, including resource, reflection,
+  foreign-function, and native-library requirements.
+- Export content is computed from a transitive resource graph beginning with
+  the manifest, entry scene, systems, input map, import recipes, and export
+  preset. Globs may add deliberately unreferenced content but are not the
+  primary packaging model.
+- The first certified target is `macos-aarch64`, followed by
+  `windows-x86_64` and `linux-x86_64`. Additional architecture triples follow
+  demonstrated demand. Each target uses matching native dependencies and real
+  target smoke tests.
+
+### Rendering and resource decisions
+
+- Shared resource definitions are immutable. Per-node playback, body state,
+  health, and material overrides are separate runtime state. “Make Unique”
+  creates a new project resource instead of mutating shared data accidentally.
+- Standard material resources expose portable properties such as color,
+  textures, normals, emission, metallic and roughness values, opacity, alpha
+  policy, culling, depth, sampling, and UV settings where supported.
+- Custom shaders declare their renderer and source language explicitly. Initial
+  raw GLSL resources target OpenGL and are not claimed to be portable to every
+  future renderer. Export validates target compatibility and may later select
+  declared variants or fallbacks.
+- Instanced meshes support authored, imported, and deterministic generated
+  instance sources. Authored instances have persistent resource-local IDs;
+  imported instances use source identities; generated instances use stable
+  generator keys when editing requires identity.
+- One batched mesh instance cannot independently own children, a controller,
+  signals, audio, or physics. Such an instance must be promoted to an ordinary
+  scene node.
+
+### Dimensional model and naming decisions
+
+- World 2d is a first-class engine and editor concern, not a synonym for UI. A
+  later platformer proof will validate scene, rendering, input, physics,
+  animation, sensor, and editor architecture in two dimensions; it does not
+  block the next Doomed Corridors implementation slice.
+- Public Java types and authoring-model types use a lowercase `d` suffix, such
+  as `Camera2d`, `Camera3d`, `Object3d`, and `Sensor3d`. Serialized local IDs use
+  forms such as `camera-2d` and `sensor-3d`.
+- Concepts shared by both dimensions use the same base name with only the
+  suffix changed. A different name is used only when the concept itself is
+  dimension-specific.
+- The author-facing term is `Sensor2d` or `Sensor3d`, not `Trigger`. A trigger is
+  one possible game use of a sensor.
+- A scene tree may contain world-2d, world-3d, and screen-space UI branches.
+  Transform inheritance occurs only through compatible dimensional ancestry;
+  projection between spaces is explicit.
+- `SceneNode` is the universal structural model but is not exposed as parallel
+  `Node2d` and `Node3d` authoring types. Transform-only grouping uses `Group2d`
+  or `Group3d`; dimension-neutral organization uses `Group`.
+- World 2d uses positive X to the right, positive Y downward, and positive
+  visible rotation clockwise. One 2d world unit is one logical pixel, independent
+  of physical display pixels or DPI. Camera zoom controls display mapping.
+- World 3d remains right-handed with positive Y upward and negative Z forward.
+  One world unit is one metre.
+- Three-dimensional transforms serialize normalized quaternions. The Inspector
+  presents Euler angles in degrees. Authored angle properties also use degrees
+  and runtime implementation may convert to radians.
+- Screen-space UI is a separate capability family. It uses layout, anchors,
+  containers, focus, clipping, and responsive sizing rather than world-2d
+  transforms and cameras.
+- Visible world-2d nodes have a named render layer and integer order. Project
+  data orders layers; scene-tree order is the deterministic final tie-breaker.
+  A `Group2d` may opt into Y sorting, cameras select visible layers, and UI uses
+  its own stacking rules.
+
+### Physics decisions
+
+- Collision placement is represented by child `CollisionShape2d` or
+  `CollisionShape3d` nodes with transforms and references to reusable immutable
+  shape resources. Shapes are visible only through editor or debug overlays.
+- The completed physics architecture must support static, kinematic, character,
+  dynamic rigid-body, and sensor semantics in both dimensions. Dynamic
+  rigid-body physics is an engine requirement, but completing both solver
+  integrations does not block the first Doomed Corridors authoring slice.
+- The public JScene3D physics model is backend-independent and delegates
+  production simulation to mature solvers rather than growing the existing
+  static and kinematic collision routines into an ad hoc solver.
+- Version 0.1 ships one certified 2d backend and one certified 3d backend while
+  preserving an extension seam for later alternatives.
+- Physics project data covers collision layers and masks, materials, queries,
+  contact events, gravity, forces, impulses, damping, sleeping, continuous
+  collision detection, and an initial bounded joint or constraint set.
+- Each running scene session supplies default `PhysicsWorld2d` and
+  `PhysicsWorld3d` instances configured by explicit project resources. Instanced
+  scenes inherit their host world. An isolated world requires an explicit
+  boundary and is an advanced use case.
+
+### Animation decisions
+
+- Animation uses a dimension-neutral `Animator` scene node. It can target
+  declared properties on world-2d, world-3d, UI, material, sprite, light, and
+  audio nodes through stable node and property identifiers.
+- Selecting an `Animator` opens an integrated lower editor panel while the
+  scene tree, viewport, and Inspector remain visible. The panel provides clip
+  management, tracks, a timeline, keyframes, transport controls, snapping,
+  looping, interpolation, and key editing.
+- Animatable Inspector properties display a key control. Moving the playhead,
+  changing a property in the Inspector or viewport, and adding a key creates or
+  updates the corresponding typed track.
+- This adopts the useful property-track workflow demonstrated by Godot without
+  copying node paths, arbitrary Java method-call tracks, or a magic animation
+  name for reset behavior.
+- Animation tracks use stable node IDs and registered property IDs. They may
+  use discrete or supported interpolated values and an explicit baseline pose.
+  Scrubbing overlays values without overwriting saved scene properties.
+- Arbitrary Java methods are not animation targets. Declared actions, signals,
+  or events provide inspectable integration with project code.
+- Clips are scene-owned resources by default. The editor can extract a clip as
+  a shared resource. Initially, a shared clip targets instances of the same
+  scene definition; cross-structure reuse requires an explicit binding or
+  retargeting map.
+- `Sprite2d` and `Sprite3d` work with the general `Animator`. A “Create sprite
+  frame animation” editor operation may generate the appropriate clip and
+  tracks without introducing a separate frame-only animation system.
+- Version 0.1 includes an optional project-authored animation state machine with
+  a graph editor in the Animation panel. A project defines its own state names,
+  parameters, triggers, transitions, exit rules, priorities, and crossfades.
+- Java game code owns decisions such as movement, attacks, pain, and death. It
+  updates declared animation parameters or triggers; the generic animation
+  state machine selects presentation clips. Direct clip playback remains
+  available when no state machine is needed.
+
 ## Goals
 
 - Keep the Project Manifest small, stable, safe to inspect, and independent of
-  graphics, audio, importing, and Game Provider execution.
+  graphics, audio, importing, and extension execution.
 - Define a native, versioned scene format capable of describing a complete game
-  composition rather than only an `Object3D` hierarchy.
+  composition rather than only a render hierarchy.
 - Reuse scenes through scene instantiation instead of introducing a separate
   prefab format prematurely.
 - Support shared native resources without duplicating them at every use site.
-- Support node-scoped behavior and project-wide Java systems explicitly.
-- Let Java providers register types through stable identifiers rather than
+- Support one optional node-scoped controller and project-wide Java systems
+  explicitly.
+- Let Java extensions register types through stable identifiers rather than
   serializing implementation class names.
 - Make registered types discoverable and configurable by the future editor.
 - Preserve serialized project-authored event connections where those
@@ -59,13 +519,13 @@ Consequently:
   conventions.
 - Establish one import orchestration model for source formats such as glTF and
   Doom-compatible WADs.
-- Distinguish an editor's in-process 3D edit viewport from playable preview,
+- Distinguish an editor's in-process 2d or 3d edit viewport from playable preview,
   running the current scene, and running the complete project.
 - Define reproducible export presets that package project content, Java code,
   dependencies, a Java runtime, and platform-native libraries.
-- Establish a deliberately bounded version 0.1 catalog of 3D scene entries,
-  resources, and runtime systems without making the scene schema depend on one
-  renderer implementation.
+- Establish a deliberately bounded version 0.1 catalog of world-2d, world-3d,
+  UI, resource, and runtime capabilities without making the scene schema depend
+  on one renderer implementation.
 - Keep imported sources authoritative, imports deterministic, and derived
   output disposable.
 - Allow project-authored content to extend imported content without being
@@ -157,10 +617,11 @@ A stable type identifier contributed by JScene3D or a Java extension. Its
 descriptor defines where the type may be used, its editable properties,
 validation rules, defaults, events, actions, and editor presentation.
 
-### Behavior
+### Node controller
 
-A registered type applied to one scene entry or scene instance. Its lifetime is
-associated with that instance.
+An optional registered Java-backed type attached to one scene node. Its
+lifetime is associated with that node instance. Version 0.1 permits at most one
+controller per node; reusable functional composition uses child nodes.
 
 ### Project system definition
 
@@ -171,9 +632,10 @@ inventory.
 
 ### Java extension
 
-A packaged Java contribution that registers behaviors, project systems,
-resource types, importers, or editor descriptors. A Game Provider is the
-project's principal Java extension and may depend on additional extensions.
+A packaged Java contribution that registers node controllers, project systems,
+resource types, importers, or editor descriptors. A project designates one
+extension as its application extension, but it uses the same contracts as
+other extensions.
 
 ### Adapter
 
@@ -218,22 +680,23 @@ not changing Java code.
 
 ## Project Manifest direction
 
-The existing Project Manifest version 1 correctly separates project metadata
-from `schemaVersion`, engine compatibility, runtime selection, and source
-assets. It should remain safe to load without executing extensions or importing
-assets.
+Project Manifest schema version 1 separates descriptive metadata from
+`schemaVersion`, engine compatibility, runtime selection, and source assets. It
+remains safe to load without executing extensions or importing assets. The
+current provisional version 1 structure may be replaced freely before release;
+private pre-release files receive no compatibility promise.
 
 The current startup pair of source asset and target was useful for proving WAD
 loading, but it should evolve toward an engine-native entry scene. Source asset
 and target selection belong in an import declaration rather than serving as the
 permanent application entry point.
 
-A possible future shape is:
+A possible final version 1 shape is:
 
 ```json
 {
-  "$schema": "schema/project-2.schema.json",
-  "schemaVersion": 2,
+  "$schema": "schema/project-1.schema.json",
+  "schemaVersion": 1,
   "identity": {
     "id": "io.github.glynch.doomed-corridors",
     "name": "Doomed Corridors",
@@ -244,12 +707,16 @@ A possible future shape is:
     "requires": ">=0.1.0 <0.2.0"
   },
   "runtime": {
-    "gameProvider": "io.github.glynch.doomed-corridors",
+    "applicationExtension": "io.github.glynch.doomed-corridors",
     "entryScene": "application/main.scene.json",
-    "configuration": "game/runtime.json",
+    "projectSystems": "game/systems.json",
     "inputMap": "input/default.json"
   },
   "extensions": [
+    {
+      "id": "io.github.glynch.doomed-corridors",
+      "requires": ">=0.1.0 <0.2.0"
+    },
     {
       "id": "io.github.glynch.jscene3d.doom-format",
       "requires": ">=0.1.0 <0.2.0"
@@ -258,19 +725,25 @@ A possible future shape is:
   "assets": [
     {
       "id": "freedoom",
-      "type": "wad",
+      "type": "io.github.glynch.jscene3d.doom-format/wad",
       "path": "assets/freedoom2.wad",
       "sha256": "..."
     }
   ],
-  "imports": ["imports/freedoom-map01.import.json"]
+  "imports": ["imports/freedoom-map01.import.json"],
+  "exportPresets": ["exports/desktop.json"]
 }
 ```
 
-This is an illustrative example rather than a proposed final schema. Questions
-still to resolve include whether extension requirements belong in the Project
-Manifest, an application package descriptor, or both, and whether a single Game
-Provider remains sufficient.
+This is the settled Project Manifest version 1 direction for the first
+framework increment. The application extension must also occur in
+`extensions`. Extension requirements use semantic-version comparisons. Asset
+types use an extension-qualified registered type identifier. `assets`,
+`imports`, `exportPresets`, `projectSystems`, and `inputMap` are optional; this
+allows a generated engine example to start from a scene without pretending it
+has external source assets. All file paths use forward-slash project-relative
+syntax on disk and become normalized paths confined to the project root only
+after safe loading.
 
 ## Native scene model
 
@@ -284,17 +757,17 @@ Introducing both `scene` and `prefab` formats would duplicate identity,
 properties, resource references, nesting, validation, overrides, and event
 connections before a demonstrated semantic difference exists.
 
-### Broader than an `Object3D` tree
+### Broader than a render tree
 
 A complete game composition contains more than rendered spatial objects. It may
-also contain collision descriptions, audio emitters, user-interface elements,
-timers, behaviors, and references to project systems. Therefore the serialized
-scene model should not assume that every entry is an `Object3D`.
+also contain collision, audio, user-interface elements, timers, animators, node
+controllers, and references to project systems. Therefore the serialized scene
+model uses one universal structural node rather than assuming every entry is a
+render object.
 
-The scene loader can create `Object3D` instances for registered spatial types,
-but the serialized hierarchy represents game composition. Whether spatial and
-user-interface entries ultimately share one root abstraction is an open design
-question and should be proven with both a 3D world and a menu/HUD composition.
+Registered node capabilities create the appropriate world-2d, world-3d, UI,
+audio, or physics runtime objects. All capabilities share one logical scene
+root, while transform inheritance remains dimension-specific.
 
 ### Stable identities
 
@@ -316,7 +789,8 @@ imports appear modified on every run.
   "id": "main",
   "root": {
     "id": "application",
-    "type": "jscene3d/game-root",
+    "type": "io.github.glynch.jscene3d/group-3d",
+    "typeVersion": 1,
     "children": [
       {
         "id": "world",
@@ -334,16 +808,27 @@ imports appear modified on every run.
   },
   "connections": [
     {
-      "from": "system:combat/player-health-changed",
-      "to": "node:hud/set-health"
+      "from": {
+        "node": "combat",
+        "signal": "player-health-changed"
+      },
+      "to": {
+        "node": "hud",
+        "action": "set-health"
+      }
     }
   ]
 }
 ```
 
-This example intentionally shows concepts, not settled connection syntax. A
-final design must define endpoint types, payload compatibility, multiplicity,
-lifecycle, connection ordering, and diagnostic behavior.
+Scene version 1 settles stable node identifiers, registered typed nodes, nested
+scene instances, optional controllers, ordered children, editable properties,
+bounded instance overrides, and scene-level signal-to-action connections.
+Registered node and controller references contain an extension-qualified
+`type` plus a positive `typeVersion`. A node declares exactly one of a typed
+source or an `instance`. The first loader verifies node identity, endpoint
+existence, path safety, and reference syntax; descriptor-aware payload and
+endpoint compatibility belongs to the registered-type catalog increment.
 
 ### Instance overrides
 
@@ -356,8 +841,8 @@ declared editable by the registered type.
   "id": "guard-west",
   "instance": "../actors/zombieman.scene.json",
   "overrides": {
-    "transform.position": [-128, 0, 256],
-    "awareness.sightRange": 1536
+    "position": [-128, 0, 256],
+    "sight-range": 1536
   }
 }
 ```
@@ -377,27 +862,41 @@ and mutability interface permits it.
 ```json
 {
   "id": "zombieman-visual",
-  "type": "jscene3d/animated-billboard",
+  "type": "io.github.glynch.doomed-corridors/animated-billboard-3d",
+  "typeVersion": 1,
   "properties": {
-    "animations": "resource:actors/zombieman-animations",
-    "material": "resource:materials/actor-sprite"
+    "animations": {
+      "$ref": "project:actors/zombieman-animations.json"
+    },
+    "material": {
+      "$ref": "import:freedoom-map01/materials/actor-sprite"
+    },
+    "source": {
+      "$ref": "asset:freedoom"
+    }
   }
 }
 ```
 
-The final design must distinguish project-relative file references, declared
-resource identifiers, imported-resource references, and runtime-only object
-references. A URI-like syntax may make those categories explicit, but it should
-not be adopted until resolution and error behavior are specified.
+Scene version 1 distinguishes three explicit resource namespaces:
 
-## Three-dimensional scene and resource model
+- `project:` locates a project-relative file and is confined to the project
+  root during loading;
+- `asset:` names an authoritative source asset declared by the manifest;
+- `import:` names an import identifier followed by a portable output locator.
 
-Godot is useful here as an established product reference, not as a format or
-API to reproduce. Its stable documentation separates a hierarchical 3D entry
-with a local transform from reusable resource data, and separates the editor's
-3D viewport from the camera and environment that ship with the game. It also
+A reference is represented by an object containing only `$ref`; ordinary text
+therefore remains ordinary text. Runtime-only object references are deliberately
+excluded from persisted property values.
+
+## Dimensional scene and resource model
+
+Godot is useful here as an established product reference, not as a format, API,
+or node catalog to reproduce. Its stable documentation separates hierarchical
+world objects with local transforms from reusable resource data, and separates
+editor viewports from cameras and environments that ship with a game. It also
 uses the same saved-scene concept for a whole level and an instanced reusable
-object. These observations support, but do not by themselves settle, the scene
+object. These observations support, but do not by themselves define, the scene
 and resource decisions in this draft. See Godot's
 [introduction to 3D](https://docs.godotengine.org/en/stable/tutorials/3d/introduction_to_3d.html),
 [nodes and scenes](https://docs.godotengine.org/en/stable/getting_started/step_by_step/nodes_and_scenes.html),
@@ -407,11 +906,11 @@ documentation.
 ### Entries declare composition; resources hold reusable data
 
 The JScene3D scene format should model visible composition through typed scene
-entries. A spatial entry has a parent-relative transform and may own children,
-but mesh data, materials, textures, animation clips, audio clips, and collision
-shapes should be reusable resources referenced by entries. This prevents every
-instance from duplicating large data and lets an importer emit one resource
-that many authored entries can use.
+nodes. A world-2d or world-3d node has a parent-relative transform and may own
+children, but mesh data, materials, textures, animation clips, audio clips, and
+collision shapes are reusable resources referenced by nodes. This prevents
+every instance from duplicating large data and lets an importer emit one
+resource that many authored nodes can use.
 
 This separation is more important than matching another engine's type names.
 For example, a mesh instance entry might reference a mesh resource and an
@@ -426,24 +925,26 @@ Mutable per-instance animation state, playback position, physics pose, and
 material parameter overrides are runtime instance state and must not mutate a
 shared project resource accidentally.
 
-### Baseline 3D capability families
+### Baseline capability families across dimensions
 
-The native model should have a place for the following capability families.
-The last column is a recommendation for project-format version 0.1, not a
-claim about Godot's scope.
+The native model should have a place for the following capability families in
+world 2d, world 3d, or UI where the concept genuinely exists. The last column is
+a recommendation for project-format version 0.1, not a claim about another
+engine's scope.
 
-| Capability | Scene composition | Reusable or derived data | Recommended version 0.1 scope |
+| Capability | Scene composition | Reusable or derived data | Version 0.1 scope |
 | --- | --- | --- | --- |
-| Spatial hierarchy | Transform-bearing entries and scene instances | None beyond scene data | Required |
-| Mesh rendering | Mesh instance and instanced-mesh entries | Geometry, material, texture, and instance transforms | Mesh instance required; instanced mesh supported where the renderer already can |
-| Sprite in 3D | Billboard and animated-billboard entries | Image regions and sprite animation sets | Required for Doomed Corridors |
-| Camera and viewport | Perspective or orthographic camera entry assigned to an output | Render-target and viewport settings | One game viewport and active camera required; sub-viewports later |
-| Lighting and environment | Ambient, hemisphere, directional, point, and spot light entries; scene environment reference | Environment maps and environment settings | Existing light types plus a minimal environment resource |
+| Scene hierarchy | `Group`, dimension-specific groups, concrete nodes, and scene instances | None beyond scene data | One logical tree supporting world 2d, world 3d, and UI |
+| Mesh rendering | Dimension-specific mesh-instance and instanced-mesh nodes where supported | Geometry, material, texture, and instance transforms | Existing world-3d mesh capabilities plus a deliberate world-2d mesh contract |
+| Sprites | `Sprite2d` or `Sprite3d` composed with an `Animator` when animated | Images, texture regions, and animation clips | Required in both dimensions |
+| Camera and viewport | Dimension-specific cameras assigned to an output | Render-target and viewport settings | One primary output and active camera; sub-viewports later |
+| Lighting and environment | Dimension-appropriate light nodes and explicit world environment references | Environment maps and environment settings | Existing world-3d lights; world-2d lighting must be designed with its renderer |
 | Materials and shaders | Material references and bounded per-instance overrides | Standard and shader material resources | Existing materials and inspectable custom spatial shaders required |
-| Animation | Animation player or behavior references clips and targets | Transform, morph, skeletal, and sprite clips | Existing transform, morph, skeletal, and sprite playback; advanced blend graphs later |
-| Physics and collision | Static body, kinematic body, sensor, and character configuration | Primitive and generated collision shapes | Existing supported shapes and character motion required |
-| Audio | Listener and spatial or non-spatial source entries | Audio clips and playback configuration | Existing audio capabilities required |
-| User interface | Non-spatial hierarchy for menus and HUD | Images, fonts, themes, and layout data | Small HUD and menu composition proof required |
+| Animation | A dimension-neutral `Animator` targets registered properties | Transform, morph, skeletal, sprite, and general property clips | Timeline editing and a basic animation state machine required |
+| Physics and collision | Static, kinematic, character, rigid-body, sensor, shape, and joint nodes in both dimensions | Primitive, imported, and generated shape resources | Full dynamic simulation through certified backends in both dimensions |
+| Audio | Dimension-specific spatial sources and listeners plus non-spatial playback | Audio clips and playback configuration | Existing audio capabilities generalized across both dimensions |
+| User interface | A separate UI hierarchy for menus and HUDs | Images, fonts, themes, and layout data | Small HUD and menu composition proof required |
+| Tile maps | World-2d tile-map authoring and rendering | Tile sets, layers, collision, and source provenance | Required by the platformer proof; exact first schema remains to design |
 | Navigation | Regions, links, agents, and obstacles connected to a navigation world | Navigation mesh or graph derived data | Long-term; custom game navigation remains possible |
 | Particles | Emitter entries and collision or attraction entries | Emitter settings, materials, and particle shaders | Long-term |
 | Visibility optimization | Per-instance ranges, hierarchy proxies, occluders, and renderer settings | LOD meshes and baked occlusion data | Long-term and renderer-capability driven |
@@ -491,7 +992,7 @@ to those supported capabilities.
 
 All instances in a batch share geometry and material structure, render
 callbacks occur for the batch, and transparent instances cannot be sorted as
-independent objects. An instance that needs its own children, behavior,
+independent objects. An instance that needs its own children, controller,
 event connections, audio, physics body, or independently ordered transparent
 rendering should normally be an ordinary scene instance instead. The editor
 may offer a populate or conversion tool, but its result must be inspectable
@@ -568,19 +1069,22 @@ index, or pathfinding data structure. Runtime systems build optimized state
 from the declared composition and referenced resources.
 
 JScene3D already has transform, morph, skeletal, and sprite animation
-capabilities. Version 0.1 should serialize clips, targets, playback selection,
-looping, and project-authored animation events that those capabilities can
-honor. A later animation graph can add state machines and blend spaces without
-changing the identity of the animated entry. Godot's split between property
-animation and a higher-level animation tree demonstrates this distinction; see
+capabilities. Version 0.1 should serialize clips, stable property targets,
+playback selection, looping, interpolation, baseline values, and
+project-authored animation events. It also includes a basic project-authored
+animation state machine; advanced blend trees and multidimensional blend spaces
+remain later capabilities. Godot's split between property animation and a
+higher-level animation tree demonstrates this distinction; see
 [AnimationTree](https://docs.godotengine.org/en/stable/tutorials/animation/animation_tree.html).
 
-Physics serialization should distinguish a body from its reusable shape and
-should make static, kinematic, character, and sensor semantics explicit. The
-editor may offer derived collision generation, but imported render meshes must
-not automatically become expensive dynamic triangle collision. Godot likewise
-recommends primitive shapes for dynamic bodies and concave shapes for static
-level collision. See [3D collision shapes](https://docs.godotengine.org/en/stable/tutorials/physics/collision_shapes_3d.html).
+Physics serialization distinguishes a body node from child collision-shape
+nodes, each of which references reusable shape data. Static, kinematic,
+character, rigid-body, sensor, and joint semantics are explicit in both
+dimensions. The editor may offer derived collision generation, but imported
+render meshes must not automatically become expensive dynamic triangle
+collision. Godot likewise recommends primitive shapes for dynamic bodies and
+concave shapes for static level collision. See
+[3D collision shapes](https://docs.godotengine.org/en/stable/tutorials/physics/collision_shapes_3d.html).
 
 Navigation should be an optional world capability rather than assumed actor
 behavior. A navigation resource may be imported or baked from geometry;
@@ -625,11 +1129,16 @@ and [GridMap](https://docs.godotengine.org/en/stable/classes/class_gridmap.html)
 
 ### Coordinate and unit contract
 
-The scene format must state its coordinate handedness, up axis, forward axis,
-angle units, distance units, and conversion rules. Import adapters should
-normalize source formats deliberately and record provenance rather than let
-each presentation path guess. The editor grid, transform inspector, physics,
-audio attenuation, navigation, and runtime must all use the same contract.
+World 3d is right-handed, positive Y is up, negative Z is forward, and one unit
+is one metre. World 2d uses positive X to the right, positive Y downward,
+clockwise positive visible rotation, and one unit per logical pixel. UI also
+uses logical pixels but has a separate layout coordinate system.
+
+Three-dimensional transforms serialize normalized quaternions. The Inspector
+edits Euler angles in degrees, and authored angle properties use degrees.
+Import adapters normalize source formats deliberately and record provenance
+rather than let presentation code guess. The editor grid, Inspector, physics,
+audio attenuation, navigation, and runtime use these same contracts.
 
 Godot's explicit Y-up, right-handed, metre-based convention shows the product
 value of settling this early, but JScene3D must document its own existing
@@ -643,8 +1152,8 @@ in project data. A registered type descriptor should include at least:
 
 - a globally stable identifier;
 - a display name and description;
-- its allowed scope, such as scene entry, behavior, project system, resource,
-  or importer;
+- its allowed scope, such as scene node, node controller, project system,
+  resource, or importer;
 - a versioned configuration schema;
 - defaults;
 - editor categories, ranges, units, and resource-reference constraints;
@@ -668,7 +1177,7 @@ Project data should contain:
 
 ```json
 {
-  "type": "io.github.glynch.doomed-corridors/zombieman-behavior"
+  "type": "io.github.glynch.doomed-corridors/zombieman-controller"
 }
 ```
 
@@ -680,28 +1189,31 @@ It should not contain:
 }
 ```
 
-The provider maps a stable type identifier to an implementation. This permits
+The owning extension maps a stable type identifier to an implementation. This permits
 implementation refactoring, JPMS encapsulation, validation before
 instantiation, and useful diagnostics when an extension is missing.
 
 ## Java extension scopes
 
-### Scene behavior
+### Node controller extension scope
 
-A scene behavior has one instance for one scene entry or instantiated scene. It
-receives only the scoped runtime facilities and references it declares. Typical
-examples include actor movement, an interactive switch, a camera controller, or
-a door mover.
+A node controller has one instance for one scene node. A node has zero or one
+controller in version 0.1. The controller receives only the scoped runtime
+facilities and references it declares. Typical examples include actor movement,
+an interactive switch, a camera controller, or a door mover.
 
 ```json
 {
   "id": "door-motion",
-  "type": "io.github.glynch.doomed-corridors/sector-door",
-  "properties": {
-    "sector": "import:freedoom-map01/sector/12",
-    "speed": 2.0,
-    "wait": "PT4S",
-    "movement": "open-wait-close"
+  "type": "io.github.glynch.jscene3d/group-3d",
+  "controller": {
+    "type": "io.github.glynch.doomed-corridors/sector-door-controller",
+    "properties": {
+      "sector": "import:freedoom-map01/sector/12",
+      "speed": 2.0,
+      "wait": "PT4S",
+      "movement": "open-wait-close"
+    }
   }
 }
 ```
@@ -736,12 +1248,10 @@ changes according to its declared lifecycle.
 }
 ```
 
-Project systems should receive a project-scoped runtime context rather than
-access process-wide mutable singletons. The lifecycle must define creation,
-startup, fixed update, rendered update, scene-change notification, stopping,
-and closure only where each phase is genuinely required. A single deep runtime
-interface is preferable to exposing loader, registry, renderer, physics, audio,
-and cache implementation details to every system.
+Project systems receive declared narrow capabilities rather than process-wide
+mutable singletons. Their base lifecycle contains startup and closure. Fixed or
+frame updates are opt-in participant interfaces, and systems do not receive
+renderer callbacks.
 
 Ordering should be derived from explicit dependencies or a small number of
 well-defined phases. A manually ordered list whose correctness depends on
@@ -755,13 +1265,12 @@ source asset and returns imported resources plus structured diagnostics and
 provenance. It must not mutate the source or silently write project-authored
 documents.
 
-### Application lifecycle extension
+### Application extension
 
-Some applications may require Java code around project startup, scene
-selection, or shutdown. This should be represented by an explicit provider or
-project system lifecycle rather than requiring an invisible root scene node.
-The design should avoid adding a separate lifecycle extension category if the
-Game Provider and project systems already cover the demonstrated cases.
+Every project designates one application extension. It uses the same extension
+contracts as additional dependencies and does not gain a privileged imperative
+assembly API. Project systems and scene controllers provide the required
+lifecycles without an invisible root node.
 
 ### Editor extension
 
@@ -777,7 +1286,7 @@ The following sketches illustrate responsibility and depth. They are not
 proposed source-ready signatures.
 
 ```java
-public interface GameExtension {
+public interface ProjectExtension {
     ExtensionDescriptor descriptor();
 
     void contribute(GameTypeCatalog catalog);
@@ -787,20 +1296,12 @@ public interface GameExtension {
 ```java
 public interface ProjectSystem extends AutoCloseable {
     void start(ProjectRuntimeContext context);
-
-    void fixedUpdate(FixedUpdate update);
-
-    void frameUpdate(FrameUpdate update);
-
-    void stop();
 }
 ```
 
-The second sketch may expose too much lifecycle surface. Before implementation,
-it should be tested against at least combat, campaign progression, and save
-management. Systems that do not need every callback should not be forced to
-implement empty methods, and splitting every callback into a separate shallow
-interface would also be undesirable.
+Separate opt-in interfaces participate in fixed or frame updates. Exact names
+must be tested against combat, campaign progression, save management, and other
+real systems before becoming public API.
 
 The external runtime seam should remain small. Conceptually:
 
@@ -859,8 +1360,8 @@ implementation details.
 The recommended version 0.1 event contract is deliberately smaller than a
 general message bus:
 
-- registered scene entries, behaviors, and project systems declare named event
-  outputs and action inputs in their descriptors;
+- registered scene nodes, node controllers, and project systems declare named
+  signal or event outputs and action inputs in their descriptors;
 - payload types use stable registered identifiers with schemas the editor and
   headless validator can inspect;
 - a serialized connection targets an action identifier, never an arbitrary
@@ -896,9 +1397,10 @@ represented cleanly.
 
 ## Input actions
 
-Input maps are project resources, not hard-coded launcher behavior. Behaviors
-consume semantic actions such as `move-forward`, `turn-left`, or `fire`, while
-an input map binds keys, mouse buttons, pointer motion, and controllers.
+Input maps are project resources, not hard-coded launcher behavior. Node
+controllers and project systems consume semantic actions such as
+`move-forward`, `turn-left`, or `fire`, while an input map binds keys, mouse
+buttons, pointer motion, and controllers.
 
 The existing `jscene3d-game` `InputMap` and `ActionSnapshot` provide the runtime
 foundation. A native input-map resource should be a serializable description
@@ -924,7 +1426,7 @@ that creates the same runtime model.
 }
 ```
 
-Defaults supplied by a provider may seed a new project, but once bindings are
+Defaults supplied by an extension may seed a new project, but once bindings are
 part of a project they must be data the editor can inspect and change.
 
 ## Source import architecture
@@ -1126,19 +1628,34 @@ The next features should validate the architecture rather than bypass it.
 
 The fact that a zombieman drops an ammunition clip is project-authored gameplay
 configuration. It can be represented as a declared death connection or a drop
-configuration consumed by a registered behavior.
+configuration consumed by a registered child node and controller.
 
 ```json
 {
-  "id": "zombieman",
-  "type": "io.github.glynch.doomed-corridors/actor",
-  "behaviors": [
-    {
-      "type": "io.github.glynch.doomed-corridors/drop-on-death",
-      "properties": {
-        "scene": "../pickups/ammunition-clip.scene.json",
-        "chance": 1.0
+  "root": {
+    "id": "zombieman",
+    "type": "io.github.glynch.jscene3d/character-body-3d",
+    "controller": {
+      "type": "io.github.glynch.doomed-corridors/zombieman-controller"
+    },
+    "children": [
+      {
+        "id": "death-drop",
+        "type": "io.github.glynch.jscene3d/group-3d",
+        "controller": {
+          "type": "io.github.glynch.doomed-corridors/drop-spawner-controller",
+          "properties": {
+            "scene": "../pickups/ammunition-clip.scene.json",
+            "chance": 1.0
+          }
+        }
       }
+    ]
+  },
+  "connections": [
+    {
+      "from": "node:zombieman/died",
+      "to": "node:death-drop/spawn"
     }
   ]
 }
@@ -1152,7 +1669,7 @@ choice of dropped scene and chance remain visible and editable.
 A Doom door combines imported source identity, activation rules, sector motion,
 timing, collision updates, sound, and presentation. The WAD adapter recognizes
 the linedef special and produces deterministic imported metadata. Registered
-Doomed Corridors behaviors interpret that metadata.
+Doomed Corridors controllers and project systems interpret that metadata.
 
 Properties likely to be editable include activation mode, repeatability, key
 requirement, speed, destination rule, wait duration, sound set, and target
@@ -1172,7 +1689,7 @@ A switch is a useful proof of serialized connections:
 
 The WAD adapter can generate that relationship from tags and specials. An
 author can inspect and, where allowed, override it in the editor. The switch's
-visual state and sound are resources referenced by its registered behavior.
+visual state and sound are resources referenced by its registered controller.
 
 ### Lifts, teleports, exits, and sector effects
 
@@ -1184,13 +1701,13 @@ and extension design has failed to provide sufficient leverage.
 
 The editor should expose three deliberately different operations:
 
-- **Edit scene** renders project data in an editor-owned 3D viewport with an
-  editor camera, selection, transform gizmos, grid, debug overlays, and optional
-  preview lighting. It must not start the game loop or execute arbitrary
-  project Java code merely to display standard registered types.
+- **Edit scene** renders project data in an editor-owned 2d, 3d, or UI viewport
+  with editor cameras, selection, transform gizmos, grids, debug overlays, and
+  optional preview lighting. It must not start the game loop or execute project
+  controllers merely to display standard registered types.
 - **Play current scene** starts a playable session at the open scene. The
-  runtime composition interface must define which project systems and input
-  configuration form its test harness.
+  application extension, project systems, input, events, physics, audio, and
+  services are the same as Play Project; only the entry scene changes.
 - **Play project** starts from the Project Manifest's entry scene exactly as a
   packaged application would.
 
@@ -1210,21 +1727,21 @@ later without moving gameplay into the editor JVM. Process isolation prevents a
 project crash, `System.exit`, runaway game loop, or native renderer failure from
 taking down the editor.
 
-The editor should launch the project's Maven Wrapper rather than assume a
-globally installed Maven. The project build owns Java compilation and runtime
-dependency resolution. A small, versioned preview protocol may later support
-ready/stopped/error state, structured diagnostics, pause, frame advance, scene
-tree snapshots, selected-property inspection, and camera override. It must not
-promise persistence of runtime mutations. Durable changes target the local
-authored scene and are then synchronized or applied on the next run.
+The editor launches the project's Maven Wrapper through a declared Maven build
+adapter rather than assuming a globally installed Maven or one POM layout. The
+project build owns Java compilation and dependency resolution. The version 0.1
+child protocol reports lifecycle state and structured failures. Scene-tree
+snapshots, runtime property inspection, embedded play, and hot synchronization
+are later protocol capabilities and must not imply that runtime mutations are
+saved.
 
 The complete conceptual sequence is:
 
 1. Load `project.json` safely through `jscene3d-project`.
-2. Display basic identity, icon, compatibility, source assets, and missing
-   extension diagnostics without executing Game Provider code.
-3. After the project is trusted, discover installed extensions and their type
-   descriptors.
+2. Display safe identity, authorship, icon, compatibility, source assets, and
+   extension diagnostics without executing extension code.
+3. After the project is trusted, invoke the Maven build adapter in a child JVM
+   and discover extension descriptors.
 4. Validate referenced resources against structural schemas and registered
    semantic rules.
 5. Inspect source assets and run explicit or automatic deterministic imports.
@@ -1240,15 +1757,16 @@ The complete conceptual sequence is:
 11. Build exports from named, validated export presets.
 
 Editor-only state such as panel layout, expanded tree nodes, recent selections,
-local cache paths, and window position stays outside the shared project
+editor cameras, trust, local toolchain overrides, and window position stays in
+the operating system's application-data area outside shared project
 definitions.
 
 ## Export and distribution
 
 Export is not a copy of the source directory. It is a reproducible build that
-selects project content, compiles Java code, resolves runtime dependencies,
-chooses platform-native libraries, creates a Java runtime image, and produces a
-launchable distribution for one target.
+walks the project's transitive resource graph, compiles Java code, resolves
+runtime dependencies, chooses platform-native libraries, and produces a
+launchable distribution for one declared target.
 
 Godot separates named export presets from export templates and can emit either
 a playable build or a content pack. It also distinguishes committed presets
@@ -1266,10 +1784,8 @@ An illustrative JScene3D export preset is:
   "platform": "macos",
   "architecture": "aarch64",
   "format": "application-image",
-  "mainClass": "io.github.glynch.doomedcorridors.DoomedCorridors",
   "content": {
-    "include": ["project.json", "scenes/**", "game/**", "assets/**"],
-    "exclude": ["target/**"]
+    "additional": ["licenses/THIRD-PARTY.txt"]
   },
   "java": {
     "runtimeImage": "linked",
@@ -1278,11 +1794,12 @@ An illustrative JScene3D export preset is:
 }
 ```
 
-The syntax and values are illustrative. The final preset must reference an
-application entry definition instead of duplicating a Java main class if the
-project runtime can supply one generic launcher. Content selection must be
-dependency-aware so a referenced scene, resource, imported output, WAD, or
-license file is not accidentally omitted by a glob.
+The syntax and values are illustrative. Version 0.1 uses a generic JScene3D
+launcher and the Project Manifest's application definition rather than a
+project main class. Content selection follows typed references so a scene,
+resource, imported output, source asset, provenance record, or license is not
+accidentally omitted. Globs may deliberately add otherwise unreferenced content
+but are not the primary closure mechanism.
 
 Maven should remain the Java build authority. An export component can ask the
 project build for compiled application artifacts and a resolved runtime
@@ -1300,11 +1817,18 @@ libraries for a target. Therefore macOS, Windows, and Linux outputs should be
 built and smoke-tested on corresponding build hosts. The preset is portable;
 the generated package is not.
 
-Version 0.1 should support a runnable application image for the current host,
-with a staged project-content directory and deterministic dependency report.
-Installers, signing, notarization, icons for every platform, content-only packs,
-patches, and cross-host CI matrices can follow. Credentials, certificates, and
-passwords must remain outside committed project data.
+Version 0.1 certifies a self-contained application image for
+`macos-aarch64`, including a bundled Java runtime and deterministic dependency
+report. `windows-x86_64` and `linux-x86_64` follow. Installers, signing,
+notarization, content-only packs, and additional triples can follow.
+Credentials, certificates, and passwords remain outside committed project
+data.
+
+True ahead-of-time native executables for macOS, Windows, and Linux, requiring
+no installed or bundled JVM, are a long-term requirement. The generic launcher
+and extensions must therefore remain compatible with build-time discovery,
+closed-world resource metadata, foreign-function declarations, and target
+native libraries instead of assuming dynamic runtime classpath discovery.
 
 ## Trust and extension execution
 
@@ -1322,11 +1846,11 @@ safe manifest load
 -> edit or run
 ```
 
-The final security design must define extension provenance, installation,
-version resolution, JPMS module-layer or classpath behavior, failure isolation, and
-what the editor can still display when an extension is missing or untrusted.
-Automatic Maven dependency download and arbitrary code execution are outside
-the initial proposal.
+The security design distinguishes restricted and trusted modes. Trust applies
+to a canonical project directory and is stored only in local editor state. In
+trusted mode, Maven may download dependencies and extension code may execute in
+child processes. Those processes provide failure isolation, not a security
+sandbox. New executable dependencies require a renewed warning.
 
 ## Diagnostics
 
@@ -1393,44 +1917,31 @@ serialize every existing engine class. The following catalog is concrete enough
 to design schemas and editor inspectors while leaving final stable type
 identifiers for the grill.
 
-### Version 0.1 scene-entry catalog
+### Version 0.1 scene-node catalog
 
 The names below describe capabilities rather than final serialized type
 identifiers or a Java inheritance hierarchy.
 
-| Entry family | Version 0.1 responsibility |
+| Node family | Version 0.1 responsibility |
 | --- | --- |
-| Logical group | Ordered non-spatial composition, name, tags, enabled state, behaviors, events, and actions |
-| Spatial group | Parent-relative transform, visibility, ordered children, tags, and behaviors without a render resource |
+| `Group` | Ordered dimension-neutral composition without a transform |
+| `Group2d` and `Group3d` | Transform-only grouping in the corresponding world dimension |
 | Scene instance | Another scene definition plus bounded property overrides and a stable instance identity |
-| World | Scene environment, primary output, active camera selection, and world-level settings |
-| Mesh instance | Shared mesh, per-surface materials or overrides, transform, visibility, shadow settings, and bounds policy |
-| Instanced mesh | Shared mesh and materials plus active count, transforms, colors, custom numeric attributes, morph influences, and bounds supported by `InstancedMesh` |
-| Billboard | Texture or region, size, alignment, alpha behavior, and transform |
-| Animated billboard | Sprite animation set, selected animation, playback, looping, events, and billboard presentation |
-| Perspective camera | Field of view, clipping, output selection, layer mask, and active priority |
-| Orthographic camera | View size, clipping, output selection, layer mask, and active priority |
-| Ambient or hemisphere light | Existing ambient contribution properties |
-| Directional, point, or spot light | Existing color, intensity, range, cone, shadow, and transform properties applicable to the selected family |
-| Animation player | Clip library, initial animation, playback settings, and stable target bindings for existing animation capabilities |
-| Static body | One or more collision-shape references, transforms, material settings when supported, and collision filters |
-| Kinematic body | Collision-shape references, collision filters, and project-controlled movement |
-| Character body | Character-controller settings, collision filters, and semantic movement inputs without game-specific rules |
-| Sensor | Shape references, collision filters, enabled state, and entered, stayed, and exited events |
-| Audio listener | Listener transform and active priority |
-| Audio source | Clip, spatial mode, attenuation, category, gain, looping, autoplay, and playback actions or events |
-| Timer | Duration, one-shot or repeating mode, autoplay, pause behavior, and timeout event |
-| Screen canvas and UI group | Ordered screen-space composition and a minimal anchored layout model |
-| UI image | Texture or region, tint, opacity, fit mode, and anchors |
-| UI text | Text, font reference, color, alignment, wrapping, and anchors sufficient for menus and HUDs |
+| World-2d rendering | `Sprite2d`, `Camera2d`, and `TileMap2d`; exact mesh and light nodes remain to be settled during the grill |
+| World-3d rendering | `MeshInstance3d`, `InstancedMesh3d`, `Sprite3d`, dimension-specific cameras, and the existing light families using lowercase `3d` suffixes |
+| `Animator` | Clip library, playback, stable property targets, baseline pose, and an optional project-authored animation state machine |
+| Bodies in both dimensions | `StaticBody2d` or `3d`, `KinematicBody2d` or `3d`, `CharacterBody2d` or `3d`, and `RigidBody2d` or `3d` |
+| Collision in both dimensions | Child `CollisionShape2d` or `3d`, `Sensor2d` or `3d`, collision filters, physics materials, and a bounded initial joint set |
+| Audio | Dimension-specific spatial listener and source nodes plus a dimension-neutral non-spatial player |
+| `Timer` | Duration, one-shot or repeating mode, autoplay, pause behavior, and timeout signal |
+| UI composition | `UiCanvas` and a minimal family of layout, image, text, and interactive controls separate from world 2d |
 
 Tags are inspectable labels for lookup and categorization; they do not replace
-stable identities or typed event connections. Behaviors are attached using the
-separate behavior mechanism and do not require a dummy behavior node. Collision
-shapes remain resources referenced by bodies or sensors rather than visible
-meshes or independent transform nodes. If compound-shape authoring later proves
-that child shape entries provide better editing, that can be added without
-changing the shape resource itself.
+stable identities or typed connections. A node may have one optional controller
+and does not contain a list of behaviors. Collision placement uses transformable
+child shape nodes that reference immutable shape resources, allowing compound
+bodies and independently positioned sensor shapes without turning shapes into
+rendered meshes.
 
 A shader is a resource used by a material, not a scene entry. Raw shader source,
 declared uniforms, uniform types, defaults, ranges, and resource constraints
@@ -1444,15 +1955,16 @@ into project documents.
 
 - scene definition and input map;
 - image, texture, and texture region;
+- tile set, tile-map layers, and their collision metadata;
 - mesh and instanced-transform data;
 - standard material, shader material, and shader source;
 - environment settings and environment map;
-- transform, morph, skeletal, and sprite animation data already represented by
-  JScene3D;
+- property, transform, morph, skeletal, and sprite animation clips plus a basic
+  animation-state resource;
 - audio clip;
 - font and a minimal user-interface theme and layout resource;
-- supported primitive collision shapes and deterministic imported or generated
-  static collision geometry;
+- supported 2d and 3d primitive collision shapes, physics materials, and
+  deterministic imported or generated static collision geometry;
 - project configuration resources registered by extensions;
 - import recipes and logical references to imported outputs.
 
@@ -1466,19 +1978,21 @@ must not be improvised as image-specific properties.
 - project loading, type registration, semantic validation, and migration;
 - scene resolution, instantiation, overrides, lifecycle, and stable addressing;
 - resource resolution, sharing, and closure;
-- rendering, camera selection, input, physics, animation, and audio adapters over
-  the existing engine components;
-- project event routing and registered behaviors;
+- world-2d and world-3d rendering, camera selection, input, animation, and audio;
+- certified 2d and 3d physics backends behind the common physics model;
+- direct signals, project event routing, registered node controllers, and
+  project systems;
 - deterministic import and reimport orchestration;
 - child-JVM current-scene and project play;
 - host-platform application-image export.
 
 Navigation, particle simulation, LOD authoring, hierarchical visibility,
-occlusion baking, sub-viewports, CSG, grid editing, terrain tools, advanced
-animation graphs, embedded play, runtime inspection, hot synchronization,
-content packs, installers, and signing are long-term capabilities. The scene and
-descriptor formats should leave room for registered types in these families;
-version 0.1 does not need empty placeholders for each one.
+occlusion baking, sub-viewports, CSG, world-3d grid editing, terrain tools,
+advanced animation blend graphs, embedded play, runtime inspection, hot
+synchronization, content packs, installers, and signing are long-term
+capabilities. The scene and descriptor formats should leave room for registered
+types in these families; version 0.1 does not need empty placeholders for each
+one.
 
 ### Long-term scene-entry families
 
@@ -1491,8 +2005,8 @@ should nevertheless accommodate these families without a new scene format:
 | Rendering | Three-dimensional text, decals, line and debug geometry, reflection and light probes, fog volumes, particle emitters, and renderer-specific effects |
 | Output and compositing | Sub-viewports, render targets, multiple windows, cameras per output, screen-space and world-space UI composition, and post-processing volumes |
 | Spatial authoring | Markers and sockets, paths and curves, transform constraints, editor gizmos, and large-world partitioning |
-| Animation | Blend trees, state machines, blend spaces, skeleton and skin controls, inverse kinematics, root motion, animation retargeting, and ragdoll integration |
-| Physics | Dynamic rigid bodies, joints, shape casts, persistent ray queries, soft bodies, vehicles, richer physics materials, and debug visualization |
+| Animation | Advanced blend trees, multidimensional blend spaces, skeleton and skin controls, inverse kinematics, root motion, cross-structure retargeting, and ragdoll integration |
+| Physics | Additional joints, shape casts, persistent ray queries, soft bodies, vehicles, backend-specific advanced capabilities, and richer debug visualization |
 | Navigation | Navigation worlds, regions, agents, links, obstacles, layers, baked meshes, graph navigation, and editor debug views |
 | Visibility and scale | Automatic mesh LOD, authored HLOD replacement groups, occluders, visibility ranges, streaming cells, and background loading |
 | Level construction | CSG blockout, reusable grid or tile libraries, spline-generated geometry, terrain extensions, collision generation, and navigation baking |
@@ -1512,21 +2026,21 @@ The following is a first allocation for discussion:
 | Responsibility | Proposed owner |
 | --- | --- |
 | Safe Project Manifest loading and metadata | `jscene3d-project` |
-| Native scene and resource schemas | A new project/scene artifact or a carefully deepened `jscene3d-project` |
-| Scene instantiation and project runtime composition | A genre-independent game-project runtime artifact or `jscene3d-game` only if the interface remains genre-independent and deep |
+| Native scene and resource schemas | Deepened `jscene3d-project` |
+| Scene instantiation and project runtime composition | New `jscene3d-project-runtime` |
 | Existing fixed/rendered game loop | `jscene3d-game` |
 | Registered type descriptors and catalog | The project/runtime composition component |
 | Import orchestration, provenance, and cache policy | A reusable import artifact justified by glTF and WAD adapters |
 | glTF format interpretation | `jscene3d-gltf` adapter |
 | Generic WAD archive access | Optional `jscene3d-wad` artifact |
 | Doom-format decoding and import | Optional `jscene3d-doom-format` artifact |
-| Doom gameplay semantics | Doomed Corridors Game Provider and project resources |
-| General collision and character motion | `jscene3d-physics` and `jscene3d-game` as already defined |
-| Descriptor-driven 3D edit viewport and editor-only aids | Editor application using renderer adapters |
+| Doom gameplay semantics | Doomed Corridors application extension and project resources |
+| General 2d and 3d physics model | `jscene3d-physics` with certified solver backends |
+| Descriptor-driven 2d and 3d edit viewports and editor-only aids | Editor application using renderer adapters |
 | Child-JVM current-scene and project play | Editor runtime-launch component over the project build and game runtime |
 | Export preset validation and dependency closure | Reusable project-export component |
 | Java runtime image and native application packaging | Platform build adapter using Maven and JDK packaging tools |
-| Editor application | `jscene3d-gui` or a separately named editor application, to be decided |
+| Editor application | Separate Java `jscene3d-editor` application, with SWT subject to the agreed spike |
 
 The native scene model, import orchestration, and editor are substantial enough
 that artifact ownership should not be decided merely by placing new packages in
@@ -1563,38 +2077,38 @@ implementations.
 Implementation should begin only after this draft is challenged and the first
 decisions are recorded.
 
-1. Agree on invariants and terminology for Project Manifest, scene definition,
-   scene instance, registered type, behavior, project system, and imported
-   resource.
-2. Confirm JScene3D's coordinate, unit, resource-sharing, mesh-surface, material,
-   and shader-parameter contracts.
-3. Design the registered type descriptor using at least a spatial scene entry,
-   mesh instance, camera, light, collider, HUD entry, behavior, project system,
-   and import adapter as examples.
-4. Design the smallest scene schema that composes a root, children, scene
-   instances, properties, resource references, and connections.
-5. Prove directory independence and safe headless loading on synthetic project
-   fixtures.
-6. Design project runtime composition around the existing `GameApplication`
-   and `GameRuntime` rather than adding another loop.
+1. Settle only the Project Manifest, scene, descriptor, extension, and runtime
+   interfaces required by the first engine-owned framework proof.
+2. Deepen `jscene3d-project` with safe manifest, scene, descriptor, resource
+   reference, validation, and diagnostic data models.
+3. Add extension descriptor discovery and a registered type catalog that can be
+   tested without executing extension implementations.
+4. Add `jscene3d-project-runtime` with scene and resource resolution, node and
+   controller instantiation, project-system lifecycle, and connection setup.
+5. Add the smallest built-in 3d node adapters and generic launcher needed by the
+   proof, changing core, LWJGL, game, physics, or audio modules only at
+   demonstrated generic seams.
+6. Prove the framework headlessly and graphically with synthetic project
+   fixtures and an engine-owned runnable example.
 7. Design import orchestration using both the existing glTF loader and current
    WAD pipeline so the seam is based on two real adapters.
 8. Separate generic WAD archive behavior from Doom-format interpretation and
-   decide which existing Doomed Corridors classes should migrate, if any.
-9. Represent the current MAP01 composition without changing its observable
-   gameplay.
-10. Represent zombieman ammunition drops through registered behavior and project
-   data as the first small authoring proof.
-11. Represent one door and switch connection as the first imported-interaction
-    proof.
-12. Add further Doom behaviors only through the proven definitions and runtime
-    interfaces.
-13. Prove descriptor-driven edit-viewport rendering without project Java
-    execution, followed by child-JVM current-scene and project play.
-14. Prove a host-platform application-image export containing a linked Java
-    runtime, dependency closure, native libraries, and project content.
-15. Build the editor shell over those same interfaces after the runtime, import,
-    preview, and export models have survived real game features.
+   decide which existing Doomed Corridors classes should migrate.
+9. Give Doomed Corridors an application extension, entry scene, project systems,
+   registered types, and generic-launcher path, reusing existing domain and
+   presentation implementations only where they fit the new architecture.
+10. Reproduce the current MAP01 rendering, movement, combat, enemies, HUD,
+    audio, and pickups through the new runtime.
+11. Represent zombieman ammunition drops through a registered child node,
+    controller, scene-level connection, and project data.
+12. Represent one complete door and switch interaction, including imported
+    identity, motion, collision, audio, and state.
+13. Add further Doom controllers and systems only through the proven
+    definitions and runtime interfaces.
+14. Prove descriptor-driven edit-viewport rendering and child-process play only
+    after the runtime and game migration interfaces have survived real use.
+15. Prove the first `macos-aarch64` application-image export from the same
+    project definition and transitive resource closure.
 
 Each migration slice should keep the standalone game runnable and provide a
 manual smoke test in addition to automated verification.
@@ -1655,115 +2169,22 @@ This would make ordinary project editing depend on executable editor plugins.
 Schemas and descriptors should handle ordinary property editing; custom panels
 are reserved for interactions that genuinely need them.
 
-## Questions for the design grill
+## Remaining questions for the design grill
 
-### Project and packaging
+The incremental decision record resolves the original checklist below. The
+remaining branches include:
 
-- Q1: Should a project have exactly one principal Game Provider plus optional
-   extensions, or should every runtime contribution use one extension list?
-- Q2: Are Java extensions resolved only by the packaged Maven application at
-   first, or does the editor need an installed-extension catalog immediately?
-- Q3: Which metadata must remain visible without trusting or loading extensions?
-- Q4: Should `runtime.configuration` be one document or a catalog of independently
-   referenced project resources?
-
-### Scene model
-
-- Q5: Is one reusable scene format sufficient for complete screens, 3D worlds,
-   actors, and HUD fragments?
-- Q6: What is the smallest runtime abstraction that can contain spatial,
-   user-interface, audio, physics, and behavior entries without becoming a
-   weak universal object?
-- Q7: Are behaviors children, a distinct list on an entry, or ordinary registered
-   entries with a declared scope?
-- Q8: Which override operations are necessary in version 1?
-- Q9: How are stable authored identifiers generated and preserved?
-- Q10: How are imported identifiers derived so they remain stable across reimport?
-- Q11: Should event connections live at scene scope, entry scope, or both?
-- Q12: How much payload adaptation is required before a general expression
-    language becomes justified?
-
-### Java extensions
-
-- Q13: What project-wide Java lifecycles are demonstrated by current code rather
-    than merely anticipated?
-- Q14: How should a project system obtain physics, rendering, audio, resources,
-    scenes, and events without receiving an oversized runtime context?
-- Q15: How are dependencies and ordering between project systems declared?
-- Q16: Can type descriptors be inspected without instantiating runtime
-    implementations?
-- Q17: What migration guarantees apply when a registered type's schema evolves?
-- Q18: Should type identifiers include provider identity implicitly or always be
-    fully qualified?
-
-### Import and WAD support
-
-- Q19: What exact interface is genuinely shared by glTF and WAD import rather than
-    being superficial orchestration?
-- Q20: Does import produce serialized cache documents, direct immutable Java
-    models, binary cache artifacts, or a combination?
-- Q21: How are large imported resource graphs browsed without loading all content?
-- Q22: What overlay operations are needed for author modifications to imported
-    maps?
-- Q23: Which current WAD classes are generic archive capability, which are
-    Doom-format interpretation, and which are Doomed Corridors gameplay?
-- Q24: Does out-of-the-box distribution include both raw WAD inspection and
-    Doom-format import by default?
-- Q25: How should PWAD layering and multiple source archives appear in an import
-    declaration?
-
-### Editor and trust
-
-- Q26: Is the future editor part of `jscene3d-gui` or a separately packaged
-    JScene3D Editor application that consumes `jscene3d-gui`?
-- Q27: What can the editor show and modify when a required extension is missing?
-- Q28: How does a user explicitly trust a project and its Java extensions?
-- Q29: Which editor state is local, and where is that local state stored?
-- Q30: What round-trip guarantees prevent the editor from discarding unknown but
-    valid extension data?
-
-### Preview, runtime, and export
-
-- Q31: Which standard scene types can the edit viewport render without loading
-  project Java, and how are extension-defined types represented when untrusted?
-- Q32: What is the exact current-scene play harness for project systems, input,
-  scene transitions, and application services?
-- Q33: Is a separate game window sufficient for the first editor release, with
-  embedded play and remote inspection explicitly deferred?
-- Q34: What build interface can launch a Maven project without coupling the
-  editor to one POM layout?
-- Q35: Does version 0.1 export one generic JScene3D launcher or a project-supplied
-  main class?
-- Q36: How does an export preset express the transitive content closure while
-  retaining source-asset licenses and imported-resource provenance?
-- Q37: Which target triples are officially supported, and where are matching
-  LWJGL native dependencies selected and verified?
-- Q38: Which material and shader properties are portable project data, and which
-  are capabilities of one renderer backend?
-- Q39: Are instanced mesh transforms authored directly, imported, generated, or
-  all three, and what identity is available for editing one instance?
-
-## Decisions that should precede implementation
-
-The grill session should at minimum settle or narrow these points:
-
-- whether the Project Manifest advances to an entry scene and import
-  declarations;
-- the one-scene-format recommendation;
-- the distinction between scene behavior and project system;
-- the registered type descriptor and stable identifier strategy;
-- serialized connection scope;
-- imported resource identity and authored-overlay rules;
-- artifact ownership for import orchestration, WAD archive access, and
-  Doom-format interpretation;
-- the definition of out-of-the-box WAD support;
-- extension discovery and trust assumptions for the first editor version;
-- the version 0.1 scene-entry, resource, and runtime-system catalogs;
-- edit viewport versus current-scene play versus project-play semantics;
-- child-JVM preview lifecycle and the boundary of its optional debug protocol;
-- export preset ownership, Java packaging strategy, and first supported target;
-- a small proof slice that migrates existing behavior without changing the
-  current game.
-
-Once those decisions are recorded, schemas and Java interfaces can be designed
-against concrete examples before implementation begins.
+- final names for project-property access, runtime drivability, keyframe
+  support, and live read-only output;
+- the exact version 0.1 node and resource catalog, including world-2d meshes,
+  lights, tile maps, audio, and UI controls;
+- viewport, output, camera, and explicit isolated-world ownership;
+- selection of the certified 2d and 3d physics backends and the initial joint
+  set;
+- the world-2d renderer, material, shader, batching, and texture-atlas contract;
+- remaining animation semantics, including cues, action tracks, interruption,
+  transition priority, and blending;
+- exact descriptor, resource-document, overlay, and import schemas beyond the
+  settled first Project Manifest and Scene version 1 structures;
+- module ownership, dependency direction, build-adapter protocol, and the first
+  migration slices.

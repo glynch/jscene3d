@@ -4,6 +4,10 @@
  */
 package io.github.glynch.jscene3d.project;
 
+import static io.github.glynch.jscene3d.project.internal.ProjectPaths.immutableNormalizedAbsolutePaths;
+import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireNormalizedAbsolute;
+import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireOptionalNormalizedAbsolute;
+
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -18,7 +22,8 @@ public final class GameProject {
     private final Metadata metadata;
     private final EngineCompatibility engine;
     private final RuntimeConfiguration runtime;
-    private final List<AssetSource> assets;
+    private final List<ExtensionRequirement> extensions;
+    private final ProjectFiles files;
 
     /**
      * Creates a validated immutable project descriptor.
@@ -26,20 +31,23 @@ public final class GameProject {
      * @param root normalized absolute project directory
      * @param metadata identity and project-browser metadata
      * @param engine engine compatibility
-     * @param runtime Game Provider and startup configuration
-     * @param assets authoritative source assets
+     * @param runtime application startup configuration
+     * @param extensions extension requirements in declaration order
+     * @param files project content references
      */
     public GameProject(
             Path root,
             Metadata metadata,
             EngineCompatibility engine,
             RuntimeConfiguration runtime,
-            List<AssetSource> assets) {
-        this.root = requireAbsolute(root, "root");
+            List<ExtensionRequirement> extensions,
+            ProjectFiles files) {
+        this.root = requireNormalizedAbsolute(root, "root");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.runtime = Objects.requireNonNull(runtime, "runtime");
-        this.assets = List.copyOf(assets);
+        this.extensions = List.copyOf(extensions);
+        this.files = Objects.requireNonNull(files, "files");
     }
 
     /**
@@ -97,7 +105,7 @@ public final class GameProject {
     }
 
     /**
-     * Returns game-provider and startup configuration.
+     * Returns application startup configuration.
      *
      * @return runtime configuration
      */
@@ -106,12 +114,48 @@ public final class GameProject {
     }
 
     /**
+     * Returns required project extensions in declaration order.
+     *
+     * @return immutable extension requirements
+     */
+    public List<ExtensionRequirement> extensions() {
+        return extensions;
+    }
+
+    /**
      * Returns authoritative source assets in manifest order.
      *
      * @return immutable source assets
      */
     public List<AssetSource> assets() {
-        return assets;
+        return files.assets();
+    }
+
+    /**
+     * Returns import definitions in declaration order.
+     *
+     * @return immutable normalized absolute import-definition paths
+     */
+    public List<Path> imports() {
+        return files.imports();
+    }
+
+    /**
+     * Returns export presets in declaration order.
+     *
+     * @return immutable normalized absolute export-preset paths
+     */
+    public List<Path> exportPresets() {
+        return files.exportPresets();
+    }
+
+    /**
+     * Returns project content references as one cohesive value.
+     *
+     * @return immutable project file references
+     */
+    public ProjectFiles files() {
+        return files;
     }
 
     /**
@@ -177,7 +221,7 @@ public final class GameProject {
             Objects.requireNonNull(created, "created");
             Objects.requireNonNull(released, "released");
             Objects.requireNonNull(description, "description");
-            Objects.requireNonNull(icon, "icon").ifPresent(path -> requireAbsolute(path, "icon"));
+            Objects.requireNonNull(icon, "icon").ifPresent(path -> requireNormalizedAbsolute(path, "icon"));
         }
     }
 
@@ -229,7 +273,7 @@ public final class GameProject {
         /** Validates license values. */
         public ProjectLicense {
             requireText(expression, "expression");
-            Objects.requireNonNull(file, "file").ifPresent(path -> requireAbsolute(path, "file"));
+            Objects.requireNonNull(file, "file").ifPresent(path -> requireNormalizedAbsolute(path, "file"));
         }
     }
 
@@ -245,8 +289,8 @@ public final class GameProject {
         public Legal {
             Objects.requireNonNull(projectLicense, "projectLicense");
             Objects.requireNonNull(thirdPartyNotices, "thirdPartyNotices")
-                    .ifPresent(path -> requireAbsolute(path, "thirdPartyNotices"));
-            Objects.requireNonNull(credits, "credits").ifPresent(path -> requireAbsolute(path, "credits"));
+                    .ifPresent(path -> requireNormalizedAbsolute(path, "thirdPartyNotices"));
+            Objects.requireNonNull(credits, "credits").ifPresent(path -> requireNormalizedAbsolute(path, "credits"));
         }
 
         /**
@@ -272,31 +316,99 @@ public final class GameProject {
         }
     }
 
-    /** Generic startup target within one source asset.
-     *
-     * @param asset source-asset identifier
-     * @param target importer-specific target identifier
-     */
-    public record StartupTarget(String asset, String target) {
-        /** Validates startup identifiers. */
-        public StartupTarget {
-            requireText(asset, "asset");
-            requireText(target, "target");
+    /** Runtime entry points used by preview, play, and export workflows. */
+    public static final class RuntimeConfiguration {
+        private final String applicationExtension;
+        private final Path entryScene;
+        private final Optional<Path> projectSystems;
+        private final Optional<Path> inputMap;
+
+        /**
+         * Creates validated runtime configuration.
+         *
+         * @param applicationExtension extension that creates project-specific runtime objects
+         * @param entryScene normalized absolute entry-scene path
+         * @param projectSystems optional normalized absolute project-systems path
+         * @param inputMap optional normalized absolute input-map path
+         */
+        public RuntimeConfiguration(
+                String applicationExtension, Path entryScene, Optional<Path> projectSystems, Optional<Path> inputMap) {
+            this.applicationExtension = requireText(applicationExtension, "applicationExtension");
+            this.entryScene = requireNormalizedAbsolute(entryScene, "entryScene");
+            this.projectSystems = requireOptionalNormalizedAbsolute(projectSystems, "projectSystems");
+            this.inputMap = requireOptionalNormalizedAbsolute(inputMap, "inputMap");
+        }
+
+        /**
+         * Returns the project-specific application extension identifier.
+         *
+         * @return application extension identifier
+         */
+        public String applicationExtension() {
+            return applicationExtension;
+        }
+
+        /**
+         * Returns the initial scene used for preview, play, and export.
+         *
+         * @return normalized absolute entry-scene path
+         */
+        public Path entryScene() {
+            return entryScene;
+        }
+
+        /**
+         * Returns the optional project-systems definition.
+         *
+         * @return normalized absolute project-systems path when configured
+         */
+        public Optional<Path> projectSystems() {
+            return projectSystems;
+        }
+
+        /**
+         * Returns the optional input-map definition.
+         *
+         * @return normalized absolute input-map path when configured
+         */
+        public Optional<Path> inputMap() {
+            return inputMap;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            return other instanceof RuntimeConfiguration configuration
+                    && applicationExtension.equals(configuration.applicationExtension)
+                    && entryScene.equals(configuration.entryScene)
+                    && projectSystems.equals(configuration.projectSystems)
+                    && inputMap.equals(configuration.inputMap);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(applicationExtension, entryScene, projectSystems, inputMap);
+        }
+
+        @Override
+        public String toString() {
+            return "RuntimeConfiguration[applicationExtension=" + applicationExtension + ", entryScene=" + entryScene
+                    + ", projectSystems=" + projectSystems + ", inputMap=" + inputMap + ']';
         }
     }
 
-    /** Game Provider and startup configuration.
+    /** Required project extension.
      *
-     * @param gameProvider stable Game Provider identifier
-     * @param startup initial source asset and target
-     * @param inputMap optional normalized absolute input-map path
+     * @param id stable reverse-domain extension identifier
+     * @param requirement semantic-version requirement
      */
-    public record RuntimeConfiguration(String gameProvider, StartupTarget startup, Optional<Path> inputMap) {
-        /** Validates runtime configuration. */
-        public RuntimeConfiguration {
-            requireText(gameProvider, "gameProvider");
-            Objects.requireNonNull(startup, "startup");
-            Objects.requireNonNull(inputMap, "inputMap").ifPresent(path -> requireAbsolute(path, "inputMap"));
+    public record ExtensionRequirement(String id, String requirement) {
+        /** Validates extension requirement values. */
+        public ExtensionRequirement {
+            requireText(id, "id");
+            requireText(requirement, "requirement");
         }
     }
 
@@ -312,8 +424,76 @@ public final class GameProject {
         public AssetSource {
             requireText(id, "id");
             requireText(type, "type");
-            requireAbsolute(path, "path");
+            requireNormalizedAbsolute(path, "path");
             Objects.requireNonNull(sha256, "sha256");
+        }
+    }
+
+    /** Project files referenced directly by the manifest. */
+    public static final class ProjectFiles {
+        private final List<AssetSource> assets;
+        private final List<Path> imports;
+        private final List<Path> exportPresets;
+
+        /**
+         * Creates validated immutable project file references.
+         *
+         * @param assets authoritative source assets
+         * @param imports normalized absolute import-definition paths
+         * @param exportPresets normalized absolute export-preset paths
+         */
+        public ProjectFiles(List<AssetSource> assets, List<Path> imports, List<Path> exportPresets) {
+            this.assets = List.copyOf(assets);
+            this.imports = immutableNormalizedAbsolutePaths(imports, "imports");
+            this.exportPresets = immutableNormalizedAbsolutePaths(exportPresets, "exportPresets");
+        }
+
+        /**
+         * Returns authoritative source assets in manifest order.
+         *
+         * @return immutable source assets
+         */
+        public List<AssetSource> assets() {
+            return assets;
+        }
+
+        /**
+         * Returns import definitions in manifest order.
+         *
+         * @return immutable normalized absolute import paths
+         */
+        public List<Path> imports() {
+            return imports;
+        }
+
+        /**
+         * Returns export presets in manifest order.
+         *
+         * @return immutable normalized absolute export-preset paths
+         */
+        public List<Path> exportPresets() {
+            return exportPresets;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            return other instanceof ProjectFiles projectFiles
+                    && assets.equals(projectFiles.assets)
+                    && imports.equals(projectFiles.imports)
+                    && exportPresets.equals(projectFiles.exportPresets);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(assets, imports, exportPresets);
+        }
+
+        @Override
+        public String toString() {
+            return "ProjectFiles[assets=" + assets + ", imports=" + imports + ", exportPresets=" + exportPresets + ']';
         }
     }
 
@@ -376,14 +556,5 @@ public final class GameProject {
             copied.add(requireText(value, name + " entry"));
         }
         return List.copyOf(copied);
-    }
-
-    /** Requires a normalized absolute path. */
-    private static Path requireAbsolute(Path path, String name) {
-        Path validPath = Objects.requireNonNull(path, name);
-        if (!validPath.isAbsolute() || !validPath.equals(validPath.normalize())) {
-            throw new IllegalArgumentException(name + " must be a normalized absolute path: " + validPath);
-        }
-        return validPath;
     }
 }

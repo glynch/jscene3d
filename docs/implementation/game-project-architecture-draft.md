@@ -110,6 +110,76 @@ reconciled as the grill progresses rather than relying on memory at its end.
   existing graphical path remains runnable while its remaining world and
   presentation responsibilities are migrated behind declarative types.
 
+### Project authoring mode decisions
+
+- JScene3D supports descriptor-first, Java-first, and editor-first project
+  authoring. These are different front ends for one canonical project model,
+  not separate runtime architectures.
+- Descriptor-first developers may hand-author the Project Manifest, scenes,
+  imports, resources, and related project documents.
+- Java-first developers may define the same information using annotations and
+  a typed Java configuration API. Annotations provide discovery and metadata
+  naturally attached to Java declarations; a configuration API represents
+  nested scenes, assets, imports, references, and connections that would be
+  unwieldy as annotation attributes alone.
+- The editor reads and writes the same project-document formats available to a
+  descriptor-first developer. Editor-first therefore describes an authoring
+  workflow rather than an editor-specific project format.
+- A build-time project compiler turns Java-first definitions into the same
+  canonical manifests, scenes, extension descriptors, import definitions, and
+  resources consumed by the ordinary validators and runtime. Generated output
+  is reproducible, validated identically to hand-authored data, and written to
+  a build-output location rather than over checked-in project files.
+- Runtime reflection is not part of this model. Build-time metadata and binding
+  generation preserve JPMS encapsulation and support deterministic validation,
+  editor discovery, export, and later native compilation.
+- The exact division between annotation processing and a Maven build plugin is
+  deferred. The selected mechanism must not create a second semantic model or
+  require application classes to be reflectively inspected at runtime.
+- A project element has one authoring owner. A scene, resource, import, or other
+  stable identifier may be supplied by Java configuration or by a project
+  document, but a collision is a diagnostic rather than an implicit precedence
+  rule.
+- Arbitrary Java configuration cannot be safely round-tripped into source by a
+  visual editor. Java-defined structures may initially be displayed,
+  inspected, previewed, and linked to their source as read-only structures.
+  Descriptor-defined instances of Java-backed registered types remain fully
+  editable through their generated property metadata.
+- A later explicit conversion operation may materialize generated Java-first
+  structure as editable project documents. Conversion changes authoring
+  ownership and must never silently rewrite the developer's Java source.
+- API and annotation names remain parked until this authoring mode becomes an
+  implementation milestone. A representative shape is:
+
+  ```java
+  @JScene3dProject(
+      id = "io.github.glynch.doomed-corridors",
+      name = "Doomed Corridors",
+      version = "0.1.0-SNAPSHOT")
+  public final class DoomedCorridorsProject implements ProjectConfigurer {
+
+      @Override
+      public void configure(ProjectBuilder project) {
+          AssetRef freedoom = project.asset("freedoom")
+                  .type("io.github.glynch.jscene3d.wad/source")
+                  .path("assets/freedoom2.wad");
+
+          ResourceRef map01 = project.importResource("freedoom-maps")
+                  .from(freedoom)
+                  .using("io.github.glynch.jscene3d.doom/maps")
+                  .select("maps/MAP01");
+
+          project.scene("main", scene -> scene
+                  .root("level",
+                          "io.github.glynch.doomed-corridors/doom-level-3d")
+                  .property("map", map01));
+      }
+  }
+  ```
+
+  The names in this example illustrate the intended responsibility split; they
+  are not accepted public API names.
+
 ### Project composition and extension loading decisions
 
 - All Java contributions use one extension model. There is no privileged

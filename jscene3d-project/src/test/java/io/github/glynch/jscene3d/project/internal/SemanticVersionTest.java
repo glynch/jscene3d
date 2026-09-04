@@ -58,8 +58,8 @@ final class SemanticVersionTest {
     /** Rejects empty requirements and any requirement containing an invalid clause. */
     @Test
     void rejectsInvalidEngineRequirements() {
-        assertThat(EngineVersionRequirement.parse(" ")).isEmpty();
-        assertThat(EngineVersionRequirement.parse(">=1.2.3 nonsense")).isEmpty();
+        assertThat(SemanticVersionRequirement.parse(" ")).isEmpty();
+        assertThat(SemanticVersionRequirement.parse(">=1.2.3 nonsense")).isEmpty();
     }
 
     /** Parses a version known to be valid for a test case. */
@@ -68,8 +68,8 @@ final class SemanticVersionTest {
     }
 
     /** Parses a requirement known to be valid for a test case. */
-    private static EngineVersionRequirement requirement(String text) {
-        Optional<EngineVersionRequirement> requirement = EngineVersionRequirement.parse(text);
+    private static SemanticVersionRequirement requirement(String text) {
+        Optional<SemanticVersionRequirement> requirement = SemanticVersionRequirement.parse(text);
         assertThat(requirement).isPresent();
         return requirement.orElseThrow();
     }

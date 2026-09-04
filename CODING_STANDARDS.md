@@ -109,6 +109,11 @@ the build-authoritative NullAway configuration.
   it currently has one caller. Put generic argument checks in a focused internal
   `Preconditions` component; keep class-specific invariant validation and
   implementation behavior in the owning class.
+- Each production Maven artifact owns its internal precondition policy. Reuse
+  that component across the artifact instead of duplicating generic checks in
+  public model classes. Add focused internal components for other shared
+  policies, such as path resolution or format decoding, when those policies
+  have their own state or behavior.
 
 ## Static verification
 
@@ -209,6 +214,8 @@ prior deprecation where practical.
   eventually requires it.
 - Keep an exception assertion's executable lambda to one invocation that may
   throw. Construct inputs and callbacks before the assertion.
+- Keep each test method below 25 assertion invocations. Split broader scenarios
+  into focused tests instead of hiding assertions in helper methods.
 - Compile every Feature Example during ordinary verification.
 - Run context-dependent OpenGL tests with:
 

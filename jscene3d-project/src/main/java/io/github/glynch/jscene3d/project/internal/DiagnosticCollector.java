@@ -4,38 +4,72 @@
  */
 package io.github.glynch.jscene3d.project.internal;
 
-import io.github.glynch.jscene3d.project.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Collects ordered diagnostics for one manifest source. */
-final class DiagnosticCollector {
-    private final Path source;
+public final class DiagnosticCollector {
+    private final URI source;
     private final List<ProjectDiagnostic> diagnostics = new ArrayList<>();
 
-    /** Stores the normalized manifest source. */
-    DiagnosticCollector(Path source) {
+    /**
+     * Stores the normalized manifest source.
+     *
+     * @param source normalized absolute source path
+     */
+    public DiagnosticCollector(Path source) {
+        this(source.toUri());
+    }
+
+    /**
+     * Stores an absolute descriptor source.
+     *
+     * @param source absolute source URI
+     */
+    public DiagnosticCollector(URI source) {
         this.source = source;
     }
 
-    /** Adds an error. */
-    void error(String code, String message, String location) {
+    /**
+     * Adds an error.
+     *
+     * @param code stable diagnostic code
+     * @param message human-readable message
+     * @param location JSON Pointer location
+     */
+    public void error(String code, String message, String location) {
         diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source, location));
     }
 
-    /** Adds a warning. */
-    void warning(String code, String message, String location) {
+    /**
+     * Adds a warning.
+     *
+     * @param code stable diagnostic code
+     * @param message human-readable message
+     * @param location JSON Pointer location
+     */
+    public void warning(String code, String message, String location) {
         diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.WARNING, code, message, source, location));
     }
 
-    /** Returns whether any error prevents a validated project. */
-    boolean hasErrors() {
+    /**
+     * Returns whether any error prevents a validated project.
+     *
+     * @return {@code true} when an error has been collected
+     */
+    public boolean hasErrors() {
         return diagnostics.stream().anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
     }
 
-    /** Copies all diagnostics. */
-    List<ProjectDiagnostic> diagnostics() {
+    /**
+     * Copies all diagnostics.
+     *
+     * @return immutable ordered diagnostics
+     */
+    public List<ProjectDiagnostic> diagnostics() {
         return List.copyOf(diagnostics);
     }
 }

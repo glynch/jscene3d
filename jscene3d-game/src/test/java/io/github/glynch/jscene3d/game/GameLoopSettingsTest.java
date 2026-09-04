@@ -30,12 +30,12 @@ final class GameLoopSettingsTest {
     @Test
     void rejectsInvalidSettings() {
         GameLoopSettings.Builder zeroUpdates = GameLoopSettings.builder();
+        GameLoopSettings.Builder zeroFixedStep = GameLoopSettings.builder();
         GameLoopSettings.Builder reversedDurations =
                 GameLoopSettings.builder().fixedStep(Duration.ofMillis(20L)).maximumFrameTime(Duration.ofMillis(10L));
 
         assertThatThrownBy(() -> zeroUpdates.maximumFixedUpdates(0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(reversedDurations::build).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> GameLoopSettings.builder().fixedStep(Duration.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> zeroFixedStep.fixedStep(Duration.ZERO)).isInstanceOf(IllegalArgumentException.class);
     }
 }

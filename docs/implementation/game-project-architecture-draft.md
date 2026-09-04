@@ -1171,6 +1171,77 @@ hard-code knowledge of Doomed Corridors. A Doom door may then appear in the
 editor because an installed extension contributes its descriptor, not because
 the editor itself understands sectors.
 
+### Extension Descriptor version 1
+
+An extension artifact publishes its safe, generated descriptor at
+`META-INF/jscene3d/extension.json`. Descriptor discovery reads only these
+resources. It must not load implementation classes, invoke static initializers,
+or use service providers while the editor is inspecting a project.
+
+The first descriptor schema is bundled as
+`META-INF/jscene3d/project/extension-1.schema.json` and has the canonical URI
+`https://jscene3d.org/schemas/extension-1.json`. A representative descriptor is:
+
+```json
+{
+  "$schema": "https://jscene3d.org/schemas/extension-1.json",
+  "schemaVersion": 1,
+  "id": "io.github.glynch.example-game",
+  "version": "1.0.0",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "Example Game",
+  "types": [
+    {
+      "id": "io.github.glynch.example-game/actor-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Actor 3d",
+      "properties": [
+        {
+          "id": "mesh",
+          "valueKind": "reference",
+          "displayName": "Mesh",
+          "acceptedReferences": ["project", "import"]
+        },
+        {
+          "id": "visible",
+          "valueKind": "boolean",
+          "defaultValue": true,
+          "displayName": "Visible",
+          "editor": {"group": "Rendering"}
+        }
+      ],
+      "signals": [
+        {
+          "id": "died",
+          "payload": {
+            "type": "io.github.glynch.example-game/actor-event",
+            "typeVersion": 1
+          },
+          "displayName": "Died"
+        }
+      ],
+      "actions": [
+        {"id": "activate", "displayName": "Activate"}
+      ],
+      "requiredCapabilities": ["org.jscene3d.render/mesh-3d"]
+    }
+  ]
+}
+```
+
+The descriptor contains no Java implementation class names. The resolved
+catalog indexes the exact pair of stable type identifier and positive
+`typeVersion`. It validates type scope, property names and value kinds,
+required properties, reference namespaces, signal and action existence, and
+exact endpoint payload compatibility before runtime instantiation. Project
+extension requirements and descriptor engine requirements are independent
+semantic-version checks.
+
+Property `editor` data is deliberately generic metadata in version 1. Naming
+and semantics for broader property capabilities remain undecided; the initial
+schema does not encode an animation-specific policy by accident.
+
 ### Stable type identifiers, not Java class names
 
 Project data should contain:
@@ -2029,7 +2100,7 @@ The following is a first allocation for discussion:
 | Native scene and resource schemas | Deepened `jscene3d-project` |
 | Scene instantiation and project runtime composition | New `jscene3d-project-runtime` |
 | Existing fixed/rendered game loop | `jscene3d-game` |
-| Registered type descriptors and catalog | The project/runtime composition component |
+| Registered type descriptors and safe catalog validation | `jscene3d-project` |
 | Import orchestration, provenance, and cache policy | A reusable import artifact justified by glTF and WAD adapters |
 | glTF format interpretation | `jscene3d-gltf` adapter |
 | Generic WAD archive access | Optional `jscene3d-wad` artifact |
@@ -2046,6 +2117,29 @@ The native scene model, import orchestration, and editor are substantial enough
 that artifact ownership should not be decided merely by placing new packages in
 an existing artifact. Each proposed artifact must hide meaningful complexity
 behind a small interface and avoid dependency cycles.
+
+Within `jscene3d-project`, public APIs are grouped by responsibility rather than
+collected in one root package:
+
+| Package | Responsibility |
+| --- | --- |
+| `io.github.glynch.jscene3d.project.manifest` | Project Manifest model and loading |
+| `io.github.glynch.jscene3d.project.scene` | Scene model and structural loading |
+| `io.github.glynch.jscene3d.project.value` | Portable values and resource references |
+| `io.github.glynch.jscene3d.project.extension` | Safe descriptors, discovery, catalog lookup, and catalog-aware validation |
+| `io.github.glynch.jscene3d.project.diagnostic` | Structured diagnostics shared by public loading operations |
+
+Each format family owns its raw Jackson model and validator in a corresponding
+unexported `internal` package. The shared unexported
+`io.github.glynch.jscene3d.project.internal` package is limited to genuinely
+cross-cutting policies. `Preconditions` owns throwing public-model invariants;
+`ValidationContext` owns diagnostic-producing authored-field validation;
+`ProjectPathResolver` owns project-root confinement and symlink checks;
+`ProjectJsonReader` owns strict Jackson configuration; and `JsonPointers` owns
+JSON Pointer escaping. Portable JSON-to-`ProjectValue` conversion belongs to
+the value family's internal decoder. This division gives each rule one
+implementation while preserving the distinction between invalid Java API use
+and invalid authored documents.
 
 ## Relationship to current Doomed Corridors code
 

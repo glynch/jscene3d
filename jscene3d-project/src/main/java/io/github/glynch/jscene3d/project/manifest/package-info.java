@@ -2,8 +2,8 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-/** Shared internal policies for JScene3D project formats. */
+/** Versioned Project Manifest loading and validated project definitions. */
 @NullMarked
-package io.github.glynch.jscene3d.project.internal;
+package io.github.glynch.jscene3d.project.manifest;
 
 import org.jspecify.annotations.NullMarked;

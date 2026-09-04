@@ -42,8 +42,12 @@
             <message key="matchxpath.match" value="Public and protected methods and constructors must not have an empty body." />
         </module>
         <module name="MatchXpath">
-            <property name="query" value="//METHOD_CALL[./IDENT[@text='assertThatThrownBy' or @text='assertThrows']]/ELIST/EXPR/LAMBDA[count(.//METHOD_CALL | .//LITERAL_NEW) &gt; 1]" />
+            <property name="query" value="//LAMBDA[ancestor::METHOD_CALL[descendant::IDENT[@text='assertThatThrownBy' or @text='assertThrows']]][count(.//METHOD_CALL | .//LITERAL_NEW) &gt; 1]" />
             <message key="matchxpath.match" value="Prepare arguments before an exception assertion so its lambda contains only the invocation under test." />
+        </module>
+        <module name="MatchXpath">
+            <property name="query" value="//METHOD_DEF[count(.//METHOD_CALL[./IDENT[starts-with(@text, 'assertThat') or @text='assertThrows']]) &gt; 24]" />
+            <message key="matchxpath.match" value="Split tests containing more than 24 assertions into focused test methods." />
         </module>
         <module name="MatchXpath">
             <property name="query" value="//METHOD_DEF[./IDENT[@text='requirePositiveFinite' or @text='requireNonNegativeFinite']]" />

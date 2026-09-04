@@ -33,6 +33,7 @@
     </scm>
 
     <modules>
+        <module>jscene3d-documentation</module>
         <module>jscene3d-core</module>
         <module>jscene3d-physics</module>
         <module>jscene3d-game</module>
@@ -386,6 +387,7 @@
                         </excludes>
                         <failOnViolation>true</failOnViolation>
                         <includeTests>false</includeTests>
+                        <linkXRef>false</linkXRef>
                         <printFailingErrors>true</printFailingErrors>
                         <rulesets>
                             <ruleset>${maven.multiModuleProjectDirectory}/config/pmd/jscene3d-ruleset.xml</ruleset>
@@ -489,48 +491,6 @@
             </plugins>
         </pluginManagement>
         <plugins>
-            <plugin>
-                <groupId>com.github.eirslett</groupId>
-                <artifactId>frontend-maven-plugin</artifactId>
-                <inherited>false</inherited>
-                <configuration>
-                    <installDirectory>${maven.multiModuleProjectDirectory}/target/markdownlint-toolchain</installDirectory>
-                    <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>install-markdownlint-toolchain</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>install-node-and-npm</goal>
-                        </goals>
-                        <configuration>
-                            <nodeVersion>${node.version}</nodeVersion>
-                            <npmVersion>${npm.version}</npmVersion>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>install-markdownlint</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>ci --ignore-scripts</arguments>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>check-markdown</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>run lint:markdown</arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 final class RendererInfoTest {
     @Test
-    void separatesFrameAndResourceStatistics() {
+    void exposesStableStatisticsViews() {
         RendererInfo info = new RendererInfo();
 
         RenderStatistics statistics = info.statistics();
@@ -18,6 +18,12 @@ final class RendererInfoTest {
 
         assertThat(info.statistics()).isSameAs(statistics);
         assertThat(info.resources()).isSameAs(resources);
+    }
+
+    @Test
+    void initializesFrameStatistics() {
+        RenderStatistics statistics = new RendererInfo().statistics();
+
         assertThat(statistics.frame()).isZero();
         assertThat(statistics.drawCalls()).isZero();
         assertThat(statistics.triangles()).isZero();
@@ -35,6 +41,12 @@ final class RendererInfoTest {
         assertThat(statistics.shadowPasses()).isZero();
         assertThat(statistics.shadowDrawCalls()).isZero();
         assertThat(statistics.shadowTriangles()).isZero();
+    }
+
+    @Test
+    void initializesResourceStatistics() {
+        ResourceStatistics resources = new RendererInfo().resources();
+
         assertThat(resources.activeGeometryResources()).isZero();
         assertThat(resources.activeTextureResources()).isZero();
         assertThat(resources.activeInstanceResources()).isZero();

@@ -75,14 +75,14 @@ final class GameRuntimeTest {
         RecordingApplication application = new RecordingApplication();
         GameRuntime runtime = new GameRuntime(application, settings());
         ActionSnapshot empty = ActionSnapshot.empty();
+        Duration negativeDuration = Duration.ofMillis(-1L);
 
         assertThatThrownBy(runtime::render).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> runtime.advance(Duration.ZERO, empty)).isInstanceOf(IllegalStateException.class);
         runtime.start();
         assertThat(runtime.isStarted()).isTrue();
         assertThatThrownBy(runtime::start).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> runtime.advance(Duration.ofMillis(-1L), empty))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> runtime.advance(negativeDuration, empty)).isInstanceOf(IllegalArgumentException.class);
         runtime.close();
         assertThatThrownBy(runtime::render).isInstanceOf(IllegalStateException.class);
     }

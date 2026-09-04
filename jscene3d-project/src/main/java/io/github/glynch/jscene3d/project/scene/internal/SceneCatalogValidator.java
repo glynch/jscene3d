@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.scene.internal;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
@@ -11,9 +12,11 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
 import io.github.glynch.jscene3d.project.extension.internal.RegisteredPropertyValidator;
+import io.github.glynch.jscene3d.project.internal.PropertyDiagnosticCodes;
 import io.github.glynch.jscene3d.project.scene.ControllerDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneConnection;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDiagnosticCode;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.net.URI;
@@ -84,10 +87,10 @@ public final class SceneCatalogValidator {
             RegisteredType type, RegisteredTypeScope expectedScope, String location) {
         Optional<RegisteredTypeDescriptor> descriptor = catalog.find(type);
         if (descriptor.isEmpty()) {
-            error("scene.catalog.type.missing", "registered type was not found: " + type, location);
+            error(SceneDiagnosticCode.TYPE_MISSING, "registered type was not found: " + type, location);
         } else if (descriptor.orElseThrow().scope() != expectedScope) {
             error(
-                    "scene.catalog.type.scope",
+                    SceneDiagnosticCode.TYPE_SCOPE_INVALID,
                     "registered type " + type + " has scope "
                             + descriptor.orElseThrow().scope() + " but " + expectedScope + " is required",
                     location);
@@ -99,7 +102,15 @@ public final class SceneCatalogValidator {
     /** Validates authored properties against one registered type descriptor. */
     private void validateProperties(
             Map<String, ProjectValue> authored, RegisteredTypeDescriptor type, String location) {
-        diagnostics.addAll(RegisteredPropertyValidator.validate(authored, type, source, location, "scene.catalog"));
+        diagnostics.addAll(RegisteredPropertyValidator.validate(
+                authored,
+                type,
+                source,
+                location,
+                new PropertyDiagnosticCodes(
+                        SceneDiagnosticCode.PROPERTY_REQUIRED,
+                        SceneDiagnosticCode.PROPERTY_UNKNOWN,
+                        SceneDiagnosticCode.PROPERTY_VALUE_INVALID)));
     }
 
     /** Validates every signal-to-action connection. */
@@ -117,7 +128,10 @@ public final class SceneCatalogValidator {
         if (signal.isPresent()
                 && action.isPresent()
                 && !signal.orElseThrow().payload().equals(action.orElseThrow().payload())) {
-            error("scene.catalog.connection.payload", "signal and action payload types are incompatible", location);
+            error(
+                    SceneDiagnosticCode.CONNECTION_PAYLOAD_INCOMPATIBLE,
+                    "signal and action payload types are incompatible",
+                    location);
         }
     }
 
@@ -140,7 +154,7 @@ public final class SceneCatalogValidator {
         }
         if (types.sceneInstance()) {
             warning(
-                    "scene.catalog.instance.endpoint",
+                    SceneDiagnosticCode.INSTANCE_ENDPOINT_INVALID,
                     "nested-scene endpoint validation is deferred until scene-instance resolution",
                     location);
             return Optional.empty();
@@ -148,14 +162,14 @@ public final class SceneCatalogValidator {
         List<EndpointDescriptor> matches = endpointMatches(types, endpointId, signal);
         if (matches.isEmpty()) {
             error(
-                    signal ? "scene.catalog.signal.missing" : "scene.catalog.action.missing",
+                    signal ? SceneDiagnosticCode.SIGNAL_MISSING : SceneDiagnosticCode.ACTION_MISSING,
                     (signal ? "signal" : "action") + " is not declared: " + endpointId,
                     location);
             return Optional.empty();
         }
         if (matches.size() > 1) {
             error(
-                    signal ? "scene.catalog.signal.ambiguous" : "scene.catalog.action.ambiguous",
+                    signal ? SceneDiagnosticCode.SIGNAL_AMBIGUOUS : SceneDiagnosticCode.ACTION_AMBIGUOUS,
                     (signal ? "signal" : "action") + " is declared by both the node and controller: " + endpointId,
                     location);
             return Optional.empty();
@@ -179,13 +193,19 @@ public final class SceneCatalogValidator {
     }
 
     /** Adds a catalog validation error. */
-    private void error(String code, String message, String location) {
-        diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source, location));
+    private void error(DiagnosticCode code, String technicalDetail, String location) {
+        diagnostics.add(new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, source, location, Map.of("technicalDetail", technicalDetail)));
     }
 
     /** Adds a catalog validation warning. */
-    private void warning(String code, String message, String location) {
-        diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.WARNING, code, message, source, location));
+    private void warning(DiagnosticCode code, String technicalDetail, String location) {
+        diagnostics.add(new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.WARNING,
+                code,
+                source,
+                location,
+                Map.of("technicalDetail", technicalDetail)));
     }
 
     /** Resolved type metadata for one scene node. */

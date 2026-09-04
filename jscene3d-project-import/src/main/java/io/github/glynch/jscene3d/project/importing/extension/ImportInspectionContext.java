@@ -4,10 +4,12 @@
  */
 package io.github.glynch.jscene3d.project.importing.extension;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.importing.ImportProgress;
 import io.github.glynch.jscene3d.project.importing.SourceItem;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import java.nio.file.Path;
+import java.util.Map;
 
 /** Engine-owned context exposed to a format adapter during read-only source inspection. */
 public interface ImportInspectionContext {
@@ -42,20 +44,20 @@ public interface ImportInspectionContext {
     /**
      * Adds a non-terminal inspection warning.
      *
-     * @param code stable adapter-qualified diagnostic code
-     * @param message human-readable explanation
+     * @param code stable adapter-qualified diagnostic identity
      * @param location source-local location or empty string
+     * @param details immutable values describing this occurrence
      */
-    void warning(String code, String message, String location);
+    void warning(DiagnosticCode code, String location, Map<String, String> details);
 
     /**
      * Adds a terminal inspection or preparation error.
      *
-     * @param code stable adapter-qualified diagnostic code
-     * @param message human-readable explanation
+     * @param code stable adapter-qualified diagnostic identity
      * @param location source-local location or empty string
+     * @param details immutable values describing this occurrence
      */
-    void error(String code, String message, String location);
+    void error(DiagnosticCode code, String location, Map<String, String> details);
 
     /**
      * Reports adapter-specific progress synchronously.

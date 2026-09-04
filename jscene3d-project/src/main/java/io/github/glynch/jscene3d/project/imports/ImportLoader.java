@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.imports;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.imports.internal.ImportValidator;
 import io.github.glynch.jscene3d.project.imports.internal.RawImport;
@@ -15,6 +16,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -41,12 +43,15 @@ public final class ImportLoader {
                 ? suppliedPath.normalize()
                 : validProject.root().resolve(suppliedPath).normalize();
         if (!resolvedPath.startsWith(validProject.root())) {
-            return failure(resolvedPath, "import.path.escape", "import path is outside the project directory");
+            return failure(
+                    resolvedPath,
+                    ImportDefinitionDiagnosticCode.PATH_ESCAPES_PROJECT,
+                    "import path is outside the project directory");
         }
         if (!Files.isRegularFile(resolvedPath)) {
             return failure(
                     resolvedPath,
-                    "import.file.missing",
+                    ImportDefinitionDiagnosticCode.FILE_MISSING,
                     "import definition does not exist or is not a regular file: " + resolvedPath);
         }
         Path source;
@@ -54,10 +59,15 @@ public final class ImportLoader {
             source = resolvedPath.toRealPath();
         } catch (IOException exception) {
             return failure(
-                    resolvedPath, "import.file.read", "import path cannot be resolved: " + exception.getMessage());
+                    resolvedPath,
+                    ImportDefinitionDiagnosticCode.FILE_READ_FAILED,
+                    "import path cannot be resolved: " + exception.getMessage());
         }
         if (!source.startsWith(validProject.root())) {
-            return failure(source, "import.path.escape", "import definition resolves outside the project directory");
+            return failure(
+                    source,
+                    ImportDefinitionDiagnosticCode.PATH_ESCAPES_PROJECT,
+                    "import definition resolves outside the project directory");
         }
         return readDefinition(validProject, source);
     }
@@ -71,17 +81,20 @@ public final class ImportLoader {
         } catch (JsonProcessingException exception) {
             return failure(
                     source,
-                    "import.json",
+                    ImportDefinitionDiagnosticCode.JSON_INVALID,
                     "import definition is not valid JScene3D Import JSON: " + exception.getOriginalMessage());
         } catch (IOException exception) {
-            return failure(source, "import.file.read", "import definition cannot be read: " + exception.getMessage());
+            return failure(
+                    source,
+                    ImportDefinitionDiagnosticCode.FILE_READ_FAILED,
+                    "import definition cannot be read: " + exception.getMessage());
         }
     }
 
     /** Creates one terminal error result. */
-    private static ImportLoadResult failure(Path source, String code, String message) {
-        ProjectDiagnostic diagnostic =
-                new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source.toUri(), "");
+    private static ImportLoadResult failure(Path source, DiagnosticCode code, String technicalDetail) {
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, source.toUri(), "", Map.of("technicalDetail", technicalDetail));
         return new ImportLoadResult(Optional.empty(), List.of(diagnostic));
     }
 }

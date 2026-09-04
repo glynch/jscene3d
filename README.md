@@ -220,6 +220,9 @@ Large content can be consumed through `archive.openStream(lump)`, which returns 
 independent caller-owned stream bounded to the validated lump range. Explicit
 low-to-high precedence composition is available through `WadArchiveLayers`;
 the library never discovers layers or assigns meaning to lump names itself.
+WAD failures use the feature-owned `WadDiagnosticCode` enum. Its stable codes
+act as localization keys, its default messages provide English fallbacks, and
+variable failure values remain available as structured diagnostic details.
 
 Run the self-contained archive and layering example with:
 

@@ -7,7 +7,9 @@ package io.github.glynch.jscene3d.project.imports.internal;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
+import io.github.glynch.jscene3d.project.imports.ImportDefinitionDiagnosticCode;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.internal.FieldDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.JsonPointers;
 import io.github.glynch.jscene3d.project.internal.ProjectIdentifiers;
 import io.github.glynch.jscene3d.project.internal.ProjectSchemaReferences;
@@ -41,7 +43,13 @@ public final class ImportValidator {
         this.project = project;
         this.source = source;
         diagnostics = new DiagnosticCollector(source);
-        fields = new ValidationContext(diagnostics, "import");
+        fields = new ValidationContext(
+                diagnostics,
+                new FieldDiagnosticCodes(
+                        ImportDefinitionDiagnosticCode.FIELD_REQUIRED,
+                        ImportDefinitionDiagnosticCode.FIELD_BLANK,
+                        ImportDefinitionDiagnosticCode.FIELD_IDENTIFIER_INVALID,
+                        ImportDefinitionDiagnosticCode.FIELD_TYPE_INVALID));
         values = ProjectValueDecoder.plain();
     }
 
@@ -79,7 +87,7 @@ public final class ImportValidator {
     private void validateSchema(@Nullable String schema, int schemaVersion) {
         if (schemaVersion != SCHEMA_VERSION) {
             diagnostics.error(
-                    "import.schema.unsupported",
+                    ImportDefinitionDiagnosticCode.SCHEMA_UNSUPPORTED,
                     "schemaVersion must be " + SCHEMA_VERSION + ": " + schemaVersion,
                     "/schemaVersion");
         }
@@ -87,7 +95,7 @@ public final class ImportValidator {
                 && !ProjectSchemaReferences.matches(
                         project.root(), source, schema, SCHEMA_URI, LOCAL_SCHEMA_REFERENCE)) {
             diagnostics.warning(
-                    "import.schema.uri",
+                    ImportDefinitionDiagnosticCode.SCHEMA_URI_INVALID,
                     "$schema does not identify the bundled Import Definition version 1 schema",
                     "/$schema");
         }
@@ -101,7 +109,9 @@ public final class ImportValidator {
         }
         if (!reference.startsWith("asset:") || reference.length() == "asset:".length()) {
             diagnostics.error(
-                    "import.source.namespace", "source must be an asset reference such as asset:model", "/source");
+                    ImportDefinitionDiagnosticCode.SOURCE_NAMESPACE_INVALID,
+                    "source must be an asset reference such as asset:model",
+                    "/source");
             return Optional.empty();
         }
         String assetId = reference.substring("asset:".length());
@@ -109,7 +119,10 @@ public final class ImportValidator {
                 .filter(candidate -> candidate.id().equals(assetId))
                 .findFirst();
         if (asset.isEmpty()) {
-            diagnostics.error("import.source.missing", "source asset does not exist: " + assetId, "/source");
+            diagnostics.error(
+                    ImportDefinitionDiagnosticCode.SOURCE_MISSING,
+                    "source asset does not exist: " + assetId,
+                    "/source");
         }
         return asset;
     }
@@ -117,7 +130,8 @@ public final class ImportValidator {
     /** Validates the required ordered, duplicate-free source-item selection. */
     private List<String> validateSelection(@Nullable JsonNode rawSelection) {
         if (rawSelection == null || !rawSelection.isArray()) {
-            diagnostics.error("import.selection.array", "selection must be an array", "/selection");
+            diagnostics.error(
+                    ImportDefinitionDiagnosticCode.SELECTION_NOT_ARRAY, "selection must be an array", "/selection");
             return List.of();
         }
         List<String> selection = new ArrayList<>();
@@ -126,18 +140,23 @@ public final class ImportValidator {
             JsonNode rawIdentity = rawSelection.get(index);
             String location = "/selection/" + index;
             if (!rawIdentity.isTextual() || rawIdentity.textValue().isBlank()) {
-                diagnostics.error("import.selection.text", "selection identities must be non-blank strings", location);
+                diagnostics.error(
+                        ImportDefinitionDiagnosticCode.SELECTION_TEXT_INVALID,
+                        "selection identities must be non-blank strings",
+                        location);
                 continue;
             }
             String identity = rawIdentity.textValue();
             if (!seen.add(identity)) {
                 diagnostics.error(
-                        "import.selection.duplicate", "selection identity is duplicated: " + identity, location);
+                        ImportDefinitionDiagnosticCode.SELECTION_DUPLICATE,
+                        "selection identity is duplicated: " + identity,
+                        location);
                 continue;
             }
             if (!ProjectIdentifiers.isPortableLocator(identity)) {
                 diagnostics.error(
-                        "import.selection.identity",
+                        ImportDefinitionDiagnosticCode.SELECTION_IDENTITY_INVALID,
                         "selection identity must be a portable relative locator",
                         location);
                 continue;
@@ -153,7 +172,8 @@ public final class ImportValidator {
             return Map.of();
         }
         if (!rawSettings.isObject()) {
-            diagnostics.error("import.settings.object", "settings must be an object", "/settings");
+            diagnostics.error(
+                    ImportDefinitionDiagnosticCode.SETTINGS_NOT_OBJECT, "settings must be an object", "/settings");
             return Map.of();
         }
         return values.decodeObject(rawSettings, "/settings").values();
@@ -165,7 +185,10 @@ public final class ImportValidator {
             return Map.of();
         }
         if (!rawItemSettings.isObject()) {
-            diagnostics.error("import.item-settings.index", "itemSettings must be an object", "/itemSettings");
+            diagnostics.error(
+                    ImportDefinitionDiagnosticCode.ITEM_SETTINGS_INDEX_INVALID,
+                    "itemSettings must be an object",
+                    "/itemSettings");
             return Map.of();
         }
         Map<String, Map<String, ProjectValue>> itemSettings = new LinkedHashMap<>();
@@ -181,10 +204,15 @@ public final class ImportValidator {
         String location = "/itemSettings/" + JsonPointers.escapeSegment(identity);
         if (!ProjectIdentifiers.isPortableLocator(identity)) {
             diagnostics.error(
-                    "import.item-settings.identity", "itemSettings key must be a portable relative locator", location);
+                    ImportDefinitionDiagnosticCode.ITEM_SETTINGS_IDENTITY_INVALID,
+                    "itemSettings key must be a portable relative locator",
+                    location);
         }
         if (!rawSettings.isObject()) {
-            diagnostics.error("import.item-settings.object", "item settings must be an object", location);
+            diagnostics.error(
+                    ImportDefinitionDiagnosticCode.ITEM_SETTINGS_NOT_OBJECT,
+                    "item settings must be an object",
+                    location);
             return;
         }
         if (ProjectIdentifiers.isPortableLocator(identity)) {

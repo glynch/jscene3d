@@ -10,12 +10,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.internal.FieldDiagnosticCodes;
+import io.github.glynch.jscene3d.project.internal.PathDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.ProjectPathResolver;
 import io.github.glynch.jscene3d.project.internal.ProjectReferenceDecoder;
 import io.github.glynch.jscene3d.project.internal.ProjectSchemaReferences;
+import io.github.glynch.jscene3d.project.internal.ReferenceDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
+import io.github.glynch.jscene3d.project.resource.ResourceDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
 import java.nio.file.Path;
@@ -41,9 +45,34 @@ public final class ResourceValidator {
         this.project = project;
         this.source = source;
         diagnostics = new DiagnosticCollector(source);
-        ProjectPathResolver paths = new ProjectPathResolver(project.root(), diagnostics, "resource");
-        fields = new ValidationContext(diagnostics, "resource");
-        ProjectReferenceDecoder references = new ProjectReferenceDecoder(project, paths, diagnostics, "resource");
+        FieldDiagnosticCodes fieldCodes = new FieldDiagnosticCodes(
+                ResourceDiagnosticCode.FIELD_REQUIRED,
+                ResourceDiagnosticCode.FIELD_BLANK,
+                ResourceDiagnosticCode.FIELD_IDENTIFIER_INVALID,
+                ResourceDiagnosticCode.FIELD_TYPE_INVALID);
+        ProjectPathResolver paths = new ProjectPathResolver(
+                project.root(),
+                diagnostics,
+                new PathDiagnosticCodes(
+                        fieldCodes,
+                        ResourceDiagnosticCode.PATH_PORTABILITY_INVALID,
+                        ResourceDiagnosticCode.PATH_INVALID,
+                        ResourceDiagnosticCode.PATH_ABSOLUTE,
+                        ResourceDiagnosticCode.PATH_ESCAPES_PROJECT,
+                        ResourceDiagnosticCode.PATH_MISSING,
+                        ResourceDiagnosticCode.PATH_READ_FAILED));
+        fields = new ValidationContext(diagnostics, fieldCodes);
+        ProjectReferenceDecoder references = new ProjectReferenceDecoder(
+                project,
+                paths,
+                diagnostics,
+                new ReferenceDiagnosticCodes(
+                        ResourceDiagnosticCode.REFERENCE_OBJECT_INVALID,
+                        ResourceDiagnosticCode.REFERENCE_SCHEME_UNSUPPORTED,
+                        ResourceDiagnosticCode.REFERENCE_LOCATOR_BLANK,
+                        ResourceDiagnosticCode.REFERENCE_ASSET_INVALID,
+                        ResourceDiagnosticCode.REFERENCE_ASSET_MISSING,
+                        ResourceDiagnosticCode.REFERENCE_IMPORT_INVALID));
         values = ProjectValueDecoder.withReferences(references::decode);
     }
 
@@ -67,13 +96,14 @@ public final class ResourceValidator {
         String id = fields.requiredText(raw.type(), "/type");
         if (!id.isEmpty() && !isRegisteredTypeId(id)) {
             diagnostics.error(
-                    "resource.type.identifier",
+                    ResourceDiagnosticCode.TYPE_ID_INVALID,
                     "type must contain an extension id and local type separated by one slash",
                     "/type");
         }
         int version = raw.typeVersion() == null ? 0 : raw.typeVersion();
         if (version < 1) {
-            diagnostics.error("resource.type.version", "typeVersion must be positive", "/typeVersion");
+            diagnostics.error(
+                    ResourceDiagnosticCode.TYPE_VERSION_INVALID, "typeVersion must be positive", "/typeVersion");
         }
         Map<String, ProjectValue> properties = validateProperties(raw.properties());
         if (diagnostics.hasErrors()) {
@@ -86,7 +116,7 @@ public final class ResourceValidator {
     private void validateSchema(@Nullable String schema, int schemaVersion) {
         if (schemaVersion != SCHEMA_VERSION) {
             diagnostics.error(
-                    "resource.schema.unsupported",
+                    ResourceDiagnosticCode.SCHEMA_UNSUPPORTED,
                     "schemaVersion must be " + SCHEMA_VERSION + ": " + schemaVersion,
                     "/schemaVersion");
         }
@@ -94,7 +124,7 @@ public final class ResourceValidator {
                 && !ProjectSchemaReferences.matches(
                         project.root(), source, schema, SCHEMA_URI, LOCAL_SCHEMA_REFERENCE)) {
             diagnostics.warning(
-                    "resource.schema.uri",
+                    ResourceDiagnosticCode.SCHEMA_URI_INVALID,
                     "$schema does not identify the bundled Resource version 1 schema",
                     "/$schema");
         }
@@ -106,7 +136,7 @@ public final class ResourceValidator {
             return Map.of();
         }
         if (!raw.isObject()) {
-            diagnostics.error("resource.value.object", "properties must be an object", "/properties");
+            diagnostics.error(ResourceDiagnosticCode.VALUE_NOT_OBJECT, "properties must be an object", "/properties");
             return Map.of();
         }
         return values.decodeObject(raw, "/properties").values();

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
+import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import java.util.Objects;
 
 /** Structured composition failure converted to a project diagnostic by the loader. */
@@ -11,7 +12,7 @@ public final class RuntimeCompositionException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     /** Stable diagnostic code. */
-    private final String code;
+    private final RuntimeDiagnosticCode code;
 
     /** JSON Pointer location. */
     private final String location;
@@ -23,9 +24,9 @@ public final class RuntimeCompositionException extends RuntimeException {
      * @param message human-readable failure detail
      * @param location JSON Pointer location
      */
-    public RuntimeCompositionException(String code, String message, String location) {
+    public RuntimeCompositionException(RuntimeDiagnosticCode code, String message, String location) {
         super(message);
-        this.code = Preconditions.requireNonBlank(code, "code");
+        this.code = Objects.requireNonNull(code, "code");
         this.location = Objects.requireNonNull(location, "location");
     }
 
@@ -34,7 +35,7 @@ public final class RuntimeCompositionException extends RuntimeException {
      *
      * @return diagnostic code
      */
-    public String code() {
+    public RuntimeDiagnosticCode code() {
         return code;
     }
 

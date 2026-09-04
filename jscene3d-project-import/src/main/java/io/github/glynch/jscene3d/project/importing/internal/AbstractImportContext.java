@@ -4,7 +4,9 @@
  */
 package io.github.glynch.jscene3d.project.importing.internal;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.importing.ImportDiagnosticCode;
 import io.github.glynch.jscene3d.project.importing.ImportExecution;
 import io.github.glynch.jscene3d.project.importing.ImportProgress;
 import io.github.glynch.jscene3d.project.importing.SourceItem;
@@ -63,7 +65,10 @@ public abstract class AbstractImportContext implements ImportInspectionContext {
         try {
             dependencies.put(resolved, ImportHashes.file(resolved));
         } catch (IOException exception) {
-            error("import.dependency.read", "dependency cannot be read: " + resolved, resolved.toString());
+            error(
+                    ImportDiagnosticCode.DEPENDENCY_READ_FAILED,
+                    resolved.toString(),
+                    Map.of("technicalDetail", "dependency cannot be read: " + resolved));
         }
     }
 
@@ -76,23 +81,23 @@ public abstract class AbstractImportContext implements ImportInspectionContext {
     }
 
     @Override
-    public final void warning(String code, String message, String location) {
+    public final void warning(DiagnosticCode code, String location, Map<String, String> details) {
         diagnostics.add(new ProjectDiagnostic(
                 ProjectDiagnostic.Severity.WARNING,
-                Preconditions.requireNonBlank(code, "code"),
-                Preconditions.requireNonBlank(message, "message"),
+                Objects.requireNonNull(code, "code"),
                 asset.path().toUri(),
-                Objects.requireNonNull(location, "location")));
+                Objects.requireNonNull(location, "location"),
+                Map.copyOf(details)));
     }
 
     @Override
-    public final void error(String code, String message, String location) {
+    public final void error(DiagnosticCode code, String location, Map<String, String> details) {
         diagnostics.add(new ProjectDiagnostic(
                 ProjectDiagnostic.Severity.ERROR,
-                Preconditions.requireNonBlank(code, "code"),
-                Preconditions.requireNonBlank(message, "message"),
+                Objects.requireNonNull(code, "code"),
                 asset.path().toUri(),
-                Objects.requireNonNull(location, "location")));
+                Objects.requireNonNull(location, "location"),
+                Map.copyOf(details)));
     }
 
     @Override
@@ -144,18 +149,27 @@ public abstract class AbstractImportContext implements ImportInspectionContext {
                 ? supplied.normalize()
                 : project.root().resolve(supplied).normalize();
         if (!resolved.startsWith(project.root()) || !Files.isRegularFile(resolved)) {
-            error("import.dependency.invalid", "dependency must be a project file: " + supplied, supplied.toString());
+            error(
+                    ImportDiagnosticCode.DEPENDENCY_INVALID,
+                    supplied.toString(),
+                    Map.of("technicalDetail", "dependency must be a project file: " + supplied));
             return null;
         }
         try {
             Path real = resolved.toRealPath();
             if (!real.startsWith(project.root())) {
-                error("import.dependency.escape", "dependency resolves outside the project", supplied.toString());
+                error(
+                        ImportDiagnosticCode.DEPENDENCY_ESCAPES_PROJECT,
+                        supplied.toString(),
+                        Map.of("technicalDetail", "dependency resolves outside the project"));
                 return null;
             }
             return real;
         } catch (IOException exception) {
-            error("import.dependency.read", "dependency cannot be resolved: " + supplied, supplied.toString());
+            error(
+                    ImportDiagnosticCode.DEPENDENCY_READ_FAILED,
+                    supplied.toString(),
+                    Map.of("technicalDetail", "dependency cannot be resolved: " + supplied));
             return null;
         }
     }

@@ -6,7 +6,6 @@ package io.github.glynch.jscene3d.project.scene;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
@@ -199,7 +198,7 @@ final class SceneLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.scene()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .contains(
                         "scene.schema.unsupported",
                         "scene.schema.uri",
@@ -231,7 +230,9 @@ final class SceneLoaderTest {
 
         SceneLoadResult result = new SceneLoader().loadEntryScene(project);
 
-        assertThat(result.diagnostics()).extracting(ProjectDiagnostic::code).contains("scene.node.source");
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains("scene.node.source");
     }
 
     /** Returns a terminal diagnostic when the entry scene does not exist. */
@@ -242,7 +243,7 @@ final class SceneLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics())
                 .singleElement()
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo("scene.file.missing");
     }
 
@@ -325,7 +326,7 @@ final class SceneLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics())
                 .singleElement()
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo(code);
     }
 }

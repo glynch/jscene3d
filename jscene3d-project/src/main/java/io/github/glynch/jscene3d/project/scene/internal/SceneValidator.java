@@ -10,14 +10,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.internal.FieldDiagnosticCodes;
+import io.github.glynch.jscene3d.project.internal.PathDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.ProjectPathResolver;
 import io.github.glynch.jscene3d.project.internal.ProjectReferenceDecoder;
 import io.github.glynch.jscene3d.project.internal.ProjectSchemaReferences;
+import io.github.glynch.jscene3d.project.internal.ReferenceDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.scene.ControllerDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneConnection;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDiagnosticCode;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
@@ -49,9 +53,34 @@ public final class SceneValidator {
         this.project = project;
         this.source = source;
         diagnostics = new DiagnosticCollector(source);
-        paths = new ProjectPathResolver(project.root(), diagnostics, "scene");
-        fields = new ValidationContext(diagnostics, "scene");
-        ProjectReferenceDecoder references = new ProjectReferenceDecoder(project, paths, diagnostics, "scene");
+        FieldDiagnosticCodes fieldCodes = new FieldDiagnosticCodes(
+                SceneDiagnosticCode.FIELD_REQUIRED,
+                SceneDiagnosticCode.FIELD_BLANK,
+                SceneDiagnosticCode.FIELD_IDENTIFIER_INVALID,
+                SceneDiagnosticCode.FIELD_TYPE_INVALID);
+        paths = new ProjectPathResolver(
+                project.root(),
+                diagnostics,
+                new PathDiagnosticCodes(
+                        fieldCodes,
+                        SceneDiagnosticCode.PATH_PORTABILITY_INVALID,
+                        SceneDiagnosticCode.PATH_INVALID,
+                        SceneDiagnosticCode.PATH_ABSOLUTE,
+                        SceneDiagnosticCode.PATH_ESCAPES_PROJECT,
+                        SceneDiagnosticCode.PATH_MISSING,
+                        SceneDiagnosticCode.PATH_READ_FAILED));
+        fields = new ValidationContext(diagnostics, fieldCodes);
+        ProjectReferenceDecoder references = new ProjectReferenceDecoder(
+                project,
+                paths,
+                diagnostics,
+                new ReferenceDiagnosticCodes(
+                        SceneDiagnosticCode.REFERENCE_OBJECT_INVALID,
+                        SceneDiagnosticCode.REFERENCE_SCHEME_UNSUPPORTED,
+                        SceneDiagnosticCode.REFERENCE_LOCATOR_BLANK,
+                        SceneDiagnosticCode.REFERENCE_ASSET_INVALID,
+                        SceneDiagnosticCode.REFERENCE_ASSET_MISSING,
+                        SceneDiagnosticCode.REFERENCE_IMPORT_INVALID));
         values = ProjectValueDecoder.withReferences(references::decode);
     }
 
@@ -85,7 +114,7 @@ public final class SceneValidator {
     private void validateSchema(@Nullable String schema, int schemaVersion) {
         if (schemaVersion != SCHEMA_VERSION) {
             diagnostics.error(
-                    "scene.schema.unsupported",
+                    SceneDiagnosticCode.SCHEMA_UNSUPPORTED,
                     "schemaVersion must be " + SCHEMA_VERSION + ": " + schemaVersion,
                     "/schemaVersion");
         }
@@ -93,20 +122,22 @@ public final class SceneValidator {
                 && !ProjectSchemaReferences.matches(
                         project.root(), source, schema, SCHEMA_URI, LOCAL_SCHEMA_REFERENCE)) {
             diagnostics.warning(
-                    "scene.schema.uri", "$schema does not identify the bundled Scene version 1 schema", "/$schema");
+                    SceneDiagnosticCode.SCHEMA_URI_INVALID,
+                    "$schema does not identify the bundled Scene version 1 schema",
+                    "/$schema");
         }
     }
 
     /** Validates one node and its descendants. */
     private SceneNodeDefinition validateNode(RawScene.@Nullable Node raw, String location) {
         if (raw == null) {
-            diagnostics.error("scene.field.required", "scene node is required", location);
+            diagnostics.error(SceneDiagnosticCode.FIELD_REQUIRED, "scene node is required", location);
             return placeholderNode();
         }
         String id = fields.requiredLocalId(raw.id(), location + "/id");
         String safeId = id.isEmpty() ? "invalid-" + nodeIds.size() : id;
         if (!id.isEmpty() && !nodeIds.add(id)) {
-            diagnostics.error("scene.node.duplicate", "node id is duplicated: " + id, location + "/id");
+            diagnostics.error(SceneDiagnosticCode.NODE_DUPLICATE, "node id is duplicated: " + id, location + "/id");
         }
         Optional<String> name = fields.optionalText(raw.name(), location + "/name");
         SceneNodeDefinition.Source sourceDefinition = validateNodeSource(raw, location);
@@ -122,7 +153,7 @@ public final class SceneValidator {
         boolean hasInstance = raw.instance() != null || raw.overrides() != null;
         if (hasType == hasInstance) {
             diagnostics.error(
-                    "scene.node.source",
+                    SceneDiagnosticCode.NODE_SOURCE_INVALID,
                     "a node must declare exactly one of a typed source or a scene instance",
                     location);
             return new SceneNodeDefinition.TypedNode(new RegisteredType("invalid.extension/invalid", 1), Map.of());
@@ -139,7 +170,7 @@ public final class SceneValidator {
     private SceneNodeDefinition.SceneInstance validateSceneInstance(RawScene.Node raw, String location) {
         if (raw.type() != null || raw.typeVersion() != null || raw.properties() != null) {
             diagnostics.error(
-                    "scene.node.instance.fields",
+                    SceneDiagnosticCode.INSTANCE_FIELDS_INVALID,
                     "a scene instance cannot also declare type, typeVersion, or properties",
                     location);
         }
@@ -165,13 +196,16 @@ public final class SceneValidator {
         String id = fields.requiredText(rawId, location + "/type");
         if (!id.isEmpty() && !isRegisteredTypeId(id)) {
             diagnostics.error(
-                    "scene.type.identifier",
+                    SceneDiagnosticCode.TYPE_ID_INVALID,
                     "type must contain an extension id and local type separated by one slash",
                     location + "/type");
         }
         int version = rawVersion == null ? 0 : rawVersion;
         if (version < 1) {
-            diagnostics.error("scene.type.version", "typeVersion must be positive", location + "/typeVersion");
+            diagnostics.error(
+                    SceneDiagnosticCode.TYPE_VERSION_INVALID,
+                    "typeVersion must be positive",
+                    location + "/typeVersion");
         }
         String safeId = isRegisteredTypeId(id) ? id : "invalid.extension/invalid";
         return new RegisteredType(safeId, Math.clamp(version, 1, Integer.MAX_VALUE));
@@ -201,7 +235,7 @@ public final class SceneValidator {
             String location = "/connections/" + index;
             Optional<SceneConnection> connection = validateConnection(rawConnections.get(index), location);
             if (connection.isPresent() && !unique.add(connection.orElseThrow())) {
-                diagnostics.error("scene.connection.duplicate", "connection is duplicated", location);
+                diagnostics.error(SceneDiagnosticCode.CONNECTION_DUPLICATE, "connection is duplicated", location);
             } else {
                 connection.ifPresent(connections::add);
             }
@@ -212,7 +246,7 @@ public final class SceneValidator {
     /** Validates one connection and its referenced nodes. */
     private Optional<SceneConnection> validateConnection(RawScene.@Nullable Connection raw, String location) {
         if (raw == null || raw.from() == null || raw.to() == null) {
-            diagnostics.error("scene.field.required", "connection endpoints are required", location);
+            diagnostics.error(SceneDiagnosticCode.FIELD_REQUIRED, "connection endpoints are required", location);
             return Optional.empty();
         }
         String fromNode = fields.requiredLocalId(raw.from().node(), location + "/from/node");
@@ -232,7 +266,10 @@ public final class SceneValidator {
     /** Requires one connection endpoint to identify a node in this scene. */
     private void validateEndpointNode(String node, String location) {
         if (!node.isEmpty() && !nodeIds.contains(node)) {
-            diagnostics.error("scene.connection.node", "connection references an unknown node: " + node, location);
+            diagnostics.error(
+                    SceneDiagnosticCode.CONNECTION_NODE_MISSING,
+                    "connection references an unknown node: " + node,
+                    location);
         }
     }
 
@@ -242,7 +279,7 @@ public final class SceneValidator {
             return Map.of();
         }
         if (!raw.isObject()) {
-            diagnostics.error("scene.value.object", "value must be an object", location);
+            diagnostics.error(SceneDiagnosticCode.VALUE_NOT_OBJECT, "value must be an object", location);
             return Map.of();
         }
         return values.decodeObject(raw, location).values();

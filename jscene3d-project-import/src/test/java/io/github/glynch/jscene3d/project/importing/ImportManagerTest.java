@@ -143,7 +143,7 @@ final class ImportManagerTest {
         try (PreparedImport failed = manager.prepare(definition)) {
             assertThat(failed.preview().isValid()).isFalse();
             assertThat(failed.preview().diagnostics())
-                    .extracting(diagnostic -> diagnostic.code())
+                    .extracting(diagnostic -> diagnostic.code().code())
                     .containsExactly("import.prepare.failed");
         }
 
@@ -176,7 +176,7 @@ final class ImportManagerTest {
         try (PreparedImport prepared = manager.prepare(configured)) {
             assertThat(prepared.preview().isValid()).isFalse();
             assertThat(prepared.preview().diagnostics())
-                    .extracting(diagnostic -> diagnostic.code())
+                    .extracting(diagnostic -> diagnostic.code().code())
                     .containsExactlyInAnyOrder("import.item-settings.unused", "import.item-settings.missing");
             assertThatIllegalStateException().isThrownBy(prepared::commit);
         }
@@ -184,7 +184,7 @@ final class ImportManagerTest {
         ImportDefinition notSelectable = definition(List.of("entries/child"), Map.of());
         try (PreparedImport prepared = manager.prepare(notSelectable)) {
             assertThat(prepared.preview().diagnostics())
-                    .extracting(diagnostic -> diagnostic.code())
+                    .extracting(diagnostic -> diagnostic.code().code())
                     .containsExactly("import.selection.not-selectable");
         }
     }
@@ -216,11 +216,11 @@ final class ImportManagerTest {
 
         assertThat(missingSource.state()).isEqualTo(ImportState.BLOCKED);
         assertThat(missingSource.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("import.source.missing");
         assertThat(inspection.isValid()).isFalse();
         assertThat(inspection.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .contains("import.source.read");
         ImportDefinition unknownImporter = new ImportDefinition(
                 definition.source(),
@@ -233,6 +233,20 @@ final class ImportManagerTest {
         assertThat(manager.status(unknownImporter).state()).isEqualTo(ImportState.BLOCKED);
         assertThatIllegalArgumentException().isThrownBy(() -> manager.prepare(unknownImporter));
         assertThatIllegalArgumentException().isThrownBy(() -> manager.inspect("unknown-asset", IMPORTER_ID));
+    }
+
+    /** Preserves an importer-owned diagnostic identity, fallback, and structured details. */
+    @Test
+    void reportsImporterOwnedWarning() throws IOException {
+        write("assets/source.txt", "WARN-v1");
+
+        SourceInspection inspection = manager().inspect("source-data", IMPORTER_ID);
+
+        assertThat(inspection.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code().code()).isEqualTo("test-import.source.notice");
+            assertThat(diagnostic.message()).isEqualTo("The synthetic source requested a notice");
+            assertThat(diagnostic.details()).containsEntry("sourceText", "WARN-v1");
+        });
     }
 
     /** Creates the import manager through its complete public construction seam. */

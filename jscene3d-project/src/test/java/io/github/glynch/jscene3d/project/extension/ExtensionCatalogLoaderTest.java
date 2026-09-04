@@ -7,7 +7,6 @@ package io.github.glynch.jscene3d.project.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
@@ -112,7 +111,7 @@ final class ExtensionCatalogLoaderTest {
             assertThat(result.isComplete()).isFalse();
             assertThat(result.catalog().extensions()).isEmpty();
             assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
-                assertThat(diagnostic.code()).isEqualTo("extension.missing");
+                assertThat(diagnostic.code().code()).isEqualTo("extension.missing");
                 assertThat(diagnostic.location()).isEqualTo("/extensions/0");
                 assertThat(diagnostic.source())
                         .isEqualTo(temporaryDirectory.resolve("project.json").toUri());
@@ -135,7 +134,9 @@ final class ExtensionCatalogLoaderTest {
                     .singleElement()
                     .extracting(extension -> extension.presentation().displayName())
                     .isEqualTo("Example Game");
-            assertThat(result.diagnostics()).extracting(ProjectDiagnostic::code).containsExactly("extension.duplicate");
+            assertThat(result.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("extension.duplicate");
         }
     }
 
@@ -171,7 +172,7 @@ final class ExtensionCatalogLoaderTest {
 
             assertThat(result.catalog().extensions()).isEmpty();
             assertThat(result.diagnostics())
-                    .extracting(ProjectDiagnostic::code)
+                    .extracting(diagnostic -> diagnostic.code().code())
                     .containsExactly("extension.json", "extension.missing");
         }
     }
@@ -188,7 +189,7 @@ final class ExtensionCatalogLoaderTest {
 
             assertThat(result.catalog().extensions()).isEmpty();
             assertThat(result.diagnostics())
-                    .extracting(ProjectDiagnostic::code)
+                    .extracting(diagnostic -> diagnostic.code().code())
                     .containsExactly("extension.engine.incompatible", "extension.missing");
         }
     }
@@ -205,7 +206,7 @@ final class ExtensionCatalogLoaderTest {
             assertThat(result.catalog().extensions()).isEmpty();
             assertThat(result.diagnostics())
                     .singleElement()
-                    .extracting(ProjectDiagnostic::code)
+                    .extracting(diagnostic -> diagnostic.code().code())
                     .isEqualTo("extension.version.incompatible");
         }
     }
@@ -281,7 +282,7 @@ final class ExtensionCatalogLoaderTest {
 
             assertThat(result.catalog().extensions()).isEmpty();
             assertThat(result.diagnostics())
-                    .extracting(ProjectDiagnostic::code)
+                    .extracting(diagnostic -> diagnostic.code().code())
                     .contains(
                             "extension.schema.uri",
                             "extension.field.required",
@@ -308,7 +309,7 @@ final class ExtensionCatalogLoaderTest {
                 .load(project("example.game", "1.0.0"), new FailingResourceClassLoader());
 
         assertThat(result.diagnostics())
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("extension.discovery.read", "extension.missing");
     }
 

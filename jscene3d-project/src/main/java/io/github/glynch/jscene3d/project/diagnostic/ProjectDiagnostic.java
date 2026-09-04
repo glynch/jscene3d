@@ -5,27 +5,38 @@
 package io.github.glynch.jscene3d.project.diagnostic;
 
 import static io.github.glynch.jscene3d.project.internal.Preconditions.requireAbsoluteUri;
-import static io.github.glynch.jscene3d.project.internal.Preconditions.requireNonBlank;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import java.net.URI;
+import java.util.Map;
 import java.util.Objects;
 
 /** One structured project-loading message suitable for tools and graphical interfaces.
  *
  * @param severity diagnostic severity
- * @param code stable machine-readable diagnostic code
- * @param message human-readable explanation
+ * @param code feature-owned stable code and English fallback
  * @param source absolute source URI, including {@code jar:} resources
  * @param location JSON Pointer location, or an empty string for the complete file
+ * @param details immutable language-neutral values associated with the diagnostic
  */
-public record ProjectDiagnostic(Severity severity, String code, String message, URI source, String location) {
+public record ProjectDiagnostic(
+        Severity severity, DiagnosticCode code, URI source, String location, Map<String, String> details) {
     /** Validates diagnostic values. */
     public ProjectDiagnostic {
         Objects.requireNonNull(severity, "severity");
-        code = requireNonBlank(code, "code");
-        message = requireNonBlank(message, "message");
+        Objects.requireNonNull(code, "code");
         source = requireAbsoluteUri(source, "source");
         Objects.requireNonNull(location, "location");
+        details = Map.copyOf(details);
+    }
+
+    /**
+     * Returns the English fallback text supplied by the diagnostic code.
+     *
+     * @return non-blank fallback message
+     */
+    public String message() {
+        return code.defaultMessage();
     }
 
     /** Project-loading diagnostic severity. */

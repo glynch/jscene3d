@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.runtime.RuntimeAction;
+import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayloadAction;
 import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
@@ -58,7 +59,7 @@ final class EndpointRouter {
             ActionBinding action = actions.get(target);
             if (action == null) {
                 throw new RuntimeCompositionException(
-                        "runtime.action.unimplemented",
+                        RuntimeDiagnosticCode.ACTION_UNIMPLEMENTED,
                         "connected action has no runtime implementation: " + target,
                         "/connections/" + index + "/to");
             }

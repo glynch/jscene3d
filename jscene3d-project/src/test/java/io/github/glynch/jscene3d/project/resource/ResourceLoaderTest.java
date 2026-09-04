@@ -6,7 +6,6 @@ package io.github.glynch.jscene3d.project.resource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
@@ -127,7 +126,7 @@ final class ResourceLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.resource()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly(
                         "resource.schema.unsupported",
                         "resource.schema.uri",
@@ -154,7 +153,7 @@ final class ResourceLoaderTest {
 
         assertThat(result.diagnostics())
                 .singleElement()
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo("resource.json");
     }
 
@@ -166,8 +165,12 @@ final class ResourceLoaderTest {
         ResourceLoadResult missing = loader.load(loadedProject, Path.of("resources/missing.resource.json"));
         ResourceLoadResult escaping = loader.load(loadedProject, Path.of("../outside.resource.json"));
 
-        assertThat(missing.diagnostics()).extracting(ProjectDiagnostic::code).containsExactly("resource.file.missing");
-        assertThat(escaping.diagnostics()).extracting(ProjectDiagnostic::code).containsExactly("resource.path.escape");
+        assertThat(missing.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("resource.file.missing");
+        assertThat(escaping.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("resource.path.escape");
     }
 
     /** Publishes the Resource version-one schema for editors and validation tools. */

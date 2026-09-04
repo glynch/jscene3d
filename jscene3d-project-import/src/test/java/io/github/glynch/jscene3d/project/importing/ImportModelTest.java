@@ -123,6 +123,18 @@ final class ImportModelTest {
                 .isThrownBy(() -> new ImportStatus(ImportState.MISSING, Optional.of(SHA_256), List.of()));
     }
 
+    /** Keeps engine-owned import diagnostic keys unique and fallbacks non-blank. */
+    @Test
+    void validatesDiagnosticCatalog() {
+        assertThat(ImportDiagnosticCode.values())
+                .extracting(ImportDiagnosticCode::code)
+                .doesNotHaveDuplicates()
+                .allSatisfy(code -> assertThat(code).isNotBlank());
+        assertThat(ImportDiagnosticCode.values())
+                .extracting(ImportDiagnosticCode::defaultMessage)
+                .allSatisfy(message -> assertThat(message).isNotBlank());
+    }
+
     /** Copies inspection and artifact metadata at the public boundary. */
     @Test
     void describesInspectionAndArtifactMetadata(@TempDir Path temporaryDirectory) {
@@ -176,6 +188,11 @@ final class ImportModelTest {
 
     /** Creates one reusable project diagnostic. */
     private static ProjectDiagnostic diagnostic(ProjectDiagnostic.Severity severity) {
-        return new ProjectDiagnostic(severity, "import.test", "test diagnostic", URI.create("file:///import.json"), "");
+        return new ProjectDiagnostic(
+                severity,
+                ImportDiagnosticCode.INSPECTION_FAILED,
+                URI.create("file:///import.json"),
+                "",
+                Map.of("technicalDetail", "test diagnostic"));
     }
 }

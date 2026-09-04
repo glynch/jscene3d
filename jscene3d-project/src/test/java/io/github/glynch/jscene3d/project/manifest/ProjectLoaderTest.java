@@ -159,7 +159,7 @@ final class ProjectLoaderTest {
         assertThat(result.project()).isPresent();
         assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
             assertThat(diagnostic.severity()).isEqualTo(ProjectDiagnostic.Severity.WARNING);
-            assertThat(diagnostic.code()).isEqualTo("project.path.missing");
+            assertThat(diagnostic.code().code()).isEqualTo("project.path.missing");
             assertThat(diagnostic.location()).isEqualTo("/assets/0/path");
         });
     }
@@ -238,7 +238,7 @@ final class ProjectLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.project()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .contains(
                         "project.schema.unsupported",
                         "project.schema.uri",
@@ -272,7 +272,7 @@ final class ProjectLoaderTest {
 
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics())
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .contains("project.path.escape", "project.path.portable");
     }
 
@@ -286,7 +286,7 @@ final class ProjectLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics())
                 .singleElement()
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo("project.directory.missing");
     }
 
@@ -298,7 +298,7 @@ final class ProjectLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics())
                 .singleElement()
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo("project.manifest.missing");
     }
 
@@ -400,7 +400,7 @@ final class ProjectLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
             assertThat(diagnostic.severity()).isEqualTo(ProjectDiagnostic.Severity.ERROR);
-            assertThat(diagnostic.code()).isEqualTo(code);
+            assertThat(diagnostic.code().code()).isEqualTo(code);
         });
     }
 }

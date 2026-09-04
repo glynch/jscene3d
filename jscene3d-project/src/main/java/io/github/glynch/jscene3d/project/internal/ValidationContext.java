@@ -14,17 +14,17 @@ import org.jspecify.annotations.Nullable;
 /** Applies common diagnostic-producing field validation for one document format. */
 public final class ValidationContext {
     private final DiagnosticCollector diagnostics;
-    private final String diagnosticPrefix;
+    private final FieldDiagnosticCodes codes;
 
     /**
      * Creates a validation context with format-specific diagnostic codes.
      *
      * @param diagnostics destination for validation diagnostics
-     * @param diagnosticPrefix stable diagnostic-code prefix
+     * @param codes feature-owned field diagnostic codes
      */
-    public ValidationContext(DiagnosticCollector diagnostics, String diagnosticPrefix) {
+    public ValidationContext(DiagnosticCollector diagnostics, FieldDiagnosticCodes codes) {
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
-        this.diagnosticPrefix = Preconditions.requireNonBlank(diagnosticPrefix, "diagnosticPrefix");
+        this.codes = Objects.requireNonNull(codes, "codes");
     }
 
     /**
@@ -36,7 +36,7 @@ public final class ValidationContext {
      */
     public String requiredText(@Nullable String value, String location) {
         if (value == null || value.isBlank()) {
-            diagnostics.error(diagnosticPrefix + ".field.required", "a non-blank value is required", location);
+            diagnostics.error(codes.required(), "a non-blank value is required", location);
             return "";
         }
         return value.strip();
@@ -54,7 +54,7 @@ public final class ValidationContext {
             return Optional.empty();
         }
         if (value.isBlank()) {
-            diagnostics.error(diagnosticPrefix + ".field.blank", "optional values must not be blank", location);
+            diagnostics.error(codes.blank(), "optional values must not be blank", location);
             return Optional.empty();
         }
         return Optional.of(value.strip());
@@ -70,8 +70,7 @@ public final class ValidationContext {
     public String requiredLocalId(@Nullable String value, String location) {
         String identifier = requiredText(value, location);
         if (!identifier.isEmpty() && !isLocalId(identifier)) {
-            diagnostics.error(
-                    diagnosticPrefix + ".field.identifier", "value must be a portable lowercase identifier", location);
+            diagnostics.error(codes.identifier(), "value must be a portable lowercase identifier", location);
             return "";
         }
         return identifier;
@@ -88,9 +87,7 @@ public final class ValidationContext {
         String identifier = requiredText(value, location);
         if (!identifier.isEmpty() && !isRegisteredTypeId(identifier)) {
             diagnostics.error(
-                    diagnosticPrefix + ".field.type",
-                    "value must contain an extension id and local type separated by one slash",
-                    location);
+                    codes.type(), "value must contain an extension id and local type separated by one slash", location);
             return "";
         }
         return identifier;

@@ -4,11 +4,13 @@
  */
 package io.github.glynch.jscene3d.project.internal;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /** Collects ordered diagnostics for one manifest source. */
 public final class DiagnosticCollector {
@@ -36,23 +38,65 @@ public final class DiagnosticCollector {
     /**
      * Adds an error.
      *
-     * @param code stable diagnostic code
-     * @param message human-readable message
+     * @param code feature-owned diagnostic code
      * @param location JSON Pointer location
      */
-    public void error(String code, String message, String location) {
-        diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source, location));
+    public void error(DiagnosticCode code, String location) {
+        error(code, location, Map.of());
+    }
+
+    /**
+     * Adds an error with language-neutral details.
+     *
+     * @param code feature-owned diagnostic code
+     * @param location JSON Pointer location
+     * @param details values associated with the failure
+     */
+    public void error(DiagnosticCode code, String location, Map<String, String> details) {
+        diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, source, location, details));
+    }
+
+    /**
+     * Adds an error while preserving an implementation-supplied technical explanation.
+     *
+     * @param code feature-owned diagnostic code
+     * @param technicalDetail non-localized technical context
+     * @param location JSON Pointer location
+     */
+    public void error(DiagnosticCode code, String technicalDetail, String location) {
+        error(code, location, Map.of("technicalDetail", technicalDetail));
     }
 
     /**
      * Adds a warning.
      *
-     * @param code stable diagnostic code
-     * @param message human-readable message
+     * @param code feature-owned diagnostic code
      * @param location JSON Pointer location
      */
-    public void warning(String code, String message, String location) {
-        diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.WARNING, code, message, source, location));
+    public void warning(DiagnosticCode code, String location) {
+        warning(code, location, Map.of());
+    }
+
+    /**
+     * Adds a warning with language-neutral details.
+     *
+     * @param code feature-owned diagnostic code
+     * @param location JSON Pointer location
+     * @param details values associated with the warning
+     */
+    public void warning(DiagnosticCode code, String location, Map<String, String> details) {
+        diagnostics.add(new ProjectDiagnostic(ProjectDiagnostic.Severity.WARNING, code, source, location, details));
+    }
+
+    /**
+     * Adds a warning while preserving an implementation-supplied technical explanation.
+     *
+     * @param code feature-owned diagnostic code
+     * @param technicalDetail non-localized technical context
+     * @param location JSON Pointer location
+     */
+    public void warning(DiagnosticCode code, String technicalDetail, String location) {
+        warning(code, location, Map.of("technicalDetail", technicalDetail));
     }
 
     /**

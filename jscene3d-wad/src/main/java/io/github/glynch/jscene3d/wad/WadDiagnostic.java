@@ -6,18 +6,20 @@ package io.github.glynch.jscene3d.wad;
 
 import io.github.glynch.jscene3d.wad.internal.Preconditions;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
 
 /**
  * Stable source-aware problem discovered while opening a WAD archive.
  *
  * @param severity diagnostic severity
- * @param code stable machine-readable code
+ * @param code feature-owned stable code and fallback message
  * @param source normalized absolute source path
  * @param location structural location within the archive
- * @param message actionable human-readable description
+ * @param details immutable language-neutral values associated with the failure
  */
-public record WadDiagnostic(Severity severity, String code, Path source, String location, String message) {
+public record WadDiagnostic(
+        Severity severity, WadDiagnosticCode code, Path source, String location, Map<String, String> details) {
     /** Diagnostic severity. */
     public enum Severity {
         /** The archive cannot be used. */
@@ -30,9 +32,18 @@ public record WadDiagnostic(Severity severity, String code, Path source, String 
     /** Creates a validated diagnostic. */
     public WadDiagnostic {
         Objects.requireNonNull(severity, "severity");
-        code = Preconditions.requireNonBlank(code, "code");
+        Objects.requireNonNull(code, "code");
         source = Preconditions.requireAbsoluteNormalized(source, "source");
         Objects.requireNonNull(location, "location");
-        message = Preconditions.requireNonBlank(message, "message");
+        details = Map.copyOf(details);
+    }
+
+    /**
+     * Returns the English fallback text supplied by the diagnostic code.
+     *
+     * @return non-blank fallback message
+     */
+    public String message() {
+        return code.defaultMessage();
     }
 }

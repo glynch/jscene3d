@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
+import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeFactory;
@@ -71,7 +72,9 @@ public final class FactoryBindings {
         SceneNodeFactory factory = sceneNodes.get(type);
         if (factory == null) {
             throw new RuntimeCompositionException(
-                    "runtime.factory.scene-node.missing", "no runtime factory is registered for " + type, location);
+                    RuntimeDiagnosticCode.SCENE_NODE_FACTORY_MISSING,
+                    "no runtime factory is registered for " + type,
+                    location);
         }
         return factory;
     }
@@ -87,7 +90,9 @@ public final class FactoryBindings {
         NodeControllerFactory factory = controllers.get(type);
         if (factory == null) {
             throw new RuntimeCompositionException(
-                    "runtime.factory.controller.missing", "no runtime factory is registered for " + type, location);
+                    RuntimeDiagnosticCode.CONTROLLER_FACTORY_MISSING,
+                    "no runtime factory is registered for " + type,
+                    location);
         }
         return factory;
     }
@@ -103,7 +108,9 @@ public final class FactoryBindings {
         ResourceFactory factory = resources.get(type);
         if (factory == null) {
             throw new RuntimeCompositionException(
-                    "runtime.factory.resource.missing", "no runtime factory is registered for " + type, location);
+                    RuntimeDiagnosticCode.RESOURCE_FACTORY_MISSING,
+                    "no runtime factory is registered for " + type,
+                    location);
         }
         return factory;
     }

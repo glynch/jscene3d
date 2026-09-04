@@ -6,7 +6,6 @@ package io.github.glynch.jscene3d.project.imports;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -123,7 +122,7 @@ final class ImportLoaderTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.definition()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly(
                         "import.schema.unsupported",
                         "import.schema.uri",
@@ -156,11 +155,11 @@ final class ImportLoaderTest {
 
         assertThat(unknown.diagnostics())
                 .singleElement()
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo("import.json");
         assertThat(escaping.diagnostics())
                 .singleElement()
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo("import.path.escape");
     }
 

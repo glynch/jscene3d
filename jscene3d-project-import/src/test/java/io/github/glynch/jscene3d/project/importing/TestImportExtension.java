@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.importing;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.importing.extension.ImportInspectionContext;
 import io.github.glynch.jscene3d.project.importing.extension.ImportPreparationContext;
@@ -36,6 +37,10 @@ final class TestImportExtension implements ProjectImportExtension {
     private static final class TextImporter implements ProjectImporter {
         @Override
         public void inspect(ImportInspectionContext context) throws IOException {
+            String source = Files.readString(context.asset().path(), StandardCharsets.UTF_8);
+            if (source.startsWith("WARN")) {
+                context.warning(TestDiagnosticCode.SOURCE_NOTICE, "", Map.of("sourceText", source));
+            }
             context.dependency(dependency(context));
             context.sourceItem(new SourceItem(
                     "entries/main",
@@ -78,6 +83,22 @@ final class TestImportExtension implements ProjectImportExtension {
         /** Returns the synthetic dependency belonging to the test project. */
         private static Path dependency(ImportInspectionContext context) {
             return context.project().root().resolve("assets/dependency.txt");
+        }
+    }
+
+    /** Diagnostic identity owned by this synthetic importing feature. */
+    private enum TestDiagnosticCode implements DiagnosticCode {
+        /** The source requested a synthetic warning. */
+        SOURCE_NOTICE;
+
+        @Override
+        public String code() {
+            return "test-import.source.notice";
+        }
+
+        @Override
+        public String defaultMessage() {
+            return "The synthetic source requested a notice";
         }
     }
 }

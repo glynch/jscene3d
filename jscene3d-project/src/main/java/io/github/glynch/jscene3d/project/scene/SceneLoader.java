@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.scene;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
@@ -15,6 +16,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -52,22 +54,29 @@ public final class SceneLoader {
                 ? suppliedPath.normalize()
                 : validProject.root().resolve(suppliedPath).normalize();
         if (!resolvedPath.startsWith(validProject.root())) {
-            return failure(resolvedPath, "scene.path.escape", "scene path is outside the project directory");
+            return failure(
+                    resolvedPath,
+                    SceneDiagnosticCode.PATH_ESCAPES_PROJECT,
+                    "scene path is outside the project directory");
         }
         if (!Files.isRegularFile(resolvedPath)) {
             return failure(
                     resolvedPath,
-                    "scene.file.missing",
+                    SceneDiagnosticCode.FILE_MISSING,
                     "scene does not exist or is not a regular file: " + resolvedPath);
         }
         Path source;
         try {
             source = resolvedPath.toRealPath();
         } catch (IOException exception) {
-            return failure(resolvedPath, "scene.file.read", "scene path cannot be resolved: " + exception.getMessage());
+            return failure(
+                    resolvedPath,
+                    SceneDiagnosticCode.FILE_READ_FAILED,
+                    "scene path cannot be resolved: " + exception.getMessage());
         }
         if (!source.startsWith(validProject.root())) {
-            return failure(source, "scene.path.escape", "scene resolves outside the project directory");
+            return failure(
+                    source, SceneDiagnosticCode.PATH_ESCAPES_PROJECT, "scene resolves outside the project directory");
         }
         return readScene(validProject, source);
     }
@@ -80,16 +89,19 @@ public final class SceneLoader {
             return new SceneLoadResult(validation.scene(), validation.diagnostics());
         } catch (JsonProcessingException exception) {
             return failure(
-                    source, "scene.json", "scene is not valid JScene3D Scene JSON: " + exception.getOriginalMessage());
+                    source,
+                    SceneDiagnosticCode.JSON_INVALID,
+                    "scene is not valid JScene3D Scene JSON: " + exception.getOriginalMessage());
         } catch (IOException exception) {
-            return failure(source, "scene.file.read", "scene cannot be read: " + exception.getMessage());
+            return failure(
+                    source, SceneDiagnosticCode.FILE_READ_FAILED, "scene cannot be read: " + exception.getMessage());
         }
     }
 
     /** Creates one terminal error result. */
-    private static SceneLoadResult failure(Path source, String code, String message) {
-        ProjectDiagnostic diagnostic =
-                new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source.toUri(), "");
+    private static SceneLoadResult failure(Path source, DiagnosticCode code, String technicalDetail) {
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, source.toUri(), "", Map.of("technicalDetail", technicalDetail));
         return new SceneLoadResult(Optional.empty(), List.of(diagnostic));
     }
 }

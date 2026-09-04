@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 public final class ProjectPathResolver {
     private final Path root;
     private final DiagnosticCollector diagnostics;
-    private final String diagnosticPrefix;
+    private final PathDiagnosticCodes codes;
     private final ValidationContext fields;
 
     /**
@@ -24,13 +24,13 @@ public final class ProjectPathResolver {
      *
      * @param root normalized absolute project root
      * @param diagnostics destination for validation diagnostics
-     * @param diagnosticPrefix diagnostic namespace such as {@code project} or {@code scene}
+     * @param codes feature-owned path diagnostic codes
      */
-    public ProjectPathResolver(Path root, DiagnosticCollector diagnostics, String diagnosticPrefix) {
+    public ProjectPathResolver(Path root, DiagnosticCollector diagnostics, PathDiagnosticCodes codes) {
         this.root = ProjectPaths.requireNormalizedAbsolute(root, "root");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
-        this.diagnosticPrefix = Preconditions.requireNonBlank(diagnosticPrefix, "diagnosticPrefix");
-        fields = new ValidationContext(diagnostics, diagnosticPrefix);
+        this.codes = Objects.requireNonNull(codes, "codes");
+        fields = new ValidationContext(diagnostics, codes.fields());
     }
 
     /**
@@ -69,13 +69,13 @@ public final class ProjectPathResolver {
      */
     public Optional<Path> resolve(String value, String location, boolean warnIfMissing) {
         if (value.indexOf('\\') >= 0) {
-            diagnostics.error(code("portable"), "project paths must use forward slashes", location);
+            diagnostics.error(codes.portable(), "project paths must use forward slashes", location);
             return Optional.empty();
         }
         try {
             return resolvePath(Path.of(value), value, location, warnIfMissing);
         } catch (InvalidPathException ignored) {
-            diagnostics.error(code("invalid"), "project path is invalid", location);
+            diagnostics.error(codes.invalid(), "project path is invalid", location);
             return Optional.empty();
         }
     }
@@ -83,19 +83,19 @@ public final class ProjectPathResolver {
     /** Resolves a parsed relative path. */
     private Optional<Path> resolvePath(Path relative, String value, String location, boolean warnIfMissing) {
         if (relative.isAbsolute()) {
-            diagnostics.error(code("absolute"), "project path must be relative", location);
+            diagnostics.error(codes.absolute(), "project path must be relative", location);
             return Optional.empty();
         }
         Path resolved = root.resolve(relative).normalize();
         if (!resolved.startsWith(root)) {
-            diagnostics.error(code("escape"), "project path escapes the project directory", location);
+            diagnostics.error(codes.escape(), "project path escapes the project directory", location);
             return Optional.empty();
         }
         if (!validateExistingPath(resolved, location)) {
             return Optional.empty();
         }
         if (warnIfMissing && Files.notExists(resolved)) {
-            diagnostics.warning(code("missing"), "referenced project path does not exist: " + value, location);
+            diagnostics.warning(codes.missing(), "referenced project path does not exist: " + value, location);
         }
         return Optional.of(resolved);
     }
@@ -107,18 +107,13 @@ public final class ProjectPathResolver {
         }
         try {
             if (!resolved.toRealPath().startsWith(root.toRealPath())) {
-                diagnostics.error(code("escape"), "project path resolves outside the project directory", location);
+                diagnostics.error(codes.escape(), "project path resolves outside the project directory", location);
                 return false;
             }
             return true;
         } catch (IOException exception) {
-            diagnostics.error(code("read"), "project path cannot be resolved: " + exception.getMessage(), location);
+            diagnostics.error(codes.read(), "project path cannot be resolved: " + exception.getMessage(), location);
             return false;
         }
-    }
-
-    /** Builds one namespaced diagnostic code. */
-    private String code(String suffix) {
-        return diagnosticPrefix + ".path." + suffix;
     }
 }

@@ -9,11 +9,14 @@ import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isPr
 
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.internal.FieldDiagnosticCodes;
+import io.github.glynch.jscene3d.project.internal.PathDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.ProjectPathResolver;
 import io.github.glynch.jscene3d.project.internal.SemanticVersion;
 import io.github.glynch.jscene3d.project.internal.SemanticVersionRequirement;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.manifest.ProjectDiagnosticCode;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -46,8 +49,23 @@ public final class ManifestValidator {
         this.engineVersion = engineVersion;
         this.engineVersionText = engineVersionText;
         diagnostics = new DiagnosticCollector(source);
-        paths = new ProjectPathResolver(root, diagnostics, "project");
-        fields = new ValidationContext(diagnostics, "project");
+        FieldDiagnosticCodes fieldCodes = new FieldDiagnosticCodes(
+                ProjectDiagnosticCode.FIELD_REQUIRED,
+                ProjectDiagnosticCode.FIELD_BLANK,
+                ProjectDiagnosticCode.FIELD_IDENTIFIER_INVALID,
+                ProjectDiagnosticCode.FIELD_TYPE_INVALID);
+        paths = new ProjectPathResolver(
+                root,
+                diagnostics,
+                new PathDiagnosticCodes(
+                        fieldCodes,
+                        ProjectDiagnosticCode.PATH_PORTABILITY_INVALID,
+                        ProjectDiagnosticCode.PATH_INVALID,
+                        ProjectDiagnosticCode.PATH_ABSOLUTE,
+                        ProjectDiagnosticCode.PATH_ESCAPES_PROJECT,
+                        ProjectDiagnosticCode.PATH_MISSING,
+                        ProjectDiagnosticCode.PATH_UNREADABLE));
+        fields = new ValidationContext(diagnostics, fieldCodes);
     }
 
     /** Validates one raw manifest and returns its complete loading result.
@@ -93,13 +111,13 @@ public final class ManifestValidator {
     private void validateSchema(@Nullable String schema, int schemaVersion) {
         if (schemaVersion != SCHEMA_VERSION) {
             diagnostics.error(
-                    "project.schema.unsupported",
+                    ProjectDiagnosticCode.SCHEMA_UNSUPPORTED,
                     "schemaVersion must be " + SCHEMA_VERSION + ": " + schemaVersion,
                     "/schemaVersion");
         }
         if (schema != null && !SCHEMA_URI.equals(schema) && !LOCAL_SCHEMA_REFERENCE.equals(schema)) {
             diagnostics.warning(
-                    "project.schema.uri",
+                    ProjectDiagnosticCode.SCHEMA_URI_INVALID,
                     "$schema does not identify the bundled Project Manifest version 1 schema",
                     "/$schema");
         }
@@ -108,13 +126,15 @@ public final class ManifestValidator {
     /** Validates stable identity and project-browser metadata. */
     private GameProject.Identity validateIdentity(RawManifest.@Nullable Identity raw) {
         if (raw == null) {
-            diagnostics.error("project.field.required", "identity is required", "/identity");
+            diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "identity is required", "/identity");
             raw = new RawManifest.Identity(null, null, null, null, null, null, null);
         }
         String id = fields.requiredText(raw.id(), "/identity/id");
         if (!id.isEmpty() && !isProjectId(id)) {
             diagnostics.error(
-                    "project.identity.id", "identity.id must be a lowercase reverse-domain identifier", "/identity/id");
+                    ProjectDiagnosticCode.IDENTITY_ID_INVALID,
+                    "identity.id must be a lowercase reverse-domain identifier",
+                    "/identity/id");
         }
         String name = fields.requiredText(raw.name(), "/identity/name");
         String version = fields.requiredText(raw.version(), "/identity/version");
@@ -152,7 +172,7 @@ public final class ManifestValidator {
             String location = "/authors/" + index;
             RawManifest.@Nullable Author raw = rawAuthors.get(index);
             if (raw == null) {
-                diagnostics.error("project.field.required", "author must be an object", location);
+                diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "author must be an object", location);
                 continue;
             }
             String name = fields.requiredText(raw.name(), location + "/name");
@@ -200,19 +220,19 @@ public final class ManifestValidator {
     /** Validates syntax and current compatibility for the engine requirement. */
     private GameProject.EngineCompatibility validateEngine(RawManifest.@Nullable Engine raw) {
         if (raw == null) {
-            diagnostics.error("project.field.required", "engine is required", "/engine");
+            diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "engine is required", "/engine");
             raw = new RawManifest.Engine(null, null);
         }
         String requirementText = fields.requiredText(raw.requires(), "/engine/requires");
         Optional<SemanticVersionRequirement> requirement = SemanticVersionRequirement.parse(requirementText);
         if (!requirementText.isEmpty() && requirement.isEmpty()) {
             diagnostics.error(
-                    "project.engine.requirement",
+                    ProjectDiagnosticCode.ENGINE_REQUIREMENT_INVALID,
                     "engine.requires must contain semantic-version comparisons",
                     "/engine/requires");
         } else if (requirement.isPresent() && !requirement.orElseThrow().includes(engineVersion)) {
             diagnostics.error(
-                    "project.engine.incompatible",
+                    ProjectDiagnosticCode.ENGINE_INCOMPATIBLE,
                     "project requires " + requirementText + " but the current engine is " + engineVersionText,
                     "/engine/requires");
         }
@@ -227,13 +247,13 @@ public final class ManifestValidator {
     /** Validates application startup and optional project-level definitions. */
     private GameProject.RuntimeConfiguration validateRuntime(RawManifest.@Nullable RuntimeConfiguration raw) {
         if (raw == null) {
-            diagnostics.error("project.field.required", "runtime is required", "/runtime");
+            diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "runtime is required", "/runtime");
             raw = new RawManifest.RuntimeConfiguration(null, null, null, null);
         }
         String extension = fields.requiredText(raw.applicationExtension(), "/runtime/applicationExtension");
         if (!extension.isEmpty() && !isProjectId(extension)) {
             diagnostics.error(
-                    "project.runtime.extension",
+                    ProjectDiagnosticCode.RUNTIME_EXTENSION_INVALID,
                     "runtime.applicationExtension must be a lowercase reverse-domain identifier",
                     "/runtime/applicationExtension");
         }
@@ -249,7 +269,8 @@ public final class ManifestValidator {
     private List<GameProject.ExtensionRequirement> validateExtensions(
             @Nullable List<RawManifest.@Nullable ExtensionRequirement> rawExtensions) {
         if (rawExtensions == null || rawExtensions.isEmpty()) {
-            diagnostics.error("project.field.required", "at least one extension is required", "/extensions");
+            diagnostics.error(
+                    ProjectDiagnosticCode.FIELD_REQUIRED, "at least one extension is required", "/extensions");
             return List.of();
         }
         List<GameProject.ExtensionRequirement> extensions = new ArrayList<>();
@@ -265,24 +286,25 @@ public final class ManifestValidator {
             RawManifest.@Nullable ExtensionRequirement raw, int index, Set<String> identifiers) {
         String location = "/extensions/" + index;
         if (raw == null) {
-            diagnostics.error("project.field.required", "extension must be an object", location);
+            diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "extension must be an object", location);
             return Optional.empty();
         }
         String id = fields.requiredText(raw.id(), location + "/id");
         if (!id.isEmpty() && !isProjectId(id)) {
             diagnostics.error(
-                    "project.extension.id",
+                    ProjectDiagnosticCode.EXTENSION_ID_INVALID,
                     "extension id must be a lowercase reverse-domain identifier",
                     location + "/id");
         }
         if (!id.isEmpty() && !identifiers.add(id)) {
-            diagnostics.error("project.extension.duplicate", "extension id is duplicated: " + id, location + "/id");
+            diagnostics.error(
+                    ProjectDiagnosticCode.EXTENSION_DUPLICATE, "extension id is duplicated: " + id, location + "/id");
         }
         String requirement = fields.requiredText(raw.requires(), location + "/requires");
         boolean validRequirement = SemanticVersionRequirement.parse(requirement).isPresent();
         if (!requirement.isEmpty() && !validRequirement) {
             diagnostics.error(
-                    "project.extension.requirement",
+                    ProjectDiagnosticCode.EXTENSION_REQUIREMENT_INVALID,
                     "extension requires must contain semantic-version comparisons",
                     location + "/requires");
         }
@@ -303,12 +325,15 @@ public final class ManifestValidator {
             String location = "/assets/" + index;
             RawManifest.@Nullable Asset raw = rawAssets.get(index);
             if (raw == null) {
-                diagnostics.error("project.field.required", "asset source must be an object", location);
+                diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "asset source must be an object", location);
                 continue;
             }
             String id = fields.requiredLocalId(raw.id(), location + "/id");
             if (!id.isEmpty() && !identifiers.add(id)) {
-                diagnostics.error("project.asset.duplicate", "asset source id is duplicated: " + id, location + "/id");
+                diagnostics.error(
+                        ProjectDiagnosticCode.ASSET_DUPLICATE,
+                        "asset source id is duplicated: " + id,
+                        location + "/id");
             }
             String type = fields.requiredRegisteredTypeId(raw.type(), location + "/type");
             Optional<Path> path = paths.resolveRequired(raw.path(), location + "/path", true);
@@ -339,7 +364,9 @@ public final class ManifestValidator {
         }
         if (raw.minimum() < 1 || raw.maximum() < raw.minimum()) {
             diagnostics.error(
-                    "project.catalog.players", "players must satisfy 1 <= minimum <= maximum", "/catalog/players");
+                    ProjectDiagnosticCode.CATALOG_PLAYERS_INVALID,
+                    "players must satisfy 1 <= minimum <= maximum",
+                    "/catalog/players");
             return Optional.empty();
         }
         return Optional.of(new GameProject.PlayerRange(raw.minimum(), raw.maximum()));
@@ -352,7 +379,7 @@ public final class ManifestValidator {
                 extensions.stream().anyMatch(extension -> extension.id().equals(applicationExtension));
         if (!present) {
             diagnostics.error(
-                    "project.runtime.extension.missing",
+                    ProjectDiagnosticCode.RUNTIME_EXTENSION_MISSING,
                     "application extension is not declared: " + applicationExtension,
                     "/runtime/applicationExtension");
         }
@@ -369,7 +396,7 @@ public final class ManifestValidator {
             String itemLocation = location + "/" + index;
             Optional<Path> path = paths.resolveRequired(values.get(index), itemLocation, true);
             if (path.isPresent() && !unique.add(path.orElseThrow())) {
-                diagnostics.error("project.path.duplicate", "project path is duplicated", itemLocation);
+                diagnostics.error(ProjectDiagnosticCode.PATH_DUPLICATE, "project path is duplicated", itemLocation);
             } else {
                 path.ifPresent(resolvedPaths::add);
             }
@@ -381,7 +408,10 @@ public final class ManifestValidator {
     private Optional<String> validateDigest(@Nullable String value, String location) {
         Optional<String> digest = fields.optionalText(value, location);
         if (digest.isPresent() && !isSha256(digest.orElseThrow())) {
-            diagnostics.error("project.asset.sha256", "sha256 must contain exactly 64 hexadecimal digits", location);
+            diagnostics.error(
+                    ProjectDiagnosticCode.ASSET_FINGERPRINT_INVALID,
+                    "sha256 must contain exactly 64 hexadecimal digits",
+                    location);
             return Optional.empty();
         }
         return digest.map(text -> text.toLowerCase(Locale.ROOT));
@@ -396,7 +426,8 @@ public final class ManifestValidator {
         try {
             return Optional.of(LocalDate.parse(text.orElseThrow()));
         } catch (DateTimeParseException ignored) {
-            diagnostics.error("project.field.date", "value must be an ISO-8601 calendar date", location);
+            diagnostics.error(
+                    ProjectDiagnosticCode.FIELD_DATE_INVALID, "value must be an ISO-8601 calendar date", location);
             return Optional.empty();
         }
     }
@@ -410,12 +441,12 @@ public final class ManifestValidator {
         try {
             URI uri = new URI(text.orElseThrow());
             if (!uri.isAbsolute()) {
-                diagnostics.error("project.field.uri", "URI must be absolute", location);
+                diagnostics.error(ProjectDiagnosticCode.FIELD_URI_INVALID, "URI must be absolute", location);
                 return Optional.empty();
             }
             return Optional.of(uri);
         } catch (URISyntaxException ignored) {
-            diagnostics.error("project.field.uri", "value must be a valid absolute URI", location);
+            diagnostics.error(ProjectDiagnosticCode.FIELD_URI_INVALID, "value must be a valid absolute URI", location);
             return Optional.empty();
         }
     }
@@ -423,7 +454,8 @@ public final class ManifestValidator {
     /** Validates a semantic version when a value is present. */
     private void validateSemanticVersion(String value, String location) {
         if (!value.isEmpty() && SemanticVersion.parse(value).isEmpty()) {
-            diagnostics.error("project.field.version", "value must be a semantic version", location);
+            diagnostics.error(
+                    ProjectDiagnosticCode.FIELD_VERSION_INVALID, "value must be a semantic version", location);
         }
     }
 
@@ -438,7 +470,8 @@ public final class ManifestValidator {
             String itemLocation = location + "/" + index;
             String value = fields.requiredText(values.get(index), itemLocation);
             if (!value.isEmpty() && !unique.add(value)) {
-                diagnostics.error("project.field.duplicate", "list value is duplicated: " + value, itemLocation);
+                diagnostics.error(
+                        ProjectDiagnosticCode.FIELD_DUPLICATE, "list value is duplicated: " + value, itemLocation);
             } else if (!value.isEmpty()) {
                 result.add(value);
             }

@@ -12,12 +12,14 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
 import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
+import io.github.glynch.jscene3d.project.extension.ExtensionDiagnosticCode;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.internal.FieldDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.SemanticVersion;
 import io.github.glynch.jscene3d.project.internal.SemanticVersionRequirement;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
@@ -48,7 +50,13 @@ public final class ExtensionDescriptorValidator {
     private ExtensionDescriptorValidator(URI source, SemanticVersion engineVersion) {
         this.engineVersion = engineVersion;
         diagnostics = new DiagnosticCollector(source);
-        fields = new ValidationContext(diagnostics, "extension");
+        fields = new ValidationContext(
+                diagnostics,
+                new FieldDiagnosticCodes(
+                        ExtensionDiagnosticCode.FIELD_REQUIRED,
+                        ExtensionDiagnosticCode.FIELD_BLANK,
+                        ExtensionDiagnosticCode.FIELD_IDENTIFIER_INVALID,
+                        ExtensionDiagnosticCode.FIELD_TYPE_INVALID));
         values = ProjectValueDecoder.plain();
     }
 
@@ -71,11 +79,13 @@ public final class ExtensionDescriptorValidator {
         validateSchema(raw.schema(), raw.schemaVersion());
         String id = fields.requiredText(raw.id(), "/id");
         if (!id.isEmpty() && !isProjectId(id)) {
-            diagnostics.error("extension.id", "id must be a lowercase reverse-domain identifier", "/id");
+            diagnostics.error(
+                    ExtensionDiagnosticCode.ID_INVALID, "id must be a lowercase reverse-domain identifier", "/id");
         }
         String version = fields.requiredText(raw.version(), "/version");
         if (!version.isEmpty() && SemanticVersion.parse(version).isEmpty()) {
-            diagnostics.error("extension.version", "version must be a semantic version", "/version");
+            diagnostics.error(
+                    ExtensionDiagnosticCode.VERSION_INVALID, "version must be a semantic version", "/version");
         }
         String engineRequires = fields.requiredText(raw.engineRequires(), "/engineRequires");
         validateEngineRequirement(engineRequires);
@@ -94,13 +104,13 @@ public final class ExtensionDescriptorValidator {
     private void validateSchema(@Nullable String schema, int schemaVersion) {
         if (schemaVersion != SCHEMA_VERSION) {
             diagnostics.error(
-                    "extension.schema.unsupported",
+                    ExtensionDiagnosticCode.SCHEMA_UNSUPPORTED,
                     "schemaVersion must be " + SCHEMA_VERSION + ": " + schemaVersion,
                     "/schemaVersion");
         }
         if (schema != null && !SCHEMA_URI.equals(schema)) {
             diagnostics.warning(
-                    "extension.schema.uri",
+                    ExtensionDiagnosticCode.SCHEMA_URI_INVALID,
                     "$schema does not identify the bundled Extension Descriptor version 1 schema",
                     "/$schema");
         }
@@ -111,12 +121,12 @@ public final class ExtensionDescriptorValidator {
         Optional<SemanticVersionRequirement> requirement = SemanticVersionRequirement.parse(requirementText);
         if (!requirementText.isEmpty() && requirement.isEmpty()) {
             diagnostics.error(
-                    "extension.engine.requirement",
+                    ExtensionDiagnosticCode.ENGINE_REQUIREMENT_INVALID,
                     "engineRequires must contain semantic-version comparisons",
                     "/engineRequires");
         } else if (requirement.isPresent() && !requirement.orElseThrow().includes(engineVersion)) {
             diagnostics.error(
-                    "extension.engine.incompatible",
+                    ExtensionDiagnosticCode.ENGINE_INCOMPATIBLE,
                     "extension requires " + requirementText + " but the current engine is incompatible",
                     "/engineRequires");
         }
@@ -135,7 +145,7 @@ public final class ExtensionDescriptorValidator {
             Optional<RegisteredTypeDescriptor> descriptor = validateType(rawTypes.get(index), extensionId, location);
             if (descriptor.isPresent() && !unique.add(descriptor.orElseThrow().type())) {
                 diagnostics.error(
-                        "extension.type.duplicate",
+                        ExtensionDiagnosticCode.TYPE_DUPLICATE,
                         "registered type is duplicated: "
                                 + descriptor.orElseThrow().type(),
                         location);
@@ -150,14 +160,14 @@ public final class ExtensionDescriptorValidator {
     private Optional<RegisteredTypeDescriptor> validateType(
             RawExtensionDescriptor.@Nullable Type raw, String extensionId, String location) {
         if (raw == null) {
-            diagnostics.error("extension.field.required", "registered type must be an object", location);
+            diagnostics.error(ExtensionDiagnosticCode.FIELD_REQUIRED, "registered type must be an object", location);
             return Optional.empty();
         }
         String id = fields.requiredText(raw.id(), location + "/id");
         boolean validId = isRegisteredTypeId(id) && id.startsWith(extensionId + '/');
         if (!id.isEmpty() && !validId) {
             diagnostics.error(
-                    "extension.type.id",
+                    ExtensionDiagnosticCode.TYPE_ID_INVALID,
                     "type id must be qualified by its owning extension: " + extensionId,
                     location + "/id");
         }
@@ -194,7 +204,7 @@ public final class ExtensionDescriptorValidator {
             Optional<PropertyDescriptor> property = validateProperty(rawProperties.get(index), location + "/" + index);
             if (property.isPresent() && !unique.add(property.orElseThrow().id())) {
                 diagnostics.error(
-                        "extension.property.duplicate",
+                        ExtensionDiagnosticCode.PROPERTY_DUPLICATE,
                         "property is duplicated: " + property.orElseThrow().id(),
                         location + "/" + index + "/id");
             } else {
@@ -208,7 +218,7 @@ public final class ExtensionDescriptorValidator {
     private Optional<PropertyDescriptor> validateProperty(
             RawExtensionDescriptor.@Nullable Property raw, String location) {
         if (raw == null) {
-            diagnostics.error("extension.field.required", "property must be an object", location);
+            diagnostics.error(ExtensionDiagnosticCode.FIELD_REQUIRED, "property must be an object", location);
             return Optional.empty();
         }
         String id = fields.requiredLocalId(raw.id(), location + "/id");
@@ -222,14 +232,14 @@ public final class ExtensionDescriptorValidator {
         Optional<ProjectValue> defaultValue = optionalValue(raw.defaultValue(), location + "/defaultValue");
         if (defaultValue.isPresent() && !accepts(valueKind, acceptedReferences, defaultValue.orElseThrow())) {
             diagnostics.error(
-                    "extension.property.default",
+                    ExtensionDiagnosticCode.PROPERTY_DEFAULT_INVALID,
                     "defaultValue does not satisfy valueKind and acceptedReferences",
                     location + "/defaultValue");
             defaultValue = Optional.empty();
         }
         if (required && defaultValue.isPresent()) {
             diagnostics.error(
-                    "extension.property.required-default",
+                    ExtensionDiagnosticCode.PROPERTY_REQUIRED_DEFAULT,
                     "a required property cannot also declare a defaultValue",
                     location);
         }
@@ -259,7 +269,7 @@ public final class ExtensionDescriptorValidator {
             Optional<EndpointDescriptor> endpoint = validateEndpoint(rawEndpoints.get(index), location + "/" + index);
             if (endpoint.isPresent() && !unique.add(endpoint.orElseThrow().id())) {
                 diagnostics.error(
-                        "extension.endpoint.duplicate",
+                        ExtensionDiagnosticCode.ENDPOINT_DUPLICATE,
                         "endpoint is duplicated: " + endpoint.orElseThrow().id(),
                         location + "/" + index + "/id");
             } else {
@@ -273,7 +283,7 @@ public final class ExtensionDescriptorValidator {
     private Optional<EndpointDescriptor> validateEndpoint(
             RawExtensionDescriptor.@Nullable Endpoint raw, String location) {
         if (raw == null) {
-            diagnostics.error("extension.field.required", "endpoint must be an object", location);
+            diagnostics.error(ExtensionDiagnosticCode.FIELD_REQUIRED, "endpoint must be an object", location);
             return Optional.empty();
         }
         String id = fields.requiredLocalId(raw.id(), location + "/id");
@@ -299,7 +309,9 @@ public final class ExtensionDescriptorValidator {
         String id = fields.requiredText(raw.type(), location + "/type");
         if (!id.isEmpty() && !isRegisteredTypeId(id)) {
             diagnostics.error(
-                    "extension.endpoint.payload", "payload type must be extension-qualified", location + "/type");
+                    ExtensionDiagnosticCode.ENDPOINT_PAYLOAD_INVALID,
+                    "payload type must be extension-qualified",
+                    location + "/type");
         }
         int version = positiveVersion(raw.typeVersion(), location + "/typeVersion");
         return isRegisteredTypeId(id) && version > 0 ? Optional.of(new RegisteredType(id, version)) : Optional.empty();
@@ -309,7 +321,7 @@ public final class ExtensionDescriptorValidator {
     private int positiveVersion(@Nullable Integer version, String location) {
         int value = version == null ? 0 : version;
         if (value < 1) {
-            diagnostics.error("extension.type.version", "typeVersion must be positive", location);
+            diagnostics.error(ExtensionDiagnosticCode.TYPE_VERSION_INVALID, "typeVersion must be positive", location);
         }
         return value;
     }
@@ -321,7 +333,7 @@ public final class ExtensionDescriptorValidator {
             return RegisteredTypeScope.valueOf(text.replace('-', '_').toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
             diagnostics.error(
-                    "extension.type.scope",
+                    ExtensionDiagnosticCode.TYPE_SCOPE_INVALID,
                     "scope must be scene-node, node-controller, project-system, resource, or importer",
                     location);
             return RegisteredTypeScope.RESOURCE;
@@ -335,7 +347,7 @@ public final class ExtensionDescriptorValidator {
             return ProjectValueKind.valueOf(text.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
             diagnostics.error(
-                    "extension.property.kind",
+                    ExtensionDiagnosticCode.PROPERTY_KIND_INVALID,
                     "valueKind must be null, boolean, number, text, array, object, or reference",
                     location);
             return ProjectValueKind.NULL;
@@ -355,20 +367,22 @@ public final class ExtensionDescriptorValidator {
                 ResourceReference.Kind kind = ResourceReference.Kind.valueOf(value.toUpperCase(Locale.ROOT));
                 if (!result.add(kind)) {
                     diagnostics.error(
-                            "extension.property.reference-duplicate",
+                            ExtensionDiagnosticCode.PROPERTY_REFERENCE_DUPLICATE,
                             "accepted reference namespace is duplicated: " + value,
                             location + "/" + index);
                 }
             } catch (IllegalArgumentException ignored) {
                 diagnostics.error(
-                        "extension.property.reference-kind",
+                        ExtensionDiagnosticCode.PROPERTY_REFERENCE_KIND_INVALID,
                         "accepted reference namespace must be project, asset, or import",
                         location + "/" + index);
             }
         }
         if (valueKind != ProjectValueKind.REFERENCE && !result.isEmpty()) {
             diagnostics.error(
-                    "extension.property.reference-kind", "acceptedReferences require valueKind reference", location);
+                    ExtensionDiagnosticCode.PROPERTY_REFERENCE_KIND_INVALID,
+                    "acceptedReferences require valueKind reference",
+                    location);
             return Set.of();
         }
         return Set.copyOf(result);
@@ -385,12 +399,12 @@ public final class ExtensionDescriptorValidator {
             String value = fields.requiredText(values.get(index), location + "/" + index);
             if (!value.isEmpty() && !isRegisteredTypeId(value)) {
                 diagnostics.error(
-                        "extension.capability.id",
+                        ExtensionDiagnosticCode.CAPABILITY_ID_INVALID,
                         "capability must be an extension-qualified identifier",
                         location + "/" + index);
             } else if (!value.isEmpty() && !unique.add(value)) {
                 diagnostics.error(
-                        "extension.capability.duplicate",
+                        ExtensionDiagnosticCode.CAPABILITY_DUPLICATE,
                         "required capability is duplicated: " + value,
                         location + "/" + index);
             } else if (!value.isEmpty()) {
@@ -422,7 +436,7 @@ public final class ExtensionDescriptorValidator {
             return Map.of();
         }
         if (!raw.isObject()) {
-            diagnostics.error("extension.editor.object", "editor metadata must be an object", location);
+            diagnostics.error(ExtensionDiagnosticCode.EDITOR_NOT_OBJECT, "editor metadata must be an object", location);
             return Map.of();
         }
         return values.decodeObject(raw, location).values();

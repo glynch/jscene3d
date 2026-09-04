@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.extension;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.internal.ExtensionDescriptorValidator;
 import io.github.glynch.jscene3d.project.extension.internal.RawExtensionDescriptor;
@@ -83,7 +84,7 @@ public final class ExtensionCatalogLoader {
         } catch (IOException exception) {
             diagnostics.add(error(
                     manifest,
-                    "extension.discovery.read",
+                    ExtensionDiagnosticCode.DISCOVERY_READ_FAILED,
                     "extension descriptors cannot be enumerated: " + exception.getMessage(),
                     ""));
             return List.of();
@@ -104,7 +105,10 @@ public final class ExtensionCatalogLoader {
             LocatedDescriptor previous = discovered.putIfAbsent(value.id(), new LocatedDescriptor(value, source));
             if (previous != null) {
                 diagnostics.add(error(
-                        source, "extension.duplicate", "multiple descriptors declare extension " + value.id(), "/id"));
+                        source,
+                        ExtensionDiagnosticCode.DESCRIPTOR_DUPLICATE,
+                        "multiple descriptors declare extension " + value.id(),
+                        "/id"));
             }
         }
         return Collections.unmodifiableMap(discovered);
@@ -122,12 +126,15 @@ public final class ExtensionCatalogLoader {
         } catch (JsonProcessingException exception) {
             diagnostics.add(error(
                     source,
-                    "extension.json",
+                    ExtensionDiagnosticCode.JSON_INVALID,
                     "extension descriptor is not valid JSON: " + exception.getOriginalMessage(),
                     ""));
         } catch (IOException exception) {
             diagnostics.add(error(
-                    source, "extension.read", "extension descriptor cannot be read: " + exception.getMessage(), ""));
+                    source,
+                    ExtensionDiagnosticCode.READ_FAILED,
+                    "extension descriptor cannot be read: " + exception.getMessage(),
+                    ""));
         }
         return Optional.empty();
     }
@@ -147,7 +154,7 @@ public final class ExtensionCatalogLoader {
             if (located == null) {
                 diagnostics.add(error(
                         manifest,
-                        "extension.missing",
+                        ExtensionDiagnosticCode.MISSING,
                         "declared extension was not discovered: " + requirement.id(),
                         location));
             } else if (matches(requirement, located.descriptor())) {
@@ -155,7 +162,7 @@ public final class ExtensionCatalogLoader {
             } else {
                 diagnostics.add(error(
                         located.source(),
-                        "extension.version.incompatible",
+                        ExtensionDiagnosticCode.VERSION_INCOMPATIBLE,
                         "project requires " + requirement.requirement() + " but discovered "
                                 + located.descriptor().version(),
                         "/version"));
@@ -181,7 +188,7 @@ public final class ExtensionCatalogLoader {
         } catch (URISyntaxException exception) {
             diagnostics.add(error(
                     fallback,
-                    "extension.resource.uri",
+                    ExtensionDiagnosticCode.RESOURCE_URI_INVALID,
                     "extension descriptor has an invalid resource URI: " + resource,
                     ""));
             return fallback;
@@ -189,8 +196,9 @@ public final class ExtensionCatalogLoader {
     }
 
     /** Creates one structured error. */
-    private static ProjectDiagnostic error(URI source, String code, String message, String location) {
-        return new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source, location);
+    private static ProjectDiagnostic error(URI source, DiagnosticCode code, String technicalDetail, String location) {
+        return new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, source, location, Map.of("technicalDetail", technicalDetail));
     }
 
     /** Couples a validated descriptor to the resource that supplied it. */

@@ -86,11 +86,12 @@ final class WadLoaderTest {
         assertThat(missingResult.diagnostics())
                 .singleElement()
                 .extracting(WadDiagnostic::code)
-                .isEqualTo("wad.source.missing");
+                .isEqualTo(WadDiagnosticCode.SOURCE_MISSING);
         assertThat(truncatedResult.archive()).isEmpty();
         assertThat(truncatedResult.diagnostics()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo("wad.header.truncated");
+            assertThat(diagnostic.code()).isEqualTo(WadDiagnosticCode.HEADER_TRUNCATED);
             assertThat(diagnostic.location()).isEqualTo("/header");
+            assertThat(diagnostic.details()).containsEntry("minimumBytes", "12");
         });
     }
 
@@ -110,19 +111,19 @@ final class WadLoaderTest {
         assertThat(signatureResult.diagnostics())
                 .singleElement()
                 .extracting(WadDiagnostic::code)
-                .isEqualTo("wad.header.signature");
+                .isEqualTo(WadDiagnosticCode.HEADER_SIGNATURE_INVALID);
         assertThat(countResult.diagnostics())
                 .singleElement()
                 .extracting(WadDiagnostic::code)
-                .isEqualTo("wad.directory.count");
+                .isEqualTo(WadDiagnosticCode.DIRECTORY_COUNT_INVALID);
         assertThat(offsetResult.diagnostics())
                 .singleElement()
                 .extracting(WadDiagnostic::code)
-                .isEqualTo("wad.directory.offset");
+                .isEqualTo(WadDiagnosticCode.DIRECTORY_OFFSET_INVALID);
         assertThat(directoryResult.diagnostics())
                 .singleElement()
                 .extracting(WadDiagnostic::code)
-                .isEqualTo("wad.directory.bounds");
+                .isEqualTo(WadDiagnosticCode.DIRECTORY_OUT_OF_BOUNDS);
     }
 
     /** Diagnoses directory entries with invalid ranges or encoded names. */
@@ -141,11 +142,12 @@ final class WadLoaderTest {
         WadLoadResult nameResult = WadLoader.load(name);
 
         assertThat(boundsResult.diagnostics()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo("wad.lump.bounds");
+            assertThat(diagnostic.code()).isEqualTo(WadDiagnosticCode.LUMP_OUT_OF_BOUNDS);
             assertThat(diagnostic.location()).isEqualTo("/directory/0");
+            assertThat(diagnostic.details()).containsEntry("lumpIndex", "0");
         });
         assertThat(nameResult.diagnostics()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo("wad.lump.name");
+            assertThat(diagnostic.code()).isEqualTo(WadDiagnosticCode.LUMP_NAME_INVALID);
             assertThat(diagnostic.location()).isEqualTo("/directory/0/name");
         });
     }
@@ -165,7 +167,7 @@ final class WadLoaderTest {
         assertThat(mismatch.diagnostics())
                 .singleElement()
                 .extracting(WadDiagnostic::code)
-                .isEqualTo("wad.source.sha256");
+                .isEqualTo(WadDiagnosticCode.SOURCE_FINGERPRINT_MISMATCH);
         assertThatIllegalArgumentException().isThrownBy(() -> WadLoader.load(source, "invalid"));
     }
 

@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.wad.internal;
 
 import io.github.glynch.jscene3d.wad.WadArchive;
 import io.github.glynch.jscene3d.wad.WadDiagnostic;
+import io.github.glynch.jscene3d.wad.WadDiagnosticCode;
 import io.github.glynch.jscene3d.wad.WadKind;
 import io.github.glynch.jscene3d.wad.WadLoadResult;
 import io.github.glynch.jscene3d.wad.WadLump;
@@ -21,6 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -64,7 +66,7 @@ public final class WadDecoder {
                 Objects.requireNonNull(source, "source").toAbsolutePath().normalize();
         List<WadDiagnostic> diagnostics = new ArrayList<>();
         if (!Files.isRegularFile(normalizedSource)) {
-            return error(diagnostics, normalizedSource, "wad.source.missing", "", "WAD source is not a regular file");
+            return error(diagnostics, normalizedSource, WadDiagnosticCode.SOURCE_MISSING, "");
         }
 
         try {
@@ -75,9 +77,9 @@ public final class WadDecoder {
                 return error(
                         diagnostics,
                         resolvedSource,
-                        "wad.source.sha256",
+                        WadDiagnosticCode.SOURCE_FINGERPRINT_MISMATCH,
                         "",
-                        "WAD SHA-256 is " + sha256 + ", expected " + expectedSha256);
+                        Map.of("actualSha256", sha256, "expectedSha256", expectedSha256));
             }
             WadProvenance provenance = new WadProvenance(resolvedSource, fileSize, sha256);
             return readDirectory(provenance, diagnostics);
@@ -85,9 +87,9 @@ public final class WadDecoder {
             return error(
                     diagnostics,
                     normalizedSource,
-                    "wad.source.read",
+                    WadDiagnosticCode.SOURCE_READ_FAILED,
                     "",
-                    "Cannot read WAD: " + failureMessage(exception));
+                    Map.of("failure", failureMessage(exception)));
         }
     }
 
@@ -96,20 +98,15 @@ public final class WadDecoder {
             throws IOException {
         try (FileChannel channel = FileChannel.open(provenance.source(), StandardOpenOption.READ)) {
             if (channel.size() != provenance.fileSize()) {
-                return error(
-                        diagnostics,
-                        provenance.source(),
-                        "wad.source.changed",
-                        "",
-                        "WAD source size changed while it was being loaded");
+                return error(diagnostics, provenance.source(), WadDiagnosticCode.SOURCE_CHANGED, "");
             }
             if (provenance.fileSize() < HEADER_SIZE) {
                 return error(
                         diagnostics,
                         provenance.source(),
-                        "wad.header.truncated",
+                        WadDiagnosticCode.HEADER_TRUNCATED,
                         "/header",
-                        "WAD header is shorter than 12 bytes");
+                        Map.of("minimumBytes", Integer.toString(HEADER_SIZE)));
             }
 
             ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.LITTLE_ENDIAN);
@@ -137,26 +134,21 @@ public final class WadDecoder {
             return Optional.of(error(
                     diagnostics,
                     provenance.source(),
-                    "wad.directory.count",
+                    WadDiagnosticCode.DIRECTORY_COUNT_INVALID,
                     "/header/lumpCount",
-                    "WAD lump count is outside the supported range: " + lumpCount));
+                    Map.of("lumpCount", Integer.toString(lumpCount))));
         }
         if (directoryOffset < 0) {
             return Optional.of(error(
                     diagnostics,
                     provenance.source(),
-                    "wad.directory.offset",
-                    "/header/directoryOffset",
-                    "WAD directory offset must not be negative"));
+                    WadDiagnosticCode.DIRECTORY_OFFSET_INVALID,
+                    "/header/directoryOffset"));
         }
         long directorySize = (long) lumpCount * DIRECTORY_ENTRY_SIZE;
         if (directoryOffset > provenance.fileSize() || directorySize > provenance.fileSize() - directoryOffset) {
-            return Optional.of(error(
-                    diagnostics,
-                    provenance.source(),
-                    "wad.directory.bounds",
-                    "/directory",
-                    "WAD directory extends beyond the source file"));
+            return Optional.of(
+                    error(diagnostics, provenance.source(), WadDiagnosticCode.DIRECTORY_OUT_OF_BOUNDS, "/directory"));
         }
         return Optional.empty();
     }
@@ -200,18 +192,14 @@ public final class WadDecoder {
             return Optional.of(error(
                     diagnostics,
                     provenance.source(),
-                    "wad.lump.bounds",
+                    WadDiagnosticCode.LUMP_OUT_OF_BOUNDS,
                     location,
-                    "Lump " + index + " extends beyond the source file"));
+                    Map.of("lumpIndex", Integer.toString(index))));
         }
         Optional<String> name = WadNames.decode(rawName);
         if (name.isEmpty()) {
-            return Optional.of(error(
-                    diagnostics,
-                    provenance.source(),
-                    "wad.lump.name",
-                    location + "/name",
-                    "Lump name must contain printable ASCII followed only by NUL padding"));
+            return Optional.of(
+                    error(diagnostics, provenance.source(), WadDiagnosticCode.LUMP_NAME_INVALID, location + "/name"));
         }
         lumps.add(new WadLump(index, name.orElseThrow(), offset, size));
         return Optional.empty();
@@ -228,10 +216,10 @@ public final class WadDecoder {
             default -> {
                 diagnostics.add(new WadDiagnostic(
                         WadDiagnostic.Severity.ERROR,
-                        "wad.header.signature",
+                        WadDiagnosticCode.HEADER_SIGNATURE_INVALID,
                         source,
                         "/header/signature",
-                        "WAD signature must be IWAD or PWAD, found " + printable(signatureBytes)));
+                        Map.of("actualSignature", printable(signatureBytes))));
                 yield Optional.empty();
             }
         };
@@ -261,8 +249,18 @@ public final class WadDecoder {
 
     /** Produces one terminal load result with a single appended error. */
     private static WadLoadResult error(
-            List<WadDiagnostic> diagnostics, Path source, String code, String location, String message) {
-        diagnostics.add(new WadDiagnostic(WadDiagnostic.Severity.ERROR, code, source, location, message));
+            List<WadDiagnostic> diagnostics, Path source, WadDiagnosticCode code, String location) {
+        return error(diagnostics, source, code, location, Map.of());
+    }
+
+    /** Produces one terminal load result containing structured failure details. */
+    private static WadLoadResult error(
+            List<WadDiagnostic> diagnostics,
+            Path source,
+            WadDiagnosticCode code,
+            String location,
+            Map<String, String> details) {
+        diagnostics.add(new WadDiagnostic(WadDiagnostic.Severity.ERROR, code, source, location, details));
         return new WadLoadResult(Optional.empty(), diagnostics);
     }
 

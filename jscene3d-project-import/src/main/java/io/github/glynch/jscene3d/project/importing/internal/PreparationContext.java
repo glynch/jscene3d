@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.importing.internal;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.io.TemporaryWorkspace;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.importing.ArtifactContentWriter;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -95,29 +97,29 @@ public final class PreparationContext extends AbstractImportContext implements I
     /**
      * Reports one import-definition error rather than an adapter-source error.
      *
-     * @param code stable diagnostic code
-     * @param message actionable diagnostic message
+     * @param code stable diagnostic identity
+     * @param technicalDetail occurrence-specific technical detail
      * @param location JSON Pointer within the import definition
      */
-    public void definitionError(String code, String message, String location) {
-        definitionDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, location);
+    public void definitionError(DiagnosticCode code, String technicalDetail, String location) {
+        definitionDiagnostic(ProjectDiagnostic.Severity.ERROR, code, technicalDetail, location);
     }
 
     /**
      * Reports one import-definition warning rather than an adapter-source warning.
      *
-     * @param code stable diagnostic code
-     * @param message actionable diagnostic message
+     * @param code stable diagnostic identity
+     * @param technicalDetail occurrence-specific technical detail
      * @param location JSON Pointer within the import definition
      */
-    public void definitionWarning(String code, String message, String location) {
-        definitionDiagnostic(ProjectDiagnostic.Severity.WARNING, code, message, location);
+    public void definitionWarning(DiagnosticCode code, String technicalDetail, String location) {
+        definitionDiagnostic(ProjectDiagnostic.Severity.WARNING, code, technicalDetail, location);
     }
 
     /** Adds one validated diagnostic associated with the authored import definition. */
     private void definitionDiagnostic(
-            ProjectDiagnostic.Severity severity, String code, String message, String location) {
+            ProjectDiagnostic.Severity severity, DiagnosticCode code, String technicalDetail, String location) {
         diagnostic(new ProjectDiagnostic(
-                severity, code, message, definition.source().toUri(), location));
+                severity, code, definition.source().toUri(), location, Map.of("technicalDetail", technicalDetail)));
     }
 }

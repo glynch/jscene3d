@@ -58,7 +58,7 @@ final class RegisteredTypeCatalogTest {
         List<ProjectDiagnostic> diagnostics = catalog().validate(scene(root, List.of()));
 
         assertThat(diagnostics)
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactlyInAnyOrder(
                         "scene.catalog.property.value",
                         "scene.catalog.property.unknown",
@@ -77,7 +77,7 @@ final class RegisteredTypeCatalogTest {
         List<ProjectDiagnostic> diagnostics = catalog().validate(scene(wrongScope, List.of()));
 
         assertThat(diagnostics)
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("scene.catalog.type.scope", "scene.catalog.type.missing");
     }
 
@@ -98,7 +98,7 @@ final class RegisteredTypeCatalogTest {
         List<ProjectDiagnostic> diagnostics = catalog().validate(scene(root, connections));
 
         assertThat(diagnostics)
-                .extracting(ProjectDiagnostic::code)
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly(
                         "scene.catalog.signal.missing",
                         "scene.catalog.action.missing",
@@ -116,7 +116,9 @@ final class RegisteredTypeCatalogTest {
         List<ProjectDiagnostic> diagnostics =
                 catalog().validate(scene(root, List.of(connection("root", "selected", "root", "select"))));
 
-        assertThat(diagnostics).extracting(ProjectDiagnostic::code).containsExactly("scene.catalog.signal.ambiguous");
+        assertThat(diagnostics)
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("scene.catalog.signal.ambiguous");
     }
 
     /** Defers nested-scene endpoint checks until instances have been resolved. */
@@ -135,7 +137,7 @@ final class RegisteredTypeCatalogTest {
 
         assertThat(diagnostics).hasSize(2).allSatisfy(diagnostic -> {
             assertThat(diagnostic.severity()).isEqualTo(ProjectDiagnostic.Severity.WARNING);
-            assertThat(diagnostic.code()).isEqualTo("scene.catalog.instance.endpoint");
+            assertThat(diagnostic.code().code()).isEqualTo("scene.catalog.instance.endpoint");
         });
     }
 

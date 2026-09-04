@@ -4,6 +4,7 @@
  */
 /** Headless loading and validation of versioned JScene3D game projects. */
 module io.github.glynch.jscene3d.project {
+    requires transitive io.github.glynch.jscene3d.core;
     requires com.fasterxml.jackson.databind;
     requires static org.jspecify;
 

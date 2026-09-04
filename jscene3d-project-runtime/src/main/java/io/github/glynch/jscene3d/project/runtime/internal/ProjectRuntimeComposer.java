@@ -11,6 +11,7 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntime;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeObject;
+import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.RuntimeNode;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeFactory;
@@ -81,7 +82,7 @@ public final class ProjectRuntimeComposer {
             SceneNodeDefinition definition, Optional<RuntimeNode> parent, boolean parentEnabled, String location) {
         if (!(definition.source() instanceof SceneNodeDefinition.TypedNode typedNode)) {
             throw new RuntimeCompositionException(
-                    "runtime.scene-instance.unsupported",
+                    RuntimeDiagnosticCode.SCENE_INSTANCE_UNSUPPORTED,
                     "nested scene instances are not implemented by this runtime slice",
                     location + "/instance");
         }
@@ -149,7 +150,7 @@ public final class ProjectRuntimeComposer {
     private RegisteredTypeDescriptor requireDescriptor(RegisteredType type, String location) {
         return catalog.find(type)
                 .orElseThrow(() -> new RuntimeCompositionException(
-                        "runtime.type.missing",
+                        RuntimeDiagnosticCode.TYPE_MISSING,
                         "registered type is absent from the runtime catalog: " + type,
                         location));
     }
@@ -162,7 +163,7 @@ public final class ProjectRuntimeComposer {
         }
         String detail = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
         return new RuntimeCompositionException(
-                "runtime.factory.create",
+                RuntimeDiagnosticCode.FACTORY_CREATE_FAILED,
                 "factory for " + type + " failed at node " + nodeId + ": " + detail,
                 location);
     }

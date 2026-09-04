@@ -20,7 +20,7 @@ public final class ProjectReferenceDecoder {
     private final GameProject project;
     private final ProjectPathResolver paths;
     private final DiagnosticCollector diagnostics;
-    private final String diagnosticPrefix;
+    private final ReferenceDiagnosticCodes codes;
 
     /**
      * Creates a decoder for one project document family.
@@ -28,14 +28,17 @@ public final class ProjectReferenceDecoder {
      * @param project containing validated project
      * @param paths project-confined path resolver
      * @param diagnostics destination for validation diagnostics
-     * @param diagnosticPrefix diagnostic namespace such as {@code scene} or {@code resource}
+     * @param codes feature-owned reference diagnostic codes
      */
     public ProjectReferenceDecoder(
-            GameProject project, ProjectPathResolver paths, DiagnosticCollector diagnostics, String diagnosticPrefix) {
+            GameProject project,
+            ProjectPathResolver paths,
+            DiagnosticCollector diagnostics,
+            ReferenceDiagnosticCodes codes) {
         this.project = Objects.requireNonNull(project, "project");
         this.paths = Objects.requireNonNull(paths, "paths");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
-        this.diagnosticPrefix = Preconditions.requireNonBlank(diagnosticPrefix, "diagnosticPrefix");
+        this.codes = Objects.requireNonNull(codes, "codes");
     }
 
     /**
@@ -49,9 +52,7 @@ public final class ProjectReferenceDecoder {
         JsonNode referenceNode = raw.get("$ref");
         if (raw.size() != 1 || referenceNode == null || !referenceNode.isTextual()) {
             diagnostics.error(
-                    code("reference.object"),
-                    "a resource reference must contain only one textual $ref property",
-                    location);
+                    codes.object(), "a resource reference must contain only one textual $ref property", location);
             return new ProjectValue.ReferenceValue(ResourceReference.asset("invalid"));
         }
         return new ProjectValue.ReferenceValue(validate(referenceNode.textValue(), location + "/$ref"));
@@ -64,15 +65,14 @@ public final class ProjectReferenceDecoder {
                 return validate(kind, value.substring(kind.prefix().length()), location);
             }
         }
-        diagnostics.error(
-                code("reference.scheme"), "resource reference must use project:, asset:, or import:", location);
+        diagnostics.error(codes.scheme(), "resource reference must use project:, asset:, or import:", location);
         return ResourceReference.asset("invalid");
     }
 
     /** Validates one reference namespace. */
     private ResourceReference validate(ResourceReference.Kind kind, String locator, String location) {
         if (locator.isBlank()) {
-            diagnostics.error(code("reference.locator"), "resource reference locator must not be blank", location);
+            diagnostics.error(codes.locator(), "resource reference locator must not be blank", location);
             return ResourceReference.asset("invalid");
         }
         return switch (kind) {
@@ -94,11 +94,11 @@ public final class ProjectReferenceDecoder {
     /** Validates one declared source-asset reference. */
     private ResourceReference validateAsset(String locator, String location) {
         if (!isLocalId(locator)) {
-            diagnostics.error(code("reference.asset"), "asset reference must contain a local asset id", location);
+            diagnostics.error(codes.asset(), "asset reference must contain a local asset id", location);
             return ResourceReference.asset("invalid");
         }
         if (project.assets().stream().noneMatch(asset -> asset.id().equals(locator))) {
-            diagnostics.error(code("reference.asset.missing"), "asset is not declared: " + locator, location);
+            diagnostics.error(codes.missingAsset(), "asset is not declared: " + locator, location);
         }
         return ResourceReference.asset(locator);
     }
@@ -112,16 +112,11 @@ public final class ProjectReferenceDecoder {
                 && isPortableLocator(locator.substring(separator + 1));
         if (!valid) {
             diagnostics.error(
-                    code("reference.import"),
+                    codes.imported(),
                     "import reference must contain an import id and portable output locator",
                     location);
             return ResourceReference.imported("invalid/output");
         }
         return ResourceReference.imported(locator);
-    }
-
-    /** Builds one document-family diagnostic code. */
-    private String code(String suffix) {
-        return diagnosticPrefix + '.' + suffix;
     }
 }

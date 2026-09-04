@@ -2339,12 +2339,22 @@ Project, scene, resource, extension, and import failures should use a common
 diagnostic shape where practical:
 
 - severity;
-- stable diagnostic code;
-- human-readable message;
+- feature-owned `DiagnosticCode` implemented by an enum;
+- stable machine-readable code that also serves as a localization key;
+- an English default message used as a fallback when no translation exists;
 - source resource;
 - machine-navigable location;
+- immutable language-neutral details for variable values;
 - related locations where a relationship spans documents;
 - optional remediation metadata for the editor.
+
+`DiagnosticCode` belongs to the core diagnostic interface. Each feature owns
+its enum, such as `WadDiagnosticCode`, so adding or translating WAD diagnostics
+does not modify a central catalogue. Diagnostic producers select codes and
+retain variable values as structured details. They do not select a locale or
+permanently interpolate those values into English text. A command-line tool or
+editor resolves the stable code through its resource bundles and falls back to
+`defaultMessage()` when no localized entry exists.
 
 Expected invalid project data is diagnostic output, not an exception. Caller
 contract violations and unexpected implementation failures remain exceptions.

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.runtime;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
@@ -141,7 +142,7 @@ public final class ProjectRuntimeLoader {
         } catch (RuntimeException exception) {
             diagnostics.add(error(
                     scene.source().toUri(),
-                    "runtime.composition",
+                    RuntimeDiagnosticCode.COMPOSITION_FAILED,
                     failureMessage("runtime composition failed", exception),
                     ""));
         }
@@ -157,7 +158,7 @@ public final class ProjectRuntimeLoader {
         } catch (ServiceConfigurationError error) {
             diagnostics.add(error(
                     manifest(project),
-                    "runtime.extension.discovery",
+                    RuntimeDiagnosticCode.EXTENSION_DISCOVERY_FAILED,
                     failureMessage("runtime extension discovery failed", error),
                     "/runtime/applicationExtension"));
         }
@@ -174,7 +175,7 @@ public final class ProjectRuntimeLoader {
         if (!providers.containsKey(project.runtime().applicationExtension())) {
             diagnostics.add(error(
                     manifest(project),
-                    "runtime.extension.application.missing",
+                    RuntimeDiagnosticCode.APPLICATION_EXTENSION_MISSING,
                     "application runtime extension was not discovered: "
                             + project.runtime().applicationExtension(),
                     "/runtime/applicationExtension"));
@@ -200,14 +201,14 @@ public final class ProjectRuntimeLoader {
                 if (providers.putIfAbsent(id, validExtension) != null) {
                     diagnostics.add(error(
                             manifest(project),
-                            "runtime.extension.duplicate",
+                            RuntimeDiagnosticCode.EXTENSION_DUPLICATE,
                             "multiple runtime providers declare extension " + id,
                             "/extensions"));
                 }
             } catch (RuntimeException exception) {
                 diagnostics.add(error(
                         manifest(project),
-                        "runtime.extension.invalid",
+                        RuntimeDiagnosticCode.EXTENSION_INVALID,
                         failureMessage("invalid runtime extension provider", exception),
                         "/extensions"));
             }
@@ -228,7 +229,7 @@ public final class ProjectRuntimeLoader {
         } catch (RuntimeException exception) {
             diagnostics.add(error(
                     manifest(project),
-                    "runtime.extension.registration",
+                    RuntimeDiagnosticCode.EXTENSION_REGISTRATION_FAILED,
                     failureMessage("runtime extension registration failed for " + extension.id(), exception),
                     "/extensions"));
         } finally {
@@ -242,7 +243,7 @@ public final class ProjectRuntimeLoader {
                 .projectSystems()
                 .ifPresent(path -> diagnostics.add(error(
                         path.toUri(),
-                        "runtime.project-systems.unsupported",
+                        RuntimeDiagnosticCode.PROJECT_SYSTEMS_UNSUPPORTED,
                         "project-system definitions are not implemented by this runtime slice",
                         "")));
     }
@@ -253,8 +254,9 @@ public final class ProjectRuntimeLoader {
     }
 
     /** Creates one terminal diagnostic. */
-    private static ProjectDiagnostic error(URI source, String code, String message, String location) {
-        return new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source, location);
+    private static ProjectDiagnostic error(URI source, DiagnosticCode code, String technicalDetail, String location) {
+        return new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, source, location, Map.of("technicalDetail", technicalDetail));
     }
 
     /** Returns the project manifest URI used for runtime-provider diagnostics. */

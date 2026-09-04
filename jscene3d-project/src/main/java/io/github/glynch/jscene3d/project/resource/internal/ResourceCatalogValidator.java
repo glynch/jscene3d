@@ -10,7 +10,9 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
 import io.github.glynch.jscene3d.project.extension.internal.RegisteredPropertyValidator;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.internal.PropertyDiagnosticCodes;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
+import io.github.glynch.jscene3d.project.resource.ResourceDiagnosticCode;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,10 +35,10 @@ public final class ResourceCatalogValidator {
         Optional<RegisteredTypeDescriptor> descriptor = catalog.find(resource.type());
         if (descriptor.isEmpty()) {
             diagnostics.error(
-                    "resource.catalog.type.missing", "registered type was not found: " + resource.type(), "/type");
+                    ResourceDiagnosticCode.TYPE_MISSING, "registered type was not found: " + resource.type(), "/type");
         } else if (descriptor.orElseThrow().scope() != RegisteredTypeScope.RESOURCE) {
             diagnostics.error(
-                    "resource.catalog.type.scope",
+                    ResourceDiagnosticCode.TYPE_SCOPE_INVALID,
                     "registered type " + resource.type() + " has scope "
                             + descriptor.orElseThrow().scope() + " but " + RegisteredTypeScope.RESOURCE
                             + " is required",
@@ -47,7 +49,10 @@ public final class ResourceCatalogValidator {
                     descriptor.orElseThrow(),
                     resource.source().toUri(),
                     "/properties",
-                    "resource.catalog"));
+                    new PropertyDiagnosticCodes(
+                            ResourceDiagnosticCode.PROPERTY_REQUIRED,
+                            ResourceDiagnosticCode.PROPERTY_UNKNOWN,
+                            ResourceDiagnosticCode.PROPERTY_VALUE_INVALID)));
         }
         return diagnostics.diagnostics();
     }

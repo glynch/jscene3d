@@ -4,9 +4,11 @@
  */
 package io.github.glynch.jscene3d.project.importing.internal;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.io.TemporaryWorkspace;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.importing.ImportCancelledException;
+import io.github.glynch.jscene3d.project.importing.ImportDiagnosticCode;
 import io.github.glynch.jscene3d.project.importing.ImportExecution;
 import io.github.glynch.jscene3d.project.importing.ImportPhase;
 import io.github.glynch.jscene3d.project.importing.ImportPreview;
@@ -20,6 +22,7 @@ import io.github.glynch.jscene3d.project.importing.SourceInspection;
 import io.github.glynch.jscene3d.project.importing.SourceItem;
 import io.github.glynch.jscene3d.project.importing.SourceItemRelation;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
+import io.github.glynch.jscene3d.project.imports.ImportDefinitionDiagnosticCode;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -93,7 +96,11 @@ public final class ImportCoordinator {
         try {
             active = cache.active(validDefinition.id());
         } catch (IOException | RuntimeException exception) {
-            return blocked(validDefinition, Optional.empty(), "import.cache.read", failureMessage(exception));
+            return blocked(
+                    validDefinition,
+                    Optional.empty(),
+                    ImportDiagnosticCode.CACHE_READ_FAILED,
+                    failureMessage(exception));
         }
         Optional<String> activeFingerprint =
                 active.map(generation -> generation.index().fingerprint());
@@ -102,7 +109,7 @@ public final class ImportCoordinator {
             return blocked(
                     validDefinition,
                     activeFingerprint,
-                    "import.importer.missing",
+                    ImportDiagnosticCode.IMPORTER_MISSING,
                     "importer implementation is unavailable: " + validDefinition.importer());
         }
         if (active.isEmpty()) {
@@ -111,7 +118,7 @@ public final class ImportCoordinator {
                     : blocked(
                             validDefinition,
                             Optional.empty(),
-                            "import.source.missing",
+                            ImportDefinitionDiagnosticCode.SOURCE_MISSING,
                             "source asset is unavailable: "
                                     + validDefinition.asset().path());
         }
@@ -120,7 +127,11 @@ public final class ImportCoordinator {
                     validDefinition, binding.orElseThrow(), active.orElseThrow().index());
             return new ImportStatus(current ? ImportState.CURRENT : ImportState.STALE, activeFingerprint, List.of());
         } catch (IOException exception) {
-            return blocked(validDefinition, activeFingerprint, "import.status.read", failureMessage(exception));
+            return blocked(
+                    validDefinition,
+                    activeFingerprint,
+                    ImportDiagnosticCode.STATUS_READ_FAILED,
+                    failureMessage(exception));
         }
     }
 
@@ -182,7 +193,10 @@ public final class ImportCoordinator {
         try {
             binding.importer().inspect(context);
         } catch (IOException | RuntimeException exception) {
-            context.error("import.inspect.failed", "source inspection failed: " + failureMessage(exception), "");
+            context.error(
+                    ImportDiagnosticCode.INSPECTION_FAILED,
+                    "",
+                    Map.of("technicalDetail", "source inspection failed: " + failureMessage(exception)));
         }
     }
 
@@ -236,7 +250,7 @@ public final class ImportCoordinator {
             List<ProjectDiagnostic> diagnostics = new ArrayList<>(preview.diagnostics());
             diagnostics.add(error(
                     definition,
-                    "import.cache.write",
+                    ImportDiagnosticCode.CACHE_WRITE_FAILED,
                     "prepared cache index cannot be written: " + failureMessage(exception)));
             ImportPreview invalid = new ImportPreview(
                     fingerprints.complete(), diagnostics, preview.artifacts(), preview.estimatedSize());
@@ -251,7 +265,10 @@ public final class ImportCoordinator {
         } catch (ImportCancelledException exception) {
             throw exception;
         } catch (IOException | RuntimeException exception) {
-            context.error("import.prepare.failed", "source import failed: " + failureMessage(exception), "");
+            context.error(
+                    ImportDiagnosticCode.PREPARATION_FAILED,
+                    "",
+                    Map.of("technicalDetail", "source import failed: " + failureMessage(exception)));
         }
     }
 
@@ -264,9 +281,12 @@ public final class ImportCoordinator {
             for (String reference : artifact.metadata().descriptor().references()) {
                 if (!artifacts.containsKey(reference)) {
                     context.error(
-                            "import.artifact.reference",
-                            "artifact " + artifact.metadata().identity() + " references missing output " + reference,
-                            artifact.metadata().identity());
+                            ImportDiagnosticCode.ARTIFACT_REFERENCE_INVALID,
+                            artifact.metadata().identity(),
+                            Map.of(
+                                    "technicalDetail",
+                                    "artifact " + artifact.metadata().identity() + " references missing output "
+                                            + reference));
                 }
             }
         }
@@ -285,10 +305,14 @@ public final class ImportCoordinator {
             String location = "/selection/" + index;
             if (item == null) {
                 context.definitionError(
-                        "import.selection.missing", "selected source item no longer exists: " + identity, location);
+                        ImportDiagnosticCode.SELECTION_MISSING,
+                        "selected source item no longer exists: " + identity,
+                        location);
             } else if (!item.isSelectable()) {
                 context.definitionError(
-                        "import.selection.not-selectable", "source item cannot be selected: " + identity, location);
+                        ImportDiagnosticCode.SELECTION_NOT_SELECTABLE,
+                        "source item cannot be selected: " + identity,
+                        location);
             } else {
                 pending.add(identity);
             }
@@ -298,12 +322,12 @@ public final class ImportCoordinator {
             String location = "/itemSettings/" + identity.replace("~", "~0").replace("/", "~1");
             if (!items.containsKey(identity)) {
                 context.definitionError(
-                        "import.item-settings.missing",
+                        ImportDiagnosticCode.ITEM_SETTINGS_MISSING,
                         "configured source item no longer exists: " + identity,
                         location);
             } else if (!reachable.contains(identity)) {
                 context.definitionWarning(
-                        "import.item-settings.unused",
+                        ImportDiagnosticCode.ITEM_SETTINGS_UNUSED,
                         "source item is outside the selected dependency closure: " + identity,
                         location);
             }
@@ -316,9 +340,12 @@ public final class ImportCoordinator {
             for (SourceItemRelation relation : item.relations()) {
                 if (!items.containsKey(relation.targetIdentity())) {
                     context.error(
-                            "import.source-item.reference",
-                            "source item " + item.identity() + " references missing item " + relation.targetIdentity(),
-                            item.identity());
+                            ImportDiagnosticCode.SOURCE_ITEM_REFERENCE_INVALID,
+                            item.identity(),
+                            Map.of(
+                                    "technicalDetail",
+                                    "source item " + item.identity() + " references missing item "
+                                            + relation.targetIdentity()));
                 }
             }
         }
@@ -383,7 +410,10 @@ public final class ImportCoordinator {
         try {
             return ImportHashes.file(asset.path());
         } catch (IOException exception) {
-            context.error("import.source.read", "source asset cannot be read: " + asset.path(), "");
+            context.error(
+                    ImportDiagnosticCode.SOURCE_READ_FAILED,
+                    "",
+                    Map.of("technicalDetail", "source asset cannot be read: " + asset.path()));
             return EMPTY_FINGERPRINT;
         }
     }
@@ -421,18 +451,18 @@ public final class ImportCoordinator {
 
     /** Creates a blocked status carrying one actionable diagnostic. */
     private static ImportStatus blocked(
-            ImportDefinition definition, Optional<String> fingerprint, String code, String message) {
-        return new ImportStatus(ImportState.BLOCKED, fingerprint, List.of(error(definition, code, message)));
+            ImportDefinition definition, Optional<String> fingerprint, DiagnosticCode code, String technicalDetail) {
+        return new ImportStatus(ImportState.BLOCKED, fingerprint, List.of(error(definition, code, technicalDetail)));
     }
 
     /** Creates one import-definition diagnostic. */
-    private static ProjectDiagnostic error(ImportDefinition definition, String code, String message) {
+    private static ProjectDiagnostic error(ImportDefinition definition, DiagnosticCode code, String technicalDetail) {
         return new ProjectDiagnostic(
                 ProjectDiagnostic.Severity.ERROR,
                 code,
-                message,
                 definition.source().toUri(),
-                "");
+                "",
+                Map.of("technicalDetail", technicalDetail));
     }
 
     /** Returns a stable useful failure message. */

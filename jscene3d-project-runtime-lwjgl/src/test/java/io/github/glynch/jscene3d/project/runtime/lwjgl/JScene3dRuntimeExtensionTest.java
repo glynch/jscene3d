@@ -193,7 +193,7 @@ final class JScene3dRuntimeExtensionTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.extension.registration");
     }
 

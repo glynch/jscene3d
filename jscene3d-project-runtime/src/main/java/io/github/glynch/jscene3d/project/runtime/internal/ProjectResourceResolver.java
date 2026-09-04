@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
@@ -11,6 +12,7 @@ import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.resource.ResourceLoadResult;
 import io.github.glynch.jscene3d.project.resource.ResourceLoader;
+import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactory;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.net.URI;
@@ -57,7 +59,7 @@ final class ProjectResourceResolver {
         if (validReference.kind() != ResourceReference.Kind.PROJECT) {
             throw failure(
                     currentSource(),
-                    "runtime.resource.kind.unsupported",
+                    RuntimeDiagnosticCode.RESOURCE_KIND_UNSUPPORTED,
                     "runtime resource resolution is not implemented for "
                             + validReference.kind().prefix(),
                     "");
@@ -76,7 +78,7 @@ final class ProjectResourceResolver {
         if (!validValueType.isInstance(value)) {
             throw failure(
                     definition.source().toUri(),
-                    "runtime.resource.value.type",
+                    RuntimeDiagnosticCode.RESOURCE_VALUE_TYPE_INVALID,
                     "resource " + relative(definition.source()) + " produced "
                             + value.getClass().getName() + " but " + validValueType.getName() + " is required",
                     "");
@@ -131,7 +133,7 @@ final class ProjectResourceResolver {
         if (resolving.contains(definition.source())) {
             throw failure(
                     definition.source().toUri(),
-                    "runtime.resource.cycle",
+                    RuntimeDiagnosticCode.RESOURCE_CYCLE,
                     "resource dependency cycle: " + cycle(definition.source()),
                     "");
         }
@@ -155,7 +157,7 @@ final class ProjectResourceResolver {
         } catch (RuntimeException exception) {
             throw failure(
                     definition.source().toUri(),
-                    "runtime.factory.resource.create",
+                    RuntimeDiagnosticCode.RESOURCE_FACTORY_CREATE_FAILED,
                     failureMessage("resource factory failed for " + definition.type(), exception),
                     "");
         } finally {
@@ -171,7 +173,8 @@ final class ProjectResourceResolver {
             throw failure(
                     definition.source().toUri(),
                     exception.code(),
-                    Objects.requireNonNullElse(exception.getMessage(), exception.code()),
+                    Objects.requireNonNullElse(
+                            exception.getMessage(), exception.code().defaultMessage()),
                     exception.location());
         }
     }
@@ -210,9 +213,10 @@ final class ProjectResourceResolver {
     }
 
     /** Creates one structured runtime failure. */
-    private static RuntimeDiagnosticsException failure(URI source, String code, String message, String location) {
-        ProjectDiagnostic diagnostic =
-                new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source, location);
+    private static RuntimeDiagnosticsException failure(
+            URI source, DiagnosticCode code, String technicalDetail, String location) {
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, source, location, Map.of("technicalDetail", technicalDetail));
         return new RuntimeDiagnosticsException(List.of(diagnostic));
     }
 

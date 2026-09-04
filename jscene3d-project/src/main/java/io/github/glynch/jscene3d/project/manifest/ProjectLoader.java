@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.manifest;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.internal.SemanticVersion;
@@ -15,6 +16,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -54,7 +56,7 @@ public final class ProjectLoader {
         if (!Files.isDirectory(suppliedRoot)) {
             return failure(
                     suppliedManifest,
-                    "project.directory.missing",
+                    ProjectDiagnosticCode.DIRECTORY_MISSING,
                     "project directory does not exist or is not a directory: " + suppliedRoot);
         }
 
@@ -64,19 +66,21 @@ public final class ProjectLoader {
         } catch (IOException exception) {
             return failure(
                     suppliedManifest,
-                    "project.directory.read",
+                    ProjectDiagnosticCode.DIRECTORY_READ_FAILED,
                     "project directory cannot be resolved: " + exception.getMessage());
         }
         Path manifest = root.resolve(MANIFEST_NAME);
         if (!Files.isRegularFile(manifest)) {
             return failure(
                     manifest,
-                    "project.manifest.missing",
+                    ProjectDiagnosticCode.MANIFEST_MISSING,
                     "project manifest does not exist or is not a regular file: " + manifest);
         }
         if (!isInsideRoot(root, manifest)) {
             return failure(
-                    manifest, "project.manifest.escape", "project manifest resolves outside the project directory");
+                    manifest,
+                    ProjectDiagnosticCode.MANIFEST_ESCAPES_PROJECT,
+                    "project manifest resolves outside the project directory");
         }
         return readManifest(root, manifest);
     }
@@ -91,11 +95,13 @@ public final class ProjectLoader {
         } catch (JsonProcessingException exception) {
             return failure(
                     manifest,
-                    "project.manifest.json",
+                    ProjectDiagnosticCode.MANIFEST_JSON_INVALID,
                     "project manifest is not valid Project Manifest JSON: " + exception.getOriginalMessage());
         } catch (IOException exception) {
             return failure(
-                    manifest, "project.manifest.read", "project manifest cannot be read: " + exception.getMessage());
+                    manifest,
+                    ProjectDiagnosticCode.MANIFEST_READ_FAILED,
+                    "project manifest cannot be read: " + exception.getMessage());
         }
     }
 
@@ -109,9 +115,9 @@ public final class ProjectLoader {
     }
 
     /** Creates one terminal error result. */
-    private static ProjectLoadResult failure(Path source, String code, String message) {
-        ProjectDiagnostic diagnostic =
-                new ProjectDiagnostic(ProjectDiagnostic.Severity.ERROR, code, message, source.toUri(), "");
+    private static ProjectLoadResult failure(Path source, DiagnosticCode code, String technicalDetail) {
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, source.toUri(), "", Map.of("technicalDetail", technicalDetail));
         return new ProjectLoadResult(Optional.empty(), List.of(diagnostic));
     }
 }

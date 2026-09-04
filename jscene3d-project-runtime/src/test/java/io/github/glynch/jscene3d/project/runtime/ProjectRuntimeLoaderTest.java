@@ -168,7 +168,7 @@ final class ProjectRuntimeLoaderTest {
         assertThat(result.isOpen()).isFalse();
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("scene.catalog.type.missing");
         assertThat(TestRuntimeState.EVENTS).isEmpty();
     }
@@ -181,7 +181,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.isOpen()).isFalse();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.extension.application.missing");
     }
 
@@ -207,7 +207,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.extension.registration");
     }
 
@@ -218,7 +218,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.factory.scene-node.missing");
     }
 
@@ -238,7 +238,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.project-systems.unsupported");
     }
 
@@ -262,7 +262,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .contains("runtime.scene-instance.unsupported");
     }
 
@@ -312,8 +312,8 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo("runtime.resource.cycle");
-            assertThat(diagnostic.message())
+            assertThat(diagnostic.code().code()).isEqualTo("runtime.resource.cycle");
+            assertThat(diagnostic.details().get("technicalDetail"))
                     .contains("resources/first.resource.json -> resources/second.resource.json"
                             + " -> resources/first.resource.json");
         });
@@ -330,7 +330,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("resource.type.version");
     }
 
@@ -344,7 +344,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("resource.catalog.type.scope");
     }
 
@@ -358,7 +358,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.factory.resource.missing");
     }
 
@@ -372,7 +372,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.resource.value.type");
     }
 
@@ -385,7 +385,7 @@ final class ProjectRuntimeLoaderTest {
 
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
-                .extracting(diagnostic -> diagnostic.code())
+                .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.resource.kind.unsupported");
     }
 

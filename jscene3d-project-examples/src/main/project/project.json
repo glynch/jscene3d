@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "id": "io.github.glynch.jscene3d.declarative-3d-example",
+    "name": "Declarative 3d Example",
+    "version": "1.0.0",
+    "description": "A minimal scene composed entirely from native project data."
+  },
+  "engine": {
+    "requires": ">=0.1.0-SNAPSHOT <0.2.0"
+  },
+  "runtime": {
+    "applicationExtension": "io.github.glynch.jscene3d",
+    "entryScene": "application/main.scene.json"
+  },
+  "extensions": [
+    {
+      "id": "io.github.glynch.jscene3d",
+      "requires": "0.1.0-SNAPSHOT"
+    }
+  ]
+}

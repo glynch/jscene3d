@@ -45,6 +45,13 @@ public interface RuntimeCreationContext extends RuntimeResourceLookup {
     Map<String, ProjectValue> properties();
 
     /**
+     * Returns whether the owning node and every ancestor are enabled.
+     *
+     * @return effective enabled state during composition and dispatch
+     */
+    boolean isEnabled();
+
+    /**
      * Returns an emitter for a signal declared by this registered type.
      *
      * @param id declared signal identifier

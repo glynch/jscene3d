@@ -30,6 +30,7 @@ final class CoreModuleDescriptorTest {
                         "io.github.glynch.jscene3d.fogs",
                         "io.github.glynch.jscene3d.geometries",
                         "io.github.glynch.jscene3d.helpers",
+                        "io.github.glynch.jscene3d.io",
                         "io.github.glynch.jscene3d.lights",
                         "io.github.glynch.jscene3d.materials",
                         "io.github.glynch.jscene3d.math",

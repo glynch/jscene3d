@@ -12,6 +12,7 @@ module io.github.glynch.jscene3d.core {
     exports io.github.glynch.jscene3d.fogs;
     exports io.github.glynch.jscene3d.geometries;
     exports io.github.glynch.jscene3d.helpers;
+    exports io.github.glynch.jscene3d.io;
     exports io.github.glynch.jscene3d.lights;
     exports io.github.glynch.jscene3d.materials;
     exports io.github.glynch.jscene3d.math;

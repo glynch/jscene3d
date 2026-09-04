@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.glynch.jscene3d",
+  "version": "0.1.0-SNAPSHOT",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "JScene3D Built-in 3d",
+  "types": [
+    {
+      "id": "io.github.glynch.jscene3d/group-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Group 3d",
+      "properties": [
+        {
+          "id": "position",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Position",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "rotation-degrees",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Rotation",
+          "editor": {"section": "Transform", "elementCount": 3, "unit": "degrees"}
+        },
+        {
+          "id": "scale",
+          "valueKind": "array",
+          "defaultValue": [1, 1, 1],
+          "displayName": "Scale",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "background",
+          "valueKind": "text",
+          "defaultValue": "#101820",
+          "displayName": "Background",
+          "editor": {"section": "World", "control": "color"}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/mesh-instance-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Mesh Instance 3d",
+      "properties": [
+        {
+          "id": "geometry",
+          "valueKind": "reference",
+          "required": true,
+          "displayName": "Geometry",
+          "acceptedReferences": ["project"]
+        },
+        {
+          "id": "material",
+          "valueKind": "reference",
+          "required": true,
+          "displayName": "Material",
+          "acceptedReferences": ["project"]
+        },
+        {
+          "id": "position",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Position",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "rotation-degrees",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Rotation",
+          "editor": {"section": "Transform", "elementCount": 3, "unit": "degrees"}
+        },
+        {
+          "id": "scale",
+          "valueKind": "array",
+          "defaultValue": [1, 1, 1],
+          "displayName": "Scale",
+          "editor": {"section": "Transform", "elementCount": 3}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/perspective-camera-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Perspective Camera 3d",
+      "properties": [
+        {
+          "id": "position",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 5],
+          "displayName": "Position",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "scale",
+          "valueKind": "array",
+          "defaultValue": [1, 1, 1],
+          "displayName": "Scale",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "target",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Target",
+          "editor": {"section": "Camera", "elementCount": 3}
+        },
+        {
+          "id": "field-of-view-degrees",
+          "valueKind": "number",
+          "defaultValue": 60,
+          "displayName": "Field of View",
+          "editor": {"section": "Camera", "minimum": 1, "maximum": 179, "unit": "degrees"}
+        },
+        {
+          "id": "near",
+          "valueKind": "number",
+          "defaultValue": 0.1,
+          "displayName": "Near",
+          "editor": {"section": "Camera", "minimumExclusive": 0}
+        },
+        {
+          "id": "far",
+          "valueKind": "number",
+          "defaultValue": 1000,
+          "displayName": "Far",
+          "editor": {"section": "Camera", "minimumExclusive": 0}
+        },
+        {
+          "id": "active",
+          "valueKind": "boolean",
+          "defaultValue": true,
+          "displayName": "Active",
+          "editor": {"section": "Camera"}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/ambient-light-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Ambient Light 3d",
+      "properties": [
+        {
+          "id": "color",
+          "valueKind": "text",
+          "defaultValue": "#ffffff",
+          "displayName": "Color",
+          "editor": {"control": "color"}
+        },
+        {
+          "id": "intensity",
+          "valueKind": "number",
+          "defaultValue": 0.35,
+          "displayName": "Intensity",
+          "editor": {"minimum": 0}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/box-geometry-3d",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Box Geometry 3d",
+      "properties": [
+        {
+          "id": "width",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Width",
+          "editor": {"minimumExclusive": 0}
+        },
+        {
+          "id": "height",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Height",
+          "editor": {"minimumExclusive": 0}
+        },
+        {
+          "id": "depth",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Depth",
+          "editor": {"minimumExclusive": 0}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/lambert-material-3d",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Lambert Material 3d",
+      "properties": [
+        {
+          "id": "color",
+          "valueKind": "text",
+          "defaultValue": "#4fc3f7",
+          "displayName": "Color",
+          "editor": {"control": "color"}
+        }
+      ]
+    }
+  ]
+}

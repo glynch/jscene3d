@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "main",
+  "root": {
+    "id": "world",
+    "name": "World",
+    "type": "io.github.glynch.jscene3d/group-3d",
+    "typeVersion": 1,
+    "properties": {
+      "background": "#0b1020"
+    },
+    "children": [
+      {
+        "id": "camera",
+        "name": "Camera",
+        "type": "io.github.glynch.jscene3d/perspective-camera-3d",
+        "typeVersion": 1,
+        "properties": {
+          "position": [4, 3, 6],
+          "target": [0, 0, 0],
+          "field-of-view-degrees": 55
+        }
+      },
+      {
+        "id": "ambient-light",
+        "name": "Ambient Light",
+        "type": "io.github.glynch.jscene3d/ambient-light-3d",
+        "typeVersion": 1,
+        "properties": {
+          "color": "#ffffff",
+          "intensity": 0.9
+        }
+      },
+      {
+        "id": "cube",
+        "name": "Cube",
+        "type": "io.github.glynch.jscene3d/mesh-instance-3d",
+        "typeVersion": 1,
+        "properties": {
+          "geometry": {"$ref": "project:resources/cube.geometry.json"},
+          "material": {"$ref": "project:resources/cyan.material.json"},
+          "rotation-degrees": [20, 35, 0]
+        }
+      }
+    ]
+  }
+}

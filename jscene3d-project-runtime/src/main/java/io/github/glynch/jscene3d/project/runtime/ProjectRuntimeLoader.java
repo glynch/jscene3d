@@ -53,14 +53,32 @@ public final class ProjectRuntimeLoader {
      * @return composed runtime or structured diagnostics
      */
     public ProjectRuntimeLoadResult load(GameProject project, ClassLoader classLoader) {
+        return load(project, classLoader, List.of());
+    }
+
+    /**
+     * Discovers class-path extensions and appends trusted host-provided runtime extensions.
+     *
+     * <p>This overload allows an embedding host to contribute extensions that require live host
+     * objects and therefore cannot be constructed by {@link ServiceLoader}.
+     *
+     * @param project validated project manifest
+     * @param classLoader loader containing extension descriptors and service providers
+     * @param hostExtensions trusted runtime extensions constructed by the embedding host
+     * @return composed runtime or structured diagnostics
+     */
+    public ProjectRuntimeLoadResult load(
+            GameProject project, ClassLoader classLoader, Collection<ProjectRuntimeExtension> hostExtensions) {
         GameProject validProject = Objects.requireNonNull(project, "project");
         ClassLoader validClassLoader = Objects.requireNonNull(classLoader, "classLoader");
+        List<ProjectRuntimeExtension> validHostExtensions = List.copyOf(hostExtensions);
         ExtensionCatalogLoadResult catalogResult = catalogLoader.load(validProject, validClassLoader);
         List<ProjectDiagnostic> diagnostics = new ArrayList<>(catalogResult.diagnostics());
         if (hasErrors(diagnostics)) {
             return ProjectRuntimeLoadResult.failure(diagnostics);
         }
         List<ProjectRuntimeExtension> extensions = discoverExtensions(validProject, validClassLoader, diagnostics);
+        extensions.addAll(validHostExtensions);
         if (hasErrors(diagnostics)) {
             return ProjectRuntimeLoadResult.failure(diagnostics);
         }
@@ -143,7 +161,7 @@ public final class ProjectRuntimeLoader {
                     failureMessage("runtime extension discovery failed", error),
                     "/runtime/applicationExtension"));
         }
-        return List.copyOf(extensions);
+        return extensions;
     }
 
     /** Registers contributions in safe descriptor order after resolving provider identities. */

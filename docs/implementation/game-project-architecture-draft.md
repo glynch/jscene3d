@@ -169,12 +169,42 @@ reconciled as the grill progresses rather than relying on memory at its end.
   Payload-bearing endpoints use an exact registered payload identity and do
   not perform runtime conversion.
 - Native project resources and their runtime ownership are part of the first
-  executable kernel. Nested-scene expansion, project-system definitions, and
-  built-in rendering adapters remain subsequent runtime slices. Encountering
-  a configured but unsupported feature produces a terminal diagnostic rather
-  than silently ignoring project data.
+  executable kernel. The first built-in rendering adapter is now implemented;
+  nested-scene expansion and project-system definitions remain subsequent
+  runtime slices. Encountering a configured but unsupported feature produces a
+  terminal diagnostic rather than silently ignoring project data.
 - Annotation-processing ownership may be separated later if build-time
   dependency direction requires it; that does not change the runtime seam.
+
+### Built-in declarative 3d rendering slice
+
+- `jscene3d-project-runtime-lwjgl` owns the adapter from portable registered
+  types to JScene3D scene-graph objects. The renderer-independent
+  `jscene3d-project-runtime` module does not depend on LWJGL or construct render
+  objects.
+- An embedding host creates `JScene3dRuntimeExtension` with its live `Window`
+  and `Renderer`, then supplies it to `ProjectRuntimeLoader`. Safe descriptor
+  discovery remains class-loader based; only the executable adapter receives
+  live host services.
+- The first built-in scene-node types are `group-3d`, `mesh-instance-3d`,
+  `perspective-camera-3d`, and `ambient-light-3d`. The first native resource
+  types are `box-geometry-3d` and `lambert-material-3d`.
+- The extension descriptor defines stable properties, defaults, display names,
+  sections, units, ranges, and reference constraints. These properties are the
+  future inspector contract as well as the runtime input; the Java adapter does
+  not contain an example-specific scene layout.
+- `perspective-camera-3d` version 1 uses `position`, `scale`, and `target` for
+  orientation. It does not expose an Euler rotation that would be silently
+  superseded by `target`. A later orientation mode can add alternative rotation
+  authoring without making two properties compete.
+- Effective scene-node enablement controls JScene3D visibility. Generated
+  geometries and materials are shared by canonical project reference and are
+  closed once by the project runtime after scene objects detach.
+- `jscene3d-project-examples/src/main/project` is the first graphical proof. Its
+  Project Manifest, scene, box geometry, and Lambert material are independent
+  project documents. The Java example class supplies the native host and drives
+  the existing `GameRuntime`; it does not construct the camera, light, mesh,
+  geometry, material, or transforms.
 
 ### Native resource version 1 and runtime ownership
 

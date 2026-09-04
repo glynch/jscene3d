@@ -72,6 +72,11 @@ abstract class AbstractCreationContext implements RuntimeCreationContext {
     }
 
     @Override
+    public final boolean isEnabled() {
+        return enabled.getAsBoolean();
+    }
+
+    @Override
     public final <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
         return resources.resolve(reference, valueType);
     }

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "type": "io.github.glynch.jscene3d/lambert-material-3d",
+  "typeVersion": 1,
+  "properties": {
+    "color": "#35d0ba"
+  }
+}

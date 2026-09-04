@@ -185,6 +185,21 @@ final class ProjectRuntimeLoaderTest {
                 .containsExactly("runtime.extension.application.missing");
     }
 
+    /** Appends a host-created provider after safe descriptor and service discovery. */
+    @Test
+    void composesWithHostProvidedRuntimeExtension() {
+        ProjectRuntimeLoadResult result = new ProjectRuntimeLoader("0.1.0-SNAPSHOT")
+                .load(
+                        loadedProject,
+                        Thread.currentThread().getContextClassLoader(),
+                        List.of(new TestRuntimeExtension()));
+
+        assertThat(result.diagnostics()).isEmpty();
+        try (ProjectRuntime runtime = result.runtime().orElseThrow()) {
+            assertThat(runtime.root().definition().id()).isEqualTo("root");
+        }
+    }
+
     /** Converts invalid trusted registration into a structured loading failure. */
     @Test
     void reportsFactoryRegisteredAgainstWrongDescriptorScope() {

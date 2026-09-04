@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.project.resource;
 
+import static io.github.glynch.jscene3d.project.internal.Preconditions.requireAbsoluteUri;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
@@ -13,6 +15,7 @@ import io.github.glynch.jscene3d.project.resource.internal.RawResource;
 import io.github.glynch.jscene3d.project.resource.internal.ResourceValidator;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -76,7 +79,7 @@ public final class ResourceLoader {
     private ResourceLoadResult readResource(GameProject project, Path source) {
         try (InputStream input = Files.newInputStream(source)) {
             RawResource raw = jsonReader.read(input, RawResource.class);
-            ResourceValidator.ValidationResult validation = ResourceValidator.validate(raw, project, source);
+            ResourceValidator.ValidationResult validation = ResourceValidator.validate(raw, project, source.toUri());
             return new ResourceLoadResult(validation.resource(), validation.diagnostics());
         } catch (JsonProcessingException exception) {
             return failure(
@@ -91,10 +94,47 @@ public final class ResourceLoader {
         }
     }
 
+    /**
+     * Loads one generated resource from a logical source without exposing its physical storage.
+     *
+     * <p>The caller retains ownership of {@code input}; this method consumes but does not close it.
+     *
+     * @param project containing validated project
+     * @param source absolute logical resource source
+     * @param input serialized JScene3D Resource JSON
+     * @return validated resource or structured loading errors
+     */
+    public ResourceLoadResult load(GameProject project, URI source, InputStream input) {
+        GameProject validProject = Objects.requireNonNull(project, "project");
+        URI validSource = requireAbsoluteUri(source, "source").normalize();
+        InputStream validInput = Objects.requireNonNull(input, "input");
+        try {
+            RawResource raw = jsonReader.read(validInput, RawResource.class);
+            ResourceValidator.ValidationResult validation =
+                    ResourceValidator.validate(raw, validProject, validSource.normalize());
+            return new ResourceLoadResult(validation.resource(), validation.diagnostics());
+        } catch (JsonProcessingException exception) {
+            return failure(
+                    validSource,
+                    ResourceDiagnosticCode.JSON_INVALID,
+                    "resource is not valid JScene3D Resource JSON: " + exception.getOriginalMessage());
+        } catch (IOException exception) {
+            return failure(
+                    validSource,
+                    ResourceDiagnosticCode.FILE_READ_FAILED,
+                    "resource cannot be read: " + exception.getMessage());
+        }
+    }
+
     /** Creates one terminal error result. */
     private static ResourceLoadResult failure(Path source, DiagnosticCode code, String technicalDetail) {
+        return failure(source.toUri(), code, technicalDetail);
+    }
+
+    /** Creates one terminal error result for a logical source. */
+    private static ResourceLoadResult failure(URI source, DiagnosticCode code, String technicalDetail) {
         ProjectDiagnostic diagnostic = new ProjectDiagnostic(
-                ProjectDiagnostic.Severity.ERROR, code, source.toUri(), "", Map.of("technicalDetail", technicalDetail));
+                ProjectDiagnostic.Severity.ERROR, code, source, "", Map.of("technicalDetail", technicalDetail));
         return new ResourceLoadResult(Optional.empty(), List.of(diagnostic));
     }
 }

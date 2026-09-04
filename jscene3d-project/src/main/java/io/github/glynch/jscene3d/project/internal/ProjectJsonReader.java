@@ -49,6 +49,7 @@ public final class ProjectJsonReader {
     private static ObjectMapper createObjectMapper() {
         JsonFactory factory = JsonFactory.builder()
                 .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .disable(StreamReadFeature.AUTO_CLOSE_SOURCE)
                 .build();
         return new ObjectMapper(factory)
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)

@@ -24,6 +24,35 @@
           "displayName": "Uppercase"
         }
       ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d.import-example/imported-text",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Imported Text",
+      "properties": [
+        {
+          "id": "content-base64",
+          "valueKind": "text",
+          "required": true,
+          "displayName": "Base64 Content"
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d.import-example/text-consumer-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Text Consumer 3d",
+      "properties": [
+        {
+          "id": "text",
+          "valueKind": "reference",
+          "required": true,
+          "displayName": "Text",
+          "acceptedReferences": ["import"]
+        }
+      ]
     }
   ]
 }

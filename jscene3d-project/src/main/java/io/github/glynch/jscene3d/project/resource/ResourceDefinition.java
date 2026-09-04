@@ -5,39 +5,39 @@
 package io.github.glynch.jscene3d.project.resource;
 
 import static io.github.glynch.jscene3d.project.internal.Preconditions.immutableProjectValues;
-import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireNormalizedAbsolute;
+import static io.github.glynch.jscene3d.project.internal.Preconditions.requireAbsoluteUri;
 
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
 
 /** Immutable, validated definition of one reusable project resource. */
 public final class ResourceDefinition {
-    private final Path source;
+    private final URI source;
     private final RegisteredType type;
     private final Map<String, ProjectValue> properties;
 
     /**
      * Creates one validated resource definition.
      *
-     * @param source normalized absolute source path
+     * @param source absolute logical source URI
      * @param type exact registered resource type
      * @param properties authored properties in declaration order
      */
-    public ResourceDefinition(Path source, RegisteredType type, Map<String, ProjectValue> properties) {
-        this.source = requireNormalizedAbsolute(source, "source");
+    public ResourceDefinition(URI source, RegisteredType type, Map<String, ProjectValue> properties) {
+        this.source = requireAbsoluteUri(source, "source").normalize();
         this.type = Objects.requireNonNull(type, "type");
         this.properties = immutableProjectValues(properties, "properties");
     }
 
     /**
-     * Returns the canonical source path that identifies this project resource.
+     * Returns the canonical logical source that identifies this project resource.
      *
-     * @return normalized absolute source path
+     * @return absolute logical source URI
      */
-    public Path source() {
+    public URI source() {
         return source;
     }
 

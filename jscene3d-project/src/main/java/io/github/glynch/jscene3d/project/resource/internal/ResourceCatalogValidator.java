@@ -47,7 +47,7 @@ public final class ResourceCatalogValidator {
             diagnostics.addAll(RegisteredPropertyValidator.validate(
                     resource.properties(),
                     descriptor.orElseThrow(),
-                    resource.source().toUri(),
+                    resource.source(),
                     "/properties",
                     new PropertyDiagnosticCodes(
                             ResourceDiagnosticCode.PROPERTY_REQUIRED,

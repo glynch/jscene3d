@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifactLookup;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntime;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeObject;
@@ -45,6 +46,7 @@ public final class ProjectRuntimeComposer {
      * @param scene validated entry scene
      * @param catalog validated registered-type catalog
      * @param factories trusted factory index
+     * @param importedArtifacts optional host lookup for published imported artifacts
      * @param diagnostics destination for non-terminal runtime diagnostics
      */
     public ProjectRuntimeComposer(
@@ -52,12 +54,15 @@ public final class ProjectRuntimeComposer {
             SceneDefinition scene,
             RegisteredTypeCatalog catalog,
             FactoryBindings factories,
+            Optional<ImportedArtifactLookup> importedArtifacts,
             List<ProjectDiagnostic> diagnostics) {
         this.project = Objects.requireNonNull(project, "project");
         this.scene = Objects.requireNonNull(scene, "scene");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.factories = Objects.requireNonNull(factories, "factories");
-        resources = new ProjectResourceResolver(project, scene.source().toUri(), catalog, factories, diagnostics);
+        ImportedResourceLoader importedResources = new ImportedResourceLoader(project, importedArtifacts, diagnostics);
+        resources = new ProjectResourceResolver(
+                project, scene.source().toUri(), catalog, factories, importedResources, diagnostics);
         creationServices = new RuntimeCreationServices(project, scene, router, resources);
     }
 

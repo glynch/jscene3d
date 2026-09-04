@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.internal;
 
+import java.net.URI;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 
@@ -45,6 +46,35 @@ public final class ProjectSchemaReferences {
                             .normalize()
                             .equals(projectRoot.resolve(projectRelativeSchemaPath));
         } catch (InvalidPathException ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * Tests a schema reference for a resource whose source may not be a file.
+     *
+     * @param projectRoot normalized absolute project root
+     * @param documentSource absolute logical document source
+     * @param reference authored schema reference
+     * @param canonicalUri canonical public schema URI
+     * @param projectRelativeSchemaPath schema path relative to the project root
+     * @return whether the reference identifies the supported schema
+     */
+    public static boolean matches(
+            Path projectRoot,
+            URI documentSource,
+            String reference,
+            String canonicalUri,
+            String projectRelativeSchemaPath) {
+        if (canonicalUri.equals(reference) || projectRelativeSchemaPath.equals(reference)) {
+            return true;
+        }
+        if (!"file".equals(documentSource.getScheme())) {
+            return false;
+        }
+        try {
+            return matches(projectRoot, Path.of(documentSource), reference, canonicalUri, projectRelativeSchemaPath);
+        } catch (IllegalArgumentException ignored) {
             return false;
         }
     }

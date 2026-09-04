@@ -210,7 +210,8 @@ reconciled as the grill progresses rather than relying on memory at its end.
 
 - A native resource document contains `schemaVersion`, an exact registered
   resource `type` and `typeVersion`, and an ordered `properties` object. Its
-  canonical project-confined source path is its runtime identity.
+  absolute logical URI is its runtime identity. Project files use canonical
+  `file:` URIs; imported resources use stable `import:` URIs.
 - `ResourceLoader` performs strict, headless JSON loading, validates reference
   syntax and file containment, and returns either an immutable
   `ResourceDefinition` or ordered structured diagnostics. It does not execute
@@ -221,18 +222,31 @@ reconciled as the grill progresses rather than relying on memory at its end.
 - A trusted extension registers a `ResourceFactory` for each executable
   resource type. The factory receives the owning project, immutable resource
   definition, effective properties, and a bounded resource-lookup capability.
-- Version 1 runtime lookup resolves `project:` references. It loads dependencies
-  recursively, preserves sharing through a canonical-path cache, reports a
-  project-relative dependency cycle as a terminal diagnostic, and verifies the
+- Version 1 runtime lookup resolves `project:` and `import:` references. It
+  loads dependencies recursively, preserves sharing through a logical-URI
+  cache, reports dependency cycles as terminal diagnostics, and verifies the
   Java value type requested by its consumer.
+- Imported-resource resolution is an explicit host capability. The host passes
+  an `ImportedArtifactLookup` to `ProjectRuntimeLoader`; `ImportManager`
+  implements that narrow interface. The resolver indexes manifest-declared
+  import definitions, opens the requested artifact without seeing its physical
+  cache path, requires `RESOURCE` artifact metadata, parses the standard native
+  resource document, and verifies that the document type matches the published
+  artifact type.
+- Generated resource diagnostics and factory contexts retain the logical
+  `import:<definition>/<output>` URI. Multiple consumers of that URI share one
+  parsed runtime value and open the artifact only once. Artifact read handles
+  and their streams are closed immediately after parsing; runtime resource
+  values follow the normal project-runtime ownership rules.
 - A resource factory returns a newly owned runtime value. Values implementing
   `AutoCloseable` are closed once in reverse creation order after scene nodes
   and controllers. Scene objects may retain resolved values but do not own or
   close them.
-- `asset:` and `import:` remain valid portable reference namespaces in project
-  data. Runtime materialization for those namespaces belongs to importer and
-  source-asset integration slices; requesting either through the native
-  resource resolver currently produces a terminal unsupported-kind diagnostic.
+- `asset:` remains a valid portable reference namespace for source and import
+  definitions. Direct runtime materialization of authoritative source assets is
+  not implemented; runtime consumers use native resources produced by an
+  importer. An `import:` reference without a host-supplied artifact lookup
+  produces a specific terminal diagnostic rather than accessing a cache path.
 
 ### Scene composition and identity decisions
 

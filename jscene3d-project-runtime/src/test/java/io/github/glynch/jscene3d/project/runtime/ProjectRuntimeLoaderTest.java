@@ -13,17 +13,26 @@ import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.importing.ImportArtifactDescriptor;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifact;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifactLookup;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifactMetadata;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -376,9 +385,9 @@ final class ProjectRuntimeLoaderTest {
                 .containsExactly("runtime.resource.value.type");
     }
 
-    /** Reports portable reference namespaces whose runtime adapter is not implemented yet. */
+    /** Requires the embedding host to supply imported-artifact lookup. */
     @Test
-    void reportsUnsupportedRuntimeResourceNamespace() throws IOException {
+    void reportsMissingImportedArtifactLookup() throws IOException {
         write("application/main.scene.json", resourceSceneReference("import:test/output", false));
 
         ProjectRuntimeLoadResult result = loadWithTestExtension();
@@ -386,7 +395,111 @@ final class ProjectRuntimeLoaderTest {
         assertThat(result.runtime()).isEmpty();
         assertThat(result.diagnostics())
                 .extracting(diagnostic -> diagnostic.code().code())
-                .containsExactly("runtime.resource.kind.unsupported");
+                .containsExactly("runtime.import.lookup.missing");
+    }
+
+    /** Resolves, shares, and owns a resource loaded through its logical imported identity. */
+    @Test
+    void resolvesImportedResourceWithoutExposingCachePaths() throws IOException {
+        configureImportProject();
+        write("application/main.scene.json", resourceSceneReference("import:generated/output/shared", true));
+        AtomicInteger openCount = new AtomicInteger();
+        AtomicReference<String> requestedOutput = new AtomicReference<>();
+        TestImportedArtifact artifact = TestImportedArtifact.resource(
+                "output/shared", "shared-data", resource("shared-data", "Imported value", null));
+        ImportedArtifactLookup lookup = (definition, output) -> {
+            openCount.incrementAndGet();
+            requestedOutput.set(definition.id() + '/' + output);
+            return Optional.of(artifact);
+        };
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension(lookup);
+
+        assertThat(result.diagnostics()).isEmpty();
+        ProjectRuntime runtime = result.runtime().orElseThrow();
+        TestRuntimeExtension.SharedData first = consumer(runtime, "first").resource();
+        TestRuntimeExtension.SharedData second = consumer(runtime, "second").resource();
+        assertThat(first).isSameAs(second);
+        assertThat(first.label()).isEqualTo("Imported value");
+        assertThat(openCount).hasValue(1);
+        assertThat(requestedOutput).hasValue("generated/output/shared");
+        assertThat(artifact.closeCount()).isOne();
+        runtime.close();
+        assertThat(first.closeCount()).isOne();
+    }
+
+    /** Reports a referenced output absent from the active published generation. */
+    @Test
+    void reportsMissingImportedArtifact() throws IOException {
+        configureImportedResourceScene();
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension((definition, output) -> Optional.empty());
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("runtime.import.artifact.missing");
+    }
+
+    /** Rejects an opaque payload used where a typed resource document is required. */
+    @Test
+    void reportsImportedArtifactWithWrongKind() throws IOException {
+        configureImportedResourceScene();
+        TestImportedArtifact artifact = TestImportedArtifact.payload("output/shared", "opaque");
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension((definition, output) -> Optional.of(artifact));
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("runtime.import.artifact.kind");
+        assertThat(artifact.closeCount()).isOne();
+    }
+
+    /** Rejects a lookup result whose descriptor does not match the requested identity. */
+    @Test
+    void reportsImportedArtifactIdentityMismatch() throws IOException {
+        configureImportedResourceScene();
+        TestImportedArtifact artifact = TestImportedArtifact.resource(
+                "output/different", "shared-data", resource("shared-data", "Different", null));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension((definition, output) -> Optional.of(artifact));
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("runtime.import.artifact.identity");
+        assertThat(artifact.closeCount()).isOne();
+    }
+
+    /** Verifies that cache metadata and serialized resource type agree. */
+    @Test
+    void reportsImportedResourceTypeMismatch() throws IOException {
+        configureImportedResourceScene();
+        TestImportedArtifact artifact = TestImportedArtifact.resource(
+                "output/shared", "text-data", resource("shared-data", "Mismatched", null));
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension((definition, output) -> Optional.of(artifact));
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("runtime.import.artifact.type");
+    }
+
+    /** Retains the logical imported URI when generated resource JSON is invalid. */
+    @Test
+    void preservesImportedResourceDiagnosticIdentity() throws IOException {
+        configureImportedResourceScene();
+        TestImportedArtifact artifact = TestImportedArtifact.resource("output/shared", "shared-data", "{");
+
+        ProjectRuntimeLoadResult result = loadWithTestExtension((definition, output) -> Optional.of(artifact));
+
+        assertThat(result.runtime()).isEmpty();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code().code()).isEqualTo("resource.json");
+            assertThat(diagnostic.source()).hasToString("import:generated/output/shared");
+        });
     }
 
     /** Verifies tree identity, authored order, parent views, and descriptor defaults. */
@@ -475,6 +588,14 @@ final class ProjectRuntimeLoaderTest {
                 .load(loadedProject, catalog.catalog(), List.of(new TestRuntimeExtension()));
     }
 
+    /** Loads with the test runtime extension and one imported-artifact lookup. */
+    private ProjectRuntimeLoadResult loadWithTestExtension(ImportedArtifactLookup lookup) {
+        ExtensionCatalogLoadResult catalog = loadCatalog();
+        assertThat(catalog.diagnostics()).isEmpty();
+        return new ProjectRuntimeLoader("0.1.0-SNAPSHOT")
+                .load(loadedProject, catalog.catalog(), List.of(new TestRuntimeExtension()), lookup);
+    }
+
     /** Loads with explicit executable providers against the test descriptor catalog. */
     private ProjectRuntimeLoadResult loadWithExtensions(ProjectRuntimeExtension... extensions) {
         RegisteredTypeCatalog catalog = loadCatalog().catalog();
@@ -493,6 +614,41 @@ final class ProjectRuntimeLoaderTest {
                 .load(temporaryDirectory)
                 .project()
                 .orElseThrow();
+    }
+
+    /** Adds one structurally valid import definition and source asset to the test project. */
+    private void configureImportProject() throws IOException {
+        String additions = """
+                ,
+                  "assets": [
+                    {
+                      "id": "source-data",
+                      "type": "io.github.glynch.runtime-test/source-data",
+                      "path": "assets/source.dat"
+                    }
+                  ],
+                  "imports": ["imports/generated.import.json"]
+                }
+                """;
+        String manifest = PROJECT.substring(0, PROJECT.lastIndexOf('}')) + additions;
+        write(ProjectLoader.MANIFEST_NAME, manifest);
+        write("assets/source.dat", "source");
+        write("imports/generated.import.json", """
+                {
+                  "schemaVersion": 1,
+                  "id": "generated",
+                  "source": "asset:source-data",
+                  "importer": "io.github.glynch.runtime-test/generated-importer",
+                  "selection": []
+                }
+                """);
+        reloadProject();
+    }
+
+    /** Configures one scene referencing a published imported resource. */
+    private void configureImportedResourceScene() throws IOException {
+        configureImportProject();
+        write("application/main.scene.json", resourceSceneReference("import:generated/output/shared", false));
     }
 
     /** Writes one UTF-8 test project file. */
@@ -539,6 +695,70 @@ final class ProjectRuntimeLoaderTest {
         @Override
         public void close() {
             TestRuntimeState.EVENTS.add("unexpected-close");
+        }
+    }
+
+    /** In-memory owned imported-artifact handle used at the public lookup boundary. */
+    private static final class TestImportedArtifact implements ImportedArtifact {
+        private static final String FINGERPRINT = "0".repeat(64);
+
+        private final ImportArtifactDescriptor descriptor;
+        private final String content;
+        private int closeCount;
+
+        /** Stores one descriptor and serialized artifact body. */
+        private TestImportedArtifact(ImportArtifactDescriptor descriptor, String content) {
+            this.descriptor = descriptor;
+            this.content = content;
+        }
+
+        /** Creates one typed resource artifact. */
+        private static TestImportedArtifact resource(String identity, String type, String content) {
+            RegisteredType resourceType = new RegisteredType(RESOURCE_TYPE_PREFIX + type, 1);
+            return new TestImportedArtifact(
+                    ImportArtifactDescriptor.resource(identity, resourceType, List.of()), content);
+        }
+
+        /** Creates one opaque payload artifact. */
+        private static TestImportedArtifact payload(String identity, String content) {
+            return new TestImportedArtifact(ImportArtifactDescriptor.payload(identity, "text/plain"), content);
+        }
+
+        @Override
+        public ImportedArtifactMetadata metadata() {
+            requireOpen();
+            return new ImportedArtifactMetadata(
+                    descriptor, FINGERPRINT, content.getBytes(StandardCharsets.UTF_8).length);
+        }
+
+        @Override
+        public InputStream openStream() {
+            requireOpen();
+            return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+        }
+
+        @Override
+        public boolean isClosed() {
+            return closeCount > 0;
+        }
+
+        @Override
+        public void close() {
+            if (closeCount == 0) {
+                closeCount++;
+            }
+        }
+
+        /** Returns the number of handle-close calls. */
+        private int closeCount() {
+            return closeCount;
+        }
+
+        /** Requires an artifact handle that remains open. */
+        private void requireOpen() {
+            if (isClosed()) {
+                throw new IllegalStateException("artifact is closed");
+            }
         }
     }
 }

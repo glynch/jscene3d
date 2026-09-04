@@ -25,7 +25,7 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 
 /** Project-scoped deterministic source inspection and import orchestration. */
-public final class ImportManager {
+public final class ImportManager implements ImportedArtifactLookup {
     private final ImportCoordinator coordinator;
 
     /** Stores one fully constructed coordinator. */
@@ -144,6 +144,7 @@ public final class ImportManager {
      * @param identity importer-local artifact identity
      * @return owned read handle when the active generation contains the identity
      */
+    @Override
     public Optional<ImportedArtifact> openArtifact(ImportDefinition definition, String identity) {
         return coordinator.openArtifact(definition, identity);
     }

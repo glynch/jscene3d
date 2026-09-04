@@ -34,6 +34,24 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
     SCENE_NODE_FACTORY_MISSING("runtime.factory.scene-node.missing", "A scene-node factory is missing"),
     /** Project systems are unsupported. */
     PROJECT_SYSTEMS_UNSUPPORTED("runtime.project-systems.unsupported", "Project systems are not supported"),
+    /** An imported artifact cannot be opened. */
+    IMPORT_ARTIFACT_OPEN_FAILED("runtime.import.artifact.open", "An imported artifact could not be opened"),
+    /** An imported artifact has the wrong logical kind. */
+    IMPORT_ARTIFACT_KIND_INVALID("runtime.import.artifact.kind", "An imported artifact has an invalid kind"),
+    /** An imported artifact reports an unexpected logical identity. */
+    IMPORT_ARTIFACT_IDENTITY_MISMATCH(
+            "runtime.import.artifact.identity", "An imported artifact has an unexpected identity"),
+    /** A requested imported artifact is missing. */
+    IMPORT_ARTIFACT_MISSING("runtime.import.artifact.missing", "A requested imported artifact is missing"),
+    /** An imported resource disagrees with its published type metadata. */
+    IMPORT_ARTIFACT_TYPE_MISMATCH(
+            "runtime.import.artifact.type", "An imported resource does not match its published type"),
+    /** Multiple import definitions declare the same identity. */
+    IMPORT_DEFINITION_DUPLICATE("runtime.import.definition.duplicate", "An import definition identity is duplicated"),
+    /** A referenced import definition is missing. */
+    IMPORT_DEFINITION_MISSING("runtime.import.definition.missing", "A referenced import definition is missing"),
+    /** Imported-resource lookup was not supplied by the host. */
+    IMPORT_LOOKUP_MISSING("runtime.import.lookup.missing", "Imported-resource lookup is unavailable"),
     /** Project resources contain a dependency cycle. */
     RESOURCE_CYCLE("runtime.resource.cycle", "Project resources contain a dependency cycle"),
     /** A resource-reference kind is unsupported. */

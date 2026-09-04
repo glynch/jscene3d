@@ -32,9 +32,10 @@ final class ProjectResourceResolver {
     private final FactoryBindings factories;
     private final List<ProjectDiagnostic> runtimeDiagnostics;
     private final ResourceLoader loader = new ResourceLoader();
-    private final Map<Path, Object> cache = new LinkedHashMap<>();
+    private final ImportedResourceLoader importedResources;
+    private final Map<URI, Object> cache = new LinkedHashMap<>();
     private final List<Object> creationOrder = new ArrayList<>();
-    private final List<Path> resolving = new ArrayList<>();
+    private final List<URI> resolving = new ArrayList<>();
     private boolean closed;
 
     /** Creates an empty resolver for one project runtime. */
@@ -43,11 +44,13 @@ final class ProjectResourceResolver {
             URI entrySceneSource,
             RegisteredTypeCatalog catalog,
             FactoryBindings factories,
+            ImportedResourceLoader importedResources,
             List<ProjectDiagnostic> runtimeDiagnostics) {
         this.project = Objects.requireNonNull(project, "project");
         this.entrySceneSource = Objects.requireNonNull(entrySceneSource, "entrySceneSource");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.factories = Objects.requireNonNull(factories, "factories");
+        this.importedResources = Objects.requireNonNull(importedResources, "importedResources");
         this.runtimeDiagnostics = Objects.requireNonNull(runtimeDiagnostics, "runtimeDiagnostics");
     }
 
@@ -56,7 +59,7 @@ final class ProjectResourceResolver {
         requireOpen();
         ResourceReference validReference = Objects.requireNonNull(reference, "reference");
         Class<T> validValueType = Objects.requireNonNull(valueType, "valueType");
-        if (validReference.kind() != ResourceReference.Kind.PROJECT) {
+        if (validReference.kind() == ResourceReference.Kind.ASSET) {
             throw failure(
                     currentSource(),
                     RuntimeDiagnosticCode.RESOURCE_KIND_UNSUPPORTED,
@@ -64,26 +67,42 @@ final class ProjectResourceResolver {
                             + validReference.kind().prefix(),
                     "");
         }
-        ResourceLoadResult loadResult =
-                loader.load(project, validReference.projectPath().orElseThrow());
-        if (!loadResult.isValid()) {
-            throw new RuntimeDiagnosticsException(loadResult.diagnostics());
-        }
-        ResourceDefinition definition = loadResult.resource().orElseThrow();
-        Object value = cache.get(definition.source());
+        URI source = source(validReference);
+        Object value = cache.get(source);
         if (value == null) {
-            runtimeDiagnostics.addAll(loadResult.diagnostics());
+            ResourceDefinition definition = load(validReference);
             value = create(definition);
         }
         if (!validValueType.isInstance(value)) {
             throw failure(
-                    definition.source().toUri(),
+                    source,
                     RuntimeDiagnosticCode.RESOURCE_VALUE_TYPE_INVALID,
-                    "resource " + relative(definition.source()) + " produced "
+                    "resource " + relative(source) + " produced "
                             + value.getClass().getName() + " but " + validValueType.getName() + " is required",
                     "");
         }
         return validValueType.cast(value);
+    }
+
+    /** Returns the canonical logical cache identity for one supported reference. */
+    private static URI source(ResourceReference reference) {
+        if (reference.kind() == ResourceReference.Kind.PROJECT) {
+            return reference.projectPath().orElseThrow().toUri();
+        }
+        return URI.create(reference.toString());
+    }
+
+    /** Loads one native or imported resource definition through its namespace adapter. */
+    private ResourceDefinition load(ResourceReference reference) {
+        if (reference.kind() == ResourceReference.Kind.IMPORT) {
+            return importedResources.load(reference);
+        }
+        ResourceLoadResult result = loader.load(project, reference.projectPath().orElseThrow());
+        if (!result.isValid()) {
+            throw new RuntimeDiagnosticsException(result.diagnostics());
+        }
+        runtimeDiagnostics.addAll(result.diagnostics());
+        return result.resource().orElseThrow();
     }
 
     /** Closes created resource values in reverse dependency order. */
@@ -132,7 +151,7 @@ final class ProjectResourceResolver {
     private Object create(ResourceDefinition definition) {
         if (resolving.contains(definition.source())) {
             throw failure(
-                    definition.source().toUri(),
+                    definition.source(),
                     RuntimeDiagnosticCode.RESOURCE_CYCLE,
                     "resource dependency cycle: " + cycle(definition.source()),
                     "");
@@ -156,7 +175,7 @@ final class ProjectResourceResolver {
             throw exception;
         } catch (RuntimeException exception) {
             throw failure(
-                    definition.source().toUri(),
+                    definition.source(),
                     RuntimeDiagnosticCode.RESOURCE_FACTORY_CREATE_FAILED,
                     failureMessage("resource factory failed for " + definition.type(), exception),
                     "");
@@ -171,7 +190,7 @@ final class ProjectResourceResolver {
             return factories.requireResource(definition.type(), "/type");
         } catch (RuntimeCompositionException exception) {
             throw failure(
-                    definition.source().toUri(),
+                    definition.source(),
                     exception.code(),
                     Objects.requireNonNullElse(
                             exception.getMessage(), exception.code().defaultMessage()),
@@ -181,11 +200,11 @@ final class ProjectResourceResolver {
 
     /** Returns the source currently requesting a nested resource. */
     private URI currentSource() {
-        return resolving.isEmpty() ? entrySceneSource : resolving.getLast().toUri();
+        return resolving.isEmpty() ? entrySceneSource : resolving.getLast();
     }
 
     /** Formats one cycle using project-relative resource identities. */
-    private String cycle(Path repeated) {
+    private String cycle(URI repeated) {
         int start = resolving.indexOf(repeated);
         List<String> path = new ArrayList<>();
         for (int index = start; index < resolving.size(); index++) {
@@ -196,8 +215,14 @@ final class ProjectResourceResolver {
     }
 
     /** Returns a stable project-relative resource path for diagnostics. */
-    private String relative(Path resource) {
-        return project.root().relativize(resource).toString().replace('\\', '/');
+    private String relative(URI resource) {
+        if ("file".equals(resource.getScheme())) {
+            Path path = Path.of(resource);
+            if (path.startsWith(project.root())) {
+                return project.root().relativize(path).toString().replace('\\', '/');
+            }
+        }
+        return resource.toString();
     }
 
     /** Requires a resolver whose owned values remain available. */

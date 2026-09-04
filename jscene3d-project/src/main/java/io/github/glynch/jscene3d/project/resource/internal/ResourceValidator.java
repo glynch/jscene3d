@@ -22,7 +22,7 @@ import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.resource.ResourceDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,13 +35,13 @@ public final class ResourceValidator {
     private static final String LOCAL_SCHEMA_REFERENCE = "schema/resource-1.schema.json";
 
     private final GameProject project;
-    private final Path source;
+    private final URI source;
     private final DiagnosticCollector diagnostics;
     private final ValidationContext fields;
     private final ProjectValueDecoder values;
 
     /** Stores one resource-validation context. */
-    private ResourceValidator(GameProject project, Path source) {
+    private ResourceValidator(GameProject project, URI source) {
         this.project = project;
         this.source = source;
         diagnostics = new DiagnosticCollector(source);
@@ -81,10 +81,10 @@ public final class ResourceValidator {
      *
      * @param raw nullable deserialization model
      * @param project containing validated project
-     * @param source canonical resource source path
+     * @param source absolute logical resource source
      * @return validated resource or ordered diagnostics
      */
-    public static ValidationResult validate(RawResource raw, GameProject project, Path source) {
+    public static ValidationResult validate(RawResource raw, GameProject project, URI source) {
         ResourceValidator validator = new ResourceValidator(project, source);
         Optional<ResourceDefinition> resource = validator.validate(raw);
         return new ValidationResult(resource, validator.diagnostics.diagnostics());

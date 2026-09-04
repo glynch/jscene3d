@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifactLookup;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 
@@ -70,6 +72,33 @@ public final class ProjectRuntimeLoader {
      */
     public ProjectRuntimeLoadResult load(
             GameProject project, ClassLoader classLoader, Collection<ProjectRuntimeExtension> hostExtensions) {
+        return loadDiscovered(project, classLoader, hostExtensions, Optional.empty());
+    }
+
+    /**
+     * Discovers extensions and composes a runtime able to resolve published imported resources.
+     *
+     * @param project validated project manifest
+     * @param classLoader loader containing extension descriptors and service providers
+     * @param hostExtensions trusted runtime extensions constructed by the embedding host
+     * @param importedArtifacts host-owned lookup for published imported artifacts
+     * @return composed runtime or structured diagnostics
+     */
+    public ProjectRuntimeLoadResult load(
+            GameProject project,
+            ClassLoader classLoader,
+            Collection<ProjectRuntimeExtension> hostExtensions,
+            ImportedArtifactLookup importedArtifacts) {
+        return loadDiscovered(
+                project, classLoader, hostExtensions, Optional.of(Objects.requireNonNull(importedArtifacts)));
+    }
+
+    /** Discovers metadata and implementations before composing through optional imported content. */
+    private ProjectRuntimeLoadResult loadDiscovered(
+            GameProject project,
+            ClassLoader classLoader,
+            Collection<ProjectRuntimeExtension> hostExtensions,
+            Optional<ImportedArtifactLookup> importedArtifacts) {
         GameProject validProject = Objects.requireNonNull(project, "project");
         ClassLoader validClassLoader = Objects.requireNonNull(classLoader, "classLoader");
         List<ProjectRuntimeExtension> validHostExtensions = List.copyOf(hostExtensions);
@@ -83,7 +112,7 @@ public final class ProjectRuntimeLoader {
         if (hasErrors(diagnostics)) {
             return ProjectRuntimeLoadResult.failure(diagnostics);
         }
-        return loadResolved(validProject, catalogResult.catalog(), extensions, diagnostics);
+        return loadResolved(validProject, catalogResult.catalog(), extensions, importedArtifacts, diagnostics);
     }
 
     /**
@@ -103,6 +132,29 @@ public final class ProjectRuntimeLoader {
                 Objects.requireNonNull(project, "project"),
                 Objects.requireNonNull(catalog, "catalog"),
                 List.copyOf(extensions),
+                Optional.empty(),
+                new ArrayList<>());
+    }
+
+    /**
+     * Composes from resolved metadata with a host lookup for published imported resources.
+     *
+     * @param project validated project manifest
+     * @param catalog resolved safe type metadata
+     * @param extensions trusted executable contributions
+     * @param importedArtifacts host-owned lookup for published imported artifacts
+     * @return composed runtime or structured diagnostics
+     */
+    public ProjectRuntimeLoadResult load(
+            GameProject project,
+            RegisteredTypeCatalog catalog,
+            Collection<ProjectRuntimeExtension> extensions,
+            ImportedArtifactLookup importedArtifacts) {
+        return loadResolved(
+                Objects.requireNonNull(project, "project"),
+                Objects.requireNonNull(catalog, "catalog"),
+                List.copyOf(extensions),
+                Optional.of(Objects.requireNonNull(importedArtifacts, "importedArtifacts")),
                 new ArrayList<>());
     }
 
@@ -111,6 +163,7 @@ public final class ProjectRuntimeLoader {
             GameProject project,
             RegisteredTypeCatalog catalog,
             List<ProjectRuntimeExtension> extensions,
+            Optional<ImportedArtifactLookup> importedArtifacts,
             List<ProjectDiagnostic> diagnostics) {
         SceneLoadResult sceneResult = sceneLoader.loadEntryScene(project);
         diagnostics.addAll(sceneResult.diagnostics());
@@ -128,8 +181,9 @@ public final class ProjectRuntimeLoader {
             return ProjectRuntimeLoadResult.failure(diagnostics);
         }
         try {
-            ProjectRuntime runtime =
-                    new ProjectRuntimeComposer(project, scene, catalog, bindings, diagnostics).compose();
+            ProjectRuntime runtime = new ProjectRuntimeComposer(
+                            project, scene, catalog, bindings, importedArtifacts, diagnostics)
+                    .compose();
             return ProjectRuntimeLoadResult.success(runtime, diagnostics);
         } catch (RuntimeDiagnosticsException exception) {
             diagnostics.addAll(exception.diagnostics());

@@ -202,6 +202,23 @@ version because `jpackage` does not accept the project's pre-1.0 version as a
 macOS application version; the JScene3D artifact version remains
 `0.1.0-SNAPSHOT`.
 
+## Declarative projects
+
+The project modules load versioned manifests, extension descriptors, scenes,
+resources, and import definitions without embedding Java implementation class
+names in project data. Trusted runtime extensions bind registered types to Java
+factories. Project resources and imported resources share the same native
+resource format and runtime ownership model; imported references are resolved
+by logical `import:` URI through a host-supplied artifact lookup, never through
+a physical cache path.
+
+Run the headless end-to-end example that imports a text source as a typed native
+resource and resolves it from a declarative scene with:
+
+```shell
+./mvnw -pl jscene3d-project-examples -am -Prun-import-example compile
+```
+
 ## WAD archives
 
 The optional `jscene3d-wad` artifact validates IWAD and PWAD containers without
@@ -611,6 +628,14 @@ license notices, and exact selected filenames are recorded beside the assets in
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType
   text rendering.
 - `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
+- `jscene3d-project`: versioned project manifests, extension descriptors,
+  scenes, resources, import definitions, and structured validation diagnostics.
+- `jscene3d-project-import`: deterministic import inspection, preparation,
+  cache publication, and logical artifact access.
+- `jscene3d-project-runtime`: trusted scene composition and shared runtime
+  resource resolution for project and imported resources.
+- `jscene3d-project-runtime-lwjgl`: built-in declarative 3d runtime types backed
+  by the LWJGL renderer.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives

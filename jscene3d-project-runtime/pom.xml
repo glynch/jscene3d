@@ -24,6 +24,10 @@
         </dependency>
         <dependency>
             <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-import</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-game</artifactId>
         </dependency>
         <dependency>

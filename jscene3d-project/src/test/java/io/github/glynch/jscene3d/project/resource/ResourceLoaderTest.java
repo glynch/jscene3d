@@ -11,8 +11,10 @@ import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -94,7 +96,8 @@ final class ResourceLoaderTest {
         assertThat(resource.source())
                 .isEqualTo(temporaryDirectory
                         .resolve("resources/material.resource.json")
-                        .toRealPath());
+                        .toRealPath()
+                        .toUri());
         assertThat(resource.type()).isEqualTo(new RegisteredType("example.resource-test/material", 2));
         assertThat(resource.properties()).containsEntry("label", new ProjectValue.TextValue("Steel"));
         assertThat(resource.properties())
@@ -173,6 +176,29 @@ final class ResourceLoaderTest {
                 .containsExactly("resource.path.escape");
     }
 
+    /** Loads generated resource JSON under a logical URI without closing caller-owned input. */
+    @Test
+    void loadsResourceFromLogicalSource() throws IOException {
+        String document = """
+                {
+                  "$schema": "https://jscene3d.org/schemas/resource-1.json",
+                  "schemaVersion": 1,
+                  "type": "example.resource-test/material",
+                  "typeVersion": 1
+                }
+                """;
+        TrackingInputStream input = new TrackingInputStream(document.getBytes(StandardCharsets.UTF_8));
+        URI source = URI.create("import:materials/output/main");
+
+        ResourceLoadResult result = new ResourceLoader().load(loadedProject, source, input);
+
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.resource().orElseThrow().source()).isEqualTo(source);
+        assertThat(input.isClosed()).isFalse();
+        input.close();
+        assertThat(input.isClosed()).isTrue();
+    }
+
     /** Publishes the Resource version-one schema for editors and validation tools. */
     @Test
     void bundlesVersionOneResourceSchema() throws IOException {
@@ -199,5 +225,26 @@ final class ResourceLoaderTest {
         Path target = temporaryDirectory.resolve(relativePath);
         Files.createDirectories(target.getParent());
         Files.writeString(target, content, StandardCharsets.UTF_8);
+    }
+
+    /** Input stream recording whether ownership was released by its caller. */
+    private static final class TrackingInputStream extends ByteArrayInputStream {
+        private boolean closed;
+
+        /** Stores bytes to expose through the tracked stream. */
+        private TrackingInputStream(byte[] content) {
+            super(content);
+        }
+
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            super.close();
+        }
+
+        /** Returns whether {@link #close()} was called. */
+        private boolean isClosed() {
+            return closed;
+        }
     }
 }

@@ -1638,6 +1638,192 @@ model. A glTF adapter and Doom WAD adapter may produce different registered
 resource types while sharing orchestration, diagnostics, provenance, and cache
 behavior.
 
+### Prepared import transaction
+
+Import preparation and publication use a settled prepare, preview, and commit
+transaction. Preparation performs expensive source decoding exactly once and
+writes candidate artifacts into an isolated `TemporaryWorkspace`. It returns an
+owned `PreparedImport` whose immutable preview describes diagnostics, source
+and dependency changes, stable output identities, provenance, output changes,
+and estimated size.
+
+```java
+try (PreparedImport prepared = importManager.prepare(project, definition)) {
+    ImportPreview preview = prepared.preview();
+    if (preview.isValid()) {
+        prepared.commit();
+    }
+}
+```
+
+The editor can present the preview and request confirmation. A headless build
+can apply the same transaction immediately after checking its diagnostics.
+`commit()` verifies that the prepared source fingerprint is still current and
+then atomically publishes the staged artifacts to the disposable import cache.
+Closing an uncommitted transaction deletes its staging workspace. A committed
+transaction remains terminal and closing it releases any remaining staging
+resources without deleting published artifacts.
+
+The engine-owned import module controls source resolution, staging paths,
+fingerprints, cache transactions, diagnostics, progress, cancellation, and
+provenance. A format adapter receives an import context and definition and
+returns named artifacts. It does not select cache paths, mutate authored
+project files, or publish its own results. This keeps editor and command-line
+behavior identical while allowing glTF and Doom-format adapters to produce
+different registered resource types.
+
+### Imported artifact kinds
+
+Importers produce serialized project artifacts rather than live Java runtime
+objects. Version 1 supports three artifact kinds:
+
+- `SCENE` for a complete scene definition;
+- `RESOURCE` for a typed project resource definition;
+- `PAYLOAD` for opaque data referenced by a resource definition, such as image
+  pixels, mesh buffers, audio data, or compiled shader data.
+
+Every artifact has a deterministic importer-local output identity, an artifact
+kind, a content fingerprint, and provenance identifying its source elements.
+Resource artifacts also identify their registered resource type. Artifacts
+declare references to other outputs so the orchestrator can validate the
+resulting graph before publication.
+
+The adapter chooses logical output identities and content. The import module
+chooses physical staging and cache paths. This permits large payloads to be
+written directly to staging instead of being retained as byte arrays, while
+keeping physical machine paths out of the portable project model.
+
+For example, one Doom-format import may publish:
+
+```text
+import:freedoom-map01/map
+    kind: SCENE
+
+import:freedoom-map01/textures/STARTAN3
+    kind: RESOURCE
+    type: io.github.glynch.jscene3d/texture-2d
+
+import:freedoom-map01/payload/textures/STARTAN3
+    kind: PAYLOAD
+    mediaType: image/png
+```
+
+### Source inspection before import
+
+Source inspection is a settled read-only operation performed before an import
+definition is authored. It allows tools to discover selectable content and
+source-dependent option values without creating cache entries or changing
+project files.
+
+```java
+SourceInspection inspection =
+        importManager.inspect(project, assetReference, importerId);
+```
+
+An inspection contains the importer identity and version, source and dependency
+fingerprints, structured diagnostics, and discovered source items. Each source
+item has a stable source-local identity, an adapter-qualified kind, a display
+label, selectability metadata, properties, and relationships to other items.
+Relationships form a graph rather than requiring a tree because formats such as
+glTF permit meshes, materials, skins, and animations to be shared. An editor
+may derive suitable tree presentations from that graph.
+
+Static importer metadata describes available settings and their editor
+presentation without reading a source. Inspection supplies dynamic values such
+as the maps present in one WAD or the scenes and animations present in one glTF
+document. A chosen source-item identity and settings become authored import
+definition data. Headless import can skip inspection when that definition
+already exists, although preparation still validates every selected identity
+against the current source.
+
+### Importer registration
+
+Importer metadata is declared as a registered extension type with `IMPORTER`
+scope. Tools can therefore discover, validate, and present an importer without
+executing its Java implementation. Executable implementations use a separate
+import-time extension seam:
+
+```java
+public interface ProjectImportExtension {
+    String id();
+
+    void register(ProjectImportRegistry registry);
+}
+```
+
+`ProjectImportRegistry` verifies that each implementation corresponds to a
+declared importer owned by the same extension, that its definition version is
+compatible, and that no duplicate implementation exists. The registry rejects
+runtime node, controller, system, and resource factories in importer slots.
+
+JPMS provider discovery and explicitly supplied host extensions are both
+supported, matching runtime extension composition. A single extension may
+contribute runtime types, importers, or both while their discovery and
+lifecycles remain independent. The editor loads executable import extensions
+only when inspection or preparation is requested.
+
+### Import selection and settings
+
+An import definition stores `selection` as an ordered, duplicate-free list of
+stable source-item identities returned by inspection. The same structure
+supports one WAD map, one glTF scene, multiple animations, or any later source
+format without placing importer-specific field names in the generic schema.
+
+Importer-wide `settings` are portable project values validated against the
+property descriptions on the registered importer type. Static defaults come
+from the descriptor, while source-dependent choices come from inspection. An
+authoring tool writes the effective values of all settings known when it
+creates a definition so consequential choices remain visible in source
+control. A definition created against an older importer may omit settings added
+later and receives the newer descriptor's declared defaults for those settings.
+
+```json
+{
+  "selection": ["maps/MAP01"],
+  "settings": {
+    "skill": "hurt-me-plenty",
+    "includeMultiplayerThings": false
+  }
+}
+```
+
+### Per-source-item import settings
+
+An import definition may configure individual source items through an optional
+`itemSettings` object keyed by stable identities from source inspection. Root
+selection and item configuration remain distinct: `selection` determines the
+roots whose dependency closure is imported, while `itemSettings` configures any
+selected or transitively reachable item.
+
+```json
+{
+  "selection": ["scenes/0"],
+  "settings": {
+    "importAnimations": true
+  },
+  "itemSettings": {
+    "meshes/Body": {
+      "generateCollision": true,
+      "materialMode": "preserve"
+    },
+    "animations/Walk": {
+      "loop": true
+    }
+  }
+}
+```
+
+Importer metadata declares item-setting property descriptions by
+adapter-qualified source-item kind. Inspection associates each item with one
+of those kinds, allowing the editor and headless validator to apply the same
+property rules.
+
+A setting keyed by an identity absent from the current source is an error
+because authored configuration has become stale. An invalid property for the
+item kind is also an error. Configuration for an existing item outside the
+selected dependency closure produces a warning and has no effect. Items
+without authored settings use the importer defaults declared for their kind.
+
 ### Illustrative import declaration
 
 ```json
@@ -1647,9 +1833,7 @@ behavior.
   "id": "freedoom-map01",
   "source": "asset:freedoom",
   "importer": "io.github.glynch.jscene3d.doom-format/map",
-  "selection": {
-    "map": "MAP01"
-  },
+  "selection": ["maps/MAP01"],
   "settings": {
     "skill": "hurt-me-plenty",
     "includeMultiplayerThings": false
@@ -1685,6 +1869,59 @@ Derived data belongs in a cache that can be deleted and rebuilt. Project files
 must never rely on an undocumented machine-specific absolute path. Importing
 must not rewrite or normalize the original WAD or glTF source.
 
+### Cache location and atomic publication
+
+The host supplies the resolved safe extension catalog and cache root when it
+creates the import manager. The catalog lets executable importer registrations
+be checked against descriptor ownership, scope, and version:
+
+```java
+ImportManager.create(project, registeredTypeCatalog, cacheRoot, importExtensions)
+```
+
+This keeps cache placement out of the portable project schema. The editor and
+command-line tools should initially default to a hidden project-local cache at
+`<project>/.jscene3d/cache/`, which is ignored by version control. A command-line
+override permits externally persisted CI caches. Export uses an isolated build
+cache or a previously populated cache whose generations have been validated.
+
+The physical layout is engine-managed infrastructure rather than an authored
+project convention and may evolve without changing project files. A useful
+initial layout is:
+
+```text
+cache/
+  imports/
+    freedoom-map01/
+      <complete-fingerprint>/
+        artifact-index.json
+        scenes/
+        resources/
+        payloads/
+  staging/
+```
+
+The complete fingerprint covers the source bytes, referenced source
+dependencies, selection, settings, per-item settings, importer identifier, and
+importer version. Published generations are immutable.
+
+Preparation writes a complete candidate generation beneath `staging/` on the
+same file system as the published cache. Commit rechecks the source fingerprint,
+validates the candidate, obtains a lock for the import definition, and publishes
+the generation with an atomic move. A failed preparation or commit removes its
+staging area and leaves the previous generation untouched. If the file system
+cannot provide the required atomic publication guarantee, commit fails
+explicitly instead of exposing a partially written generation.
+
+Readers retain a generation while using it. Garbage collection may remove old
+generations only after their readers release them. Logical `import:` references
+resolve through the artifact index and never reveal cache paths. Export follows
+the referenced artifact closure rather than copying the cache wholesale.
+
+Secure staging beneath a caller-supplied cache root uses the shared
+`TemporaryWorkspace.create(parent, prefix)` facility rather than duplicating
+temporary-directory policy in import orchestration.
+
 This follows a proven editor workflow. Godot keeps original source assets,
 commits small per-asset import settings, writes converted results to a hidden
 cache, detects source changes, and can regenerate the cache after deletion.
@@ -1700,6 +1937,67 @@ the corresponding recommendation is an import recipe plus deterministic
 imported identities and authored composition or overlays. See
 [Importing 3D scenes](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_3d_scenes/index.html)
 and [Advanced import settings](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_3d_scenes/import_configuration.html).
+
+### Import execution, progress, and cancellation
+
+Import operations are synchronous. `ImportManager.inspect()`,
+`ImportManager.prepare()`, and `PreparedImport.commit()` perform their work on
+the calling thread and do not create implicit background threads. The caller
+owns execution policy: the editor submits operations to its worker executor,
+while command-line and build tools may invoke them directly. The editor also
+owns transfer of progress and completion notifications onto its Java UI thread.
+
+The context passed to an importer provides cooperative cancellation and
+progress reporting. Importers check cancellation at I/O boundaries and at
+bounded intervals during long decoding or conversion loops. Cancellation is a
+distinct operation outcome rather than a validation error. It closes the
+prepared import, removes its staging generation, and never replaces the last
+published generation.
+
+Progress is hierarchical and may identify phases such as inspecting, reading,
+decoding, writing, validating, and committing. A progress update contains a
+phase, a human-readable activity description, and optional completed and total
+work when the importer can measure them. It may also identify the source item
+being processed. Progress callbacks execute on the calling thread and must not
+encode assumptions about an editor toolkit.
+
+An import manager supports concurrent independent operations. Imports with
+different identities may prepare and publish concurrently; the per-import lock
+serializes publication for the same import identity. A `PreparedImport` is
+single-use and is not thread-safe. These rules make concurrency explicit in the
+module interface while keeping thread creation and UI scheduling outside the
+import module.
+
+### Import state and reimport policy
+
+`ImportManager.status()` performs a synchronous, read-only evaluation of an
+import definition and reports one of four states with structured diagnostics:
+
+- `CURRENT` means a complete published generation matches the current source,
+  dependencies, configuration, and importer version;
+- `MISSING` means no complete generation exists;
+- `STALE` means a previous complete generation exists but its complete
+  fingerprint no longer matches;
+- `BLOCKED` means the desired state cannot be evaluated or prepared, for
+  example because the source, dependency, or importer is unavailable or the
+  definition is invalid.
+
+File watching and debounce policy belong to the host. An editor may watch known
+source and dependency paths and request status checks, but the import module
+does not create watcher threads. A watch notification is only a hint: status is
+determined from validated fingerprints rather than assumed from the event.
+
+Automatic reimport is an editor preference. It invokes the same `prepare()` and
+`commit()` transaction as an explicit user request; there is no second import
+path with weaker guarantees. The editor may continue rendering the last
+successfully published generation while clearly marking it stale or displaying
+the diagnostics from a failed reimport.
+
+Play and export require every referenced import to be `CURRENT`. They do not
+silently consume a stale generation. A failed reimport preserves its previous
+generation for editor inspection but does not make that generation current.
+Opening an untrusted project may inspect declarative metadata, but it never
+loads or executes import extensions automatically.
 
 ### Authored composition over imported content
 

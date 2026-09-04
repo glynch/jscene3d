@@ -9,12 +9,15 @@ module io.github.glynch.jscene3d.project {
 
     exports io.github.glynch.jscene3d.project.diagnostic;
     exports io.github.glynch.jscene3d.project.extension;
+    exports io.github.glynch.jscene3d.project.imports;
     exports io.github.glynch.jscene3d.project.manifest;
     exports io.github.glynch.jscene3d.project.resource;
     exports io.github.glynch.jscene3d.project.scene;
     exports io.github.glynch.jscene3d.project.value;
 
     opens io.github.glynch.jscene3d.project.extension.internal to
+            com.fasterxml.jackson.databind;
+    opens io.github.glynch.jscene3d.project.imports.internal to
             com.fasterxml.jackson.databind;
     opens io.github.glynch.jscene3d.project.manifest.internal to
             com.fasterxml.jackson.databind;

@@ -4,6 +4,8 @@
  */
 /** Runnable examples for declarative JScene3D projects. */
 module io.github.glynch.jscene3d.project.examples {
+    requires java.logging;
     requires io.github.glynch.jscene3d.examples.framework;
+    requires io.github.glynch.jscene3d.project.importing;
     requires io.github.glynch.jscene3d.project.runtime.lwjgl;
 }

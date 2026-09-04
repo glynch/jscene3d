@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "id": "io.github.glynch.jscene3d.import-example-project",
+    "name": "Project Import Example",
+    "version": "1.0.0"
+  },
+  "engine": {
+    "requires": ">=0.1.0-SNAPSHOT <0.2.0"
+  },
+  "runtime": {
+    "applicationExtension": "io.github.glynch.jscene3d.import-example",
+    "entryScene": "application/main.scene.json"
+  },
+  "extensions": [
+    {
+      "id": "io.github.glynch.jscene3d.import-example",
+      "requires": "1.0.0"
+    }
+  ],
+  "assets": [
+    {
+      "id": "source-text",
+      "type": "io.github.glynch.jscene3d.import-example/source-text",
+      "path": "assets/source.txt"
+    }
+  ],
+  "imports": ["imports/text.import.json"]
+}

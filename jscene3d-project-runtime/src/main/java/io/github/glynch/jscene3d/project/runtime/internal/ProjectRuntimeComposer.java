@@ -33,6 +33,7 @@ public final class ProjectRuntimeComposer {
     private final FactoryBindings factories;
     private final ProjectResourceResolver resources;
     private final EndpointRouter router = new EndpointRouter();
+    private final RuntimeCreationServices creationServices;
     private final List<LifecycleEntry> lifecycle = new ArrayList<>();
     private final Map<String, RuntimeNode> nodes = new LinkedHashMap<>();
 
@@ -56,6 +57,7 @@ public final class ProjectRuntimeComposer {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.factories = Objects.requireNonNull(factories, "factories");
         resources = new ProjectResourceResolver(project, scene.source().toUri(), catalog, factories, diagnostics);
+        creationServices = new RuntimeCreationServices(project, scene, router, resources);
     }
 
     /**
@@ -113,8 +115,8 @@ public final class ProjectRuntimeComposer {
         RegisteredTypeDescriptor descriptor = requireDescriptor(definition.type(), location + "/controller/type");
         NodeControllerFactory factory = factories.requireController(definition.type(), location + "/controller/type");
         Map<String, ProjectValue> properties = EffectiveProperties.merge(descriptor, definition.properties());
-        ControllerCreationContext context = new ControllerCreationContext(
-                project, scene, node, properties, descriptor, router, resources, node::isEnabled);
+        ControllerCreationContext context =
+                new ControllerCreationContext(creationServices, node, properties, descriptor, node::isEnabled);
         ProjectRuntimeObject controller;
         try {
             controller = Objects.requireNonNull(factory.create(context), "controller factory result");
@@ -135,7 +137,7 @@ public final class ProjectRuntimeComposer {
             boolean enabled,
             String location) {
         SceneNodeCreationContext context = new SceneNodeCreationContext(
-                project, scene, definition, properties, descriptor, router, resources, () -> enabled, parent);
+                creationServices, definition, properties, descriptor, () -> enabled, parent);
         try {
             return Objects.requireNonNull(factory.create(context), "scene-node factory result");
         } catch (RuntimeException exception) {

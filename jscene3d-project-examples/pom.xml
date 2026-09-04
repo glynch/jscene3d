@@ -20,6 +20,10 @@
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-import</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-project-runtime-lwjgl</artifactId>
         </dependency>
         <dependency>
@@ -53,6 +57,32 @@
     </dependencies>
 
     <profiles>
+        <profile>
+            <id>run-import-example</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-project-import-example</id>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>io.github.glynch.jscene3d.project.examples.ProjectImportExample</mainClass>
+                                    <arguments>
+                                        <argument>${project.basedir}/src/main/import-project</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>run-project-example</id>
             <build>

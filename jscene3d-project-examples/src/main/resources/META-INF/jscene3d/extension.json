@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.glynch.jscene3d.import-example",
+  "version": "1.0.0",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "Project Import Example",
+  "types": [
+    {
+      "id": "io.github.glynch.jscene3d.import-example/source-text",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Source Text"
+    },
+    {
+      "id": "io.github.glynch.jscene3d.import-example/text-importer",
+      "typeVersion": 1,
+      "scope": "importer",
+      "displayName": "Text Importer",
+      "properties": [
+        {
+          "id": "uppercase",
+          "valueKind": "boolean",
+          "defaultValue": true,
+          "displayName": "Uppercase"
+        }
+      ]
+    }
+  ]
+}

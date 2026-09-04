@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.glynch.import-test",
+  "version": "1.0.0",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "Import Test",
+  "types": [
+    {
+      "id": "io.github.glynch.import-test/source-data",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Source Data"
+    },
+    {
+      "id": "io.github.glynch.import-test/source-importer",
+      "typeVersion": 1,
+      "scope": "importer",
+      "displayName": "Source Importer",
+      "properties": [
+        {
+          "id": "uppercase",
+          "valueKind": "boolean",
+          "defaultValue": false,
+          "displayName": "Uppercase"
+        }
+      ]
+    }
+  ]
+}

@@ -33,21 +33,19 @@ abstract class AbstractCreationContext implements RuntimeCreationContext {
     private final BooleanSupplier enabled;
 
     AbstractCreationContext(
-            GameProject project,
-            SceneDefinition scene,
+            RuntimeCreationServices services,
             SceneNodeDefinition nodeDefinition,
             Map<String, ProjectValue> properties,
             RegisteredTypeDescriptor descriptor,
-            EndpointRouter router,
-            ProjectResourceResolver resources,
             BooleanSupplier enabled) {
-        this.project = Objects.requireNonNull(project, "project");
-        this.scene = Objects.requireNonNull(scene, "scene");
+        RuntimeCreationServices validServices = Objects.requireNonNull(services, "services");
+        this.project = validServices.project();
+        this.scene = validServices.scene();
         this.nodeDefinition = Objects.requireNonNull(nodeDefinition, "nodeDefinition");
         this.properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
-        this.router = Objects.requireNonNull(router, "router");
-        this.resources = Objects.requireNonNull(resources, "resources");
+        this.router = validServices.router();
+        this.resources = validServices.resources();
         this.enabled = Objects.requireNonNull(enabled, "enabled");
     }
 

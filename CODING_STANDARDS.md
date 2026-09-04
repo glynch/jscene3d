@@ -48,6 +48,9 @@ automatically.
 - Do not leave public constructors or methods empty. Perform their required
   initialization, omit them, or document why an intentionally empty body is
   part of the public contract.
+- Keep methods and constructors at or below seven parameters. Checkstyle
+  enforces this limit. Introduce a cohesive parameter object or redesign the
+  interface when related inputs would otherwise exceed it.
 - Keep production methods at or below Sonar's cognitive-complexity threshold of
   15. PMD enforces the same threshold during `clean verify`. When a feature adds
   another decision branch, extract cohesive validation or behavior in the same
@@ -212,6 +215,9 @@ prior deprecation where practical.
   headlessly through their public interfaces.
 - Never use arbitrary sleeps. Use deterministic coordination when concurrency
   eventually requires it.
+- Tests that need temporary files or directories must receive a JUnit Jupiter
+  `@TempDir Path`. Do not hard-code operating-system temporary paths or create
+  unmanaged temporary test locations directly.
 - Keep an exception assertion's executable lambda to one invocation that may
   throw. Construct inputs and callbacks before the assertion.
 - Keep each test method below 25 assertion invocations. Split broader scenarios

@@ -38,6 +38,7 @@
         <module>jscene3d-physics</module>
         <module>jscene3d-game</module>
         <module>jscene3d-project</module>
+        <module>jscene3d-project-import</module>
         <module>jscene3d-project-runtime</module>
         <module>jscene3d-audio</module>
         <module>jscene3d-lwjgl</module>
@@ -175,6 +176,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-project</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-project-import</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

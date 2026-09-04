@@ -12,6 +12,10 @@
         <property name="files" value="^(?!.*[/\\]physics[/\\]shapes[/\\]).*$" />
         <property name="id" value="physicsShapeDirectFiniteValidation" />
     </module>
+    <module name="SuppressionSingleFilter">
+        <property name="files" value=".*[/\\]src[/\\]main[/\\].*" />
+        <property name="id" value="testsUseTempDir" />
+    </module>
     <module name="TreeWalker">
         <module name="ArrayTypeStyle" />
         <module name="AvoidStarImport" />
@@ -61,11 +65,26 @@
         <module name="ModifiedControlVariable" />
         <module name="NoFinalizer" />
         <module name="OneTopLevelClass" />
+        <module name="ParameterNumber">
+            <property name="max" value="7" />
+            <property name="ignoreOverriddenMethods" value="true" />
+        </module>
         <module name="RegexpSinglelineJava">
             <property name="id" value="physicsShapeDirectFiniteValidation" />
             <property name="format" value="\bFloat\.isFinite\s*\(" />
             <property name="ignoreComments" value="true" />
             <property name="message" value="Physics shapes must use the shared physics Preconditions validation methods." />
+        </module>
+        <module name="RegexpSinglelineJava">
+            <property name="format" value="\b(?:Path\.of|Paths\.get)\s*\(\s*&quot;/tmp(?:/|&quot;)" />
+            <property name="ignoreComments" value="true" />
+            <property name="message" value="Do not hard-code a system temporary path; tests must use JUnit @TempDir." />
+        </module>
+        <module name="RegexpSinglelineJava">
+            <property name="id" value="testsUseTempDir" />
+            <property name="format" value="\b(?:Files\.createTemp(?:File|Directory)|File\.createTempFile)\s*\(" />
+            <property name="ignoreComments" value="true" />
+            <property name="message" value="Tests must use a JUnit @TempDir instead of creating unmanaged temporary paths." />
         </module>
         <module name="SimplifyBooleanExpression" />
         <module name="SimplifyBooleanReturn" />

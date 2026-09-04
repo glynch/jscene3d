@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "example-text",
+  "source": "asset:source-text",
+  "importer": "io.github.glynch.jscene3d.import-example/text-importer",
+  "selection": ["text"],
+  "settings": {
+    "uppercase": true
+  }
+}

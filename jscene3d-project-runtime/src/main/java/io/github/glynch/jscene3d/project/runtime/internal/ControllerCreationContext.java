@@ -5,10 +5,8 @@
 package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
-import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.RuntimeNode;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerContext;
-import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
@@ -19,15 +17,12 @@ final class ControllerCreationContext extends AbstractCreationContext implements
 
     /** Creates one controller context. */
     ControllerCreationContext(
-            GameProject project,
-            SceneDefinition scene,
+            RuntimeCreationServices services,
             RuntimeNode node,
             Map<String, ProjectValue> properties,
             RegisteredTypeDescriptor descriptor,
-            EndpointRouter router,
-            ProjectResourceResolver resources,
             BooleanSupplier enabled) {
-        super(project, scene, node.definition(), properties, descriptor, router, resources, enabled);
+        super(services, node.definition(), properties, descriptor, enabled);
         this.node = node;
     }
 

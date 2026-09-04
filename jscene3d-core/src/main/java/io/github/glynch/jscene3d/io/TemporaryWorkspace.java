@@ -55,6 +55,36 @@ public final class TemporaryWorkspace implements AutoCloseable {
     }
 
     /**
+     * Creates a uniquely named workspace directly beneath an existing directory.
+     *
+     * <p>The supplied directory is resolved to its real path before creation. The new workspace
+     * receives owner-only permissions when the filesystem supports POSIX attributes.
+     *
+     * @param parent existing parent directory
+     * @param prefix filename prefix of at least three characters
+     * @return workspace owning the newly created directory
+     * @throws NullPointerException if either argument is {@code null}
+     * @throws IllegalArgumentException if {@code parent} is not a directory or {@code prefix} is
+     *     not a simple filename prefix
+     * @throws UncheckedIOException if the directory cannot be resolved or created
+     */
+    public static TemporaryWorkspace create(Path parent, String prefix) {
+        Path validParent =
+                Objects.requireNonNull(parent, "parent").toAbsolutePath().normalize();
+        String validPrefix = requireSimpleNamePart(prefix, "prefix", true);
+        if (!Files.isDirectory(validParent)) {
+            throw new IllegalArgumentException("parent must be an existing directory: " + validParent);
+        }
+        try {
+            Path realParent = validParent.toRealPath();
+            return new TemporaryWorkspace(
+                    Files.createTempDirectory(realParent, validPrefix, ownerOnlyDirectoryAttributes()));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to create temporary workspace in " + validParent, exception);
+        }
+    }
+
+    /**
      * Returns the workspace root.
      *
      * @return normalized absolute root directory

@@ -5,10 +5,8 @@
 package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
-import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.RuntimeNode;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeContext;
-import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Map;
@@ -21,16 +19,13 @@ final class SceneNodeCreationContext extends AbstractCreationContext implements 
 
     /** Creates one node context. */
     SceneNodeCreationContext(
-            GameProject project,
-            SceneDefinition scene,
+            RuntimeCreationServices services,
             SceneNodeDefinition node,
             Map<String, ProjectValue> properties,
             RegisteredTypeDescriptor descriptor,
-            EndpointRouter router,
-            ProjectResourceResolver resources,
             BooleanSupplier enabled,
             Optional<RuntimeNode> parent) {
-        super(project, scene, node, properties, descriptor, router, resources, enabled);
+        super(services, node, properties, descriptor, enabled);
         this.parent = parent;
     }
 

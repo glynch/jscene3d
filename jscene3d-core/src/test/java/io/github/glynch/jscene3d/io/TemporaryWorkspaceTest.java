@@ -15,9 +15,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Exercises temporary workspace creation, isolation, and cleanup through its public interface. */
 final class TemporaryWorkspaceTest {
+    @TempDir
+    private Path temporaryDirectory;
+
     /** Creates isolated child resources and removes their complete tree on close. */
     @Test
     void ownsTemporaryTree() throws IOException {
@@ -37,6 +41,20 @@ final class TemporaryWorkspaceTest {
         assertThat(workspace.isClosed()).isTrue();
         assertThat(Files.exists(root)).isFalse();
         workspace.close();
+    }
+
+    /** Creates a secure workspace directly beneath a caller-supplied directory. */
+    @Test
+    void createsWorkspaceBeneathSuppliedDirectory() throws IOException {
+        TemporaryWorkspace workspace = TemporaryWorkspace.create(temporaryDirectory, "staging-");
+        Path root = workspace.root();
+
+        assertThat(root).isDirectory().hasParent(temporaryDirectory.toRealPath());
+        assertOwnerOnlyPermissions(root);
+
+        workspace.close();
+
+        assertThat(root).doesNotExist();
     }
 
     /** Confirms restrictive root permissions on filesystems supporting POSIX attributes. */
@@ -67,6 +85,9 @@ final class TemporaryWorkspaceTest {
     void rejectsInvalidNameParts() {
         assertThatNullPointerException().isThrownBy(() -> TemporaryWorkspace.create(null));
         assertThatIllegalArgumentException().isThrownBy(() -> TemporaryWorkspace.create("ab"));
+
+        Path missingParent = temporaryDirectory.resolve("missing");
+        assertThatIllegalArgumentException().isThrownBy(() -> TemporaryWorkspace.create(missingParent, "staging-"));
 
         try (TemporaryWorkspace workspace = TemporaryWorkspace.create("jscene3d-test-")) {
             assertThatIllegalArgumentException().isThrownBy(() -> workspace.createDirectory("../outside"));

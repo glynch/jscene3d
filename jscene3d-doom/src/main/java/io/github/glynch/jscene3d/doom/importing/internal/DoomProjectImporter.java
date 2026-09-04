@@ -5,10 +5,10 @@
 package io.github.glynch.jscene3d.doom.importing.internal;
 
 import io.github.glynch.jscene3d.doom.diagnostic.DoomDiagnostic;
+import io.github.glynch.jscene3d.doom.internal.DoomTypes;
 import io.github.glynch.jscene3d.doom.map.DoomMap;
 import io.github.glynch.jscene3d.doom.map.DoomMapDecodeResult;
 import io.github.glynch.jscene3d.doom.map.DoomMapDecoder;
-import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.importing.ImportArtifactDescriptor;
 import io.github.glynch.jscene3d.project.importing.SourceItem;
 import io.github.glynch.jscene3d.project.importing.SourceItemRelation;
@@ -35,8 +35,6 @@ final class DoomProjectImporter implements ProjectImporter {
     private static final String MAPS_IDENTITY = "maps";
     private static final String MAPS_ITEM_KIND = "io.github.glynch.jscene3d.doom/map-collection";
     private static final String MAP_ITEM_KIND = "io.github.glynch.jscene3d.doom/map";
-    private static final RegisteredType MAP_RESOURCE_TYPE =
-            new RegisteredType(DoomImportExtension.MAP_RESOURCE_TYPE_IDENTIFIER, DoomImportExtension.TYPE_VERSION);
     private final DoomMapDecoder decoder = new DoomMapDecoder();
 
     @Override
@@ -58,7 +56,7 @@ final class DoomProjectImporter implements ProjectImporter {
             if (result.isValid()) {
                 DoomMap map = result.map().orElseThrow();
                 context.artifact(
-                        ImportArtifactDescriptor.resource(mapIdentity(mapName), MAP_RESOURCE_TYPE, List.of()),
+                        ImportArtifactDescriptor.resource(mapIdentity(mapName), DoomTypes.MAP_RESOURCE, List.of()),
                         output -> DoomMapResourceWriter.write(
                                 output, context.asset().id(), archive, map));
             }

@@ -7,6 +7,7 @@ module io.github.glynch.jscene3d.doom.examples {
     requires io.github.glynch.jscene3d.core;
     requires io.github.glynch.jscene3d.doom;
     requires io.github.glynch.jscene3d.project.importing;
+    requires io.github.glynch.jscene3d.project.runtime;
     requires io.github.glynch.jscene3d.wad;
     requires java.logging;
     requires static org.jspecify;

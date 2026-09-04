@@ -100,6 +100,15 @@ reconciled as the grill progresses rather than relying on memory at its end.
   while the feature branches replace the old composition path.
 - Integration proceeds in dependency order: the required JScene3D foundation
   is integrated before the corresponding Doomed Corridors migration.
+- The Doom content extension owns both sides of its native map resource: its
+  importer writes `io.github.glynch.jscene3d.doom/map`, and its runtime factory
+  reconstructs a renderer-independent `DoomMap`. Applications consume that
+  typed value without parsing the generated JSON or reopening the WAD.
+- Doomed Corridors selects MAP01 in a project import definition and its entry
+  scene references `import:freedoom-maps/maps/MAP01`. Its application extension
+  resolves that reference for `doom-level-3d` through the generic runtime. The
+  existing graphical path remains runnable while its remaining world and
+  presentation responsibilities are migrated behind declarative types.
 
 ### Project composition and extension loading decisions
 
@@ -2614,11 +2623,13 @@ Doomed Corridors already demonstrates useful separations:
   window;
 - presentation adapts those models to JScene3D rendering and audio.
 
-The principal architectural gap is runtime composition. Startup code currently
-knows how to find and assemble the WAD map, imported resources, actor catalog,
-combat rules, presentation rules, player, enemies, HUD, input, audio, and
-renderer. The Project Manifest points directly at a WAD asset and map rather
-than at an engine-native application scene.
+The remaining architectural gap is complete runtime composition. The Project
+Manifest now points at an engine-native application scene, MAP01 is selected by
+a project import definition, and `doom-level-3d` receives the resulting typed
+map through the generic runtime. The existing graphical startup code still
+knows how to assemble materials, actor data, combat rules, presentation rules,
+player state, enemies, HUD, input, audio, and rendering; those responsibilities
+are the remaining migration work.
 
 The reusable `DoomMap`, `DoomMapDecodeResult`, and `DoomMapDecoder` in
 `jscene3d-doom` supersede the corresponding Doomed Corridors classes. The game

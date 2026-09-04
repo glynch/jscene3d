@@ -4,10 +4,12 @@
  */
 package io.github.glynch.jscene3d.doom.examples;
 
+import io.github.glynch.jscene3d.doom.map.DoomMap;
 import io.github.glynch.jscene3d.io.TemporaryWorkspace;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
+import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.importing.ImportManager;
 import io.github.glynch.jscene3d.project.importing.ImportedArtifact;
 import io.github.glynch.jscene3d.project.importing.PreparedImport;
@@ -18,6 +20,14 @@ import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
+import io.github.glynch.jscene3d.project.runtime.ProjectRuntime;
+import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeLoadResult;
+import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeLoader;
+import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeObject;
+import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
+import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeContext;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -29,24 +39,26 @@ import java.util.logging.Logger;
 
 /** Runs a generated classic map through the service-discovered Doom project importer. */
 public final class DoomProjectImportExample {
+    private static final String APPLICATION_EXTENSION = "io.github.glynch.jscene3d.doom-import-example";
     private static final String ENGINE_VERSION = "0.1.0-SNAPSHOT";
     private static final Logger LOGGER = Logger.getLogger(DoomProjectImportExample.class.getName());
     private static final String PROJECT_MANIFEST = """
             {
               "schemaVersion": 1,
               "identity": {
-                "id": "io.github.glynch.jscene3d.doom-import-example",
+                "id": "io.github.glynch.jscene3d.doom-import-project",
                 "name": "Doom Import Example",
                 "version": "1.0.0"
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "io.github.glynch.jscene3d.doom",
+                "applicationExtension": "io.github.glynch.jscene3d.doom-import-example",
                 "entryScene": "main.scene.json"
               },
               "extensions": [
                 {"id": "io.github.glynch.jscene3d.wad", "requires": "0.1.0-SNAPSHOT"},
-                {"id": "io.github.glynch.jscene3d.doom", "requires": "0.1.0-SNAPSHOT"}
+                {"id": "io.github.glynch.jscene3d.doom", "requires": "0.1.0-SNAPSHOT"},
+                {"id": "io.github.glynch.jscene3d.doom-import-example", "requires": "1.0.0"}
               ],
               "assets": [
                 {
@@ -56,6 +68,21 @@ public final class DoomProjectImportExample {
                 }
               ],
               "imports": ["imports/maps.import.json"]
+            }
+            """;
+    private static final String ENTRY_SCENE = """
+            {
+              "schemaVersion": 1,
+              "id": "main",
+              "root": {
+                "id": "map",
+                "name": "Imported MAP01",
+                "type": "io.github.glynch.jscene3d.doom-import-example/map-consumer-3d",
+                "typeVersion": 1,
+                "properties": {
+                  "map": {"$ref": "import:maps/maps/MAP01"}
+                }
+              }
             }
             """;
     private static final String IMPORT_DEFINITION = """
@@ -109,6 +136,7 @@ public final class DoomProjectImportExample {
             String resource = readMap(manager, definition);
             LOGGER.info(() ->
                     "Discovered " + (inspection.items().size() - 1) + " map and imported maps/MAP01:\n" + resource);
+            runRuntime(project, manager);
         }
     }
 
@@ -117,7 +145,7 @@ public final class DoomProjectImportExample {
         Files.createDirectories(root.resolve("assets"));
         Files.createDirectories(root.resolve("imports"));
         Files.writeString(root.resolve(ProjectLoader.MANIFEST_NAME), PROJECT_MANIFEST, StandardCharsets.UTF_8);
-        Files.writeString(root.resolve("main.scene.json"), "{}", StandardCharsets.UTF_8);
+        Files.writeString(root.resolve("main.scene.json"), ENTRY_SCENE, StandardCharsets.UTF_8);
         Files.writeString(root.resolve("imports/maps.import.json"), IMPORT_DEFINITION, StandardCharsets.UTF_8);
         ExampleDoomWad.write(root.resolve("assets/content.wad"));
         return root;
@@ -144,8 +172,60 @@ public final class DoomProjectImportExample {
         }
     }
 
+    /** Resolves the published resource through the generic project runtime. */
+    private static void runRuntime(GameProject project, ImportManager manager) {
+        ProjectRuntimeLoadResult result = new ProjectRuntimeLoader(ENGINE_VERSION)
+                .load(
+                        project,
+                        DoomProjectImportExample.class.getClassLoader(),
+                        List.of(new ExampleRuntimeExtension()),
+                        manager);
+        try (ProjectRuntime runtime = requireValue(result.runtime(), result.diagnostics(), "project runtime")) {
+            runtime.start();
+        }
+    }
+
     /** Requires one successful loading result while retaining structured diagnostics on failure. */
     private static <T> T requireValue(Optional<T> value, List<ProjectDiagnostic> diagnostics, String description) {
         return value.orElseThrow(() -> new IllegalStateException(description + " could not be loaded: " + diagnostics));
+    }
+
+    /** Provides the executable map consumer declared by the example descriptor. */
+    private static final class ExampleRuntimeExtension implements ProjectRuntimeExtension {
+        private static final RegisteredType MAP_CONSUMER =
+                new RegisteredType(APPLICATION_EXTENSION + "/map-consumer-3d", 1);
+
+        @Override
+        public String id() {
+            return APPLICATION_EXTENSION;
+        }
+
+        @Override
+        public void register(ProjectRuntimeRegistry registry) {
+            registry.registerSceneNode(MAP_CONSUMER, ExampleRuntimeExtension::createMapConsumer);
+        }
+
+        /** Resolves the imported map selected by the example scene. */
+        private static ProjectRuntimeObject createMapConsumer(SceneNodeContext context) {
+            ProjectValue value = context.properties().get("map");
+            if (!(value instanceof ProjectValue.ReferenceValue reference)) {
+                throw new IllegalArgumentException("map must be a resource reference");
+            }
+            return new MapConsumer(context.resolveResource(reference.reference(), DoomMap.class));
+        }
+    }
+
+    /** Reports the typed map received from the Doom runtime resource factory. */
+    private record MapConsumer(DoomMap map) implements ProjectRuntimeObject {
+        @Override
+        public void start() {
+            LOGGER.info(() ->
+                    "Resolved runtime " + map.name() + " with " + map.things().size() + " thing");
+        }
+
+        @Override
+        public void close() {
+            // The immutable map value owns no external resources.
+        }
     }
 }

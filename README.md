@@ -280,6 +280,11 @@ a deterministic, pretty-printed resource of type
 classic map records and source provenance; geometry, materials, sprites, audio,
 and gameplay interpretation remain separate later concerns.
 
+The same extension provides the runtime factory for that native resource type.
+When a scene resolves an imported map, the factory reconstructs the immutable
+renderer-independent `DoomMap`; consuming applications do not parse generated
+JSON or depend on cache paths.
+
 Run the self-contained Doom project-import example with:
 
 ```shell

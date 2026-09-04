@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.StreamWriteFeature;
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import io.github.glynch.jscene3d.doom.internal.DoomTypes;
 import io.github.glynch.jscene3d.doom.map.DoomMap;
 import io.github.glynch.jscene3d.wad.WadArchive;
 import java.io.IOException;
@@ -37,8 +38,8 @@ final class DoomMapResourceWriter {
             generator.setPrettyPrinter(prettyPrinter());
             generator.writeStartObject();
             generator.writeNumberField("schemaVersion", 1);
-            generator.writeStringField("type", DoomImportExtension.MAP_RESOURCE_TYPE_IDENTIFIER);
-            generator.writeNumberField("typeVersion", DoomImportExtension.TYPE_VERSION);
+            generator.writeStringField("type", DoomTypes.MAP_RESOURCE_IDENTIFIER);
+            generator.writeNumberField("typeVersion", DoomTypes.TYPE_VERSION);
             generator.writeObjectFieldStart("properties");
             generator.writeStringField("name", map.name());
             writeSource(generator, assetId, archive);

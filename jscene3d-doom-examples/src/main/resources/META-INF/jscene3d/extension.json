@@ -1,0 +1,25 @@
+{
+  "$schema": "https://jscene3d.org/schemas/extension-1.json",
+  "schemaVersion": 1,
+  "id": "io.github.glynch.jscene3d.doom-import-example",
+  "version": "1.0.0",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "Doom Import Runtime Example",
+  "types": [
+    {
+      "id": "io.github.glynch.jscene3d.doom-import-example/map-consumer-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Imported Doom Map Consumer 3d",
+      "properties": [
+        {
+          "id": "map",
+          "valueKind": "reference",
+          "required": true,
+          "displayName": "Map",
+          "acceptedReferences": ["import"]
+        }
+      ]
+    }
+  ]
+}

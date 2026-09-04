@@ -1,9 +1,6 @@
 {
-    "java.configuration.updateBuildConfiguration": "automatic",
-    "java.compile.nullAnalysis.mode": "disabled",
     "java.checkstyle.configuration": "${workspaceFolder}/config/checkstyle/checkstyle.xml",
     "java.checkstyle.version": "13.8.0",
-    "java.maven.downloadSources": true,
     "json.schemas": [
         {
             "fileMatch": [
@@ -15,18 +12,19 @@
     "[java]": {
         "editor.formatOnSave": false
     },
-    "files.associations": {
-        "LICENSE": "plaintext"
+    "files.exclude": {
+        "**/target": true,
+        "**/target_test-classes": true
     },
     "files.watcherExclude": {
-        "**/target/**": true
+        "**/target/**": true,
+        "**/target_test-classes/**": true,
+        "**/logs/**": true
     },
     "search.exclude": {
-        "**/target/**": true
-    },
-    "java.project.resourceFilters": [
-        "node_modules",
-        "\\.git",
-        "target"
-    ]
+        "**/target": true,
+        "**/target_test-classes": true,
+        "**/logs": true,
+        "**/*.log": true
+    }
 }

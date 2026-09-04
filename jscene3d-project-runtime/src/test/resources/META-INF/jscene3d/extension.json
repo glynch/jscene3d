@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.glynch.runtime-test",
+  "version": "1.0.0",
+  "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
+  "displayName": "Runtime Test",
+  "types": [
+    {
+      "id": "io.github.glynch.runtime-test/group-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Group 3d",
+      "properties": [
+        {
+          "id": "label",
+          "valueKind": "text",
+          "defaultValue": "Default root",
+          "displayName": "Label"
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.runtime-test/timer",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Timer",
+      "signals": [
+        {
+          "id": "timeout",
+          "displayName": "Timeout"
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.runtime-test/indicator-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Indicator 3d",
+      "properties": [
+        {
+          "id": "active",
+          "valueKind": "boolean",
+          "defaultValue": false,
+          "displayName": "Active"
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.runtime-test/toggle-controller",
+      "typeVersion": 1,
+      "scope": "node-controller",
+      "displayName": "Toggle Controller",
+      "actions": [
+        {
+          "id": "toggle",
+          "displayName": "Toggle"
+        }
+      ]
+    }
+  ]
+}

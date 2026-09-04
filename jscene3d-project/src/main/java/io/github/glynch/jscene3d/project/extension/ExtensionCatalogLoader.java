@@ -75,7 +75,11 @@ public final class ExtensionCatalogLoader {
             Enumeration<URL> resources = classLoader.getResources(DESCRIPTOR_RESOURCE);
             List<URL> sorted = Collections.list(resources);
             sorted.sort(Comparator.comparing(URL::toExternalForm));
-            return List.copyOf(sorted);
+            Map<String, URL> unique = new LinkedHashMap<>();
+            for (URL resource : sorted) {
+                unique.putIfAbsent(resource.toExternalForm(), resource);
+            }
+            return List.copyOf(unique.values());
         } catch (IOException exception) {
             diagnostics.add(error(
                     manifest,

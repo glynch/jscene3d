@@ -16,6 +16,7 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Objects;
@@ -136,6 +137,27 @@ final class ExtensionCatalogLoaderTest {
                     .isEqualTo("Example Game");
             assertThat(result.diagnostics()).extracting(ProjectDiagnostic::code).containsExactly("extension.duplicate");
         }
+    }
+
+    /** Ignores duplicate enumeration of the same physical descriptor resource. */
+    @Test
+    void deduplicatesRepeatedDescriptorUrl() throws IOException {
+        Path classPathRoot = descriptorRoot("repeated", VALID_DESCRIPTOR);
+        URL descriptorUrl = classPathRoot
+                .resolve(ExtensionCatalogLoader.DESCRIPTOR_RESOURCE)
+                .toUri()
+                .toURL();
+        ClassLoader classLoader = new RepeatingResourceClassLoader(descriptorUrl);
+
+        ExtensionCatalogLoadResult result =
+                new ExtensionCatalogLoader("0.1.0").load(project("example.game", "1.2.0"), classLoader);
+
+        assertThat(result.isComplete()).isTrue();
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.catalog().extensions())
+                .singleElement()
+                .extracting(ExtensionDescriptor::id)
+                .isEqualTo("example.game");
     }
 
     /** Rejects malformed descriptor JSON and then reports the unresolved declaration. */
@@ -399,6 +421,26 @@ final class ExtensionCatalogLoaderTest {
         @Override
         public Enumeration<URL> getResources(String name) throws IOException {
             throw new IOException("simulated failure");
+        }
+    }
+
+    /** Class loader that returns one physical descriptor URL more than once. */
+    private static final class RepeatingResourceClassLoader extends ClassLoader {
+        private final URL descriptorUrl;
+
+        /** Creates a loader for the repeated descriptor URL. */
+        private RepeatingResourceClassLoader(URL descriptorUrl) {
+            super(null);
+            this.descriptorUrl = descriptorUrl;
+        }
+
+        /** Repeats the fixed descriptor resource while leaving all other resources absent. */
+        @Override
+        public Enumeration<URL> getResources(String name) {
+            if (ExtensionCatalogLoader.DESCRIPTOR_RESOURCE.equals(name)) {
+                return Collections.enumeration(List.of(descriptorUrl, descriptorUrl));
+            }
+            return Collections.emptyEnumeration();
         }
     }
 }

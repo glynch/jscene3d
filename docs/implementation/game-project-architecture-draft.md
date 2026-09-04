@@ -146,6 +146,32 @@ reconciled as the grill progresses rather than relying on memory at its end.
   hides parsing, resolution, registration, factory ordering, connection setup,
   and lifecycle details from Doomed Corridors, the editor, headless tools, and
   exported launchers.
+- The first executable kernel exposes `ProjectRuntimeLoader.load(...)`. It
+  returns a `ProjectRuntimeLoadResult` containing either a fully composed
+  `ProjectRuntime` or ordered structured diagnostics. The runtime implements
+  the existing `GameApplication` contract and is therefore driven by the
+  existing `GameRuntime` rather than by a second loop.
+- Trusted extension implementations are discovered with Java's service-loader
+  mechanism or supplied explicitly by an embedding launcher. They register
+  scene-node and controller factories against exact serialized
+  `RegisteredType` identities. Project documents and safe descriptors never
+  contain Java implementation class names.
+- Factory contexts expose the project, scene, owning node, effective
+  properties, parent or controlled node, and bounded signal/action
+  capabilities. Effective properties apply descriptor defaults first and
+  authored values second.
+- Composition creates node and controller objects in scene preorder, resolves
+  declared connections after every factory has returned, starts objects in
+  creation order, and closes them in reverse order. Fixed, frame, and render
+  callbacks are separate opt-in interfaces; disabled subtrees do not receive
+  those callbacks or signal/action dispatch.
+- Runtime signals dispatch synchronously in scene-connection declaration order.
+  Payload-bearing endpoints use an exact registered payload identity and do
+  not perform runtime conversion.
+- Nested-scene expansion, project-system definitions, resources, and built-in
+  rendering adapters remain subsequent runtime slices. Encountering a
+  configured but unsupported feature produces a terminal diagnostic rather
+  than silently ignoring project data.
 - Annotation-processing ownership may be separated later if build-time
   dependency direction requires it; that does not change the runtime seam.
 
@@ -1374,11 +1400,14 @@ Separate opt-in interfaces participate in fixed or frame updates. Exact names
 must be tested against combat, campaign progression, save management, and other
 real systems before becoming public API.
 
-The external runtime seam should remain small. Conceptually:
+The external runtime seam is:
 
 ```java
-ProjectRuntimeOpenResult open(GameProject project, ExtensionCatalog extensions);
+ProjectRuntimeLoadResult load(GameProject project, ClassLoader extensions);
 ```
+
+An overload accepts an already resolved `RegisteredTypeCatalog` and trusted
+runtime-extension instances for embedded launchers and deterministic tests.
 
 The implementation should hide scene parsing, type resolution, dependency
 ordering, resource sharing, instance overrides, semantic validation, and

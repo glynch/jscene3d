@@ -4,6 +4,14 @@
     "java.checkstyle.configuration": "${workspaceFolder}/config/checkstyle/checkstyle.xml",
     "java.checkstyle.version": "13.8.0",
     "java.maven.downloadSources": true,
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "/jscene3d-project-runtime/src/test/resources/META-INF/jscene3d/extension.json"
+            ],
+            "url": "./jscene3d-project/src/main/resources/META-INF/jscene3d/project/extension-1.schema.json"
+        }
+    ],
     "[java]": {
         "editor.formatOnSave": false
     },

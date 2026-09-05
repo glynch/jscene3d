@@ -112,12 +112,21 @@ public final class CollisionQueries {
      */
     public Optional<SweepHit> sweepAccepted(
             ShapePose queryPose, Vector3fc translation, Predicate<Collider> acceptance) {
+        return sweepAccepted(queryPose, translation, acceptance, ignored -> true);
+    }
+
+    /** Finds the first accepted collider feature reached by a translating shape. */
+    Optional<SweepHit> sweepAccepted(
+            ShapePose queryPose,
+            Vector3fc translation,
+            Predicate<Collider> colliderAcceptance,
+            Predicate<ShapeCastResult> hitAcceptance) {
         List<SweepCandidate> hits = new ArrayList<>();
         for (Collider collider : sorted(index.sweepCandidates(queryPose, translation))) {
-            if (!acceptance.test(collider)) {
+            if (!colliderAcceptance.test(collider)) {
                 continue;
             }
-            ShapeCast.cast(queryPose, translation, pose(collider))
+            ShapeCast.cast(queryPose, translation, pose(collider), hitAcceptance)
                     .ifPresent(hit -> hits.add(new SweepCandidate(collider, hit)));
         }
         float length = translation.length();

@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.physics.movement.KinematicMoveSettings;
 import io.github.glynch.jscene3d.physics.movement.OverlapPhase;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import org.assertj.core.data.Offset;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -69,7 +70,7 @@ final class CharacterControllerTest {
     }
 
     @Test
-    void traversesAReachableStepAcrossRepeatedFixedUpdates() {
+    void traversesAReachableStepInBothDirectionsAcrossRepeatedFixedUpdates() {
         PhysicsWorld world = new PhysicsWorld();
         KinematicBody body = addCharacterBody(world, new Vector3f(-4.0F, 0.951F, 0.0F));
         addStaticBox(world, new Vector3f(2.0F, -0.5F, 0.0F), new Vector3f(16.0F, 1.0F, 12.0F));
@@ -84,6 +85,103 @@ final class CharacterControllerTest {
 
         assertThat(stepped).isTrue();
         assertThat(body.position(new Vector3f()).x).isGreaterThan(2.0F);
+
+        for (int update = 0; update < 240; update++) {
+            controller.move(new Vector3f(-4.0F, 0.0F, 0.0F), FIXED_SECONDS);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isLessThan(-2.0F);
+    }
+
+    @Test
+    void traversesAReachableTriangleMeshStepInBothDirections() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody body = addCharacterBody(world, new Vector3f(-4.0F, 1.001F, 0.0F));
+        addStaticTriangleStep(world, 0.5F);
+        CharacterController controller = new CharacterController(world, body);
+
+        for (int update = 0; update < 240; update++) {
+            controller.move(new Vector3f(4.0F, 0.0F, 0.0F), FIXED_SECONDS);
+        }
+        assertThat(body.position(new Vector3f()).x).isGreaterThan(2.0F);
+
+        for (int update = 0; update < 240; update++) {
+            controller.move(new Vector3f(-4.0F, 0.0F, 0.0F), FIXED_SECONDS);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isLessThan(-2.0F);
+    }
+
+    @Test
+    void doesNotClimbATriangleMeshLedgeAboveTheMaximumStepHeight() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody body = addCharacterBody(world, new Vector3f(-4.0F, 1.001F, 0.0F));
+        addStaticTriangleStep(world, 1.0F);
+        CharacterController controller = new CharacterController(world, body);
+
+        for (int update = 0; update < 240; update++) {
+            controller.move(new Vector3f(4.0F, 0.0F, 0.0F), FIXED_SECONDS);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isLessThan(-0.49F);
+        assertThat(body.position(new Vector3f()).y).isCloseTo(1.001F, TOLERANCE);
+    }
+
+    @Test
+    void descendsAnOrientedTriangleMeshStepWithoutHittingItsRiser() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody body = addCharacterBody(world, new Vector3f(-4.0F, 1.501F, 0.0F));
+        addStaticDescendingTriangleStep(world, 0.5F);
+        CharacterController controller = new CharacterController(world, body);
+
+        for (int update = 0; update < 240; update++) {
+            controller.move(new Vector3f(4.0F, 0.0F, 0.0F), FIXED_SECONDS);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isGreaterThan(2.0F);
+        assertThat(body.position(new Vector3f()).y).isCloseTo(1.001F, TOLERANCE);
+    }
+
+    @Test
+    void doesNotClimbAnOrientedTriangleMeshLedgeAboveTheMaximumStepHeight() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody body = addCharacterBody(world, new Vector3f(4.0F, 1.001F, 3.9F));
+        addStaticDescendingTriangleStep(world, 1.75F);
+        CharacterController controller = new CharacterController(world, body);
+
+        for (int update = 0; update < 240; update++) {
+            controller.move(new Vector3f(-4.0F, 0.0F, 0.0F), FIXED_SECONDS);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isGreaterThan(0.49F);
+        assertThat(body.position(new Vector3f()).y).isCloseTo(1.001F, TOLERANCE);
+    }
+
+    @Test
+    void traversesAMeshPortalWithDifferentFloorAndCeilingHeightsInBothDirections() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody body = addDoomCharacterBody(world, new Vector3f(-3.0F, 0.876F, 6.0F));
+        addStaticMapPortal(world);
+        KinematicMoveSettings movement =
+                KinematicMoveSettings.DEFAULT.withMaximumStepHeight(0.75F).withGroundSnapDistance(0.25F);
+        CharacterControllerSettings settings = CharacterControllerSettings.DEFAULT
+                .withMovementSettings(movement)
+                .withJumpSpeed(0.0F);
+        CharacterController controller = new CharacterController(world, body, settings);
+
+        for (int update = 0; update < 30; update++) {
+            controller.move(new Vector3f(8.0F, 0.0F, 0.0F), 1.0F / 60.0F);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isGreaterThan(0.0F);
+        assertThat(body.position(new Vector3f()).y).isCloseTo(0.376F, TOLERANCE);
+
+        for (int update = 0; update < 30; update++) {
+            controller.move(new Vector3f(-8.0F, 0.0F, 0.0F), 1.0F / 60.0F);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isLessThan(-2.0F);
+        assertThat(body.position(new Vector3f()).y).isCloseTo(0.876F, TOLERANCE);
     }
 
     @Test
@@ -197,8 +295,54 @@ final class CharacterControllerTest {
         return body;
     }
 
+    private static KinematicBody addDoomCharacterBody(PhysicsWorld world, Vector3f position) {
+        KinematicBody body = world.addKinematicBody(position, IDENTITY);
+        body.addCollider(new CapsuleShape(0.5F, 0.75F));
+        return body;
+    }
+
     private static void addStaticBox(PhysicsWorld world, Vector3f position, Vector3f dimensions) {
         world.addStaticBody(position, IDENTITY).addCollider(new BoxShape(dimensions.x, dimensions.y, dimensions.z));
+    }
+
+    private static void addStaticTriangleStep(PhysicsWorld world, float height) {
+        float[] positions = {
+            -8.0F, 0.0F, -4.0F, 0.0F, 0.0F, -4.0F, 0.0F, 0.0F, 4.0F, -8.0F, 0.0F, 4.0F, 0.0F, height, -4.0F, 8.0F,
+            height, -4.0F, 8.0F, height, 4.0F, 0.0F, height, 4.0F, 0.0F, 0.0F, -4.0F, 0.0F, height, -4.0F, 0.0F, height,
+            4.0F, 0.0F, 0.0F, 4.0F
+        };
+        int[] indices = {0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6, 8, 9, 10, 8, 10, 11};
+        world.addStaticBody().addCollider(new TriangleMeshShape(positions, indices));
+    }
+
+    private static void addStaticDescendingTriangleStep(PhysicsWorld world, float height) {
+        float[] positions = {
+            -8.0F, height, -4.0F, 0.0F, height, -4.0F, 0.0F, height, 4.0F, -8.0F, height, 4.0F, 0.0F, 0.0F, -4.0F, 8.0F,
+            0.0F, -4.0F, 8.0F, 0.0F, 4.0F, 0.0F, 0.0F, 4.0F, 0.0F, 0.0F, -4.0F, 0.0F, 0.0F, 4.0F, 0.0F, height, 4.0F,
+            0.0F, height, -4.0F
+        };
+        int[] indices = {0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6, 8, 9, 10, 8, 10, 11};
+        world.addStaticBody().addCollider(new TriangleMeshShape(positions, indices));
+    }
+
+    private static void addStaticMapPortal(PhysicsWorld world) {
+        float[] positions = {
+            -3.75F, 0.0F, 10.0F, -1.0F, 0.0F, 10.0F, -1.0F, 0.0F, 0.0F, -3.75F, 0.0F, 0.0F,
+            -3.75F, 4.0F, 10.0F, -1.0F, 4.0F, 10.0F, -1.0F, 4.0F, 0.0F, -3.75F, 4.0F, 0.0F,
+            -1.0F, -0.5F, 8.0F, 2.0F, -0.5F, 8.0F, 2.0F, -0.5F, 0.0F, -1.0F, -0.5F, 0.0F,
+            -1.0F, 2.0F, 8.0F, 2.0F, 2.0F, 8.0F, 2.0F, 2.0F, 0.0F, -1.0F, 2.0F, 0.0F,
+            -1.0F, -0.5F, 8.0F, -1.0F, -0.5F, 0.0F, -1.0F, 0.0F, 0.0F, -1.0F, 0.0F, 8.0F,
+            -1.0F, 2.0F, 8.0F, -1.0F, 2.0F, 0.0F, -1.0F, 4.0F, 0.0F, -1.0F, 4.0F, 8.0F
+        };
+        int[] indices = {
+            0, 1, 2, 0, 2, 3,
+            4, 5, 6, 4, 6, 7,
+            8, 9, 10, 8, 10, 11,
+            12, 13, 14, 12, 14, 15,
+            16, 17, 18, 16, 18, 19,
+            20, 21, 22, 20, 22, 23
+        };
+        world.addStaticBody().addCollider(new TriangleMeshShape(positions, indices));
     }
 
     private static void assertVector(Vector3f actual, float x, float y, float z) {

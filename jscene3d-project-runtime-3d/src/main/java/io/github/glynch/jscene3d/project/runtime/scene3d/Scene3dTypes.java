@@ -25,6 +25,9 @@ public final class Scene3dTypes {
     /** Static physics-body scene-node type. */
     public static final RegisteredType STATIC_BODY_3D = type("static-body-3d");
 
+    /** Kinematic character physics-body scene-node type. */
+    public static final RegisteredType CHARACTER_BODY_3D = type("character-body-3d");
+
     /** Collision-shape scene-node type. */
     public static final RegisteredType COLLISION_SHAPE_3D = type("collision-shape-3d");
 

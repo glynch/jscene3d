@@ -10,7 +10,7 @@ import io.github.glynch.jscene3d.physics.StaticBody;
 import java.util.Objects;
 
 /** Runtime object pairing one authored spatial node with an immovable collision body. */
-final class StaticBodyRuntimeObject extends SpatialRuntimeObject {
+final class StaticBodyRuntimeObject extends SpatialRuntimeObject implements CollisionBodyRuntimeObject {
     private final PhysicsWorld world;
     private final StaticBody body;
 
@@ -22,7 +22,7 @@ final class StaticBodyRuntimeObject extends SpatialRuntimeObject {
     }
 
     /** Returns the body to which direct collision-shape children attach. */
-    StaticBody body() {
+    public StaticBody collisionObject() {
         return body;
     }
 

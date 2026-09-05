@@ -186,6 +186,85 @@
       ]
     },
     {
+      "id": "io.github.glynch.jscene3d/character-body-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Character Body 3d",
+      "description": "A kinematic character body with sliding, stepping, gravity, and ground snapping.",
+      "properties": [
+        {
+          "id": "position",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Position",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "rotation-degrees",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Rotation",
+          "editor": {"section": "Transform", "elementCount": 3, "unit": "degrees"}
+        },
+        {
+          "id": "up",
+          "valueKind": "array",
+          "defaultValue": [0, 1, 0],
+          "displayName": "Up",
+          "editor": {"section": "Movement", "elementCount": 3}
+        },
+        {
+          "id": "gravity",
+          "valueKind": "number",
+          "defaultValue": 18,
+          "displayName": "Gravity",
+          "editor": {"section": "Movement", "minimum": 0}
+        },
+        {
+          "id": "jump-speed",
+          "valueKind": "number",
+          "defaultValue": 7,
+          "displayName": "Jump Speed",
+          "editor": {"section": "Movement", "minimum": 0}
+        },
+        {
+          "id": "skin-width",
+          "valueKind": "number",
+          "defaultValue": 0.001,
+          "displayName": "Skin Width",
+          "editor": {"section": "Collision", "minimum": 0}
+        },
+        {
+          "id": "maximum-slide-iterations",
+          "valueKind": "number",
+          "defaultValue": 4,
+          "displayName": "Maximum Slide Iterations",
+          "editor": {"section": "Collision", "integer": true, "minimum": 1}
+        },
+        {
+          "id": "maximum-step-height",
+          "valueKind": "number",
+          "defaultValue": 0.5,
+          "displayName": "Maximum Step Height",
+          "editor": {"section": "Movement", "minimum": 0}
+        },
+        {
+          "id": "ground-snap-distance",
+          "valueKind": "number",
+          "defaultValue": 0.1,
+          "displayName": "Ground Snap Distance",
+          "editor": {"section": "Movement", "minimum": 0}
+        },
+        {
+          "id": "maximum-slope-angle-degrees",
+          "valueKind": "number",
+          "defaultValue": 50,
+          "displayName": "Maximum Slope Angle",
+          "editor": {"section": "Movement", "minimum": 0, "maximumExclusive": 90, "unit": "degrees"}
+        }
+      ]
+    },
+    {
       "id": "io.github.glynch.jscene3d/collision-shape-3d",
       "typeVersion": 1,
       "scope": "scene-node",

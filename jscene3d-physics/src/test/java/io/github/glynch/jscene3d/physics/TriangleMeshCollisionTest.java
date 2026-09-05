@@ -76,6 +76,21 @@ final class TriangleMeshCollisionTest {
     }
 
     @Test
+    void blocksHorizontalMovementWhenFloorAndWallShareOneMeshCollider() {
+        PhysicsWorld world = new PhysicsWorld();
+        Collider level = world.addStaticBody().addCollider(floorAndWallShape());
+        KinematicBody character = world.addKinematicBody(new Vector3f(0.0F, 1.0F, 0.0F), IDENTITY);
+        character.addCollider(new CapsuleShape(0.5F, 1.0F));
+
+        var movement = world.move(character, new Vector3f(4.0F, 0.0F, 0.0F));
+
+        assertThat(character.position(new Vector3f()).x).isCloseTo(1.499F, Offset.offset(5.0E-3F));
+        assertThat(movement.contacts())
+                .extracting(contact -> contact.collider())
+                .contains(level);
+    }
+
+    @Test
     void limitsTriangleMeshesToStaticColliderTargets() {
         PhysicsWorld world = new PhysicsWorld();
         TriangleMeshShape mesh = floorShape();
@@ -108,6 +123,15 @@ final class TriangleMeshCollisionTest {
 
     private static TriangleMeshShape floorShape() {
         return new TriangleMeshShape(FLOOR_POSITIONS, FLOOR_INDICES);
+    }
+
+    private static TriangleMeshShape floorAndWallShape() {
+        float[] positions = {
+            -10.0F, 0.0F, -10.0F, 10.0F, 0.0F, -10.0F, 10.0F, 0.0F, 10.0F, -10.0F, 0.0F, 10.0F, 2.0F, 0.0F, -2.0F, 2.0F,
+            4.0F, -2.0F, 2.0F, 4.0F, 2.0F, 2.0F, 0.0F, 2.0F
+        };
+        int[] indices = {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7};
+        return new TriangleMeshShape(positions, indices);
     }
 
     private static Offset<Float> within() {

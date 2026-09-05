@@ -13,10 +13,15 @@ import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.objects.RotationOrder;
+import io.github.glynch.jscene3d.physics.CharacterController;
 import io.github.glynch.jscene3d.physics.Collider;
 import io.github.glynch.jscene3d.physics.CollisionFilter;
+import io.github.glynch.jscene3d.physics.CollisionObject;
+import io.github.glynch.jscene3d.physics.KinematicBody;
 import io.github.glynch.jscene3d.physics.PhysicsWorld;
 import io.github.glynch.jscene3d.physics.StaticBody;
+import io.github.glynch.jscene3d.physics.movement.CharacterControllerSettings;
+import io.github.glynch.jscene3d.physics.movement.KinematicMoveSettings;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
@@ -69,6 +74,7 @@ public final class Scene3dComposition {
         registry.registerSceneNode(Scene3dTypes.PERSPECTIVE_CAMERA_3D, this::createCamera);
         registry.registerSceneNode(Scene3dTypes.AMBIENT_LIGHT_3D, this::createAmbientLight);
         registry.registerSceneNode(Scene3dTypes.STATIC_BODY_3D, this::createStaticBody);
+        registry.registerSceneNode(Scene3dTypes.CHARACTER_BODY_3D, this::createCharacterBody);
         registry.registerSceneNode(Scene3dTypes.COLLISION_SHAPE_3D, this::createCollisionShape);
         registry.registerResource(Scene3dTypes.BOX_GEOMETRY_3D, this::createBoxGeometry);
         registry.registerResource(Scene3dTypes.LAMBERT_MATERIAL_3D, this::createLambertMaterial);
@@ -165,23 +171,50 @@ public final class Scene3dComposition {
         return new StaticBodyRuntimeObject(object, physicsWorld, body);
     }
 
-    /** Creates one collider attached directly to its authored static-body parent. */
+    /** Creates a kinematic character body configured entirely through authored properties. */
+    private ProjectRuntimeObject createCharacterBody(SceneNodeContext context) {
+        Map<String, ProjectValue> properties = context.properties();
+        Object3D object = new Object3D();
+        configurePose(object, properties, context.isEnabled());
+        attach(context, object);
+        KinematicBody body = physicsWorld.addKinematicBody(
+                object.worldPosition(new Vector3f()), object.worldQuaternion(new Quaternionf()));
+        body.setEnabled(context.isEnabled());
+        KinematicMoveSettings movementSettings = KinematicMoveSettings.DEFAULT
+                .withUp(Scene3dValues.vector3(properties, "up"))
+                .withSkinWidth(Scene3dValues.number(properties, "skin-width"))
+                .withMaximumSlideIterations(Scene3dValues.integer(properties, "maximum-slide-iterations"))
+                .withMaximumStepHeight(Scene3dValues.number(properties, "maximum-step-height"))
+                .withGroundSnapDistance(Scene3dValues.number(properties, "ground-snap-distance"))
+                .withMaximumSlopeAngle(
+                        Scene3dValues.number(properties, "maximum-slope-angle-degrees") * DEGREES_TO_RADIANS);
+        CharacterControllerSettings controllerSettings = CharacterControllerSettings.DEFAULT
+                .withMovementSettings(movementSettings)
+                .withGravity(Scene3dValues.number(properties, "gravity"))
+                .withJumpSpeed(Scene3dValues.number(properties, "jump-speed"));
+        CharacterController controller = new CharacterController(physicsWorld, body, controllerSettings);
+        return new CharacterBodyRuntimeObject(object, physicsWorld, body, controller);
+    }
+
+    /** Creates one collider attached directly to its authored collision-body parent. */
     private ProjectRuntimeObject createCollisionShape(SceneNodeContext context) {
         ProjectRuntimeObject parent = context.parent().orElseThrow().object();
-        if (!(parent instanceof StaticBodyRuntimeObject staticBody)) {
-            throw new IllegalArgumentException("collision-shape-3d requires a direct static-body-3d parent");
+        if (!(parent instanceof CollisionBodyRuntimeObject collisionBody)) {
+            throw new IllegalArgumentException(
+                    "collision-shape-3d requires a direct static-body-3d or character-body-3d parent");
         }
         CollisionShape shape =
                 context.resolveResource(Scene3dValues.reference(context.properties(), "shape"), CollisionShape.class);
         Object3D object = new Object3D();
         configurePose(object, context.properties(), context.isEnabled());
         attach(context, object);
-        Collider collider = staticBody.body().addCollider(shape, object.position(), object.quaternion());
+        CollisionObject body = collisionBody.collisionObject();
+        Collider collider = body.addCollider(shape, object.position(), object.quaternion());
         collider.setCollisionFilter(new CollisionFilter(
                 Scene3dValues.integer(context.properties(), "category-bits"),
                 Scene3dValues.integer(context.properties(), "mask-bits")));
         collider.setEnabled(context.isEnabled());
-        return new CollisionShapeRuntimeObject(object, staticBody.body(), collider);
+        return new CollisionShapeRuntimeObject(object, body, collider);
     }
 
     /** Creates one runtime-owned generated box geometry. */

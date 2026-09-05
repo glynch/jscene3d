@@ -206,7 +206,7 @@ final class DeclarativeStaticPhysicsTest {
         assertThat(retained.isRegistered()).isTrue();
     }
 
-    /** Reports an authored collision shape that is not a direct child of a static body. */
+    /** Reports an authored collision shape that is not a direct child of a collision body. */
     @Test
     void rejectsCollisionShapeWithoutStaticBodyParent() throws IOException {
         writeProject(SCENE.replace("io.github.glynch.jscene3d/static-body-3d", "io.github.glynch.jscene3d/group-3d"));
@@ -217,7 +217,7 @@ final class DeclarativeStaticPhysicsTest {
                 .extracting(diagnostic -> diagnostic.code().code())
                 .containsExactly("runtime.factory.create");
         assertThat(result.diagnostics().getFirst().details().get("technicalDetail"))
-                .contains("collision-shape-3d requires a direct static-body-3d parent");
+                .contains("collision-shape-3d requires a direct static-body-3d or character-body-3d parent");
     }
 
     /** Creates the project files used by one test. */

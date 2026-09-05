@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.physics.shapes.SphereShape;
 import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 import org.joml.Intersectionf;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -40,6 +41,27 @@ final class TriangleMeshQueries {
         RayCandidate nearest = new RayCandidate(maximumDistance);
         forEachTriangle(mesh, triangle -> nearest.include(localOrigin, localDirection, triangle));
         return nearest.result(origin, direction, meshPose);
+    }
+
+    /** Casts a convex shape against every independently accepted mesh triangle. */
+    static Optional<ShapeCastResult> cast(
+            ShapePose moving,
+            Vector3fc translation,
+            TriangleMeshShape mesh,
+            ShapePose meshPose,
+            Predicate<ShapeCastResult> acceptance) {
+        ShapeCastCandidate nearest = new ShapeCastCandidate();
+        forEachWorldTriangle(
+                mesh,
+                meshPose,
+                triangle -> ShapeCast.castFeature(
+                                moving,
+                                translation,
+                                current -> contact(current, triangle),
+                                current -> separation(current, triangle))
+                        .filter(acceptance)
+                        .ifPresent(nearest::include));
+        return nearest.result();
     }
 
     /** Finds the deepest contact between one convex shape and the mesh. */
@@ -276,6 +298,23 @@ final class TriangleMeshQueries {
             }
             Vector3f point = new Vector3f(direction).mul(distance).add(origin);
             return Optional.of(new RayHitResult(distance, point, hitNormal.rotate(pose.orientation())));
+        }
+    }
+
+    /** Retains the earliest accepted hit among independently swept mesh triangles. */
+    private static final class ShapeCastCandidate {
+        private @Nullable ShapeCastResult nearest;
+
+        /** Includes a hit when it precedes the current candidate. */
+        private void include(ShapeCastResult candidate) {
+            if (nearest == null || candidate.fraction() < nearest.fraction()) {
+                nearest = candidate;
+            }
+        }
+
+        /** Returns the earliest accepted hit, if any. */
+        private Optional<ShapeCastResult> result() {
+            return Optional.ofNullable(nearest);
         }
     }
 

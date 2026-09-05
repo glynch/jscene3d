@@ -2696,14 +2696,28 @@ Doomed Corridors already demonstrates useful separations:
 The Project Manifest now points at an engine-native application scene and a
 versioned input-map document. MAP01 is selected by project import definitions,
 and `doom-level-3d` receives the resulting typed map and materials through the
-generic runtime. Its authored `doom-player-controller` consumes semantic
-actions, owns collision-aware player movement, and updates a declared camera
-child. Physical bindings remain separately editable project data.
+generic runtime. The level owns an authored `Player` group with an attached
+`doom-player-controller` and camera child. The controller consumes semantic
+actions, places the player group from collision-aware state, and keeps camera
+position and orientation local to that group. Physical bindings remain
+separately editable project data.
+
+The first interaction slice maps E and Space to the semantic `interact`
+command. The player controller sends that targeted command to its containing
+level through the explicit scene hierarchy; it is not represented as an event
+or notification. Doomed Corridors currently interprets classic linedef specials
+31 and 117 as manual open-and-stay and fast raise doors. Door identity, target
+sector, motion policy, and destination height are derived from imported WAD
+records rather than MAP01 coordinates. The headless mechanism advances at 35
+Hz and provides one effective ceiling height to both collision and mutable
+presentation geometry. Its immutable door snapshots establish the later
+play-debug Inspector seam without placing Doom behavior in the generic project
+runtime.
 
 Complete runtime composition remains unfinished. The existing graphical
 startup code still knows how to assemble actor data, combat rules, presentation
-rules, enemies, HUD, audio, doors, and switches; those responsibilities are the
-remaining migration work.
+rules, enemies, HUD, audio, other door behaviors, and switches; those
+responsibilities are the remaining migration work.
 
 The reusable `DoomMap`, `DoomMapDecodeResult`, and `DoomMapDecoder` in
 `jscene3d-doom` supersede the corresponding Doomed Corridors classes. The game

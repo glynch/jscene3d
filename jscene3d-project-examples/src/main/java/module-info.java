@@ -7,5 +7,6 @@ module io.github.glynch.jscene3d.project.examples {
     requires java.logging;
     requires io.github.glynch.jscene3d.examples.framework;
     requires io.github.glynch.jscene3d.project.importing;
+    requires io.github.glynch.jscene3d.project.runtime.scene3d;
     requires io.github.glynch.jscene3d.project.runtime.lwjgl;
 }

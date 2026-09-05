@@ -639,8 +639,10 @@ license notices, and exact selected filenames are recorded beside the assets in
   cache publication, and logical artifact access.
 - `jscene3d-project-runtime`: trusted scene composition and shared runtime
   resource resolution for project and imported resources.
-- `jscene3d-project-runtime-lwjgl`: built-in declarative 3d runtime types backed
-  by the LWJGL renderer.
+- `jscene3d-project-runtime-3d`: platform-neutral native 3d scene composition
+  for declarative projects.
+- `jscene3d-project-runtime-lwjgl`: LWJGL render-host adapter for native 3d
+  project runtimes.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives

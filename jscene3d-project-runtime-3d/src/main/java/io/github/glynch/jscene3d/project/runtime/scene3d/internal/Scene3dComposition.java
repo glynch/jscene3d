@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.runtime.lwjgl.internal;
+package io.github.glynch.jscene3d.project.runtime.scene3d.internal;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
@@ -17,7 +17,8 @@ import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeObject;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeContext;
-import io.github.glynch.jscene3d.project.runtime.lwjgl.Scene3dRuntimeObject;
+import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dRenderHost;
+import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dRuntimeObject;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.Map;

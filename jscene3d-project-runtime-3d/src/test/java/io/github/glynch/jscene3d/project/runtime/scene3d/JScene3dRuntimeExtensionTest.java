@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.runtime.lwjgl;
+package io.github.glynch.jscene3d.project.runtime.scene3d;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,7 +21,6 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntime;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeLoadResult;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeLoader;
-import io.github.glynch.jscene3d.project.runtime.lwjgl.internal.Scene3dRenderHost;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -158,9 +157,13 @@ final class JScene3dRuntimeExtensionTest {
             Scene scene = host.scene();
             assertThat(scene.background()).isEqualTo(Color.srgb(0x102030));
             assertThat(scene.children())
-                    .extracting(Object::getClass)
+                    .extracting(child -> child.getClass().getName())
                     .containsExactly(
-                            PerspectiveCamera.class, AmbientLight.class, Mesh.class, Mesh.class, Object3D.class);
+                            PerspectiveCamera.class.getName(),
+                            AmbientLight.class.getName(),
+                            Mesh.class.getName(),
+                            Mesh.class.getName(),
+                            Object3D.class.getName());
             PerspectiveCamera camera = host.camera();
             assertThat(camera.position()).isEqualTo(new Vector3f(4.0f, 3.0f, 6.0f));
             assertThat(camera.fieldOfView()).isCloseTo((float) Math.toRadians(55.0), offset(0.0001f));

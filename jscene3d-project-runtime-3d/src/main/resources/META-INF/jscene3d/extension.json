@@ -3,7 +3,7 @@
   "id": "io.github.glynch.jscene3d",
   "version": "0.1.0-SNAPSHOT",
   "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
-  "displayName": "JScene3D Built-in 3d",
+  "displayName": "JScene3D Native 3d",
   "types": [
     {
       "id": "io.github.glynch.jscene3d/group-3d",

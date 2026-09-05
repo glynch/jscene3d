@@ -257,14 +257,15 @@ reconciled as the grill progresses rather than relying on memory at its end.
 
 ### Built-in declarative 3d rendering slice
 
-- `jscene3d-project-runtime-lwjgl` owns the adapter from portable registered
-  types to JScene3D scene-graph objects. The renderer-independent
-  `jscene3d-project-runtime` module does not depend on LWJGL or construct render
-  objects.
-- An embedding host creates `JScene3dRuntimeExtension` with its live `Window`
-  and `Renderer`, then supplies it to `ProjectRuntimeLoader`. Safe descriptor
-  discovery remains class-loader based; only the executable adapter receives
-  live host services.
+- `jscene3d-project-runtime-3d` owns the adapter from portable registered types
+  to JScene3D scene-graph objects. The renderer-independent
+  `jscene3d-project-runtime` module does not construct render objects, and the
+  native 3d runtime does not depend on a windowing backend.
+- An embedding host creates `JScene3dRuntimeExtension` with a render-host
+  adapter, then supplies it to `ProjectRuntimeLoader`. An LWJGL application
+  constructs `LwjglScene3dRenderHost` with its live `Window` and `Renderer`.
+  Safe descriptor discovery remains class-loader based; only the render-host
+  adapter receives live host services.
 - The first built-in scene-node types are `group-3d`, `mesh-instance-3d`,
   `perspective-camera-3d`, and `ambient-light-3d`. The first native resource
   types are `box-geometry-3d` and `lambert-material-3d`.

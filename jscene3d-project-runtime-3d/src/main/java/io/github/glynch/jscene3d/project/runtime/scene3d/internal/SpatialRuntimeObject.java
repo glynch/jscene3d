@@ -2,10 +2,10 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.runtime.lwjgl.internal;
+package io.github.glynch.jscene3d.project.runtime.scene3d.internal;
 
 import io.github.glynch.jscene3d.objects.Object3D;
-import io.github.glynch.jscene3d.project.runtime.lwjgl.Scene3dRuntimeObject;
+import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dRuntimeObject;
 import java.util.Objects;
 
 /** Runtime object retaining one engine scene-graph object without owning shared resources. */

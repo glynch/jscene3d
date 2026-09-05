@@ -8,9 +8,9 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>jscene3d-project-runtime-lwjgl</artifactId>
-    <name>JScene3D Project Runtime LWJGL</name>
-    <description>LWJGL render-host adapter for native 3d project runtimes.</description>
+    <artifactId>jscene3d-project-runtime-3d</artifactId>
+    <name>JScene3D Project Runtime 3d</name>
+    <description>Platform-neutral native 3d scene composition for declarative projects.</description>
 
     <properties>
         <jscene3d.coverage.line.minimum>0.85</jscene3d.coverage.line.minimum>
@@ -20,11 +20,11 @@
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
-            <artifactId>jscene3d-project-runtime-3d</artifactId>
+            <artifactId>jscene3d-core</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.glynch</groupId>
-            <artifactId>jscene3d-lwjgl</artifactId>
+            <artifactId>jscene3d-project-runtime</artifactId>
         </dependency>
         <dependency>
             <groupId>org.jspecify</groupId>

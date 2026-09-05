@@ -24,6 +24,10 @@
         </dependency>
         <dependency>
             <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-runtime-3d</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-project-runtime-lwjgl</artifactId>
         </dependency>
         <dependency>

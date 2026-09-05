@@ -2,15 +2,11 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.runtime.lwjgl;
+package io.github.glynch.jscene3d.project.runtime.scene3d;
 
-import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
-import io.github.glynch.jscene3d.project.runtime.lwjgl.internal.LwjglScene3dRenderHost;
-import io.github.glynch.jscene3d.project.runtime.lwjgl.internal.Scene3dComposition;
-import io.github.glynch.jscene3d.project.runtime.lwjgl.internal.Scene3dRenderHost;
-import io.github.glynch.jscene3d.render.Renderer;
+import io.github.glynch.jscene3d.project.runtime.scene3d.internal.Scene3dComposition;
 import java.util.Objects;
 
 /** Single-runtime built-in extension for declarative JScene3D scene and resource types. */
@@ -22,16 +18,15 @@ public final class JScene3dRuntimeExtension implements ProjectRuntimeExtension {
     private boolean registered;
 
     /**
-     * Creates an extension bound to one graphical host.
+     * Creates an extension bound to one render host.
      *
      * <p>Each project runtime requires its own extension instance. The caller retains ownership of
-     * the window and renderer.
+     * the host and any render resources behind it.
      *
-     * @param window open window providing the drawable dimensions
-     * @param renderer open renderer used by the project runtime
+     * @param host render submission destination
      */
-    public JScene3dRuntimeExtension(Window window, Renderer renderer) {
-        this(new LwjglScene3dRenderHost(window, renderer));
+    public JScene3dRuntimeExtension(Scene3dRenderHost host) {
+        composition = new Scene3dComposition(Objects.requireNonNull(host, "host"));
     }
 
     /**
@@ -43,11 +38,6 @@ public final class JScene3dRuntimeExtension implements ProjectRuntimeExtension {
         return new JScene3dRuntimeExtension((scene, camera) -> {
             // Headless composition deliberately has no render target.
         });
-    }
-
-    /** Creates an extension around one internal render-host adapter. */
-    JScene3dRuntimeExtension(Scene3dRenderHost host) {
-        composition = new Scene3dComposition(Objects.requireNonNull(host, "host"));
     }
 
     @Override

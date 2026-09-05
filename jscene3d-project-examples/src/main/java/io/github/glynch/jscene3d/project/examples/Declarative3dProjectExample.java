@@ -17,7 +17,8 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntime;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeLoadResult;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeLoader;
-import io.github.glynch.jscene3d.project.runtime.lwjgl.JScene3dRuntimeExtension;
+import io.github.glynch.jscene3d.project.runtime.lwjgl.LwjglScene3dRenderHost;
+import io.github.glynch.jscene3d.project.runtime.scene3d.JScene3dRuntimeExtension;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -53,7 +54,8 @@ public final class Declarative3dProjectExample {
                 .load(
                         project,
                         Declarative3dProjectExample.class.getClassLoader(),
-                        List.of(new JScene3dRuntimeExtension(context.window(), context.renderer())));
+                        List.of(new JScene3dRuntimeExtension(
+                                new LwjglScene3dRenderHost(context.window(), context.renderer()))));
         ProjectRuntime projectRuntime = requireValue(runtimeResult.runtime(), runtimeResult.diagnostics(), "runtime");
         GameRuntime gameRuntime = new GameRuntime(projectRuntime);
         gameRuntime.start();

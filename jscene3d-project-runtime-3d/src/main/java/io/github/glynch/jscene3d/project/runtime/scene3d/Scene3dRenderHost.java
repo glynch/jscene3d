@@ -2,12 +2,12 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.runtime.lwjgl.internal;
+package io.github.glynch.jscene3d.project.runtime.scene3d;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.scenes.Scene;
 
-/** Internal seam between declarative scene composition and a graphical render host. */
+/** Receives render submissions from one composed native 3d project runtime. */
 public interface Scene3dRenderHost {
     /**
      * Renders one scene through its active camera when a drawable surface is available.

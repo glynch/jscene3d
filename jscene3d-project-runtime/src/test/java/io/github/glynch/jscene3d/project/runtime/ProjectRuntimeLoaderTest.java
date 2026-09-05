@@ -108,6 +108,50 @@ final class ProjectRuntimeLoaderTest {
               ]
             }
             """;
+    private static final String PHASED_SCENE = """
+            {
+              "schemaVersion": 1,
+              "id": "phased",
+              "root": {
+                "id": "root",
+                "type": "io.github.glynch.runtime-test/group-3d",
+                "typeVersion": 1,
+                "children": [
+                  {
+                    "id": "after",
+                    "type": "io.github.glynch.runtime-test/timer",
+                    "typeVersion": 1,
+                    "properties": {"phase": "after-physics"}
+                  },
+                  {
+                    "id": "before-second",
+                    "type": "io.github.glynch.runtime-test/timer",
+                    "typeVersion": 1,
+                    "properties": {"phase": "before-physics"}
+                  },
+                  {
+                    "id": "physics",
+                    "type": "io.github.glynch.runtime-test/timer",
+                    "typeVersion": 1,
+                    "properties": {"phase": "physics"}
+                  },
+                  {
+                    "id": "before-first",
+                    "type": "io.github.glynch.runtime-test/timer",
+                    "typeVersion": 1,
+                    "properties": {"phase": "before-physics"}
+                  },
+                  {
+                    "id": "disabled",
+                    "type": "io.github.glynch.runtime-test/timer",
+                    "typeVersion": 1,
+                    "enabled": false,
+                    "properties": {"phase": "before-physics"}
+                  }
+                ]
+              }
+            }
+            """;
 
     @TempDir
     private Path temporaryDirectory;
@@ -157,7 +201,7 @@ final class ProjectRuntimeLoaderTest {
                         "start:timer",
                         "start:indicator",
                         "start:controller",
-                        "fixed:0",
+                        "fixed:before_physics:timer:0",
                         "toggle:false",
                         "frame:1",
                         "render:1",
@@ -165,6 +209,33 @@ final class ProjectRuntimeLoaderTest {
                         "close:indicator",
                         "close:timer",
                         "close:root");
+    }
+
+    /** Orders enabled fixed updates by physics phase rather than authored scene position. */
+    @Test
+    void ordersFixedUpdatesAroundPhysics() throws IOException {
+        write("application/main.scene.json", PHASED_SCENE);
+        reloadProject();
+        ProjectRuntimeLoadResult result = loadWithTestExtension();
+
+        assertThat(result.diagnostics()).isEmpty();
+        try (GameRuntime runtime = new GameRuntime(result.runtime().orElseThrow())) {
+            runtime.start();
+            runtime.advance(Duration.ofMillis(20L), ActionSnapshot.empty());
+        }
+
+        assertThat(TestRuntimeState.EVENTS.stream()
+                        .filter(event -> event.startsWith("fixed:"))
+                        .toList())
+                .containsExactly(
+                        "fixed:before_physics:before-second:0",
+                        "fixed:before_physics:before-first:0",
+                        "fixed:physics:physics:0",
+                        "fixed:after_physics:after:0",
+                        "fixed:before_physics:before-second:1",
+                        "fixed:before_physics:before-first:1",
+                        "fixed:physics:physics:1",
+                        "fixed:after_physics:after:1");
     }
 
     /** Returns structured validation errors before any executable factory is invoked. */

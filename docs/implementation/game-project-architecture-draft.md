@@ -244,6 +244,13 @@ reconciled as the grill progresses rather than relying on memory at its end.
   creation order, and closes them in reverse order. Fixed, frame, and render
   callbacks are separate opt-in interfaces; disabled subtrees do not receive
   those callbacks or signal/action dispatch.
+- A fixed-update participant declares one immutable runtime phase:
+  `BEFORE_PHYSICS`, `PHYSICS`, or `AFTER_PHYSICS`. The runtime executes phases
+  in that order and preserves scene composition order within each phase.
+  Controllers use the first phase to request motion or apply forces, physics
+  worlds advance in the second, and the final phase synchronizes presentation
+  state and publishes resulting contacts or overlaps. Phase selection belongs
+  to the registered runtime implementation rather than authored scene order.
 - Runtime signals dispatch synchronously in scene-connection declaration order.
   Payload-bearing endpoints use an exact registered payload identity and do
   not perform runtime conversion.
@@ -1527,10 +1534,11 @@ mutable singletons. Their base lifecycle contains startup and closure. Fixed or
 frame updates are opt-in participant interfaces, and systems do not receive
 renderer callbacks.
 
-Ordering should be derived from explicit dependencies or a small number of
-well-defined phases. A manually ordered list whose correctness depends on
-undocumented positions would become part of the interface and be difficult for
-the editor to validate.
+Fixed-update ordering uses the defined before-physics, physics, and
+after-physics phases. Explicit dependencies may order systems within a later
+project-system composition slice. A manually ordered list whose correctness
+depends on undocumented positions would become part of the interface and be
+difficult for the editor to validate.
 
 ### Import extension
 

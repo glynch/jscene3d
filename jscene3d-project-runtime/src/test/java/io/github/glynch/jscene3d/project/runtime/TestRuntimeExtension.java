@@ -14,6 +14,8 @@ import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContex
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeContext;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -27,6 +29,10 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
     private static final RegisteredType RESOURCE_CONSUMER = new RegisteredType(PREFIX + "resource-consumer-3d", 1);
     private static final RegisteredType SHARED_DATA = new RegisteredType(PREFIX + "shared-data", 1);
     private static final RegisteredType TEXT_DATA = new RegisteredType(PREFIX + "text-data", 1);
+    private static final Map<String, FixedUpdatePhase> FIXED_UPDATE_PHASES = Map.of(
+            "before-physics", FixedUpdatePhase.BEFORE_PHYSICS,
+            "physics", FixedUpdatePhase.PHYSICS,
+            "after-physics", FixedUpdatePhase.AFTER_PHYSICS);
 
     @Override
     public String id() {
@@ -56,7 +62,11 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
     private ProjectRuntimeObject createTimer(SceneNodeContext context) {
         TestRuntimeState.timerParent =
                 context.parent().orElseThrow().definition().id();
-        return new TimerObject(context.nodeDefinition().id(), context.signal("timeout"));
+        String phaseName = ((ProjectValue.TextValue)
+                        Objects.requireNonNull(context.properties().get("phase"), "phase"))
+                .value();
+        FixedUpdatePhase phase = Objects.requireNonNull(FIXED_UPDATE_PHASES.get(phaseName), "known timer phase");
+        return new TimerObject(context.nodeDefinition().id(), context.signal("timeout"), phase);
     }
 
     /** Creates one mutable test indicator from an authored property. */
@@ -135,16 +145,26 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
 
     /** Fixed-update source for the authored timeout connection. */
     private static final class TimerObject extends RecordingObject implements FixedUpdateParticipant {
+        private final String timerId;
         private final RuntimeSignal timeout;
+        private final FixedUpdatePhase phase;
 
-        TimerObject(String id, RuntimeSignal timeout) {
+        TimerObject(String id, RuntimeSignal timeout, FixedUpdatePhase phase) {
             super(id);
+            timerId = id;
             this.timeout = timeout;
+            this.phase = phase;
+        }
+
+        @Override
+        public FixedUpdatePhase fixedUpdatePhase() {
+            return phase;
         }
 
         @Override
         public void fixedUpdate(FixedUpdate update) {
-            TestRuntimeState.EVENTS.add("fixed:" + update.tick());
+            TestRuntimeState.EVENTS.add(
+                    "fixed:" + phase.name().toLowerCase(Locale.ROOT) + ':' + timerId + ':' + update.tick());
             timeout.emit();
         }
     }

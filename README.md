@@ -637,8 +637,9 @@ license notices, and exact selected filenames are recorded beside the assets in
   scenes, resources, import definitions, and structured validation diagnostics.
 - `jscene3d-project-import`: deterministic import inspection, preparation,
   cache publication, and logical artifact access.
-- `jscene3d-project-runtime`: trusted scene composition and shared runtime
-  resource resolution for project and imported resources.
+- `jscene3d-project-runtime`: trusted scene composition, shared runtime resource
+  resolution, and deterministic before-physics, physics, and after-physics
+  fixed-update scheduling.
 - `jscene3d-project-runtime-3d`: platform-neutral native 3d scene composition
   for declarative projects.
 - `jscene3d-project-runtime-lwjgl`: LWJGL render-host adapter for native 3d

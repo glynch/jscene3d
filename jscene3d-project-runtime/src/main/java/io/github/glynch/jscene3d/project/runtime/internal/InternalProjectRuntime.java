@@ -7,7 +7,6 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 import io.github.glynch.jscene3d.game.FixedUpdate;
 import io.github.glynch.jscene3d.game.FrameUpdate;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
-import io.github.glynch.jscene3d.project.runtime.FixedUpdateParticipant;
 import io.github.glynch.jscene3d.project.runtime.FrameUpdateParticipant;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntime;
 import io.github.glynch.jscene3d.project.runtime.RenderParticipant;
@@ -26,6 +25,7 @@ final class InternalProjectRuntime implements ProjectRuntime {
     private final SceneDefinition scene;
     private final RuntimeNode root;
     private final List<LifecycleEntry> lifecycle;
+    private final FixedUpdateSchedule fixedUpdates;
     private final Map<String, RuntimeNode> nodes;
     private final EndpointRouter router;
     private final ProjectResourceResolver resources;
@@ -45,6 +45,7 @@ final class InternalProjectRuntime implements ProjectRuntime {
         this.scene = Objects.requireNonNull(scene, "scene");
         this.root = Objects.requireNonNull(root, "root");
         this.lifecycle = List.copyOf(lifecycle);
+        fixedUpdates = new FixedUpdateSchedule(this.lifecycle);
         this.nodes = Collections.unmodifiableMap(new LinkedHashMap<>(nodes));
         this.router = Objects.requireNonNull(router, "router");
         this.resources = Objects.requireNonNull(resources, "resources");
@@ -90,13 +91,8 @@ final class InternalProjectRuntime implements ProjectRuntime {
 
     @Override
     public void fixedUpdate(FixedUpdate update) {
-        Objects.requireNonNull(update, "update");
         requireRunning();
-        for (LifecycleEntry entry : lifecycle) {
-            if (entry.enabled() && entry.object() instanceof FixedUpdateParticipant participant) {
-                participant.fixedUpdate(update);
-            }
-        }
+        fixedUpdates.update(update);
     }
 
     @Override

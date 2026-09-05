@@ -24,6 +24,14 @@
       "typeVersion": 1,
       "scope": "scene-node",
       "displayName": "Timer",
+      "properties": [
+        {
+          "id": "phase",
+          "valueKind": "text",
+          "defaultValue": "before-physics",
+          "displayName": "Phase"
+        }
+      ],
       "signals": [
         {
           "id": "timeout",

@@ -681,6 +681,13 @@ reconciled as the grill progresses rather than relying on memory at its end.
   height maps to world y, and source y maps to negative world z. Presentation,
   collision, actor placement, and later generated interactive nodes must use
   this same conversion policy.
+- Doomed Corridors instantiates the imported static-collision artifact through
+  an authored `static-body-3d` child of `doom-level-3d`. Its
+  `collision-shape-3d` child references the derived triangle-mesh artifact.
+  Consequently the future scene explorer can inspect the collision boundary,
+  while the generic 3d runtime owns physics registration and cleanup. The
+  temporary Doom-specific player collision remains in use only until the
+  character-body migration slice.
 
 ### Animation decisions
 

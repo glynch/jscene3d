@@ -196,7 +196,7 @@
           "valueKind": "reference",
           "required": true,
           "displayName": "Shape",
-          "acceptedReferences": ["project"]
+          "acceptedReferences": ["project", "import"]
         },
         {
           "id": "position",

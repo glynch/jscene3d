@@ -2693,13 +2693,17 @@ Doomed Corridors already demonstrates useful separations:
   window;
 - presentation adapts those models to JScene3D rendering and audio.
 
-The remaining architectural gap is complete runtime composition. The Project
-Manifest now points at an engine-native application scene, MAP01 is selected by
-a project import definition, and `doom-level-3d` receives the resulting typed
-map through the generic runtime. The existing graphical startup code still
-knows how to assemble materials, actor data, combat rules, presentation rules,
-player state, enemies, HUD, input, audio, and rendering; those responsibilities
-are the remaining migration work.
+The Project Manifest now points at an engine-native application scene and a
+versioned input-map document. MAP01 is selected by project import definitions,
+and `doom-level-3d` receives the resulting typed map and materials through the
+generic runtime. Its authored `doom-player-controller` consumes semantic
+actions, owns collision-aware player movement, and updates a declared camera
+child. Physical bindings remain separately editable project data.
+
+Complete runtime composition remains unfinished. The existing graphical
+startup code still knows how to assemble actor data, combat rules, presentation
+rules, enemies, HUD, audio, doors, and switches; those responsibilities are the
+remaining migration work.
 
 The reusable `DoomMap`, `DoomMapDecodeResult`, and `DoomMapDecoder` in
 `jscene3d-doom` supersede the corresponding Doomed Corridors classes. The game

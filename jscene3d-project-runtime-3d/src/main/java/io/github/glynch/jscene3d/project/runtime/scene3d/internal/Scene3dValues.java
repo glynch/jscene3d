@@ -29,6 +29,11 @@ final class Scene3dValues {
         return ProjectValues.bool(properties, id);
     }
 
+    /** Returns one required exact integer. */
+    static int integer(Map<String, ProjectValue> properties, String id) {
+        return ProjectValues.integer(properties, id);
+    }
+
     /** Returns one required resource reference. */
     static ResourceReference reference(Map<String, ProjectValue> properties, String id) {
         return ProjectValues.reference(properties, id);

@@ -32,15 +32,34 @@
         }
       },
       {
-        "id": "cube",
-        "name": "Cube",
-        "type": "io.github.glynch.jscene3d/mesh-instance-3d",
+        "id": "cube-body",
+        "name": "Cube Body",
+        "type": "io.github.glynch.jscene3d/static-body-3d",
         "typeVersion": 1,
         "properties": {
-          "geometry": {"$ref": "project:resources/cube.geometry.json"},
-          "material": {"$ref": "project:resources/cyan.material.json"},
           "rotation-degrees": [20, 35, 0]
-        }
+        },
+        "children": [
+          {
+            "id": "cube",
+            "name": "Cube",
+            "type": "io.github.glynch.jscene3d/mesh-instance-3d",
+            "typeVersion": 1,
+            "properties": {
+              "geometry": {"$ref": "project:resources/cube.geometry.json"},
+              "material": {"$ref": "project:resources/cyan.material.json"}
+            }
+          },
+          {
+            "id": "cube-collision",
+            "name": "Cube Collision",
+            "type": "io.github.glynch.jscene3d/collision-shape-3d",
+            "typeVersion": 1,
+            "properties": {
+              "shape": {"$ref": "project:resources/cube.shape.json"}
+            }
+          }
+        ]
       }
     ]
   }

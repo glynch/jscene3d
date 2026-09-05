@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.runtime.scene3d;
 
+import io.github.glynch.jscene3d.physics.PhysicsWorld;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.runtime.scene3d.internal.Scene3dComposition;
@@ -15,6 +16,7 @@ public final class JScene3dRuntimeExtension implements ProjectRuntimeExtension {
     public static final String EXTENSION_ID = "io.github.glynch.jscene3d";
 
     private final Scene3dComposition composition;
+    private final PhysicsWorld physicsWorld;
     private boolean registered;
 
     /**
@@ -26,7 +28,21 @@ public final class JScene3dRuntimeExtension implements ProjectRuntimeExtension {
      * @param host render submission destination
      */
     public JScene3dRuntimeExtension(Scene3dRenderHost host) {
-        composition = new Scene3dComposition(Objects.requireNonNull(host, "host"));
+        this(host, new PhysicsWorld());
+    }
+
+    /**
+     * Creates an extension that contributes declarative collision objects to an existing world.
+     *
+     * <p>The extension removes only the objects it creates; ownership of the supplied world remains
+     * with the caller.
+     *
+     * @param host render submission destination
+     * @param physicsWorld physics world shared with application-authored runtime code
+     */
+    public JScene3dRuntimeExtension(Scene3dRenderHost host, PhysicsWorld physicsWorld) {
+        this.physicsWorld = Objects.requireNonNull(physicsWorld, "physicsWorld");
+        composition = new Scene3dComposition(Objects.requireNonNull(host, "host"), physicsWorld);
     }
 
     /**
@@ -38,6 +54,15 @@ public final class JScene3dRuntimeExtension implements ProjectRuntimeExtension {
         return new JScene3dRuntimeExtension((scene, camera) -> {
             // Headless composition deliberately has no render target.
         });
+    }
+
+    /**
+     * Returns the physics world populated by declarative collision nodes.
+     *
+     * @return retained physics world
+     */
+    public PhysicsWorld physicsWorld() {
+        return physicsWorld;
     }
 
     @Override

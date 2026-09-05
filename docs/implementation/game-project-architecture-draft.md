@@ -649,6 +649,19 @@ reconciled as the grill progresses rather than relying on memory at its end.
   `PhysicsWorld3d` instances configured by explicit project resources. Instanced
   scenes inherit their host world. An isolated world requires an explicit
   boundary and is an advanced use case.
+- The initial 3d runtime slice uses the registered `static-body-3d` and
+  `collision-shape-3d` node types. A collision-shape node is a direct child of
+  its body, owns its local pose and collision filter, and references a reusable
+  `box-shape-3d`, `sphere-shape-3d`, or `capsule-shape-3d` resource. These type
+  descriptors are the same metadata used by runtime validation and the future
+  editor Inspector.
+- Application Java code may supply and retain the scene's `PhysicsWorld` when
+  creating the built-in runtime extension. Runtime closure removes only the
+  collision objects contributed by the declarative scene.
+- Collision-node scaling is not part of this first slice because the existing
+  physics model has no scaled-shape semantics. Dimensions belong to immutable
+  shape resources. Static imported triangle meshes will be registered only
+  with complete broad-phase, ray, overlap, and sweep behavior.
 
 ### Animation decisions
 

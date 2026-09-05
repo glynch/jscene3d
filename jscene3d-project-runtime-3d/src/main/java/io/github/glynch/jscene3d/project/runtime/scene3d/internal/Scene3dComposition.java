@@ -13,6 +13,14 @@ import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.objects.RotationOrder;
+import io.github.glynch.jscene3d.physics.Collider;
+import io.github.glynch.jscene3d.physics.CollisionFilter;
+import io.github.glynch.jscene3d.physics.PhysicsWorld;
+import io.github.glynch.jscene3d.physics.StaticBody;
+import io.github.glynch.jscene3d.physics.shapes.BoxShape;
+import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
+import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
+import io.github.glynch.jscene3d.physics.shapes.SphereShape;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeObject;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContext;
@@ -23,6 +31,7 @@ import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.Map;
 import java.util.Objects;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 
@@ -31,6 +40,7 @@ public final class Scene3dComposition {
     private static final float DEGREES_TO_RADIANS = (float) (Math.PI / 180.0);
 
     private final Scene3dRenderHost host;
+    private final PhysicsWorld physicsWorld;
     private final Scene scene = new Scene();
     private @Nullable PerspectiveCamera activeCamera;
     private boolean rootCreated;
@@ -39,9 +49,11 @@ public final class Scene3dComposition {
      * Creates empty composition state for one render host.
      *
      * @param host render submission adapter
+     * @param physicsWorld physics destination for declarative collision nodes
      */
-    public Scene3dComposition(Scene3dRenderHost host) {
+    public Scene3dComposition(Scene3dRenderHost host, PhysicsWorld physicsWorld) {
         this.host = Objects.requireNonNull(host, "host");
+        this.physicsWorld = Objects.requireNonNull(physicsWorld, "physicsWorld");
     }
 
     /**
@@ -54,8 +66,13 @@ public final class Scene3dComposition {
         registry.registerSceneNode(BuiltInTypes.MESH_INSTANCE_3D, this::createMesh);
         registry.registerSceneNode(BuiltInTypes.PERSPECTIVE_CAMERA_3D, this::createCamera);
         registry.registerSceneNode(BuiltInTypes.AMBIENT_LIGHT_3D, this::createAmbientLight);
+        registry.registerSceneNode(BuiltInTypes.STATIC_BODY_3D, this::createStaticBody);
+        registry.registerSceneNode(BuiltInTypes.COLLISION_SHAPE_3D, this::createCollisionShape);
         registry.registerResource(BuiltInTypes.BOX_GEOMETRY_3D, this::createBoxGeometry);
         registry.registerResource(BuiltInTypes.LAMBERT_MATERIAL_3D, this::createLambertMaterial);
+        registry.registerResource(BuiltInTypes.BOX_SHAPE_3D, this::createBoxShape);
+        registry.registerResource(BuiltInTypes.SPHERE_SHAPE_3D, this::createSphereShape);
+        registry.registerResource(BuiltInTypes.CAPSULE_SHAPE_3D, this::createCapsuleShape);
     }
 
     /** Requires the composed scene to have exactly one selected camera. */
@@ -134,6 +151,36 @@ public final class Scene3dComposition {
         return new SpatialRuntimeObject(light);
     }
 
+    /** Creates an immovable body whose collision shapes are declared by child nodes. */
+    private ProjectRuntimeObject createStaticBody(SceneNodeContext context) {
+        Object3D object = new Object3D();
+        configurePose(object, context.properties(), context.isEnabled());
+        attach(context, object);
+        StaticBody body = physicsWorld.addStaticBody(
+                object.worldPosition(new Vector3f()), object.worldQuaternion(new Quaternionf()));
+        body.setEnabled(context.isEnabled());
+        return new StaticBodyRuntimeObject(object, physicsWorld, body);
+    }
+
+    /** Creates one collider attached directly to its authored static-body parent. */
+    private ProjectRuntimeObject createCollisionShape(SceneNodeContext context) {
+        ProjectRuntimeObject parent = context.parent().orElseThrow().object();
+        if (!(parent instanceof StaticBodyRuntimeObject staticBody)) {
+            throw new IllegalArgumentException("collision-shape-3d requires a direct static-body-3d parent");
+        }
+        CollisionShape shape =
+                context.resolveResource(Scene3dValues.reference(context.properties(), "shape"), CollisionShape.class);
+        Object3D object = new Object3D();
+        configurePose(object, context.properties(), context.isEnabled());
+        attach(context, object);
+        Collider collider = staticBody.body().addCollider(shape, object.position(), object.quaternion());
+        collider.setCollisionFilter(new CollisionFilter(
+                Scene3dValues.integer(context.properties(), "category-bits"),
+                Scene3dValues.integer(context.properties(), "mask-bits")));
+        collider.setEnabled(context.isEnabled());
+        return new CollisionShapeRuntimeObject(object, staticBody.body(), collider);
+    }
+
     /** Creates one runtime-owned generated box geometry. */
     private Object createBoxGeometry(ResourceFactoryContext context) {
         Map<String, ProjectValue> properties = context.properties();
@@ -148,18 +195,43 @@ public final class Scene3dComposition {
         return new LambertMaterial(Scene3dValues.color(context.properties(), "color"));
     }
 
+    /** Creates one immutable box collision shape. */
+    private Object createBoxShape(ResourceFactoryContext context) {
+        Map<String, ProjectValue> properties = context.properties();
+        return new BoxShape(
+                Scene3dValues.number(properties, "width"),
+                Scene3dValues.number(properties, "height"),
+                Scene3dValues.number(properties, "depth"));
+    }
+
+    /** Creates one immutable sphere collision shape. */
+    private Object createSphereShape(ResourceFactoryContext context) {
+        return new SphereShape(Scene3dValues.number(context.properties(), "radius"));
+    }
+
+    /** Creates one immutable Y-aligned capsule collision shape. */
+    private Object createCapsuleShape(ResourceFactoryContext context) {
+        Map<String, ProjectValue> properties = context.properties();
+        return new CapsuleShape(
+                Scene3dValues.number(properties, "radius"), Scene3dValues.number(properties, "segment-length"));
+    }
+
     /** Applies the common authored transform and effective visibility. */
     private static void configureSpatial(Object3D object, Map<String, ProjectValue> properties, boolean visible) {
+        configurePose(object, properties, visible);
+        object.setScale(Scene3dValues.vector3(properties, "scale"));
+    }
+
+    /** Applies an authored position and orientation without unsupported collision scaling. */
+    private static void configurePose(Object3D object, Map<String, ProjectValue> properties, boolean visible) {
         Vector3f position = Scene3dValues.vector3(properties, "position");
         Vector3f rotation = Scene3dValues.vector3(properties, "rotation-degrees");
-        Vector3f scale = Scene3dValues.vector3(properties, "scale");
         object.setPosition(position);
         object.setRotationFromEuler(
                 rotation.x * DEGREES_TO_RADIANS,
                 rotation.y * DEGREES_TO_RADIANS,
                 rotation.z * DEGREES_TO_RADIANS,
                 RotationOrder.XYZ);
-        object.setScale(scale);
         object.setVisible(visible);
     }
 

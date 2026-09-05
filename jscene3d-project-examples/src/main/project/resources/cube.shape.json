@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "type": "io.github.glynch.jscene3d/box-shape-3d",
+  "typeVersion": 1,
+  "properties": {
+    "width": 2,
+    "height": 2,
+    "depth": 2
+  }
+}

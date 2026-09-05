@@ -14,8 +14,13 @@ final class BuiltInTypes {
     static final RegisteredType MESH_INSTANCE_3D = type("mesh-instance-3d");
     static final RegisteredType PERSPECTIVE_CAMERA_3D = type("perspective-camera-3d");
     static final RegisteredType AMBIENT_LIGHT_3D = type("ambient-light-3d");
+    static final RegisteredType STATIC_BODY_3D = type("static-body-3d");
+    static final RegisteredType COLLISION_SHAPE_3D = type("collision-shape-3d");
     static final RegisteredType BOX_GEOMETRY_3D = type("box-geometry-3d");
     static final RegisteredType LAMBERT_MATERIAL_3D = type("lambert-material-3d");
+    static final RegisteredType BOX_SHAPE_3D = type("box-shape-3d");
+    static final RegisteredType SPHERE_SHAPE_3D = type("sphere-shape-3d");
+    static final RegisteredType CAPSULE_SHAPE_3D = type("capsule-shape-3d");
 
     private BuiltInTypes() {
         throw new AssertionError("not instantiable");

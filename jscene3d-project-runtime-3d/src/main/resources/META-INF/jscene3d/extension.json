@@ -164,6 +164,71 @@
       ]
     },
     {
+      "id": "io.github.glynch.jscene3d/static-body-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Static Body 3d",
+      "properties": [
+        {
+          "id": "position",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Position",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "rotation-degrees",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Rotation",
+          "editor": {"section": "Transform", "elementCount": 3, "unit": "degrees"}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/collision-shape-3d",
+      "typeVersion": 1,
+      "scope": "scene-node",
+      "displayName": "Collision Shape 3d",
+      "properties": [
+        {
+          "id": "shape",
+          "valueKind": "reference",
+          "required": true,
+          "displayName": "Shape",
+          "acceptedReferences": ["project"]
+        },
+        {
+          "id": "position",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Position",
+          "editor": {"section": "Transform", "elementCount": 3}
+        },
+        {
+          "id": "rotation-degrees",
+          "valueKind": "array",
+          "defaultValue": [0, 0, 0],
+          "displayName": "Rotation",
+          "editor": {"section": "Transform", "elementCount": 3, "unit": "degrees"}
+        },
+        {
+          "id": "category-bits",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Category Bits",
+          "editor": {"section": "Collision", "integer": true}
+        },
+        {
+          "id": "mask-bits",
+          "valueKind": "number",
+          "defaultValue": -1,
+          "displayName": "Mask Bits",
+          "editor": {"section": "Collision", "integer": true}
+        }
+      ]
+    },
+    {
       "id": "io.github.glynch.jscene3d/box-geometry-3d",
       "typeVersion": 1,
       "scope": "resource",
@@ -189,6 +254,72 @@
           "defaultValue": 1,
           "displayName": "Depth",
           "editor": {"minimumExclusive": 0}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/box-shape-3d",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Box Shape 3d",
+      "properties": [
+        {
+          "id": "width",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Width",
+          "editor": {"minimumExclusive": 0}
+        },
+        {
+          "id": "height",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Height",
+          "editor": {"minimumExclusive": 0}
+        },
+        {
+          "id": "depth",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Depth",
+          "editor": {"minimumExclusive": 0}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/sphere-shape-3d",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Sphere Shape 3d",
+      "properties": [
+        {
+          "id": "radius",
+          "valueKind": "number",
+          "defaultValue": 0.5,
+          "displayName": "Radius",
+          "editor": {"minimumExclusive": 0}
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d/capsule-shape-3d",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Capsule Shape 3d",
+      "properties": [
+        {
+          "id": "radius",
+          "valueKind": "number",
+          "defaultValue": 0.5,
+          "displayName": "Radius",
+          "editor": {"minimumExclusive": 0}
+        },
+        {
+          "id": "segment-length",
+          "valueKind": "number",
+          "defaultValue": 1,
+          "displayName": "Segment Length",
+          "editor": {"minimum": 0}
         }
       ]
     },

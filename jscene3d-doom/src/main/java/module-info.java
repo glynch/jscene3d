@@ -7,6 +7,7 @@ module io.github.glynch.jscene3d.doom {
     requires transitive io.github.glynch.jscene3d.wad;
     requires io.github.glynch.jscene3d.project.importing;
     requires io.github.glynch.jscene3d.project.runtime;
+    requires io.github.glynch.jscene3d.project.runtime.scene3d;
     requires io.github.glynch.jscene3d.wad.importing;
     requires com.fasterxml.jackson.core;
     requires static org.jspecify;

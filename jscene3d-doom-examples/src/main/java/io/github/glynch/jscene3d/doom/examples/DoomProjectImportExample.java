@@ -133,9 +133,14 @@ public final class DoomProjectImportExample {
                 }
                 prepared.commit();
             }
-            String resource = readMap(manager, definition);
-            LOGGER.info(() ->
-                    "Discovered " + (inspection.items().size() - 1) + " map and imported maps/MAP01:\n" + resource);
+            String mapResource = readArtifact(manager, definition, "maps/MAP01");
+            String collisionResource = readArtifact(manager, definition, "maps/MAP01/static-collision");
+            LOGGER.info(() -> "Discovered "
+                    + (inspection.items().size() - 1)
+                    + " map and imported maps/MAP01:\n"
+                    + mapResource
+                    + "\nImported maps/MAP01/static-collision:\n"
+                    + collisionResource);
             runRuntime(project, manager);
         }
     }
@@ -163,10 +168,11 @@ public final class DoomProjectImportExample {
         return requireValue(result.definition(), result.diagnostics(), "import definition");
     }
 
-    /** Reads the published MAP01 resource through its logical artifact identity. */
-    private static String readMap(ImportManager manager, ImportDefinition definition) throws IOException {
+    /** Reads one published resource through its logical artifact identity. */
+    private static String readArtifact(ImportManager manager, ImportDefinition definition, String identity)
+            throws IOException {
         try (ImportedArtifact artifact =
-                        manager.openArtifact(definition, "maps/MAP01").orElseThrow();
+                        manager.openArtifact(definition, identity).orElseThrow();
                 InputStream input = artifact.openStream()) {
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }

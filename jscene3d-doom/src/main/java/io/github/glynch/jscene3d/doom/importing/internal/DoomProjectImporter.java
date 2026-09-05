@@ -15,6 +15,7 @@ import io.github.glynch.jscene3d.project.importing.SourceItemRelation;
 import io.github.glynch.jscene3d.project.importing.extension.ImportInspectionContext;
 import io.github.glynch.jscene3d.project.importing.extension.ImportPreparationContext;
 import io.github.glynch.jscene3d.project.importing.extension.ProjectImporter;
+import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dTypes;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.wad.WadArchive;
 import io.github.glynch.jscene3d.wad.WadDiagnostic;
@@ -59,6 +60,11 @@ final class DoomProjectImporter implements ProjectImporter {
                         ImportArtifactDescriptor.resource(mapIdentity(mapName), DoomTypes.MAP_RESOURCE, List.of()),
                         output -> DoomMapResourceWriter.write(
                                 output, context.asset().id(), archive, map));
+                DoomStaticCollisionMesh collision = DoomStaticCollisionBuilder.build(map);
+                context.artifact(
+                        ImportArtifactDescriptor.resource(
+                                collisionIdentity(mapName), Scene3dTypes.TRIANGLE_MESH_SHAPE_3D, List.of()),
+                        output -> DoomStaticCollisionResourceWriter.write(output, collision));
             }
         }
     }
@@ -152,6 +158,11 @@ final class DoomProjectImporter implements ProjectImporter {
     /** Returns the stable source-item and artifact identity for one map. */
     private static String mapIdentity(String mapName) {
         return "maps/" + mapName;
+    }
+
+    /** Returns the derived static-collision artifact identity for one selected map. */
+    private static String collisionIdentity(String mapName) {
+        return mapIdentity(mapName) + "/static-collision";
     }
 
     /** Wraps one integral source property without losing numeric precision. */

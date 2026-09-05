@@ -4,12 +4,7 @@
  */
 package io.github.glynch.jscene3d.doom.importing.internal;
 
-import com.fasterxml.jackson.core.JsonEncoding;
-import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.StreamWriteFeature;
-import com.fasterxml.jackson.core.util.DefaultIndenter;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import io.github.glynch.jscene3d.doom.internal.DoomTypes;
 import io.github.glynch.jscene3d.doom.map.DoomMap;
 import io.github.glynch.jscene3d.wad.WadArchive;
@@ -20,9 +15,6 @@ import java.util.Objects;
 
 /** Writes complete decoded maps as portable typed project resources. */
 final class DoomMapResourceWriter {
-    private static final JsonFactory JSON_FACTORY =
-            JsonFactory.builder().disable(StreamWriteFeature.AUTO_CLOSE_TARGET).build();
-
     /** Prevents construction of this stateless serializer. */
     private DoomMapResourceWriter() {
         throw new AssertionError("DoomMapResourceWriter cannot be instantiated");
@@ -34,8 +26,7 @@ final class DoomMapResourceWriter {
         Objects.requireNonNull(assetId, "assetId");
         Objects.requireNonNull(archive, "archive");
         Objects.requireNonNull(map, "map");
-        try (JsonGenerator generator = JSON_FACTORY.createGenerator(output, JsonEncoding.UTF8)) {
-            generator.setPrettyPrinter(prettyPrinter());
+        try (JsonGenerator generator = DoomJsonGenerators.create(output)) {
             generator.writeStartObject();
             generator.writeNumberField("schemaVersion", 1);
             generator.writeStringField("type", DoomTypes.MAP_RESOURCE_IDENTIFIER);
@@ -52,15 +43,6 @@ final class DoomMapResourceWriter {
             generator.writeEndObject();
             generator.writeRaw('\n');
         }
-    }
-
-    /** Creates the deterministic indentation policy for generated JSON artifacts. */
-    private static DefaultPrettyPrinter prettyPrinter() {
-        DefaultIndenter indenter = new DefaultIndenter("  ", "\n");
-        DefaultPrettyPrinter prettyPrinter = new DefaultPrettyPrinter();
-        prettyPrinter.indentObjectsWith(indenter);
-        prettyPrinter.indentArraysWith(indenter);
-        return prettyPrinter;
     }
 
     /** Writes portable source provenance. */

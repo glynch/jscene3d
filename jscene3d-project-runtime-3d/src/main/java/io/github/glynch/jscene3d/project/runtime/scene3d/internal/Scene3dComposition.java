@@ -28,6 +28,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContex
 import io.github.glynch.jscene3d.project.runtime.extension.SceneNodeContext;
 import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dRenderHost;
 import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dRuntimeObject;
+import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dTypes;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.util.Map;
@@ -63,18 +64,18 @@ public final class Scene3dComposition {
      * @param registry active extension-registration scope
      */
     public void register(ProjectRuntimeRegistry registry) {
-        registry.registerSceneNode(BuiltInTypes.GROUP_3D, this::createGroup);
-        registry.registerSceneNode(BuiltInTypes.MESH_INSTANCE_3D, this::createMesh);
-        registry.registerSceneNode(BuiltInTypes.PERSPECTIVE_CAMERA_3D, this::createCamera);
-        registry.registerSceneNode(BuiltInTypes.AMBIENT_LIGHT_3D, this::createAmbientLight);
-        registry.registerSceneNode(BuiltInTypes.STATIC_BODY_3D, this::createStaticBody);
-        registry.registerSceneNode(BuiltInTypes.COLLISION_SHAPE_3D, this::createCollisionShape);
-        registry.registerResource(BuiltInTypes.BOX_GEOMETRY_3D, this::createBoxGeometry);
-        registry.registerResource(BuiltInTypes.LAMBERT_MATERIAL_3D, this::createLambertMaterial);
-        registry.registerResource(BuiltInTypes.BOX_SHAPE_3D, this::createBoxShape);
-        registry.registerResource(BuiltInTypes.SPHERE_SHAPE_3D, this::createSphereShape);
-        registry.registerResource(BuiltInTypes.CAPSULE_SHAPE_3D, this::createCapsuleShape);
-        registry.registerResource(BuiltInTypes.TRIANGLE_MESH_SHAPE_3D, this::createTriangleMeshShape);
+        registry.registerSceneNode(Scene3dTypes.GROUP_3D, this::createGroup);
+        registry.registerSceneNode(Scene3dTypes.MESH_INSTANCE_3D, this::createMesh);
+        registry.registerSceneNode(Scene3dTypes.PERSPECTIVE_CAMERA_3D, this::createCamera);
+        registry.registerSceneNode(Scene3dTypes.AMBIENT_LIGHT_3D, this::createAmbientLight);
+        registry.registerSceneNode(Scene3dTypes.STATIC_BODY_3D, this::createStaticBody);
+        registry.registerSceneNode(Scene3dTypes.COLLISION_SHAPE_3D, this::createCollisionShape);
+        registry.registerResource(Scene3dTypes.BOX_GEOMETRY_3D, this::createBoxGeometry);
+        registry.registerResource(Scene3dTypes.LAMBERT_MATERIAL_3D, this::createLambertMaterial);
+        registry.registerResource(Scene3dTypes.BOX_SHAPE_3D, this::createBoxShape);
+        registry.registerResource(Scene3dTypes.SPHERE_SHAPE_3D, this::createSphereShape);
+        registry.registerResource(Scene3dTypes.CAPSULE_SHAPE_3D, this::createCapsuleShape);
+        registry.registerResource(Scene3dTypes.TRIANGLE_MESH_SHAPE_3D, this::createTriangleMeshShape);
     }
 
     /** Requires the composed scene to have exactly one selected camera. */

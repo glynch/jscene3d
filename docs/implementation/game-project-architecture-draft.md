@@ -666,6 +666,21 @@ reconciled as the grill progresses rather than relying on memory at its end.
   raycasts, convex-shape overlaps and sweeps, and debug geometry. Triangle
   meshes are collider targets attached to static bodies; they are not movable
   overlap or sweep query shapes.
+- The built-in 3d registered-type identities are exposed by `Scene3dTypes` so
+  import extensions and code-first project configuration can identify native
+  resources without duplicating serialized strings.
+- Selecting a classic Doom map produces both the portable
+  `io.github.glynch.jscene3d.doom/map` resource and a derived
+  `io.github.glynch.jscene3d/triangle-mesh-shape-3d` artifact at
+  `maps/<map>/static-collision`. The collision artifact contains imported
+  floors, ceilings, one-sided boundaries, portal height transitions, and
+  explicitly blocking portal spans. It remains disposable import-cache output
+  and does not put Doom semantics in the physics module.
+- Imported Doom collision uses the shared `DoomCoordinates` convention: 32
+  source map units equal one world unit, source x maps to world x, source
+  height maps to world y, and source y maps to negative world z. Presentation,
+  collision, actor placement, and later generated interactive nodes must use
+  this same conversion policy.
 
 ### Animation decisions
 

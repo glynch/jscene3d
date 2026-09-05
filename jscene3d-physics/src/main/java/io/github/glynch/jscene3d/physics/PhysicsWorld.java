@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.physics.queries.QueryFilter;
 import io.github.glynch.jscene3d.physics.queries.RaycastHit;
 import io.github.glynch.jscene3d.physics.queries.SweepHit;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
@@ -211,7 +212,7 @@ public final class PhysicsWorld {
     /**
      * Finds overlaps using the default query filter.
      *
-     * @param shape query shape
+     * @param shape convex query shape
      * @param position world-space query position
      * @param orientation world-space query orientation; normalized internally
      * @return immutable hits ordered by collider identifier
@@ -223,7 +224,7 @@ public final class PhysicsWorld {
     /**
      * Finds every accepted collider overlapping the supplied shape pose.
      *
-     * @param shape query shape
+     * @param shape convex query shape
      * @param position world-space query position
      * @param orientation world-space query orientation; normalized internally
      * @param filter immutable query filter
@@ -231,13 +232,14 @@ public final class PhysicsWorld {
      */
     public List<OverlapHit> overlap(
             CollisionShape shape, Vector3fc position, Quaternionfc orientation, QueryFilter filter) {
+        requireConvexQueryShape(shape);
         return queries.overlap(new ShapePose(shape, position, orientation), Objects.requireNonNull(filter, "filter"));
     }
 
     /**
      * Sweeps a shape using the default query filter.
      *
-     * @param shape query shape
+     * @param shape convex query shape
      * @param position starting world-space position
      * @param orientation fixed world-space orientation; normalized internally
      * @param translation world-space translation over which to sweep
@@ -251,7 +253,7 @@ public final class PhysicsWorld {
     /**
      * Finds the first accepted collider reached while translating a shape.
      *
-     * @param shape query shape
+     * @param shape convex query shape
      * @param position starting world-space position
      * @param orientation fixed world-space orientation; normalized internally
      * @param translation world-space translation over which to sweep
@@ -264,6 +266,7 @@ public final class PhysicsWorld {
             Quaternionfc orientation,
             Vector3fc translation,
             QueryFilter filter) {
+        requireConvexQueryShape(shape);
         Vector3f checkedTranslation = Preconditions.requireFinite(translation, "translation");
         return queries.sweep(
                 new ShapePose(shape, position, orientation),
@@ -305,6 +308,9 @@ public final class PhysicsWorld {
             Vector3fc localPosition,
             Quaternionfc localOrientation) {
         requireOwnedAndRegistered(collisionObject);
+        if (shape instanceof TriangleMeshShape && !(collisionObject instanceof StaticBody)) {
+            throw new IllegalArgumentException("triangle mesh shapes can be attached only to static bodies");
+        }
         ShapePose localPose = new ShapePose(shape, localPosition, localOrientation);
         ShapePose worldPose = worldPose(collisionObject, localPose);
         Collider collider = new Collider(
@@ -415,6 +421,14 @@ public final class PhysicsWorld {
         return new ObjectTransform(
                 Preconditions.requireFinite(position, "position"),
                 Preconditions.requireOrientation(orientation, "orientation"));
+    }
+
+    /** Rejects non-convex shapes from query interfaces requiring one coherent support volume. */
+    private static void requireConvexQueryShape(CollisionShape shape) {
+        Objects.requireNonNull(shape, "shape");
+        if (shape instanceof TriangleMeshShape) {
+            throw new IllegalArgumentException("triangle mesh shapes cannot be used as overlap or sweep queries");
+        }
     }
 
     private record ObjectTransform(Vector3f position, Quaternionf orientation) {}

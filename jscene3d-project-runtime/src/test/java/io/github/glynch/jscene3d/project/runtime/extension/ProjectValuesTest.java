@@ -29,6 +29,8 @@ final class ProjectValuesTest {
                 "float", number("1.25"),
                 "boolean", new ProjectValue.BooleanValue(true),
                 "array", new ProjectValue.ArrayValue(List.of(text("entry"))),
+                "float-array", new ProjectValue.ArrayValue(List.of(number("1.25"), number("2.5"))),
+                "integer-array", new ProjectValue.ArrayValue(List.of(number("1"), number("2"))),
                 "object", new ProjectValue.ObjectValue(Map.of("key", text("value"))),
                 "reference", new ProjectValue.ReferenceValue(reference));
 
@@ -38,6 +40,8 @@ final class ProjectValuesTest {
         assertThat(ProjectValues.finiteFloat(properties, "float")).isEqualTo(1.25F);
         assertThat(ProjectValues.bool(properties, "boolean")).isTrue();
         assertThat(ProjectValues.array(properties, "array")).containsExactly(text("entry"));
+        assertThat(ProjectValues.finiteFloatArray(properties, "float-array")).containsExactly(1.25F, 2.5F);
+        assertThat(ProjectValues.integerArray(properties, "integer-array")).containsExactly(1, 2);
         ProjectValue object = ProjectValues.required(properties, "object");
         assertThat(ProjectValues.object(object, "object")).containsEntry("key", text("value"));
         assertThat(ProjectValues.reference(properties, "reference")).isEqualTo(reference);

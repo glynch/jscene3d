@@ -34,6 +34,16 @@ final class Scene3dValues {
         return ProjectValues.integer(properties, id);
     }
 
+    /** Returns one required numeric array as finite single-precision values. */
+    static float[] floatArray(Map<String, ProjectValue> properties, String id) {
+        return ProjectValues.finiteFloatArray(properties, id);
+    }
+
+    /** Returns one required numeric array as exact integer values. */
+    static int[] integerArray(Map<String, ProjectValue> properties, String id) {
+        return ProjectValues.integerArray(properties, id);
+    }
+
     /** Returns one required resource reference. */
     static ResourceReference reference(Map<String, ProjectValue> properties, String id) {
         return ProjectValues.reference(properties, id);

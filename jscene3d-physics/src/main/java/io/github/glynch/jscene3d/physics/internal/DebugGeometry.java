@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.physics.debug.PhysicsDebugSnapshot;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -46,6 +47,23 @@ public final class DebugGeometry {
             case BoxShape box -> addBox(lines, collider, box);
             case SphereShape sphere -> addSphere(lines, collider, sphere);
             case CapsuleShape capsule -> addCapsule(lines, collider, capsule);
+            case TriangleMeshShape mesh -> addTriangleMesh(lines, collider, mesh);
+        }
+    }
+
+    /** Adds the three indexed edges of every mesh triangle. */
+    private static void addTriangleMesh(List<PhysicsDebugLine> lines, Collider collider, TriangleMeshShape mesh) {
+        Vector3f first = new Vector3f();
+        Vector3f second = new Vector3f();
+        Vector3f third = new Vector3f();
+        for (int triangle = 0; triangle < mesh.triangleCount(); triangle++) {
+            int offset = triangle * 3;
+            mesh.vertex(mesh.index(offset), first);
+            mesh.vertex(mesh.index(offset + 1), second);
+            mesh.vertex(mesh.index(offset + 2), third);
+            addLocalLine(lines, collider, first, second);
+            addLocalLine(lines, collider, second, third);
+            addLocalLine(lines, collider, third, first);
         }
     }
 

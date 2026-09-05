@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.physics.internal;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import java.util.Optional;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -18,6 +19,12 @@ final class OverlapTests {
     private OverlapTests() {}
 
     static Optional<ContactResult> contact(ShapePose first, ShapePose second) {
+        if (second.shape() instanceof TriangleMeshShape mesh) {
+            return TriangleMeshQueries.contact(first, mesh, second);
+        }
+        if (first.shape() instanceof TriangleMeshShape mesh) {
+            return reverse(TriangleMeshQueries.contact(second, mesh, first));
+        }
         if (first.shape() instanceof SphereShape firstSphere) {
             return sphereContact(firstSphere, first, second);
         }
@@ -33,6 +40,7 @@ final class OverlapTests {
             case SphereShape other -> sphereSphere(sphere, spherePose, other, otherPose);
             case CapsuleShape other -> sphereCapsule(sphere, spherePose, other, otherPose);
             case BoxShape other -> sphereBox(sphere, spherePose, other, otherPose);
+            case TriangleMeshShape ignored -> throw new IllegalStateException("triangle mesh handled before dispatch");
         };
     }
 
@@ -42,6 +50,7 @@ final class OverlapTests {
             case SphereShape other -> reverse(sphereCapsule(other, otherPose, capsule, capsulePose));
             case CapsuleShape other -> capsuleCapsule(capsule, capsulePose, other, otherPose);
             case BoxShape other -> capsuleBox(capsule, capsulePose, other, otherPose);
+            case TriangleMeshShape ignored -> throw new IllegalStateException("triangle mesh handled before dispatch");
         };
     }
 
@@ -50,6 +59,7 @@ final class OverlapTests {
             case SphereShape other -> reverse(sphereBox(other, otherPose, box, boxPose));
             case CapsuleShape other -> reverse(capsuleBox(other, otherPose, box, boxPose));
             case BoxShape other -> boxBox(box, boxPose, other, otherPose);
+            case TriangleMeshShape ignored -> throw new IllegalStateException("triangle mesh handled before dispatch");
         };
     }
 

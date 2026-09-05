@@ -44,7 +44,7 @@ public abstract sealed class CollisionObject permits CollisionBody, CollisionSen
     /**
      * Adds a collider at the object's origin.
      *
-     * @param shape immutable collision shape
+     * @param shape immutable collision shape; triangle meshes require a static body
      * @return object-owned collider
      */
     public final Collider addCollider(CollisionShape shape) {
@@ -54,7 +54,7 @@ public abstract sealed class CollisionObject permits CollisionBody, CollisionSen
     /**
      * Adds a collider with a transform relative to this object.
      *
-     * @param shape immutable collision shape
+     * @param shape immutable collision shape; triangle meshes require a static body
      * @param localPosition collider position relative to this object
      * @param localOrientation collider orientation relative to this object
      * @return object-owned collider

@@ -91,10 +91,30 @@ final class DeclarativeStaticPhysicsTest {
                           "shape": {"$ref": "project:resources/capsule.shape.json"},
                           "position": [0, -10, 0]
                         }
+                      },
+                      {
+                        "id": "triangle-mesh-shape",
+                        "type": "io.github.glynch.jscene3d/collision-shape-3d",
+                        "typeVersion": 1,
+                        "properties": {
+                          "shape": {"$ref": "project:resources/floor.shape.json"},
+                          "position": [0, -20, 0]
+                        }
                       }
                     ]
                   }
                 ]
+              }
+            }
+            """;
+    private static final String TRIANGLE_MESH_SHAPE = """
+            {
+              "schemaVersion": 1,
+              "type": "io.github.glynch.jscene3d/triangle-mesh-shape-3d",
+              "typeVersion": 1,
+              "properties": {
+                "positions": [-2, 0, -2, 2, 0, -2, 2, 0, 2, -2, 0, 2],
+                "indices": [0, 2, 1, 0, 3, 2]
               }
             }
             """;
@@ -138,7 +158,7 @@ final class DeclarativeStaticPhysicsTest {
                 world));
 
         assertThat(world.collisionObjectCount()).isOne();
-        assertThat(world.colliderCount()).isEqualTo(3);
+        assertThat(world.colliderCount()).isEqualTo(4);
         try (GameRuntime gameRuntime = new GameRuntime(runtime)) {
             gameRuntime.start();
             RaycastHit hit = world.raycast(new Vector3f(5, 0, 0), new Vector3f(-1, 0, 0), 10)
@@ -156,6 +176,10 @@ final class DeclarativeStaticPhysicsTest {
                             .orElseThrow()
                             .distance())
                     .isCloseTo(2.5f, within(0.0001f));
+            assertThat(world.raycast(new Vector3f(0, -15, 0), new Vector3f(0, -1, 0), 10)
+                            .orElseThrow()
+                            .distance())
+                    .isCloseTo(5.0f, within(0.0001f));
         }
         assertThat(world.collisionObjectCount()).isZero();
         assertThat(world.colliderCount()).isZero();
@@ -203,6 +227,7 @@ final class DeclarativeStaticPhysicsTest {
         write("resources/wall.shape.json", BOX_SHAPE);
         write("resources/sphere.shape.json", SPHERE_SHAPE);
         write("resources/capsule.shape.json", CAPSULE_SHAPE);
+        write("resources/floor.shape.json", TRIANGLE_MESH_SHAPE);
     }
 
     /** Loads one successfully composed runtime. */

@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.physics.internal;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -78,6 +79,8 @@ final class ShapeGeometry {
                 new Vector3f(direction).normalize().mul(sphere.radius()).add(pose.position());
             case BoxShape box -> boxSupport(box, pose, direction);
             case CapsuleShape capsule -> capsuleSupport(capsule, pose, direction);
+            case TriangleMeshShape ignored ->
+                throw new IllegalArgumentException("triangle meshes do not have a convex support point");
         };
     }
 
@@ -175,9 +178,10 @@ final class ShapeGeometry {
 
     private static Vector3f capsuleSupport(CapsuleShape capsule, ShapePose pose, Vector3fc direction) {
         Segment segment = capsuleSegment(capsule, pose);
-        Vector3f endpoint = direction.dot(new Vector3f(segment.end()).sub(segment.start())) >= 0.0F
-                ? new Vector3f(segment.end())
-                : new Vector3f(segment.start());
+        Vector3f endpoint = new Vector3f(
+                direction.dot(new Vector3f(segment.end()).sub(segment.start())) >= 0.0F
+                        ? segment.end()
+                        : segment.start());
         return endpoint.add(new Vector3f(direction).normalize().mul(capsule.radius()));
     }
 

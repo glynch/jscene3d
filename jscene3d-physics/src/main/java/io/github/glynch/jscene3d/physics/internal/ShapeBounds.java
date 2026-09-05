@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.physics.internal;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import org.joml.Matrix3f;
 import org.joml.Vector3f;
 
@@ -15,6 +16,9 @@ final class ShapeBounds {
     private ShapeBounds() {}
 
     static Aabb of(ShapePose pose) {
+        if (pose.shape() instanceof TriangleMeshShape mesh) {
+            return meshBounds(mesh, pose);
+        }
         Vector3f center = pose.position();
         Vector3f extent = extent(pose);
         return new Aabb(new Vector3f(center).sub(extent), new Vector3f(center).add(extent));
@@ -32,7 +36,21 @@ final class ShapeBounds {
             case SphereShape sphere -> new Vector3f(sphere.radius());
             case BoxShape box -> boxExtent(box, pose);
             case CapsuleShape capsule -> capsuleExtent(capsule, pose);
+            case TriangleMeshShape ignored -> throw new IllegalArgumentException("triangle meshes use vertex bounds");
         };
+    }
+
+    /** Computes transformed bounds from every vertex in one static triangle mesh. */
+    private static Aabb meshBounds(TriangleMeshShape mesh, ShapePose pose) {
+        Vector3f minimum = new Vector3f(Float.POSITIVE_INFINITY);
+        Vector3f maximum = new Vector3f(Float.NEGATIVE_INFINITY);
+        Vector3f vertex = new Vector3f();
+        for (int index = 0; index < mesh.vertexCount(); index++) {
+            mesh.vertex(index, vertex).rotate(pose.orientation()).add(pose.position());
+            minimum.min(vertex);
+            maximum.max(vertex);
+        }
+        return new Aabb(minimum, maximum);
     }
 
     private static Vector3f boxExtent(BoxShape box, ShapePose pose) {

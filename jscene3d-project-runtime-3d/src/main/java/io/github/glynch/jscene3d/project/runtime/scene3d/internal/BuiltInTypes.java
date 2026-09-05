@@ -21,6 +21,7 @@ final class BuiltInTypes {
     static final RegisteredType BOX_SHAPE_3D = type("box-shape-3d");
     static final RegisteredType SPHERE_SHAPE_3D = type("sphere-shape-3d");
     static final RegisteredType CAPSULE_SHAPE_3D = type("capsule-shape-3d");
+    static final RegisteredType TRIANGLE_MESH_SHAPE_3D = type("triangle-mesh-shape-3d");
 
     private BuiltInTypes() {
         throw new AssertionError("not instantiable");

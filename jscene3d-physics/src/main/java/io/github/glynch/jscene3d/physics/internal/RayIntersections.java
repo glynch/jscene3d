@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.physics.internal;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import java.util.Optional;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -24,6 +25,7 @@ final class RayIntersections {
             case SphereShape sphere -> sphere(origin, direction, maximumDistance, sphere.radius(), pose.position());
             case BoxShape box -> box(origin, direction, maximumDistance, box, pose);
             case CapsuleShape capsule -> capsule(origin, direction, maximumDistance, capsule, pose);
+            case TriangleMeshShape mesh -> TriangleMeshQueries.raycast(origin, direction, maximumDistance, mesh, pose);
         };
     }
 

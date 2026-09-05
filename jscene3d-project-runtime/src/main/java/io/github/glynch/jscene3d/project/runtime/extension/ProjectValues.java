@@ -128,6 +128,40 @@ public final class ProjectValues {
     }
 
     /**
+     * Returns a required numeric array as finite single-precision values.
+     *
+     * @param properties effective properties supplied to a runtime factory
+     * @param name property name and diagnostic location
+     * @return copied finite floating-point values
+     * @throws IllegalArgumentException when the property is absent, is not an array, or contains an invalid value
+     */
+    public static float[] finiteFloatArray(Map<String, ProjectValue> properties, String name) {
+        List<ProjectValue> values = array(properties, name);
+        float[] result = new float[values.size()];
+        for (int index = 0; index < values.size(); index++) {
+            result[index] = finiteFloat(values.get(index), indexedLocation(name, index));
+        }
+        return result;
+    }
+
+    /**
+     * Returns a required numeric array as exact 32-bit integer values.
+     *
+     * @param properties effective properties supplied to a runtime factory
+     * @param name property name and diagnostic location
+     * @return copied exact integer values
+     * @throws IllegalArgumentException when the property is absent, is not an array, or contains an invalid value
+     */
+    public static int[] integerArray(Map<String, ProjectValue> properties, String name) {
+        List<ProjectValue> values = array(properties, name);
+        int[] result = new int[values.size()];
+        for (int index = 0; index < values.size(); index++) {
+            result[index] = integer(values.get(index), indexedLocation(name, index));
+        }
+        return result;
+    }
+
+    /**
      * Returns a required boolean property.
      *
      * @param properties effective properties supplied to a runtime factory
@@ -232,5 +266,10 @@ public final class ProjectValues {
     /** Creates one consistently formatted invalid-value exception. */
     private static IllegalArgumentException invalid(String location, String requirement) {
         return new IllegalArgumentException(location + ' ' + requirement);
+    }
+
+    /** Creates the diagnostic location of one indexed array entry. */
+    private static String indexedLocation(String location, int index) {
+        return location + '[' + index + ']';
     }
 }

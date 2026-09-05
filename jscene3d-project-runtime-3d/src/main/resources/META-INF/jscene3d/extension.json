@@ -324,6 +324,28 @@
       ]
     },
     {
+      "id": "io.github.glynch.jscene3d/triangle-mesh-shape-3d",
+      "typeVersion": 1,
+      "scope": "resource",
+      "displayName": "Triangle Mesh Shape 3d",
+      "properties": [
+        {
+          "id": "positions",
+          "valueKind": "array",
+          "required": true,
+          "displayName": "Vertex Positions",
+          "editor": {"section": "Geometry", "elementCountMultiple": 3}
+        },
+        {
+          "id": "indices",
+          "valueKind": "array",
+          "required": true,
+          "displayName": "Triangle Indices",
+          "editor": {"section": "Geometry", "elementCountMultiple": 3}
+        }
+      ]
+    },
+    {
       "id": "io.github.glynch.jscene3d/lambert-material-3d",
       "typeVersion": 1,
       "scope": "resource",

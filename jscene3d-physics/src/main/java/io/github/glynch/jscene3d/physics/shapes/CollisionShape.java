@@ -4,5 +4,5 @@
  */
 package io.github.glynch.jscene3d.physics.shapes;
 
-/** A finite, immutable, convex three-dimensional collision shape. */
-public sealed interface CollisionShape permits BoxShape, CapsuleShape, SphereShape {}
+/** A finite, immutable three-dimensional collision shape. */
+public sealed interface CollisionShape permits BoxShape, CapsuleShape, SphereShape, TriangleMeshShape {}

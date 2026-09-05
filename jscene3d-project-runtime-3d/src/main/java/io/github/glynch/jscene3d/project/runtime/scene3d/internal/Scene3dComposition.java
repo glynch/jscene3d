@@ -21,6 +21,7 @@ import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
+import io.github.glynch.jscene3d.physics.shapes.TriangleMeshShape;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeObject;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactoryContext;
@@ -73,6 +74,7 @@ public final class Scene3dComposition {
         registry.registerResource(BuiltInTypes.BOX_SHAPE_3D, this::createBoxShape);
         registry.registerResource(BuiltInTypes.SPHERE_SHAPE_3D, this::createSphereShape);
         registry.registerResource(BuiltInTypes.CAPSULE_SHAPE_3D, this::createCapsuleShape);
+        registry.registerResource(BuiltInTypes.TRIANGLE_MESH_SHAPE_3D, this::createTriangleMeshShape);
     }
 
     /** Requires the composed scene to have exactly one selected camera. */
@@ -214,6 +216,13 @@ public final class Scene3dComposition {
         Map<String, ProjectValue> properties = context.properties();
         return new CapsuleShape(
                 Scene3dValues.number(properties, "radius"), Scene3dValues.number(properties, "segment-length"));
+    }
+
+    /** Creates one immutable indexed triangle mesh for static collision. */
+    private Object createTriangleMeshShape(ResourceFactoryContext context) {
+        Map<String, ProjectValue> properties = context.properties();
+        return new TriangleMeshShape(
+                Scene3dValues.floatArray(properties, "positions"), Scene3dValues.integerArray(properties, "indices"));
     }
 
     /** Applies the common authored transform and effective visibility. */

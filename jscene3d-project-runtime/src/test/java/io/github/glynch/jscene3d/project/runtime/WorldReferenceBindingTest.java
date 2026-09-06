@@ -28,10 +28,10 @@ import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -152,16 +152,16 @@ final class WorldReferenceBindingTest {
     @Test
     void rejectsComponentWithoutReferenceBindingCapability() throws IOException {
         List<String> events = new ArrayList<>();
-        ProjectRuntimeExtension extension = new ProjectRuntimeExtension() {
+        ComponentRuntimeExtension extension = new ComponentRuntimeExtension() {
             @Override
             public String id() {
                 return EXTENSION_ID;
             }
 
             @Override
-            public void register(ProjectRuntimeRegistry registry) {
-                registry.registerComponent(BODY_TYPE, context -> new Body(events));
-                registry.registerComponent(PROBE_TYPE, context -> new ClosingValue(events));
+            public void register(ComponentFactoryRegistry registry) {
+                registry.register(BODY_TYPE, context -> new Body(events));
+                registry.register(PROBE_TYPE, context -> new ClosingValue(events));
             }
         };
 
@@ -196,7 +196,8 @@ final class WorldReferenceBindingTest {
 
     /** Writes and composes one definition and world through the supported public seam. */
     private WorldCompositionResult compose(
-            EntityDefinition definition, WorldDefinition world, ProjectRuntimeExtension extension) throws IOException {
+            EntityDefinition definition, WorldDefinition world, ComponentRuntimeExtension extension)
+            throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("reference.entity.json"), definition);
         DefinitionWriter.write(temporaryDirectory.resolve("reference.world.json"), world);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
@@ -282,7 +283,7 @@ final class WorldReferenceBindingTest {
     }
 
     /** Registers deterministic body and probe factories. */
-    private static final class ReferenceExtension implements ProjectRuntimeExtension {
+    private static final class ReferenceExtension implements ComponentRuntimeExtension {
         private final List<String> events;
         private final boolean wrongType;
 
@@ -298,12 +299,12 @@ final class WorldReferenceBindingTest {
         }
 
         @Override
-        public void register(ProjectRuntimeRegistry registry) {
-            registry.registerComponent(BODY_TYPE, context -> {
+        public void register(ComponentFactoryRegistry registry) {
+            registry.register(BODY_TYPE, context -> {
                 events.add("create:body");
                 return new Body(events);
             });
-            registry.registerComponent(PROBE_TYPE, context -> {
+            registry.register(PROBE_TYPE, context -> {
                 events.add("create:probe");
                 return new ReferenceProbe(events, wrongType);
             });

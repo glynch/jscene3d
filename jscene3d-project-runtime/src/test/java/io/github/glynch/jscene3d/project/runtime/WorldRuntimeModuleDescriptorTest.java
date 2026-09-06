@@ -6,23 +6,22 @@ package io.github.glynch.jscene3d.project.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import java.lang.module.ModuleDescriptor;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
-/** Verifies the executable project runtime's named-module boundary. */
-final class ProjectRuntimeModuleDescriptorTest {
+/** Verifies the composed-world runtime's named-module boundary. */
+final class WorldRuntimeModuleDescriptorTest {
     /** Confirms tests execute inside the production named module. */
     @Test
-    void runsTestsInProjectRuntimeModule() {
+    void runsTestsInWorldRuntimeModule() {
         assertThat(getClass().getModule().getName()).isEqualTo("io.github.glynch.jscene3d.project.runtime");
     }
 
     /** Exposes only the runtime seam and trusted extension contracts. */
     @Test
-    void exportsSupportedPackagesAndDeclaresServiceUse() {
+    void exportsSupportedPackages() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
         Set<String> exports = descriptor.exports().stream()
                 .map(ModuleDescriptor.Exports::source)
@@ -32,6 +31,6 @@ final class ProjectRuntimeModuleDescriptorTest {
                 .containsExactlyInAnyOrder(
                         "io.github.glynch.jscene3d.project.runtime",
                         "io.github.glynch.jscene3d.project.runtime.extension");
-        assertThat(descriptor.uses()).containsExactly(ProjectRuntimeExtension.class.getName());
+        assertThat(descriptor.uses()).isEmpty();
     }
 }

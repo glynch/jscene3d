@@ -8,7 +8,7 @@ import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.net.URI;
 import java.util.Collection;
@@ -36,7 +36,7 @@ public final class WorldCompositionEngine {
             AssetCatalog assets,
             WorldDefinition definition,
             RegisteredTypeCatalog types,
-            Collection<ProjectRuntimeExtension> extensions,
+            Collection<ComponentRuntimeExtension> extensions,
             RuntimeResourceLookup resources) {
         FactoryBindings factories = WorldRuntimeExtensions.register(source, types, extensions);
         AllocatedWorld allocation = new EntityGraphAllocator(assets, types, definition, resources).allocate();

@@ -202,21 +202,19 @@ version because `jpackage` does not accept the project's pre-1.0 version as a
 macOS application version; the JScene3D artifact version remains
 `0.1.0-SNAPSHOT`.
 
-## Declarative projects
+## Entity definitions and worlds
 
-The project modules load versioned manifests, extension descriptors, scenes,
-resources, and import definitions without embedding Java implementation class
-names in project data. Trusted runtime extensions bind registered types to Java
-factories. Project resources and imported resources share the same native
-resource format and runtime ownership model; imported references are resolved
-by logical `import:` URI through a host-supplied artifact lookup, never through
-a physical cache path.
+The project model stores reusable entity definitions separately from authored
+world placements. Trusted component runtime extensions bind exact, descriptor-
+declared component types to Java factories; serialized data never names an
+implementation class. World composition allocates the complete entity graph,
+constructs components, binds stable references and endpoints, and publishes an
+inactive `World` only when the whole operation succeeds.
 
-Run the headless end-to-end example that imports a text source as a typed native
-resource and resolves it from a declarative scene with:
+Run the headless world-composition example with:
 
 ```shell
-./mvnw -pl jscene3d-project-examples -am -Prun-import-example compile
+./mvnw -pl jscene3d-project-examples -am -Prun-world-composition-example compile
 ```
 
 ## WAD archives
@@ -279,17 +277,6 @@ a deterministic, pretty-printed resource of type
 `io.github.glynch.jscene3d.doom/map`. This first content slice preserves the
 classic map records and source provenance; geometry, materials, sprites, audio,
 and gameplay interpretation remain separate later concerns.
-
-The same extension provides the runtime factory for that native resource type.
-When a scene resolves an imported map, the factory reconstructs the immutable
-renderer-independent `DoomMap`; consuming applications do not parse generated
-JSON or depend on cache paths.
-
-Run the self-contained Doom project-import example with:
-
-```shell
-./mvnw -pl jscene3d-doom-examples -am -Prun-doom-import-example compile
-```
 
 ## Animation
 
@@ -638,6 +625,8 @@ license notices, and exact selected filenames are recorded beside the assets in
   migrations, catalogs, and structured validation diagnostics.
 - `jscene3d-project-import`: deterministic import inspection, preparation,
   generated-asset publication, provenance, and disposable cache management.
+- `jscene3d-project-runtime`: transactional composition of entity definitions
+  and world placements through descriptor-backed component factories.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives
@@ -656,9 +645,9 @@ license notices, and exact selected filenames are recorded beside the assets in
   Engine, Physics Engine, renderer, and shared browser framework.
 - `jscene3d-audio-examples`: unpublished positional-audio and mixing examples
   using attributed CC0 sounds and music.
+- `jscene3d-project-examples`: unpublished entity-definition and world-
+  composition examples.
 - `jscene3d-wad-examples`: unpublished headless archive, layering, and project
-  import examples.
-- `jscene3d-doom-examples`: unpublished headless Doom decoding and project
   import examples.
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and

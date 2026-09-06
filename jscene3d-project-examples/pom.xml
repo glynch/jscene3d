@@ -10,7 +10,7 @@
 
     <artifactId>jscene3d-project-examples</artifactId>
     <name>JScene3D Project Examples</name>
-    <description>Runnable declarative project-runtime examples.</description>
+    <description>Runnable entity-definition and world-composition examples.</description>
 
     <properties>
         <jacoco.skip>true</jacoco.skip>
@@ -20,43 +20,11 @@
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
-            <artifactId>jscene3d-project-import</artifactId>
+            <artifactId>jscene3d-project</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.glynch</groupId>
-            <artifactId>jscene3d-project-runtime-3d</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.github.glynch</groupId>
-            <artifactId>jscene3d-project-runtime-lwjgl</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.github.glynch</groupId>
-            <artifactId>jscene3d-example-framework</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.lwjgl</groupId>
-            <artifactId>lwjgl</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.lwjgl</groupId>
-            <artifactId>lwjgl-glfw</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.lwjgl</groupId>
-            <artifactId>lwjgl-opengl</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.lwjgl</groupId>
-            <artifactId>lwjgl-stb</artifactId>
-            <classifier>${lwjgl.natives}</classifier>
-            <scope>runtime</scope>
+            <artifactId>jscene3d-project-runtime</artifactId>
         </dependency>
 
         <dependency>
@@ -90,62 +58,6 @@
                                     <mainClass>io.github.glynch.jscene3d.project.examples.WorldCompositionExample</mainClass>
                                     <arguments>
                                         <argument>${project.basedir}/src/main/world-project</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>run-import-example</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>run-project-import-example</id>
-                                <phase>compile</phase>
-                                <goals>
-                                    <goal>java</goal>
-                                </goals>
-                                <configuration>
-                                    <mainClass>io.github.glynch.jscene3d.project.examples.ProjectImportExample</mainClass>
-                                    <arguments>
-                                        <argument>${project.basedir}/src/main/import-project</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>run-project-example</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>run-declarative-project-example</id>
-                                <phase>compile</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <executable>${java.home}/bin/java</executable>
-                                    <arguments>
-                                        <argument>${jscene3d.example.firstThreadArgument}</argument>
-                                        <argument>-classpath</argument>
-                                        <classpath />
-                                        <argument>io.github.glynch.jscene3d.project.examples.Declarative3dProjectExample</argument>
-                                        <argument>${project.basedir}/src/main/project</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

@@ -32,7 +32,7 @@ final class ComponentFactoryRegistrationTest {
         FactoryBindings bindings = new FactoryBindings();
         RuntimeRegistry registry = registry(bindings);
 
-        registry.registerComponent(MOVER, FACTORY);
+        registry.register(MOVER, FACTORY);
 
         assertThat(bindings.requireComponent(MOVER, "/components/0")).isSameAs(FACTORY);
     }
@@ -42,10 +42,10 @@ final class ComponentFactoryRegistrationTest {
     void rejectsUnownedOrUndeclaredFactory() {
         RuntimeRegistry registry = registry(new FactoryBindings());
 
-        assertThatThrownBy(() -> registry.registerComponent(UNKNOWN, FACTORY))
+        assertThatThrownBy(() -> registry.register(UNKNOWN, FACTORY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no descriptor");
-        assertThatThrownBy(() -> registry.registerComponent(FOREIGN, FACTORY))
+        assertThatThrownBy(() -> registry.register(FOREIGN, FACTORY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not belong");
     }
@@ -55,13 +55,13 @@ final class ComponentFactoryRegistrationTest {
     void rejectsDuplicateOrLateFactory() {
         FactoryBindings bindings = new FactoryBindings();
         RuntimeRegistry registry = registry(bindings);
-        registry.registerComponent(MOVER, FACTORY);
+        registry.register(MOVER, FACTORY);
 
-        assertThatThrownBy(() -> registry.registerComponent(MOVER, FACTORY))
+        assertThatThrownBy(() -> registry.register(MOVER, FACTORY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("already registered");
         registry.closeRegistration();
-        assertThatThrownBy(() -> registry.registerComponent(MOVER, FACTORY))
+        assertThatThrownBy(() -> registry.register(MOVER, FACTORY))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already closed");
     }

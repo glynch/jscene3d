@@ -10,8 +10,7 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
 import java.util.Objects;
 
 /** Stable address of one component endpoint in a particular live world. */
-record RuntimeEndpointAddress(RuntimeEntityId entity, ComponentId component, EndpointId endpoint)
-        implements EndpointAddress {
+record RuntimeEndpointAddress(RuntimeEntityId entity, ComponentId component, EndpointId endpoint) {
     /** Validates all three runtime endpoint identity dimensions. */
     RuntimeEndpointAddress {
         Objects.requireNonNull(entity, "entity");

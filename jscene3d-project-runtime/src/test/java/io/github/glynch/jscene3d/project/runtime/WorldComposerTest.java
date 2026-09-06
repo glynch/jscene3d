@@ -31,8 +31,8 @@ import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -220,7 +220,7 @@ final class WorldComposerTest {
     @Test
     void rejectsDuplicateRuntimeExtensions() throws IOException {
         WorldDefinition definition = emptyWorld();
-        ProjectRuntimeExtension provider = extension(new RecordingFactory());
+        ComponentRuntimeExtension provider = extension(new RecordingFactory());
 
         WorldCompositionResult result = compose(definition, descriptor(), List.of(provider, provider), NO_RESOURCES);
 
@@ -235,14 +235,14 @@ final class WorldComposerTest {
     @Test
     void reportsRuntimeExtensionRegistrationFailure() throws IOException {
         WorldDefinition definition = emptyWorld();
-        ProjectRuntimeExtension provider = new ProjectRuntimeExtension() {
+        ComponentRuntimeExtension provider = new ComponentRuntimeExtension() {
             @Override
             public String id() {
                 return EXTENSION_ID;
             }
 
             @Override
-            public void register(ProjectRuntimeRegistry registry) {
+            public void register(ComponentFactoryRegistry registry) {
                 throw new IllegalStateException("registration failed");
             }
         };
@@ -307,7 +307,7 @@ final class WorldComposerTest {
     private WorldCompositionResult compose(
             WorldDefinition world,
             ComponentTypeDescriptor descriptor,
-            List<ProjectRuntimeExtension> extensions,
+            List<ComponentRuntimeExtension> extensions,
             RuntimeResourceLookup resources)
             throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
@@ -336,7 +336,7 @@ final class WorldComposerTest {
     private WorldCompositionResult composeCatalog(
             WorldDefinition world,
             ComponentTypeDescriptor descriptor,
-            List<ProjectRuntimeExtension> extensions,
+            List<ComponentRuntimeExtension> extensions,
             RuntimeResourceLookup resources) {
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
@@ -350,16 +350,16 @@ final class WorldComposerTest {
     }
 
     /** Creates the executable contribution for the test component type. */
-    private static ProjectRuntimeExtension extension(ComponentFactory<?> factory) {
-        return new ProjectRuntimeExtension() {
+    private static ComponentRuntimeExtension extension(ComponentFactory<?> factory) {
+        return new ComponentRuntimeExtension() {
             @Override
             public String id() {
                 return EXTENSION_ID;
             }
 
             @Override
-            public void register(ProjectRuntimeRegistry registry) {
-                registry.registerComponent(VALUE_TYPE, factory);
+            public void register(ComponentFactoryRegistry registry) {
+                registry.register(VALUE_TYPE, factory);
             }
         };
     }

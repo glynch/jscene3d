@@ -8,7 +8,7 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,12 +26,12 @@ final class WorldRuntimeExtensions {
 
     /** Returns component factory bindings or throws the ordered structured registration diagnostics. */
     static FactoryBindings register(
-            URI source, RegisteredTypeCatalog catalog, Collection<ProjectRuntimeExtension> extensions) {
+            URI source, RegisteredTypeCatalog catalog, Collection<ComponentRuntimeExtension> extensions) {
         List<ProjectDiagnostic> diagnostics = new ArrayList<>();
-        Map<String, ProjectRuntimeExtension> providers = index(source, extensions, diagnostics);
+        Map<String, ComponentRuntimeExtension> providers = index(source, extensions, diagnostics);
         FactoryBindings bindings = new FactoryBindings();
         for (ExtensionDescriptor descriptor : catalog.extensions()) {
-            ProjectRuntimeExtension extension = providers.get(descriptor.id());
+            ComponentRuntimeExtension extension = providers.get(descriptor.id());
             if (extension != null) {
                 register(source, catalog, extension, bindings, diagnostics);
             }
@@ -43,12 +43,12 @@ final class WorldRuntimeExtensions {
     }
 
     /** Indexes unique runtime providers and records invalid declarations. */
-    private static Map<String, ProjectRuntimeExtension> index(
-            URI source, Collection<ProjectRuntimeExtension> extensions, List<ProjectDiagnostic> diagnostics) {
-        Map<String, ProjectRuntimeExtension> providers = new LinkedHashMap<>();
-        for (ProjectRuntimeExtension extension : extensions) {
+    private static Map<String, ComponentRuntimeExtension> index(
+            URI source, Collection<ComponentRuntimeExtension> extensions, List<ProjectDiagnostic> diagnostics) {
+        Map<String, ComponentRuntimeExtension> providers = new LinkedHashMap<>();
+        for (ComponentRuntimeExtension extension : extensions) {
             try {
-                ProjectRuntimeExtension validExtension = Objects.requireNonNull(extension, "extensions entry");
+                ComponentRuntimeExtension validExtension = Objects.requireNonNull(extension, "extensions entry");
                 String id = Preconditions.requireNonBlank(validExtension.id(), "runtime extension id");
                 if (providers.putIfAbsent(id, validExtension) != null) {
                     diagnostics.add(error(
@@ -70,7 +70,7 @@ final class WorldRuntimeExtensions {
     private static void register(
             URI source,
             RegisteredTypeCatalog catalog,
-            ProjectRuntimeExtension extension,
+            ComponentRuntimeExtension extension,
             FactoryBindings bindings,
             List<ProjectDiagnostic> diagnostics) {
         RuntimeRegistry registry = new RuntimeRegistry(extension.id(), catalog, bindings);

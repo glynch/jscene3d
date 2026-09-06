@@ -27,9 +27,9 @@ import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -245,16 +245,16 @@ final class WorldLifecycleTest {
     }
 
     /** Creates the fixture runtime extension for one supplied factory. */
-    private static ProjectRuntimeExtension extension(ComponentFactory<?> factory) {
-        return new ProjectRuntimeExtension() {
+    private static ComponentRuntimeExtension extension(ComponentFactory<?> factory) {
+        return new ComponentRuntimeExtension() {
             @Override
             public String id() {
                 return EXTENSION_ID;
             }
 
             @Override
-            public void register(ProjectRuntimeRegistry registry) {
-                registry.registerComponent(TYPE, factory);
+            public void register(ComponentFactoryRegistry registry) {
+                registry.register(TYPE, factory);
             }
         };
     }

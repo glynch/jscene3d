@@ -7,7 +7,6 @@ package io.github.glynch.jscene3d.doom;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.project.importing.extension.ProjectImportExtension;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import java.lang.module.ModuleDescriptor;
 import java.util.Map;
 import java.util.Set;
@@ -23,7 +22,7 @@ final class DoomModuleDescriptorTest {
         assertThat(getClass().getModule().getName()).isEqualTo("io.github.glynch.jscene3d.doom");
     }
 
-    /** Exports only decoding interfaces, retains transitive WAD types, and provides both executable seams. */
+    /** Exports only decoding interfaces, retains transitive WAD types, and provides the import seam. */
     @Test
     void declaresSupportedModuleInterface() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
@@ -41,11 +40,8 @@ final class DoomModuleDescriptorTest {
                         assertThat(requirement.modifiers()).contains(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
         Map<String, ModuleDescriptor.Provides> providers = descriptor.provides().stream()
                 .collect(Collectors.toUnmodifiableMap(ModuleDescriptor.Provides::service, Function.identity()));
-        assertThat(providers)
-                .containsOnlyKeys(ProjectImportExtension.class.getName(), ProjectRuntimeExtension.class.getName());
+        assertThat(providers).containsOnlyKeys(ProjectImportExtension.class.getName());
         assertThat(providers.get(ProjectImportExtension.class.getName()).providers())
                 .containsExactly("io.github.glynch.jscene3d.doom.importing.internal.DoomImportExtension");
-        assertThat(providers.get(ProjectRuntimeExtension.class.getName()).providers())
-                .containsExactly("io.github.glynch.jscene3d.doom.runtime.internal.DoomRuntimeExtension");
     }
 }

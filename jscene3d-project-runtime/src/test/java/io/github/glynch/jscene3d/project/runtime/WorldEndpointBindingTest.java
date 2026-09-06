@@ -30,8 +30,8 @@ import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
@@ -176,7 +176,7 @@ final class WorldEndpointBindingTest {
     @Test
     void rejectsComponentWithoutEndpointBindingCapability() throws IOException {
         List<String> events = new ArrayList<>();
-        ProjectRuntimeExtension extension = extension(
+        ComponentRuntimeExtension extension = extension(
                 events, () -> new ClosingValue(events, "unsupported"), () -> new TargetComponent(events, "unused"));
 
         WorldCompositionResult result = compose(definition(List.of()), placedWorld(List.of()), extension);
@@ -193,7 +193,7 @@ final class WorldEndpointBindingTest {
     @Test
     void rejectsUnimplementedDeclaredEndpointAndRollsBack() throws IOException {
         List<String> events = new ArrayList<>();
-        ProjectRuntimeExtension extension =
+        ComponentRuntimeExtension extension =
                 extension(events, () -> new SourceComponent(events), () -> new IncompleteTargetComponent(events));
 
         WorldCompositionResult result = compose(definition(List.of()), placedWorld(List.of()), extension);
@@ -210,7 +210,7 @@ final class WorldEndpointBindingTest {
     @Test
     void diagnosesEndpointBindingCallbackFailure() throws IOException {
         List<String> events = new ArrayList<>();
-        ProjectRuntimeExtension extension = extension(
+        ComponentRuntimeExtension extension = extension(
                 events, () -> new FailingSourceComponent(events), () -> new TargetComponent(events, "unused"));
 
         WorldCompositionResult result = compose(definition(List.of()), placedWorld(List.of()), extension);
@@ -241,13 +241,14 @@ final class WorldEndpointBindingTest {
 
     /** Writes and composes one definition and world through the supported public seam. */
     private WorldCompositionResult compose(
-            EntityDefinition definition, WorldDefinition world, ProjectRuntimeExtension extension) throws IOException {
+            EntityDefinition definition, WorldDefinition world, ComponentRuntimeExtension extension)
+            throws IOException {
         return compose(List.of(definition), world, extension);
     }
 
     /** Writes all reusable definitions before composing one world. */
     private WorldCompositionResult compose(
-            List<EntityDefinition> definitions, WorldDefinition world, ProjectRuntimeExtension extension)
+            List<EntityDefinition> definitions, WorldDefinition world, ComponentRuntimeExtension extension)
             throws IOException {
         for (int index = 0; index < definitions.size(); index++) {
             DefinitionWriter.write(
@@ -350,7 +351,7 @@ final class WorldEndpointBindingTest {
     }
 
     /** Creates the complete source and target runtime adapters. */
-    private static ProjectRuntimeExtension completeExtension(List<String> events) {
+    private static ComponentRuntimeExtension completeExtension(List<String> events) {
         AtomicInteger targetIndex = new AtomicInteger();
         return extension(
                 events,
@@ -359,20 +360,20 @@ final class WorldEndpointBindingTest {
     }
 
     /** Creates one runtime extension from deterministic factory-result suppliers. */
-    private static ProjectRuntimeExtension extension(List<String> events, FactoryValue source, FactoryValue target) {
-        return new ProjectRuntimeExtension() {
+    private static ComponentRuntimeExtension extension(List<String> events, FactoryValue source, FactoryValue target) {
+        return new ComponentRuntimeExtension() {
             @Override
             public String id() {
                 return EXTENSION_ID;
             }
 
             @Override
-            public void register(ProjectRuntimeRegistry registry) {
-                registry.registerComponent(SOURCE_TYPE, context -> {
+            public void register(ComponentFactoryRegistry registry) {
+                registry.register(SOURCE_TYPE, context -> {
                     events.add("create:source");
                     return source.create();
                 });
-                registry.registerComponent(TARGET_TYPE, context -> {
+                registry.register(TARGET_TYPE, context -> {
                     events.add("create:target");
                     return target.create();
                 });

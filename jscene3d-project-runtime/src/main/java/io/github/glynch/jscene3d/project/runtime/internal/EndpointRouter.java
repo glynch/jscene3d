@@ -11,7 +11,6 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayloadAction;
 import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
-import io.github.glynch.jscene3d.project.scene.SceneConnection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,28 +21,14 @@ import java.util.function.BooleanSupplier;
 
 /** Synchronous declaration-ordered signal routing for one runtime. */
 final class EndpointRouter {
-    private final Map<EndpointAddress, ActionBinding> actions = new LinkedHashMap<>();
-    private final Map<EndpointAddress, List<ActionBinding>> routes = new LinkedHashMap<>();
+    private final Map<RuntimeEndpointAddress, ActionBinding> actions = new LinkedHashMap<>();
+    private final Map<RuntimeEndpointAddress, List<ActionBinding>> routes = new LinkedHashMap<>();
     private boolean active;
-
-    /** Creates one signal emitter associated with a runtime node. */
-    RuntimeSignal signal(String nodeId, EndpointDescriptor descriptor, BooleanSupplier enabled) {
-        SceneEndpointAddress key = new SceneEndpointAddress(nodeId, descriptor.id());
-        return new RoutedSignal(key, descriptor.payload(), enabled);
-    }
 
     /** Creates one signal emitter associated with a component in a composed world. */
     RuntimeSignal signal(RuntimeEndpointAddress address, EndpointDescriptor descriptor, BooleanSupplier enabled) {
         requireMatchingEndpoint(address, descriptor);
         return new RoutedSignal(address, descriptor.payload(), enabled);
-    }
-
-    /** Registers an action declared without a payload. */
-    void action(String nodeId, EndpointDescriptor descriptor, BooleanSupplier enabled, RuntimeAction action) {
-        if (descriptor.payload().isPresent()) {
-            throw new IllegalArgumentException("action requires a payload: " + descriptor.id());
-        }
-        register(nodeId, descriptor, enabled, ignored -> action.execute());
     }
 
     /** Registers a payload-free action on a component in a composed world. */
@@ -59,14 +44,6 @@ final class EndpointRouter {
         register(address, descriptor, enabled, ignored -> action.execute());
     }
 
-    /** Registers an action declared with a payload. */
-    void action(String nodeId, EndpointDescriptor descriptor, BooleanSupplier enabled, RuntimePayloadAction action) {
-        if (descriptor.payload().isEmpty()) {
-            throw new IllegalArgumentException("action does not accept a payload: " + descriptor.id());
-        }
-        register(nodeId, descriptor, enabled, payload -> action.execute(payload.orElseThrow()));
-    }
-
     /** Registers a payload-carrying action on a component in a composed world. */
     void action(
             RuntimeEndpointAddress address,
@@ -80,27 +57,8 @@ final class EndpointRouter {
         register(address, descriptor, enabled, payload -> action.execute(payload.orElseThrow()));
     }
 
-    /** Resolves authored connections after all factories have registered their actions. */
-    void connect(List<SceneConnection> connections) {
-        for (int index = 0; index < connections.size(); index++) {
-            SceneConnection connection = connections.get(index);
-            SceneEndpointAddress source = new SceneEndpointAddress(
-                    connection.from().node(), connection.from().signal());
-            SceneEndpointAddress target = new SceneEndpointAddress(
-                    connection.to().node(), connection.to().action());
-            ActionBinding action = actions.get(target);
-            if (action == null) {
-                throw new RuntimeCompositionException(
-                        RuntimeDiagnosticCode.ACTION_UNIMPLEMENTED,
-                        "connected action has no runtime implementation: " + target,
-                        "/connections/" + index + "/to");
-            }
-            routes.computeIfAbsent(source, ignored -> new ArrayList<>()).add(action);
-        }
-    }
-
     /** Resolves declaration-ordered world connections after all component actions are registered. */
-    void connectWorld(List<RuntimeConnectionPlan> connections) {
+    void connect(List<RuntimeConnectionPlan> connections) {
         for (RuntimeConnectionPlan connection : connections) {
             connect(connection.signal(), connection.action(), connection.location() + "/action");
         }
@@ -120,14 +78,7 @@ final class EndpointRouter {
 
     /** Adds one unique action implementation. */
     private void register(
-            String nodeId, EndpointDescriptor descriptor, BooleanSupplier enabled, InternalAction action) {
-        SceneEndpointAddress key = new SceneEndpointAddress(nodeId, descriptor.id());
-        register(key, descriptor, enabled, action);
-    }
-
-    /** Adds one unique action implementation using either supported endpoint-address representation. */
-    private void register(
-            EndpointAddress key, EndpointDescriptor descriptor, BooleanSupplier enabled, InternalAction action) {
+            RuntimeEndpointAddress key, EndpointDescriptor descriptor, BooleanSupplier enabled, InternalAction action) {
         ActionBinding binding = new ActionBinding(key, descriptor.payload(), enabled, action);
         if (actions.putIfAbsent(key, binding) != null) {
             throw new IllegalArgumentException("action is already implemented: " + key);
@@ -135,7 +86,7 @@ final class EndpointRouter {
     }
 
     /** Adds one route after requiring its target action implementation. */
-    private void connect(EndpointAddress source, EndpointAddress target, String location) {
+    private void connect(RuntimeEndpointAddress source, RuntimeEndpointAddress target, String location) {
         ActionBinding action = actions.get(target);
         if (action == null) {
             throw new RuntimeCompositionException(
@@ -148,7 +99,7 @@ final class EndpointRouter {
 
     /** Requires absence or exact registered payload identity as declared. */
     private static void requirePayloadType(
-            EndpointAddress source, Optional<RegisteredType> expectedType, Optional<RuntimePayload> payload) {
+            RuntimeEndpointAddress source, Optional<RegisteredType> expectedType, Optional<RuntimePayload> payload) {
         if (expectedType.isEmpty() && payload.isPresent()) {
             throw new IllegalArgumentException("signal does not accept a payload: " + source);
         }
@@ -178,7 +129,7 @@ final class EndpointRouter {
 
     /** Enabled-aware action binding. */
     private record ActionBinding(
-            EndpointAddress key,
+            RuntimeEndpointAddress key,
             Optional<RegisteredType> expectedType,
             BooleanSupplier enabled,
             InternalAction action) {
@@ -199,11 +150,12 @@ final class EndpointRouter {
 
     /** Runtime-facing emitter with descriptor-owned payload validation. */
     private final class RoutedSignal implements RuntimeSignal {
-        private final EndpointAddress source;
+        private final RuntimeEndpointAddress source;
         private final Optional<RegisteredType> payloadType;
         private final BooleanSupplier enabled;
 
-        private RoutedSignal(EndpointAddress source, Optional<RegisteredType> payloadType, BooleanSupplier enabled) {
+        private RoutedSignal(
+                RuntimeEndpointAddress source, Optional<RegisteredType> payloadType, BooleanSupplier enabled) {
             this.source = source;
             this.payloadType = payloadType;
             this.enabled = enabled;

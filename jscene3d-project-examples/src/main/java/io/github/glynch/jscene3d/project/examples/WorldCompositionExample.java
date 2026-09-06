@@ -29,11 +29,11 @@ import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -148,19 +148,19 @@ public final class WorldCompositionExample {
     }
 
     /** Supplies the executable factory independently of the safe descriptor. */
-    private static final class LabelRuntimeExtension implements ProjectRuntimeExtension {
+    private static final class LabelRuntimeExtension implements ComponentRuntimeExtension {
         @Override
         public String id() {
             return EXTENSION_ID;
         }
 
         @Override
-        public void register(ProjectRuntimeRegistry registry) {
-            registry.registerComponent(LABEL_TYPE, context -> {
+        public void register(ComponentFactoryRegistry registry) {
+            registry.register(LABEL_TYPE, context -> {
                 ProjectValue value = Objects.requireNonNull(context.properties().get(LABEL), "label");
                 return new LabelComponent(((ProjectValue.TextValue) value).value());
             });
-            registry.registerComponent(LABEL_LINK_TYPE, context -> new LabelLinkComponent());
+            registry.register(LABEL_LINK_TYPE, context -> new LabelLinkComponent());
         }
     }
 

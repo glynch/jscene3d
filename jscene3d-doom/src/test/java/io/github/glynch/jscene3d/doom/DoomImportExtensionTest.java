@@ -21,7 +21,6 @@ import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
-import io.github.glynch.jscene3d.project.runtime.scene3d.Scene3dTypes;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,8 +52,7 @@ final class DoomImportExtensionTest {
               },
               "extensions": [
                 {"id": "io.github.glynch.jscene3d.wad", "requires": "0.1.0-SNAPSHOT"},
-                {"id": "io.github.glynch.jscene3d.doom", "requires": "0.1.0-SNAPSHOT"},
-                {"id": "io.github.glynch.jscene3d", "requires": "0.1.0-SNAPSHOT"}
+                {"id": "io.github.glynch.jscene3d.doom", "requires": "0.1.0-SNAPSHOT"}
               ],
               "assets": [
                 {
@@ -131,7 +129,7 @@ final class DoomImportExtensionTest {
                 .containsEntry("marker-index", new ProjectValue.NumberValue(BigDecimal.ZERO));
     }
 
-    /** Imports one selected map and its derived static collision as native project resources. */
+    /** Imports one selected map as a native project resource. */
     @Test
     void importsSelectedMapResource() throws IOException {
         ImportManager manager = manager();
@@ -141,11 +139,9 @@ final class DoomImportExtensionTest {
             assertThat(prepared.preview().isValid()).isTrue();
             assertThat(prepared.preview().artifacts())
                     .extracting(ImportedArtifactMetadata::identity)
-                    .containsExactly("maps/MAP01", "maps/MAP01/static-collision");
+                    .containsExactly("maps/MAP01");
             assertThat(prepared.preview().artifacts().getFirst().descriptor().resourceType())
                     .contains(MAP_RESOURCE_TYPE);
-            assertThat(prepared.preview().artifacts().get(1).descriptor().resourceType())
-                    .contains(Scene3dTypes.TRIANGLE_MESH_SHAPE_3D);
             prepared.commit();
         }
 
@@ -159,16 +155,6 @@ final class DoomImportExtensionTest {
                         "\"things\" : [",
                         "\"linedefs\" : [",
                         "\"blockmap\" : {")
-                .doesNotContain(projectDirectory.toString())
-                .endsWith("}\n");
-
-        String collision = new String(read(manager, definition, "maps/MAP01/static-collision"), StandardCharsets.UTF_8);
-        assertThat(collision)
-                .startsWith("{\n  \"schemaVersion\" : 1,")
-                .contains(
-                        "\"type\" : \"io.github.glynch.jscene3d/triangle-mesh-shape-3d\"",
-                        "\"positions\" : [",
-                        "\"indices\" : [")
                 .doesNotContain(projectDirectory.toString())
                 .endsWith("}\n");
     }

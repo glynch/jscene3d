@@ -310,8 +310,8 @@ private static final ComponentType MOVER =
         ComponentType.of("example.game/mover", 1);
 
 @Override
-public void register(ProjectRuntimeRegistry registry) {
-    registry.registerComponent(MOVER, context ->
+public void register(ComponentFactoryRegistry registry) {
+    registry.register(MOVER, context ->
             new Mover(context.properties()));
 }
 ```

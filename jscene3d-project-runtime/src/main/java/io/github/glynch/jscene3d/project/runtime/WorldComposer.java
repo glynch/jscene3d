@@ -11,7 +11,7 @@ import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
-import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.internal.RuntimeCompositionException;
 import io.github.glynch.jscene3d.project.runtime.internal.RuntimeDiagnosticsException;
 import io.github.glynch.jscene3d.project.runtime.internal.WorldCompositionEngine;
@@ -59,12 +59,12 @@ public final class WorldComposer {
             AssetCatalog assets,
             AssetRef<WorldDefinition> reference,
             RegisteredTypeCatalog types,
-            Collection<ProjectRuntimeExtension> extensions,
+            Collection<ComponentRuntimeExtension> extensions,
             RuntimeResourceLookup resources) {
         AssetCatalog validAssets = Objects.requireNonNull(assets, "assets");
         AssetRef<WorldDefinition> validReference = Objects.requireNonNull(reference, "reference");
         RegisteredTypeCatalog validTypes = Objects.requireNonNull(types, "types");
-        List<ProjectRuntimeExtension> validExtensions = List.copyOf(extensions);
+        List<ComponentRuntimeExtension> validExtensions = List.copyOf(extensions);
         RuntimeResourceLookup validResources = Objects.requireNonNull(resources, "resources");
         DefinitionLoadResult<WorldDefinition> loaded = validAssets.loadWorld(validReference, validTypes);
         List<ProjectDiagnostic> diagnostics = new ArrayList<>(loaded.diagnostics());

@@ -73,7 +73,7 @@ final class RuntimeComponentConstructor {
             }
             bindReferences(bindings);
             bindEndpoints(endpointBindings, allocation.world().endpointRouter());
-            allocation.world().endpointRouter().connectWorld(allocation.connections());
+            allocation.world().endpointRouter().connect(allocation.connections());
             allocation.world().complete(entries);
             return allocation.world();
         } catch (RuntimeException failure) {

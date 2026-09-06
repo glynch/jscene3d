@@ -62,9 +62,9 @@ final class WorldComposerTest {
     private static final ComponentType VALUE_TYPE = ComponentType.of("example.game/value", 1);
     private static final PropertyId VALUE = new PropertyId("value");
 
-    private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
+    private static final RuntimeResourceProvider NO_RESOURCES = new RuntimeResourceProvider() {
         @Override
-        public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
             throw new IllegalStateException("the test defines no runtime resources");
         }
     };
@@ -175,13 +175,9 @@ final class WorldComposerTest {
 
         world.close();
         world.close();
-        ResourceReference reference = ResourceReference.asset("unused");
 
         assertThat(world.isClosed()).isTrue();
         assertThat(events).containsExactly("create:1", "create:2", "close:2", "close:1");
-        assertThatThrownBy(() -> world.resolveResource(reference, Object.class))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("closed");
     }
 
     /** Withholds a partial world and rolls back prior values when one factory fails. */
@@ -280,21 +276,222 @@ final class WorldComposerTest {
                 .isEqualTo(RuntimeDiagnosticCode.FACTORY_CREATE_FAILED);
     }
 
-    /** Delegates resource resolution without transferring ownership of the lookup to the world. */
+    /** Acquires a resource lease once and releases it after component cleanup. */
     @Test
-    void delegatesRuntimeResourceResolution() throws IOException {
-        RuntimeResourceLookup resources = new RuntimeResourceLookup() {
+    void ownsRuntimeResourceLeases() throws IOException {
+        List<String> events = new ArrayList<>();
+        RuntimeResourceProvider resources = new RuntimeResourceProvider() {
             @Override
-            public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
-                return valueType.cast("resource-value");
+            public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+                events.add("acquire:" + reference);
+                T value = valueType.cast("resource-value");
+                return RuntimeResourceLease.of(value, () -> events.add("release:" + reference));
             }
         };
-        World world = compose(emptyWorld(), descriptor(), List.of(extension(new RecordingFactory())), resources)
+        ComponentFactory<ClosingComponent> factory = context -> {
+            String value = context.resolveResource(ResourceReference.asset("shared"), String.class);
+            return new ClosingComponent(value, events);
+        };
+        World world = compose(worldWithComponent(), descriptor(), List.of(extension(factory)), resources)
                 .world()
                 .orElseThrow();
-        ResourceReference reference = ResourceReference.asset("shared");
 
-        assertThat(world.resolveResource(reference, String.class)).isEqualTo("resource-value");
+        world.close();
+
+        assertThat(events).containsExactly("acquire:asset:shared", "close:resource-value", "release:asset:shared");
+    }
+
+    /** Retains one shared lease until the final entity using it is destroyed. */
+    @Test
+    void releasesSharedLeaseAfterFinalOwningEntityIsDestroyed() throws IOException {
+        List<String> events = new ArrayList<>();
+        RuntimeResourceProvider resources = stringResourceProvider(events);
+        ComponentFactory<ClosingComponent> factory = context -> {
+            context.resolveResource(ResourceReference.asset("shared"), String.class);
+            String value = text(Objects.requireNonNull(context.properties().get(VALUE), "value"));
+            return new ClosingComponent(value, events);
+        };
+        World world = compose(twoRootWorld(), descriptor(), List.of(extension(factory)), resources)
+                .world()
+                .orElseThrow();
+        world.activate();
+
+        world.destroy(world.roots().getFirst());
+
+        assertThat(events).containsExactly("acquire:asset:shared", "close:1");
+
+        world.destroy(world.roots().getFirst());
+
+        assertThat(events).containsExactly("acquire:asset:shared", "close:1", "close:2", "release:asset:shared");
+    }
+
+    /** Releases acquired leases after constructed component values when composition fails. */
+    @Test
+    void releasesResourceLeasesDuringCompositionRollback() throws IOException {
+        List<String> events = new ArrayList<>();
+        RuntimeResourceProvider resources = stringResourceProvider(events);
+        ComponentFactory<ClosingComponent> factory = context -> {
+            context.resolveResource(ResourceReference.asset("shared"), String.class);
+            String value = text(Objects.requireNonNull(context.properties().get(VALUE), "value"));
+            if ("2".equals(value)) {
+                throw new IllegalStateException("deliberate resource-user failure");
+            }
+            return new ClosingComponent(value, events);
+        };
+
+        WorldCompositionResult result = compose(twoRootWorld(), descriptor(), List.of(extension(factory)), resources);
+
+        assertThat(result.world()).isEmpty();
+        assertThat(result.diagnostics())
+                .singleElement()
+                .extracting(ProjectDiagnostic::code)
+                .isEqualTo(RuntimeDiagnosticCode.FACTORY_CREATE_FAILED);
+        assertThat(events).containsExactly("acquire:asset:shared", "close:1", "release:asset:shared");
+    }
+
+    /** Reports provider failures at the exact constructing component and resource reference. */
+    @Test
+    void reportsRuntimeResourceAcquisitionFailure() throws IOException {
+        RuntimeResourceProvider resources = new RuntimeResourceProvider() {
+            @Override
+            public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+                throw new IllegalStateException("resource is unavailable");
+            }
+        };
+        ComponentFactory<Object> factory =
+                context -> context.resolveResource(ResourceReference.asset("missing"), String.class);
+
+        WorldCompositionResult result =
+                compose(worldWithComponent(), descriptor(), List.of(extension(factory)), resources);
+
+        assertThat(result.world()).isEmpty();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code()).isEqualTo(RuntimeDiagnosticCode.RESOURCE_ACQUISITION_FAILED);
+            assertThat(diagnostic.location()).isEqualTo("/roots/0/components/0/resources/asset:missing");
+        });
+    }
+
+    /** Releases resource leases in reverse acquisition order before closing world modules. */
+    @Test
+    void ordersResourceAndWorldModuleCleanup() throws IOException {
+        List<String> events = new ArrayList<>();
+        RuntimeResourceProvider resources = new RuntimeResourceProvider() {
+            @Override
+            public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+                events.add("acquire:" + reference);
+                T value = valueType.cast(reference.locator());
+                return RuntimeResourceLease.of(value, () -> events.add("release:" + reference));
+            }
+        };
+        ComponentFactory<ClosingComponent> factory = context -> {
+            context.resolveResource(ResourceReference.asset("first"), String.class);
+            context.resolveResource(ResourceReference.asset("second"), String.class);
+            return new ClosingComponent("component", events);
+        };
+        RecordingWorldModule module = new RecordingWorldModule("ordered", events, false);
+        WorldModuleBinding<ExampleWorldModule> binding = WorldModuleBinding.of(ExampleWorldModule.class, module);
+
+        World world = composeWithModules(
+                        worldWithComponent(), descriptor(), List.of(extension(factory)), List.of(binding), resources)
+                .world()
+                .orElseThrow();
+
+        world.close();
+
+        assertThat(events)
+                .containsExactly(
+                        "acquire:asset:first",
+                        "acquire:asset:second",
+                        "close:component",
+                        "release:asset:second",
+                        "release:asset:first",
+                        "close-module:ordered");
+    }
+
+    /** Continues module cleanup and identifies a failed resource lease by reference. */
+    @Test
+    void reportsRuntimeResourceCleanupFailure() throws IOException {
+        List<String> events = new ArrayList<>();
+        RuntimeResourceProvider resources = new RuntimeResourceProvider() {
+            @Override
+            public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+                T value = valueType.cast("resource-value");
+                return RuntimeResourceLease.of(value, () -> {
+                    events.add("release:" + reference);
+                    throw new IllegalStateException("release failed");
+                });
+            }
+        };
+        ComponentFactory<Object> factory = context -> {
+            context.resolveResource(ResourceReference.asset("broken"), String.class);
+            return new Object();
+        };
+        RecordingWorldModule module = new RecordingWorldModule("cleanup", events, false);
+        WorldModuleBinding<ExampleWorldModule> binding = WorldModuleBinding.of(ExampleWorldModule.class, module);
+        World world = composeWithModules(
+                        worldWithComponent(), descriptor(), List.of(extension(factory)), List.of(binding), resources)
+                .world()
+                .orElseThrow();
+
+        RuntimeResourceCloseException failure = catchThrowableOfType(RuntimeResourceCloseException.class, world::close);
+
+        assertThat(failure.reference()).isEqualTo(ResourceReference.asset("broken"));
+        assertThat(world.isClosed()).isTrue();
+        assertThat(events).containsExactly("release:asset:broken", "close-module:cleanup");
+    }
+
+    /** Keeps leases independent when two worlds use the same provider and resource value. */
+    @Test
+    void isolatesRuntimeResourceLeasesBetweenWorlds() throws IOException {
+        List<String> events = new ArrayList<>();
+        RuntimeResourceProvider resources = new RuntimeResourceProvider() {
+            @Override
+            public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+                int leaseNumber = events.size() + 1;
+                events.add("acquire:" + leaseNumber);
+                T value = valueType.cast("shared-value");
+                return RuntimeResourceLease.of(value, () -> events.add("release:" + leaseNumber));
+            }
+        };
+        ComponentFactory<Object> factory = context -> {
+            context.resolveResource(ResourceReference.asset("shared"), String.class);
+            return new Object();
+        };
+
+        World first = compose(worldWithComponent(), descriptor(), List.of(extension(factory)), resources)
+                .world()
+                .orElseThrow();
+        World second = compose(worldWithComponent(), descriptor(), List.of(extension(factory)), resources)
+                .world()
+                .orElseThrow();
+
+        first.close();
+
+        assertThat(events).containsExactly("acquire:1", "acquire:2", "release:1");
+
+        second.close();
+
+        assertThat(events).containsExactly("acquire:1", "acquire:2", "release:1", "release:2");
+    }
+
+    /** Prevents retained factory contexts from acquiring resources after construction. */
+    @Test
+    void expiresFactoryResourceResolution() throws IOException {
+        List<ComponentFactoryContext> contexts = new ArrayList<>();
+        ComponentFactory<Object> factory = context -> {
+            contexts.add(context);
+            return new Object();
+        };
+        World world =
+                compose(worldWithComponent(), descriptor(), factory).world().orElseThrow();
+        ComponentFactoryContext context = contexts.getFirst();
+        ResourceReference reference = ResourceReference.asset("late");
+
+        assertThatThrownBy(() -> context.resolveResource(reference, String.class))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("expired");
+
+        world.close();
     }
 
     /** Exposes exact host bindings to factories and callers, then closes them after component values. */
@@ -459,7 +656,7 @@ final class WorldComposerTest {
             WorldDefinition world,
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
-            RuntimeResourceLookup resources)
+            RuntimeResourceProvider resources)
             throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
         return composeCatalog(world, descriptor, extensions, resources);
@@ -472,8 +669,19 @@ final class WorldComposerTest {
             List<ComponentRuntimeExtension> extensions,
             List<WorldModuleBinding<?>> modules)
             throws IOException {
+        return composeWithModules(world, descriptor, extensions, modules, NO_RESOURCES);
+    }
+
+    /** Writes one world and composes it with explicit host modules and runtime resources. */
+    private WorldCompositionResult composeWithModules(
+            WorldDefinition world,
+            ComponentTypeDescriptor descriptor,
+            List<ComponentRuntimeExtension> extensions,
+            List<WorldModuleBinding<?>> modules,
+            RuntimeResourceProvider resources)
+            throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
-        return composeCatalog(world, descriptor, extensions, modules, NO_RESOURCES);
+        return composeCatalog(world, descriptor, extensions, modules, resources);
     }
 
     /** Writes the fixture assets and composes through the supported catalog interface. */
@@ -499,7 +707,7 @@ final class WorldComposerTest {
             WorldDefinition world,
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
-            RuntimeResourceLookup resources) {
+            RuntimeResourceProvider resources) {
         return composeCatalog(world, descriptor, extensions, List.of(), resources);
     }
 
@@ -509,7 +717,7 @@ final class WorldComposerTest {
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
             List<WorldModuleBinding<?>> modules,
-            RuntimeResourceLookup resources) {
+            RuntimeResourceProvider resources) {
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
                 EXTENSION_ID,
@@ -532,6 +740,27 @@ final class WorldComposerTest {
             @Override
             public void register(ComponentFactoryRegistry registry) {
                 registry.register(VALUE_TYPE, factory);
+            }
+        };
+    }
+
+    /** Creates two independent roots whose components have distinct identity and property values. */
+    private static WorldDefinition twoRootWorld() {
+        LocalEntity first = new LocalEntity(
+                LOCAL_ROOT, true, List.of(component("81411df2-a65c-449b-9611-1ec68dc5a722", "1")), List.of());
+        LocalEntity second = new LocalEntity(
+                DEFINITION_ROOT, true, List.of(component("0d6d3e6e-a2ab-49c5-9b04-bcb261341f39", "2")), List.of());
+        return new WorldDefinition(WORLD_ASSET, "Two roots", List.of(first, second));
+    }
+
+    /** Creates a provider whose one shared string lease records acquisition and release. */
+    private static RuntimeResourceProvider stringResourceProvider(List<String> events) {
+        return new RuntimeResourceProvider() {
+            @Override
+            public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+                events.add("acquire:" + reference);
+                T value = valueType.cast("resource-value");
+                return RuntimeResourceLease.of(value, () -> events.add("release:" + reference));
             }
         };
     }

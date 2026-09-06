@@ -68,9 +68,9 @@ final class WorldEndpointBindingTest {
     private static final EndpointId RESET = new EndpointId("reset");
     private static final EndpointId PUBLIC_CHANGED = new EndpointId("public-changed");
     private static final EndpointId PUBLIC_APPLY = new EndpointId("public-apply");
-    private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
+    private static final RuntimeResourceProvider NO_RESOURCES = new RuntimeResourceProvider() {
         @Override
-        public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
             throw new IllegalStateException("the endpoint fixture defines no runtime resources");
         }
     };

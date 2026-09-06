@@ -25,7 +25,8 @@ import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.FixedUpdateContext;
 import io.github.glynch.jscene3d.project.runtime.FrameUpdateContext;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
@@ -65,13 +66,8 @@ public final class WorldCompositionExample {
     private static final PropertyId LABEL_TARGET = new PropertyId("label-target");
     private static final EndpointId LABEL_UPDATE_SIGNAL = new EndpointId("label-update-requested");
     private static final EndpointId LABEL_UPDATE_ACTION = new EndpointId("update-label");
+    private static final ResourceReference LABEL_FORMATTER = ResourceReference.asset("label-formatter");
     private static final Logger LOGGER = Logger.getLogger(WorldCompositionExample.class.getName());
-    private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
-        @Override
-        public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
-            throw new IllegalArgumentException("the world-composition example has no resources");
-        }
-    };
 
     /** Prevents instantiation of this application entry point. */
     private WorldCompositionExample() {
@@ -91,13 +87,14 @@ public final class WorldCompositionExample {
         AssetCatalog assets = AssetCatalog.scan(assetDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(descriptor()));
         LoggingPresentationModule presentation = new LoggingPresentationModule();
+        ExampleResourceProvider resources = new ExampleResourceProvider();
         WorldCompositionResult result = WorldComposer.compose(
                 assets,
                 AssetRef.<WorldDefinition>to(WORLD_ID),
                 types,
                 List.of(new LabelRuntimeExtension()),
                 List.of(WorldModuleBinding.of(PresentationModule.class, presentation)),
-                NO_RESOURCES);
+                resources);
         try (World world = result.world()
                 .orElseThrow(() -> new IllegalStateException("world composition failed: " + result.diagnostics()))) {
             LOGGER.info(() -> "Presentation module available = "
@@ -121,6 +118,8 @@ public final class WorldCompositionExample {
             LOGGER.info(() -> mutableRoot.name().orElse("unnamed") + " destroyed = " + mutableRoot.isDestroyed()
                     + ", remaining roots = " + world.roots().size());
         }
+        LOGGER.info(() -> "Runtime resource acquisitions = " + resources.acquisitions() + ", lease closed = "
+                + resources.isLeaseClosed());
         LOGGER.info(() -> "Presentation module closed = " + presentation.isClosed());
     }
 
@@ -181,7 +180,8 @@ public final class WorldCompositionExample {
             registry.register(LABEL_TYPE, context -> {
                 ProjectValue value = Objects.requireNonNull(context.properties().get(LABEL), "label");
                 PresentationModule presentation = context.world().requireModule(PresentationModule.class);
-                return new LabelComponent(((ProjectValue.TextValue) value).value(), presentation);
+                LabelFormatter formatter = context.resolveResource(LABEL_FORMATTER, LabelFormatter.class);
+                return new LabelComponent(formatter.format(((ProjectValue.TextValue) value).value()), presentation);
             });
             registry.register(LABEL_LINK_TYPE, context -> new LabelLinkComponent());
         }
@@ -267,6 +267,39 @@ public final class WorldCompositionExample {
         @Override
         public void onAfterPhysics(FixedUpdateContext update) {
             updateLabel(label().value() + " signalled");
+        }
+    }
+
+    /** Immutable formatting resource shared by both placed label components. */
+    private interface LabelFormatter {
+        /** Formats one authored label. */
+        String format(String label);
+    }
+
+    /** Host-owned provider proving that the world acquires once and owns only the returned lease. */
+    private static final class ExampleResourceProvider implements RuntimeResourceProvider {
+        private int acquisitions;
+        private boolean leaseClosed;
+
+        @Override
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+            if (!LABEL_FORMATTER.equals(reference)) {
+                throw new IllegalArgumentException("unknown example resource: " + reference);
+            }
+            acquisitions++;
+            LabelFormatter formatter = label -> label;
+            T value = valueType.cast(formatter);
+            return RuntimeResourceLease.of(value, () -> leaseClosed = true);
+        }
+
+        /** Returns the number of underlying provider acquisitions. */
+        private int acquisitions() {
+            return acquisitions;
+        }
+
+        /** Returns whether the world released its lease. */
+        private boolean isLeaseClosed() {
+            return leaseClosed;
         }
     }
 

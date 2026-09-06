@@ -8,7 +8,6 @@ import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -19,26 +18,27 @@ import java.util.Objects;
 /** Immutable bounded factory context for one component construction. */
 final class ComponentCreationContext implements ComponentFactoryContext {
     private final Entity owner;
-    private final World world;
+    private final InternalWorld world;
     private final ComponentDefinition definition;
     private final ComponentTypeDescriptor descriptor;
     private final Map<PropertyId, ProjectValue> properties;
-    private final RuntimeResourceLookup resources;
+    private final String location;
+    private boolean active = true;
 
     /** Stores validated component construction values. */
     ComponentCreationContext(
             Entity owner,
-            World world,
+            InternalWorld world,
             ComponentDefinition definition,
             ComponentTypeDescriptor descriptor,
             EffectiveComponentProperties properties,
-            RuntimeResourceLookup resources) {
+            String location) {
         this.owner = Objects.requireNonNull(owner, "owner");
         this.world = Objects.requireNonNull(world, "world");
         this.definition = Objects.requireNonNull(definition, "definition");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
         this.properties = properties.values();
-        this.resources = Objects.requireNonNull(resources, "resources");
+        this.location = Objects.requireNonNull(location, "location");
     }
 
     @Override
@@ -68,6 +68,14 @@ final class ComponentCreationContext implements ComponentFactoryContext {
 
     @Override
     public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
-        return resources.resolveResource(reference, valueType);
+        if (!active) {
+            throw new IllegalStateException("component factory context has expired");
+        }
+        return world.resolveResource((InternalEntity) owner, reference, valueType, location);
+    }
+
+    /** Expires construction-only resource resolution after the factory returns. */
+    void expire() {
+        active = false;
     }
 }

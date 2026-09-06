@@ -320,10 +320,10 @@ Registration must match an exact descriptor owned by that extension. Duplicate,
 foreign, undeclared, and late registrations fail immediately. A missing factory
 for a validated component is a structured composition failure. The
 `ComponentFactoryContext` exposes the immutable authored definition, its exact
-descriptor, effective property values, and runtime resource lookup; it does not
-expose mutable composer internals. Descriptor discovery and validation therefore
-do not depend on executable class loading, and serialized files never name the
-factory or implementation class.
+descriptor, effective property values, and construction-time runtime-resource
+resolution; it does not expose mutable composer internals. Descriptor discovery
+and validation therefore do not depend on executable class loading, and
+serialized files never name the factory or implementation class.
 
 Components receive their owning `World` or a bounded context explicitly. They
 do not discover a static global world, create backend implementations, or use
@@ -336,9 +336,20 @@ and instance-contract arguments, and returns either a complete inactive
 `World` or ordered structured diagnostics. A failed composition publishes no
 world and releases already-created `AutoCloseable` component values in reverse
 construction order. The caller explicitly calls `World.activate()` after
-composition. A successful world owns its component values and releases them in
-reverse construction order when it is closed. The caller retains ownership of
-the resource lookup supplied to the composer.
+composition. A successful world owns its component values and the
+runtime-resource leases acquired while constructing them. It releases component
+values before their resource leases. The caller retains ownership of the
+`RuntimeResourceProvider`; only its returned leases transfer to the world.
+
+`RuntimeResourceProvider` is the host seam for acquiring shared immutable
+runtime values. Each acquisition returns an independent `RuntimeResourceLease`;
+the provider may retain one underlying value across leases and worlds. Within a
+world, the first request for a `ResourceReference` acquires one lease and later
+requests receive the identical value after type validation. The world attributes
+use to owning entities, releases a lease when its final owning entity is
+destroyed, and otherwise releases leases in reverse acquisition order during
+world cleanup. Components receive values rather than lease handles and therefore
+cannot accidentally release resources still used elsewhere.
 
 Composition constructs every component value before binding authored entity or
 component targets. A component type with `entity_target` or `component_target`
@@ -360,11 +371,12 @@ live component endpoints in each definition-instance scope.
 
 The implemented boundary includes initial lifecycle activation,
 descriptor-compiled fixed and frame schedules, synchronous runtime signal
-dispatch, safe enablement and destruction commits, and exact host-supplied
-world-module lookup. Scheduled callbacks and signal dispatch are enabled only
-after successful world activation and stop before world cleanup. Resource
-leases, spawning, and concrete rendering, physics, audio, and input adapters
-remain subsequent slices on top of the same composed entity graph.
+dispatch, safe enablement and destruction commits, exact host-supplied
+world-module lookup, and world-owned runtime-resource leases. Scheduled
+callbacks and signal dispatch are enabled only after successful world activation
+and stop before world cleanup. Spawning and concrete rendering, physics, audio,
+and input adapters remain subsequent slices on top of the same composed entity
+graph.
 
 ## Definition placement and composition
 
@@ -595,8 +607,9 @@ must not rely on incidental authored or collection order.
 
 Activation is transactional. Failure while validating, acquiring resources,
 constructing components, binding references, or registering modules rolls back
-the complete instance and releases acquired resources in reverse order. A
-partially active definition instance is never observable.
+the complete instance. Constructed component values close before acquired
+resource leases, and leases release in reverse acquisition order. A partially
+active definition instance is never observable.
 
 `WorldComposer.compose(...)` publishes the complete graph in an inactive state
 without invoking semantic callbacks. `World.activate()` delivers creation to

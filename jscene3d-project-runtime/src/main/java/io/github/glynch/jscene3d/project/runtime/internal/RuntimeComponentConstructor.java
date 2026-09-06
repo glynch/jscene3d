@@ -10,7 +10,6 @@ import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
@@ -32,11 +31,7 @@ final class RuntimeComponentConstructor {
     }
 
     /** Constructs every planned component and completes the world, rolling back on any failure. */
-    static World construct(
-            AllocatedWorld allocation,
-            RegisteredTypeCatalog catalog,
-            FactoryBindings factories,
-            RuntimeResourceLookup resources) {
+    static World construct(AllocatedWorld allocation, RegisteredTypeCatalog catalog, FactoryBindings factories) {
         List<Object> created = new ArrayList<>();
         List<WorldComponentEntry> entries = new ArrayList<>();
         List<ComponentBindingEntry> bindings = new ArrayList<>();
@@ -47,7 +42,7 @@ final class RuntimeComponentConstructor {
                 ComponentTypeDescriptor descriptor = descriptor(plan, catalog);
                 EffectiveComponentProperties properties = EffectiveComponentProperties.merge(
                         descriptor, plan.definition(), plan.overrides(), plan.scope());
-                Object value = create(plan, allocation.world(), descriptor, properties, factories, resources);
+                Object value = create(plan, allocation.world(), descriptor, properties, factories);
                 if (!identities.add(value)) {
                     throw new RuntimeCompositionException(
                             RuntimeDiagnosticCode.FACTORY_CREATE_FAILED,
@@ -95,16 +90,15 @@ final class RuntimeComponentConstructor {
             InternalWorld world,
             ComponentTypeDescriptor descriptor,
             EffectiveComponentProperties properties,
-            FactoryBindings factories,
-            RuntimeResourceLookup resources) {
+            FactoryBindings factories) {
         ComponentDefinition definition = plan.definition();
         ComponentType type = new ComponentType(definition.type(), definition.typeVersion());
         ComponentFactory<?> factory = factories.requireComponent(type, plan.location());
         ComponentCreationContext context =
-                new ComponentCreationContext(plan.owner(), world, definition, descriptor, properties, resources);
+                new ComponentCreationContext(plan.owner(), world, definition, descriptor, properties, plan.location());
         try {
             return Objects.requireNonNull(factory.create(context), "component factory result");
-        } catch (RuntimeDiagnosticsException exception) {
+        } catch (RuntimeDiagnosticsException | RuntimeCompositionException exception) {
             throw exception;
         } catch (MissingWorldModuleException exception) {
             throw new RuntimeCompositionException(
@@ -114,6 +108,8 @@ final class RuntimeComponentConstructor {
                     plan.location());
         } catch (RuntimeException exception) {
             throw factoryFailure(type, plan, exception);
+        } finally {
+            context.expire();
         }
     }
 
@@ -250,7 +246,6 @@ final class RuntimeComponentConstructor {
 
     /** Closes created component values in reverse order and marks the partial world unusable. */
     private static void rollback(InternalWorld world, List<Object> created, RuntimeException failure) {
-        world.fail();
         for (int index = created.size() - 1; index >= 0; index--) {
             Object value = created.get(index);
             if (value instanceof AutoCloseable closeable) {
@@ -261,5 +256,6 @@ final class RuntimeComponentConstructor {
                 }
             }
         }
+        world.fail(failure);
     }
 }

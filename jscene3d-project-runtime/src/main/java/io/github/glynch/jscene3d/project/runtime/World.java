@@ -18,7 +18,7 @@ import java.util.Optional;
  * Endpoint dispatch begins only after successful activation and stops before closure releases lifecycle participation
  * and factory-created values in reverse ownership and construction order. Closing is idempotent and terminal.
  */
-public interface World extends RuntimeResourceLookup, AutoCloseable {
+public interface World extends AutoCloseable {
     /**
      * Returns the validated authored definition used for composition.
      *
@@ -71,7 +71,8 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
      * Transactionally enters semantic lifecycle management and activates every initially enabled entity.
      *
      * <p>Creation and activation run owner before owned descendants. A callback failure compensates completed work in
-     * reverse order, closes every component value, and leaves this world closed. A world may be activated only once.
+     * reverse order, closes every component value and resource lease, closes owned world modules, and leaves this world
+     * closed. A world may be activated only once.
      *
      * @throws IllegalStateException if composition is incomplete, activation is already underway, this world is
      *     already active, or this world is closed
@@ -87,7 +88,7 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
     boolean isActive();
 
     /**
-     * Returns whether this world has released its constructed component values.
+     * Returns whether this world has released its constructed component values, resource leases, and world modules.
      *
      * @return {@code true} after closing
      */
@@ -156,8 +157,9 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
      *
      * <p>The subtree stops participating immediately. An idle active world commits destruction immediately; a request
      * made by an update callback commits after the current component-visible phase. The commit deactivates and
-     * destroys child first, closes every owned component value, and removes the subtree from world lookup and the live
-     * hierarchy. Repeated destruction requests are no-ops.
+     * destroys child first, closes every owned component value, releases resource leases no longer used by another live
+     * entity, and removes the subtree from world lookup and the live hierarchy. Repeated destruction requests are
+     * no-ops.
      *
      * @param entity entity owned by this world
      * @throws IllegalArgumentException if {@code entity} belongs to another world
@@ -167,10 +169,12 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
     void destroy(Entity entity);
 
     /**
-     * Deactivates and destroys lifecycle participants, releases component values, then closes owned world modules in
-     * reverse binding order. Cleanup continues after individual failures and retains first-failure precedence.
+     * Deactivates and destroys lifecycle participants, releases component values, closes runtime-resource leases in
+     * reverse acquisition order, then closes owned world modules in reverse binding order. Cleanup continues after
+     * individual failures and retains first-failure precedence.
      *
      * @throws WorldLifecycleException if a declared cleanup callback fails after all cleanup has been attempted
+     * @throws RuntimeResourceCloseException if resource cleanup is the first failure
      * @throws WorldModuleCloseException if module cleanup is the first failure
      */
     @Override

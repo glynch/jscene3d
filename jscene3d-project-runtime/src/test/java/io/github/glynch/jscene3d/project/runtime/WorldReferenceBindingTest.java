@@ -63,9 +63,9 @@ final class WorldReferenceBindingTest {
     private static final PropertyId BODY_TARGET = new PropertyId("body");
     private static final PropertyId ENTITY_TARGET = new PropertyId("entity");
     private static final PropertyId EXPORTED_BODY = new PropertyId("external-body");
-    private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
+    private static final RuntimeResourceProvider NO_RESOURCES = new RuntimeResourceProvider() {
         @Override
-        public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
             throw new IllegalStateException("the reference fixture defines no runtime resources");
         }
     };

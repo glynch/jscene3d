@@ -8,20 +8,22 @@ import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.Map;
 
 /**
  * Bounded construction context supplied to one registered component factory.
  *
  * <p>The eventual world composer owns implementations of this interface. The context exposes validated effective
- * configuration and shared runtime-resource lookup without exposing mutable composer internals. Target-valued
- * properties remain authored values during construction; components resolve them later through
- * {@link ComponentReferenceBinder} after every factory has completed.
+ * configuration and shared runtime-resource resolution without exposing mutable composer internals. Resource
+ * resolution is available only during the factory invocation; the world retains acquired leases for the owning entity
+ * and supplies the resource value without transferring cleanup responsibility to the component. Target-valued
+ * properties remain authored values during construction; components resolve them later through {@link
+ * ComponentReferenceBinder} after every factory has completed.
  */
-public interface ComponentFactoryContext extends RuntimeResourceLookup {
+public interface ComponentFactoryContext {
     /**
      * Returns the completely allocated entity which will own the component.
      *
@@ -56,4 +58,20 @@ public interface ComponentFactoryContext extends RuntimeResourceLookup {
      * @return immutable effective properties in descriptor declaration order
      */
     Map<PropertyId, ProjectValue> properties();
+
+    /**
+     * Resolves one shared immutable resource and attributes its lease to the owning entity.
+     *
+     * <p>Repeated resolution of the same reference within a world returns the identical value. The world releases the
+     * lease after the final entity using it is destroyed, or during world cleanup. Components must not close the shared
+     * value. This operation is valid only while the component factory is executing.
+     *
+     * @param <T> required runtime value type
+     * @param reference portable resource reference
+     * @param valueType required runtime Java type
+     * @return shared immutable runtime value
+     * @throws IllegalArgumentException if an argument is invalid
+     * @throws IllegalStateException if the context has expired or acquisition fails
+     */
+    <T> T resolveResource(ResourceReference reference, Class<T> valueType);
 }

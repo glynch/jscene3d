@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldModule;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
 final class InternalWorld implements World {
     private final WorldDefinition definition;
     private final WorldModules modules;
-    private final RuntimeResourceLookup resources;
+    private final WorldResources resources;
     private final List<Entity> roots = new ArrayList<>();
     private final Map<RuntimeEntityId, Entity> entities = new LinkedHashMap<>();
     private final WorldLifecycle lifecycle = new WorldLifecycle();
@@ -38,10 +38,10 @@ final class InternalWorld implements World {
     private boolean committingMutation;
 
     /** Creates an empty world shell visible to factories while its complete graph is constructed. */
-    InternalWorld(WorldDefinition definition, WorldModules modules, RuntimeResourceLookup resources) {
+    InternalWorld(WorldDefinition definition, WorldModules modules, RuntimeResourceProvider provider) {
         this.definition = Objects.requireNonNull(definition, "definition");
         this.modules = Objects.requireNonNull(modules, "modules");
-        this.resources = Objects.requireNonNull(resources, "resources");
+        resources = new WorldResources(provider);
         endpointRouter = new EndpointRouter(this::commitWhenIdle);
     }
 
@@ -76,6 +76,7 @@ final class InternalWorld implements World {
             lifecycle.activate();
             endpointRouter.activate();
         } catch (RuntimeException failure) {
+            closeResources(failure);
             closeModules(failure);
             throw failure;
         }
@@ -131,12 +132,11 @@ final class InternalWorld implements World {
         commitWhenIdle();
     }
 
-    @Override
-    public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
-        if (lifecycle.isClosed()) {
-            throw new IllegalStateException("world is closed");
-        }
-        return resources.resolveResource(reference, valueType);
+    /** Resolves a construction-time resource and attributes its lease to one entity. */
+    <T> T resolveResource(
+            InternalEntity owner, ResourceReference reference, Class<T> valueType, String componentLocation) {
+        requireBuilding();
+        return resources.resolve(owner, reference, valueType, componentLocation);
     }
 
     @Override
@@ -157,6 +157,7 @@ final class InternalWorld implements World {
         } catch (RuntimeException lifecycleFailure) {
             failure = lifecycleFailure;
         }
+        failure = closeResources(failure);
         failure = closeModules(failure);
         if (failure != null) {
             throw failure;
@@ -192,10 +193,11 @@ final class InternalWorld implements World {
         return endpointRouter;
     }
 
-    /** Marks an unsuccessfully composed world unusable without closing values owned by the caller's rollback. */
-    void fail() {
+    /** Marks failed composition terminal and releases leases after the caller closes constructed values. */
+    void fail(RuntimeException failure) {
         endpointRouter.deactivate();
         lifecycle.failComposition();
+        closeResources(Objects.requireNonNull(failure, "failure"));
     }
 
     /** Requires that structural composition has not completed or failed. */
@@ -278,6 +280,7 @@ final class InternalWorld implements World {
         Set<InternalEntity> destroyed = new LinkedHashSet<>();
         destructionRoots.forEach(root -> destroyed.addAll(root.subtree()));
         @Nullable RuntimeException failure = destroyComponents(destroyed);
+        failure = releaseResources(destroyed, failure);
         removeDestroyedEntities(destructionRoots, destroyed);
         if (failure != null) {
             throw failure;
@@ -319,7 +322,37 @@ final class InternalWorld implements World {
         } catch (RuntimeException cleanupFailure) {
             failure.addSuppressed(cleanupFailure);
         }
+        closeResources(failure);
         closeModules(failure);
+    }
+
+    /** Releases leases owned only by one destroyed subtree while retaining an earlier cleanup failure. */
+    private @Nullable RuntimeException releaseResources(
+            Set<InternalEntity> destroyed, @Nullable RuntimeException existing) {
+        try {
+            resources.release(destroyed);
+            return existing;
+        } catch (RuntimeException resourceFailure) {
+            if (existing == null) {
+                return resourceFailure;
+            }
+            existing.addSuppressed(resourceFailure);
+            return existing;
+        }
+    }
+
+    /** Closes all world-owned resource leases while retaining an earlier cleanup failure. */
+    private @Nullable RuntimeException closeResources(@Nullable RuntimeException existing) {
+        try {
+            resources.close();
+            return existing;
+        } catch (RuntimeException resourceFailure) {
+            if (existing == null) {
+                return resourceFailure;
+            }
+            existing.addSuppressed(resourceFailure);
+            return existing;
+        }
     }
 
     /** Closes owned world modules and retains any earlier component or lifecycle failure. */

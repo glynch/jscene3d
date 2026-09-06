@@ -20,7 +20,7 @@ import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,7 +45,7 @@ final class EntityGraphAllocator {
             RegisteredTypeCatalog types,
             WorldDefinition definition,
             WorldModules modules,
-            RuntimeResourceLookup resources) {
+            RuntimeResourceProvider resources) {
         this.assets = assets;
         this.types = types;
         world = new InternalWorld(definition, modules, resources);

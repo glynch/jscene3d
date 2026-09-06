@@ -44,17 +44,17 @@ public final class WorldComposer {
      * <p>All entity shells are allocated before the first component factory is invoked. All component factories finish
      * before authored references are bound. Descriptor-declared endpoints are implemented and authored connections are
      * resolved only after reference binding; every binding succeeds before the inactive world is published. Runtime
-     * extensions register only executable factories for component descriptors they own. The supplied resource lookup
-     * remains owned by the caller. World-module bindings use exact stable interfaces. A successfully composed world
-     * takes ownership of their adapters and closes them after its component values; failed composition leaves every
-     * adapter owned by the caller.
+     * extensions register only executable factories for component descriptors they own. The supplied resource provider
+     * remains owned by the caller. The world owns leases acquired through it and releases them after component values.
+     * World-module bindings use exact stable interfaces. A successfully composed world takes ownership of their
+     * adapters and closes them after its resource leases; failed composition leaves every adapter owned by the caller.
      *
      * @param assets stable authored asset catalog
      * @param reference startup world-definition reference
      * @param types safe resolved component descriptor catalog
      * @param extensions trusted executable runtime extensions
      * @param modules host-supplied world-module bindings in ownership and reverse-cleanup order
-     * @param resources shared runtime resource lookup
+     * @param resources host-owned runtime resource provider
      * @return inactive world or ordered structured diagnostics
      */
     public static WorldCompositionResult compose(
@@ -63,13 +63,13 @@ public final class WorldComposer {
             RegisteredTypeCatalog types,
             Collection<ComponentRuntimeExtension> extensions,
             Collection<WorldModuleBinding<?>> modules,
-            RuntimeResourceLookup resources) {
+            RuntimeResourceProvider resources) {
         AssetCatalog validAssets = Objects.requireNonNull(assets, "assets");
         AssetRef<WorldDefinition> validReference = Objects.requireNonNull(reference, "reference");
         RegisteredTypeCatalog validTypes = Objects.requireNonNull(types, "types");
         List<ComponentRuntimeExtension> validExtensions = List.copyOf(extensions);
         List<WorldModuleBinding<?>> validModules = List.copyOf(modules);
-        RuntimeResourceLookup validResources = Objects.requireNonNull(resources, "resources");
+        RuntimeResourceProvider validResources = Objects.requireNonNull(resources, "resources");
         DefinitionLoadResult<WorldDefinition> loaded = validAssets.loadWorld(validReference, validTypes);
         List<ProjectDiagnostic> diagnostics = new ArrayList<>(loaded.diagnostics());
         if (!loaded.isValid()) {

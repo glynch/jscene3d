@@ -51,9 +51,9 @@ final class WorldSchedulingTest {
     private static final ComponentType ZULU_TYPE = ComponentType.of(EXTENSION_ID + "/zulu", 1);
     private static final Set<ComponentUpdatePhase> ALL_PHASES = EnumSet.allOf(ComponentUpdatePhase.class);
     private static final Duration STEP = Duration.ofMillis(10L);
-    private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
+    private static final RuntimeResourceProvider NO_RESOURCES = new RuntimeResourceProvider() {
         @Override
-        public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
             throw new IllegalStateException("the scheduling fixture defines no runtime resources");
         }
     };

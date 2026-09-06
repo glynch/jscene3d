@@ -52,6 +52,8 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
             "runtime.component.reference.type", "An authored component reference has an incompatible runtime type"),
     /** A registered runtime type is missing. */
     TYPE_MISSING("runtime.type.missing", "A registered runtime type is missing"),
+    /** A runtime resource could not be acquired with its required type. */
+    RESOURCE_ACQUISITION_FAILED("runtime.resource.acquisition", "A runtime resource could not be acquired"),
     /** A required host-supplied world module is missing. */
     WORLD_MODULE_MISSING("runtime.world-module.missing", "A required world module is missing"),
     /** A world-module interface or adapter is bound more than once. */

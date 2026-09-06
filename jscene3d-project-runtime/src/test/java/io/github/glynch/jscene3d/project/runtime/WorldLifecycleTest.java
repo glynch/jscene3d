@@ -55,9 +55,9 @@ final class WorldLifecycleTest {
     private static final ComponentType TYPE = ComponentType.of(EXTENSION_ID + "/recording", 1);
     private static final PropertyId LABEL = new PropertyId("label");
     private static final Set<ComponentLifecycle> ALL_EVENTS = EnumSet.allOf(ComponentLifecycle.class);
-    private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
+    private static final RuntimeResourceProvider NO_RESOURCES = new RuntimeResourceProvider() {
         @Override
-        public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
             throw new IllegalStateException("the lifecycle fixture defines no runtime resources");
         }
     };

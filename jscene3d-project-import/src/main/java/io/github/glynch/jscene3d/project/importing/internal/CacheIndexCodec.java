@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.importing.ImportArtifactDescriptor;
 import io.github.glynch.jscene3d.project.importing.ImportArtifactKind;
@@ -27,7 +28,7 @@ public final class CacheIndexCodec {
     /** Fixed filename within each immutable generation. */
     public static final String INDEX_NAME = "artifact-index.json";
 
-    private static final int SCHEMA_VERSION = 1;
+    private static final int SCHEMA_VERSION = 2;
     private final ObjectMapper mapper;
 
     /** Creates a strict deterministic cache-index codec. */
@@ -107,7 +108,10 @@ public final class CacheIndexCodec {
         ImportArtifactDescriptor descriptor =
                 switch (kind) {
                     case ENTITY_DEFINITION ->
-                        ImportArtifactDescriptor.entityDefinition(artifact.identity(), artifact.references());
+                        ImportArtifactDescriptor.entityDefinition(
+                                artifact.identity(),
+                                AssetId.from(Objects.requireNonNull(artifact.assetId(), "assetId")),
+                                artifact.references());
                     case RESOURCE -> resourceDescriptor(artifact);
                     case PAYLOAD -> ImportArtifactDescriptor.payload(artifact.identity(), artifact.mediaType());
                 };
@@ -131,6 +135,7 @@ public final class CacheIndexCodec {
         return new CachedArtifact(
                 descriptor.identity(),
                 descriptor.kind().name(),
+                descriptor.assetId().map(AssetId::toString).orElse(null),
                 resourceType,
                 resourceTypeVersion,
                 descriptor.mediaType().orElseThrow(),

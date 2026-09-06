@@ -24,12 +24,15 @@ import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.entity.SpatialTarget;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -132,6 +135,61 @@ final class AssetCatalogTest {
         assertThat(worldOutput.toString(StandardCharsets.UTF_8))
                 .contains("\"assetType\" : \"world-definition\"")
                 .endsWith("\n!");
+    }
+
+    /** Resolves a generated definition placed by an authored world through one mixed-source graph. */
+    @Test
+    void resolvesGeneratedDefinitionFromAuthoredWorld() throws IOException {
+        WorldDefinition world = new WorldDefinition(
+                GARDEN_ASSET,
+                "Generated world",
+                List.of(new EntityPlacement(BEACON_PLACEMENT, true, AssetRef.to(BEACON_ASSET), Map.of())));
+        EntityDefinition generatedDefinition = new EntityDefinition(
+                BEACON_ASSET,
+                "Generated entity",
+                new LocalEntity(BEACON_ROOT, "Generated root", true, List.of(), List.of()));
+        DefinitionWriter.write(temporaryDirectory.resolve("garden.world.json"), world);
+        AssetCatalog authored = scanValidCatalog();
+        ByteArrayOutputStream generated = new ByteArrayOutputStream();
+        DefinitionWriter.write(generated, generatedDefinition);
+        DefinitionResolver definitions = DefinitionResolvers.builder(authored)
+                .addGeneratedEntity(
+                        BEACON_ASSET,
+                        URI.create("import:beacons/definitions/main"),
+                        new ByteArrayInputStream(generated.toByteArray()))
+                .build();
+
+        DefinitionLoadResult<WorldDefinition> result =
+                definitions.loadWorld(AssetRef.to(GARDEN_ASSET), RegisteredTypeCatalog.of(List.of()));
+
+        assertThat(result.definition()).contains(world);
+        assertThat(result.diagnostics()).isEmpty();
+    }
+
+    /** Applies envelope validation to generated content and reports its logical import source. */
+    @Test
+    void rejectsGeneratedDefinitionWithMismatchedIdentity() throws IOException {
+        AssetCatalog authored = scanValidCatalog();
+        ByteArrayOutputStream generated = new ByteArrayOutputStream();
+        DefinitionWriter.write(generated, beaconDefinition());
+        byte[] mismatched = generated
+                .toString(StandardCharsets.UTF_8)
+                .replace(BEACON_ASSET.toString(), SECOND_ASSET.toString())
+                .getBytes(StandardCharsets.UTF_8);
+        URI source = URI.create("import:beacons/definitions/main");
+        DefinitionResolver definitions = DefinitionResolvers.builder(authored)
+                .addGeneratedEntity(BEACON_ASSET, source, new ByteArrayInputStream(mismatched))
+                .build();
+
+        DefinitionLoadResult<EntityDefinition> result =
+                definitions.loadEntity(AssetRef.to(BEACON_ASSET), RegisteredTypeCatalog.of(List.of()));
+
+        assertThat(result.definition()).isEmpty();
+        assertThat(result.source()).isEqualTo(source);
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.source()).isEqualTo(source);
+            assertThat(diagnostic.code().code()).isEqualTo("asset.catalog.stale");
+        });
     }
 
     /** Rejects duplicate identities across otherwise independently valid asset files. */

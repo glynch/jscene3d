@@ -5,10 +5,9 @@
 package io.github.glynch.jscene3d.project.runtime;
 
 import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
-import io.github.glynch.jscene3d.project.asset.AssetCatalog;
-import io.github.glynch.jscene3d.project.asset.AssetMetadata;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
+import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
@@ -17,7 +16,6 @@ import io.github.glynch.jscene3d.project.runtime.internal.RuntimeDiagnosticsExce
 import io.github.glynch.jscene3d.project.runtime.internal.WorldCompositionEngine;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -49,7 +47,7 @@ public final class WorldComposer {
      * World-module bindings use exact stable interfaces. A successfully composed world takes ownership of their
      * adapters and closes them after its resource leases; failed composition leaves every adapter owned by the caller.
      *
-     * @param assets stable authored asset catalog
+     * @param definitions stable authored and imported definition resolver
      * @param reference startup world-definition reference
      * @param types safe resolved component descriptor catalog
      * @param extensions trusted executable runtime extensions
@@ -58,32 +56,28 @@ public final class WorldComposer {
      * @return inactive world or ordered structured diagnostics
      */
     public static WorldCompositionResult compose(
-            AssetCatalog assets,
+            DefinitionResolver definitions,
             AssetRef<WorldDefinition> reference,
             RegisteredTypeCatalog types,
             Collection<ComponentRuntimeExtension> extensions,
             Collection<WorldModuleBinding<?>> modules,
             RuntimeResourceProvider resources) {
-        AssetCatalog validAssets = Objects.requireNonNull(assets, "assets");
+        DefinitionResolver validDefinitions = Objects.requireNonNull(definitions, "definitions");
         AssetRef<WorldDefinition> validReference = Objects.requireNonNull(reference, "reference");
         RegisteredTypeCatalog validTypes = Objects.requireNonNull(types, "types");
         List<ComponentRuntimeExtension> validExtensions = List.copyOf(extensions);
         List<WorldModuleBinding<?>> validModules = List.copyOf(modules);
         RuntimeResourceProvider validResources = Objects.requireNonNull(resources, "resources");
-        DefinitionLoadResult<WorldDefinition> loaded = validAssets.loadWorld(validReference, validTypes);
+        DefinitionLoadResult<WorldDefinition> loaded = validDefinitions.loadWorld(validReference, validTypes);
         List<ProjectDiagnostic> diagnostics = new ArrayList<>(loaded.diagnostics());
         if (!loaded.isValid()) {
             return WorldCompositionResult.failure(diagnostics);
         }
-        URI source = validAssets
-                .find(validReference.id())
-                .map(AssetMetadata::path)
-                .map(Path::toUri)
-                .orElseGet(() -> validAssets.root().toUri());
+        URI source = loaded.source();
         try {
             World world = WorldCompositionEngine.compose(
                     source,
-                    validAssets,
+                    validDefinitions,
                     loaded.definition().orElseThrow(),
                     validTypes,
                     validExtensions,

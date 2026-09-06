@@ -9,6 +9,7 @@ module io.github.glynch.jscene3d.project.examples {
     requires io.github.glynch.jscene3d.examples.framework;
     requires io.github.glynch.jscene3d.lwjgl;
     requires io.github.glynch.jscene3d.project;
+    requires io.github.glynch.jscene3d.project.importing;
     requires io.github.glynch.jscene3d.project.spatial3d;
     requires io.github.glynch.jscene3d.project.runtime;
 }

@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.importing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -16,19 +17,21 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Exercises immutable import values and their boundary validation. */
 final class ImportModelTest {
     private static final String SHA_256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    private static final AssetId DEFINITION_ID = new AssetId(UUID.fromString("4e230064-13e5-4ad2-bba8-8fc7dbf4ab32"));
     private static final RegisteredType RESOURCE_TYPE = new RegisteredType("io.github.glynch.import-test/resource", 1);
 
     /** Preserves all artifact descriptor metadata and value semantics. */
     @Test
     void describesArtifacts() {
-        ImportArtifactDescriptor definition =
-                ImportArtifactDescriptor.entityDefinition("definitions/main", List.of("resources/world"));
+        ImportArtifactDescriptor definition = ImportArtifactDescriptor.entityDefinition(
+                "definitions/main", DEFINITION_ID, List.of("resources/world"));
         ImportArtifactDescriptor resource =
                 ImportArtifactDescriptor.resource("resources/world", RESOURCE_TYPE, List.of("payloads/world"));
         ImportArtifactDescriptor payload =
@@ -37,6 +40,7 @@ final class ImportModelTest {
                 ImportArtifactDescriptor.resource("resources/world", RESOURCE_TYPE, List.of("payloads/world"));
 
         assertThat(definition.kind()).isEqualTo(ImportArtifactKind.ENTITY_DEFINITION);
+        assertThat(definition.assetId()).contains(DEFINITION_ID);
         assertThat(definition.mediaType()).contains("application/json");
         assertThat(resource.resourceType()).contains(RESOURCE_TYPE);
         assertThat(resource.references()).containsExactly("payloads/world");
@@ -60,7 +64,8 @@ final class ImportModelTest {
                 .isThrownBy(() -> ImportArtifactDescriptor.payload("output/", "text/plain"));
         assertThatIllegalArgumentException().isThrownBy(() -> ImportArtifactDescriptor.payload("output", " "));
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> ImportArtifactDescriptor.entityDefinition("definition", List.of("same", "same")));
+                .isThrownBy(() -> ImportArtifactDescriptor.entityDefinition(
+                        "definition", DEFINITION_ID, List.of("same", "same")));
     }
 
     /** Preserves inspected source metadata, relationships, and stable value semantics. */

@@ -4,9 +4,9 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
-import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
+import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.contract.EntityContract;
@@ -31,7 +31,7 @@ import org.jspecify.annotations.Nullable;
 
 /** Allocates a complete ownership graph and defers every component factory invocation. */
 final class EntityGraphAllocator {
-    private final AssetCatalog assets;
+    private final DefinitionResolver definitionResolver;
     private final RegisteredTypeCatalog types;
     private final InternalWorld world;
     private final Map<AssetId, EntityDefinition> definitions = new LinkedHashMap<>();
@@ -41,12 +41,12 @@ final class EntityGraphAllocator {
 
     /** Stores immutable composition dependencies and creates the empty world shell. */
     EntityGraphAllocator(
-            AssetCatalog assets,
+            DefinitionResolver definitionResolver,
             RegisteredTypeCatalog types,
             WorldDefinition definition,
             WorldModules modules,
             RuntimeResourceProvider resources) {
-        this.assets = assets;
+        this.definitionResolver = definitionResolver;
         this.types = types;
         world = new InternalWorld(definition, modules, resources);
     }
@@ -213,14 +213,14 @@ final class EntityGraphAllocator {
         return entity;
     }
 
-    /** Loads each referenced definition once while preserving catalog diagnostics on unexpected source changes. */
+    /** Loads each referenced definition once while preserving source diagnostics on unexpected content changes. */
     private EntityDefinition load(EntityPlacement placement) {
         AssetId id = placement.definition().id();
         EntityDefinition existing = definitions.get(id);
         if (existing != null) {
             return existing;
         }
-        DefinitionLoadResult<EntityDefinition> result = assets.loadEntity(placement.definition(), types);
+        DefinitionLoadResult<EntityDefinition> result = definitionResolver.loadEntity(placement.definition(), types);
         if (!result.isValid()) {
             throw new RuntimeDiagnosticsException(result.diagnostics());
         }

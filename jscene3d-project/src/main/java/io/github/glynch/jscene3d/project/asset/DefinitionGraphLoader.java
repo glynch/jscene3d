@@ -25,7 +25,7 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,112 +39,123 @@ import org.jspecify.annotations.Nullable;
 
 /** Resolves typed assets and validates their transitive entity-definition graph. */
 final class DefinitionGraphLoader {
-    private final AssetCatalog catalog;
+    private final DefinitionAssetIndex definitions;
     private final @Nullable RegisteredTypeCatalog componentTypes;
     private final List<ProjectDiagnostic> diagnostics = new ArrayList<>();
     private final Map<AssetId, EntityDefinition> loadedEntities = new HashMap<>();
     private final Set<AssetId> validatedEntities = new HashSet<>();
     private final LinkedHashSet<AssetId> visitingEntities = new LinkedHashSet<>();
 
-    /** Stores one catalog-local graph load. */
-    private DefinitionGraphLoader(AssetCatalog catalog, @Nullable RegisteredTypeCatalog componentTypes) {
-        this.catalog = catalog;
+    /** Stores one immutable-index graph load. */
+    private DefinitionGraphLoader(DefinitionAssetIndex definitions, @Nullable RegisteredTypeCatalog componentTypes) {
+        this.definitions = definitions;
         this.componentTypes = componentTypes;
     }
 
     /** Loads one entity definition and validates its complete inclusion graph. */
     static DefinitionLoadResult<EntityDefinition> loadEntity(
-            AssetCatalog catalog, AssetRef<EntityDefinition> reference) {
-        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, null);
-        Optional<AssetMetadata> metadata =
-                loader.resolve(reference.id(), AssetKind.ENTITY_DEFINITION, catalog.root(), "");
-        Optional<EntityDefinition> definition = metadata.flatMap(loader::readEntity);
-        metadata.ifPresent(value -> definition.ifPresent(asset -> loader.validateEntityGraph(value, asset)));
-        return loader.result(definition);
+            DefinitionAssetIndex definitions, AssetRef<EntityDefinition> reference) {
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(definitions, null);
+        Optional<DefinitionAssetIndex.Source> source =
+                loader.resolve(reference.id(), AssetKind.ENTITY_DEFINITION, definitions.projectSource(), "");
+        Optional<EntityDefinition> definition = source.flatMap(loader::readEntity);
+        source.ifPresent(value -> definition.ifPresent(asset -> loader.validateEntityGraph(value, asset)));
+        return loader.result(
+                definition, source.map(DefinitionAssetIndex.Source::source).orElse(definitions.projectSource()));
     }
 
     /** Loads one entity graph and validates its components through safe descriptor metadata. */
     static DefinitionLoadResult<EntityDefinition> loadEntity(
-            AssetCatalog catalog, AssetRef<EntityDefinition> reference, RegisteredTypeCatalog componentTypes) {
-        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, componentTypes);
-        Optional<AssetMetadata> metadata =
-                loader.resolve(reference.id(), AssetKind.ENTITY_DEFINITION, catalog.root(), "");
-        Optional<EntityDefinition> definition = metadata.flatMap(loader::readEntity);
-        metadata.ifPresent(value -> definition.ifPresent(asset -> loader.validateEntityGraph(value, asset)));
-        return loader.result(definition);
+            DefinitionAssetIndex definitions,
+            AssetRef<EntityDefinition> reference,
+            RegisteredTypeCatalog componentTypes) {
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(definitions, componentTypes);
+        Optional<DefinitionAssetIndex.Source> source =
+                loader.resolve(reference.id(), AssetKind.ENTITY_DEFINITION, definitions.projectSource(), "");
+        Optional<EntityDefinition> definition = source.flatMap(loader::readEntity);
+        source.ifPresent(value -> definition.ifPresent(asset -> loader.validateEntityGraph(value, asset)));
+        return loader.result(
+                definition, source.map(DefinitionAssetIndex.Source::source).orElse(definitions.projectSource()));
     }
 
     /** Loads one world and validates every transitively placed entity definition. */
-    static DefinitionLoadResult<WorldDefinition> loadWorld(AssetCatalog catalog, AssetRef<WorldDefinition> reference) {
-        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, null);
-        Optional<AssetMetadata> metadata =
-                loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, catalog.root(), "");
-        Optional<WorldDefinition> definition = metadata.flatMap(loader::readWorld);
-        if (metadata.isPresent() && definition.isPresent()) {
+    static DefinitionLoadResult<WorldDefinition> loadWorld(
+            DefinitionAssetIndex definitions, AssetRef<WorldDefinition> reference) {
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(definitions, null);
+        Optional<DefinitionAssetIndex.Source> source =
+                loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, definitions.projectSource(), "");
+        Optional<WorldDefinition> definition = source.flatMap(loader::readWorld);
+        if (source.isPresent() && definition.isPresent()) {
             WorldDefinition world = definition.orElseThrow();
-            Path source = metadata.orElseThrow().path();
-            loader.validateEntries(world.roots(), EntityContract.empty(), source);
-            Validation components = loader.validateWorldComponents(world.roots(), world.connections(), source);
-            loader.validateConnections(world.connections(), loader.indexPlacements(world.roots()), components, source);
+            URI definitionSource = source.orElseThrow().source();
+            loader.validateEntries(world.roots(), EntityContract.empty(), definitionSource);
+            Validation components =
+                    loader.validateWorldComponents(world.roots(), world.connections(), definitionSource);
+            loader.validateConnections(
+                    world.connections(), loader.indexPlacements(world.roots()), components, definitionSource);
         }
-        return loader.result(definition);
+        return loader.result(
+                definition, source.map(DefinitionAssetIndex.Source::source).orElse(definitions.projectSource()));
     }
 
     /** Loads one world graph and validates its components through safe descriptor metadata. */
     static DefinitionLoadResult<WorldDefinition> loadWorld(
-            AssetCatalog catalog, AssetRef<WorldDefinition> reference, RegisteredTypeCatalog componentTypes) {
-        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, componentTypes);
-        Optional<AssetMetadata> metadata =
-                loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, catalog.root(), "");
-        Optional<WorldDefinition> definition = metadata.flatMap(loader::readWorld);
-        if (metadata.isPresent() && definition.isPresent()) {
+            DefinitionAssetIndex definitions,
+            AssetRef<WorldDefinition> reference,
+            RegisteredTypeCatalog componentTypes) {
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(definitions, componentTypes);
+        Optional<DefinitionAssetIndex.Source> source =
+                loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, definitions.projectSource(), "");
+        Optional<WorldDefinition> definition = source.flatMap(loader::readWorld);
+        if (source.isPresent() && definition.isPresent()) {
             WorldDefinition world = definition.orElseThrow();
-            Path source = metadata.orElseThrow().path();
-            loader.validateEntries(world.roots(), EntityContract.empty(), source);
-            Validation components = loader.validateWorldComponents(world.roots(), world.connections(), source);
-            loader.validateConnections(world.connections(), loader.indexPlacements(world.roots()), components, source);
+            URI definitionSource = source.orElseThrow().source();
+            loader.validateEntries(world.roots(), EntityContract.empty(), definitionSource);
+            Validation components =
+                    loader.validateWorldComponents(world.roots(), world.connections(), definitionSource);
+            loader.validateConnections(
+                    world.connections(), loader.indexPlacements(world.roots()), components, definitionSource);
         }
-        return loader.result(definition);
+        return loader.result(
+                definition, source.map(DefinitionAssetIndex.Source::source).orElse(definitions.projectSource()));
     }
 
     /** Reads one entity definition and appends its source-local diagnostics. */
-    private Optional<EntityDefinition> readEntity(AssetMetadata metadata) {
-        DefinitionDocumentReader.ReadResult<EntityDefinition> result =
-                DefinitionDocumentReader.readEntity(catalog.root(), metadata);
+    private Optional<EntityDefinition> readEntity(DefinitionAssetIndex.Source source) {
+        DefinitionDocumentReader.ReadResult<EntityDefinition> result = source.readEntity(definitions.projectRoot());
         diagnostics.addAll(result.diagnostics());
         return result.value();
     }
 
     /** Reads one world definition and appends its source-local diagnostics. */
-    private Optional<WorldDefinition> readWorld(AssetMetadata metadata) {
-        DefinitionDocumentReader.ReadResult<WorldDefinition> result =
-                DefinitionDocumentReader.readWorld(catalog.root(), metadata);
+    private Optional<WorldDefinition> readWorld(DefinitionAssetIndex.Source source) {
+        DefinitionDocumentReader.ReadResult<WorldDefinition> result = source.readWorld(definitions.projectRoot());
         diagnostics.addAll(result.diagnostics());
         return result.value();
     }
 
     /** Validates one entity's transitive placement graph with cycle detection and memoization. */
-    private void validateEntityGraph(AssetMetadata metadata, EntityDefinition definition) {
-        AssetId id = metadata.id();
+    private void validateEntityGraph(DefinitionAssetIndex.Source source, EntityDefinition definition) {
+        AssetId id = source.id();
         if (validatedEntities.contains(id)) {
             return;
         }
         if (!visitingEntities.add(id)) {
-            addCycle(metadata.path(), id);
+            addCycle(source.source(), id);
             return;
         }
         loadedEntities.put(id, definition);
-        validateEntries(List.of(definition.root()), definition.contract(), metadata.path());
+        validateEntries(List.of(definition.root()), definition.contract(), source.source());
         Map<EntityId, EntityPlacement> placements = indexPlacements(List.of(definition.root()));
-        validateContractSeams(definition.contract(), placements, metadata.path());
-        Validation components = validateEntityComponents(definition, metadata.path());
-        validateConnections(definition.connections(), placements, components, metadata.path());
+        validateContractSeams(definition.contract(), placements, source.source());
+        Validation components = validateEntityComponents(definition, source.source());
+        validateConnections(definition.connections(), placements, components, source.source());
         visitingEntities.remove(id);
         validatedEntities.add(id);
     }
 
     /** Validates components when a safe component catalog was supplied. */
-    private @Nullable Validation validateEntityComponents(EntityDefinition definition, Path source) {
+    private @Nullable Validation validateEntityComponents(EntityDefinition definition, URI source) {
         if (componentTypes == null) {
             return null;
         }
@@ -156,7 +167,7 @@ final class DefinitionGraphLoader {
 
     /** Validates world components when a safe component catalog was supplied. */
     private @Nullable Validation validateWorldComponents(
-            List<? extends EntityEntry> roots, List<SignalConnection> connections, Path source) {
+            List<? extends EntityEntry> roots, List<SignalConnection> connections, URI source) {
         if (componentTypes == null) {
             return null;
         }
@@ -166,7 +177,7 @@ final class DefinitionGraphLoader {
     }
 
     /** Traverses placements in deterministic authored hierarchy order. */
-    private void validateEntries(List<? extends EntityEntry> entries, EntityContract contract, Path source) {
+    private void validateEntries(List<? extends EntityEntry> entries, EntityContract contract, URI source) {
         for (EntityEntry entry : entries) {
             if (entry instanceof EntityPlacement placement) {
                 validatePlacement(placement, contract, source);
@@ -177,15 +188,15 @@ final class DefinitionGraphLoader {
     }
 
     /** Resolves and recursively validates one placed reusable entity definition. */
-    private void validatePlacement(EntityPlacement placement, EntityContract containingContract, Path source) {
+    private void validatePlacement(EntityPlacement placement, EntityContract containingContract, URI source) {
         AssetId id = placement.definition().id();
-        Optional<AssetMetadata> metadata = resolve(id, AssetKind.ENTITY_DEFINITION, source, "");
-        if (metadata.isEmpty()) {
+        Optional<DefinitionAssetIndex.Source> definitionSource = resolve(id, AssetKind.ENTITY_DEFINITION, source, "");
+        if (definitionSource.isEmpty()) {
             return;
         }
         EntityDefinition definition = loadedEntities.get(id);
         if (definition == null) {
-            Optional<EntityDefinition> loaded = readEntity(metadata.orElseThrow());
+            Optional<EntityDefinition> loaded = readEntity(definitionSource.orElseThrow());
             if (loaded.isEmpty()) {
                 return;
             }
@@ -200,12 +211,12 @@ final class DefinitionGraphLoader {
         if (validatedEntities.contains(id)) {
             return;
         }
-        validateEntityGraph(metadata.orElseThrow(), definition);
+        validateEntityGraph(definitionSource.orElseThrow(), definition);
     }
 
     /** Validates supplied and required arguments against one placed definition's exported contract. */
     private void validatePlacementArguments(
-            EntityPlacement placement, EntityContract target, EntityContract containingContract, Path source) {
+            EntityPlacement placement, EntityContract target, EntityContract containingContract, URI source) {
         for (Map.Entry<PropertyId, ProjectValue> argument :
                 placement.arguments().entrySet()) {
             EntityContract.Parameter parameter = target.parameters().get(argument.getKey());
@@ -253,7 +264,7 @@ final class DefinitionGraphLoader {
     }
 
     /** Reports one omitted argument unless it is supplied by a containing public contract. */
-    private void requireArgument(EntityPlacement placement, PropertyId id, Set<PropertyId> reexported, Path source) {
+    private void requireArgument(EntityPlacement placement, PropertyId id, Set<PropertyId> reexported, URI source) {
         if (!placement.arguments().containsKey(id) && !reexported.contains(id)) {
             addError(
                     source,
@@ -264,8 +275,7 @@ final class DefinitionGraphLoader {
     }
 
     /** Validates public members which deliberately re-export a nested placement contract. */
-    private void validateContractSeams(
-            EntityContract contract, Map<EntityId, EntityPlacement> placements, Path source) {
+    private void validateContractSeams(EntityContract contract, Map<EntityId, EntityPlacement> placements, URI source) {
         contract.parameters().values().forEach(parameter -> validateReexportedParameter(parameter, placements, source));
         contract.resourceBindings()
                 .values()
@@ -279,7 +289,7 @@ final class DefinitionGraphLoader {
 
     /** Validates one parameter re-exported from a nested placement. */
     private void validateReexportedParameter(
-            EntityContract.Parameter parameter, Map<EntityId, EntityPlacement> placements, Path source) {
+            EntityContract.Parameter parameter, Map<EntityId, EntityPlacement> placements, URI source) {
         PropertyTarget target = parameter.target();
         if (target.component().isPresent()) {
             return;
@@ -297,7 +307,7 @@ final class DefinitionGraphLoader {
 
     /** Validates one resource binding re-exported from a nested placement. */
     private void validateReexportedResourceBinding(
-            EntityContract.ResourceBinding binding, Map<EntityId, EntityPlacement> placements, Path source) {
+            EntityContract.ResourceBinding binding, Map<EntityId, EntityPlacement> placements, URI source) {
         PropertyTarget target = binding.target();
         if (target.component().isPresent()) {
             return;
@@ -315,7 +325,7 @@ final class DefinitionGraphLoader {
 
     /** Validates one attachment re-exported from a nested placement. */
     private void validateReexportedAttachment(
-            EntityContract.Attachment attachment, Map<EntityId, EntityPlacement> placements, Path source) {
+            EntityContract.Attachment attachment, Map<EntityId, EntityPlacement> placements, URI source) {
         SpatialTarget target = attachment.target();
         if (target.component().isPresent() || target.attachment().isEmpty()) {
             return;
@@ -332,7 +342,7 @@ final class DefinitionGraphLoader {
 
     /** Validates one re-exported signal and its payload declaration. */
     private void validateReexportedSignal(
-            EntityContract.Signal signal, Map<EntityId, EntityPlacement> placements, Path source) {
+            EntityContract.Signal signal, Map<EntityId, EntityPlacement> placements, URI source) {
         EndpointTarget target = signal.target();
         if (target.component().isPresent()) {
             return;
@@ -350,7 +360,7 @@ final class DefinitionGraphLoader {
 
     /** Validates one re-exported action and its payload declaration. */
     private void validateReexportedAction(
-            EntityContract.Action action, Map<EntityId, EntityPlacement> placements, Path source) {
+            EntityContract.Action action, Map<EntityId, EntityPlacement> placements, URI source) {
         EndpointTarget target = action.target();
         if (target.component().isPresent()) {
             return;
@@ -371,7 +381,7 @@ final class DefinitionGraphLoader {
             List<SignalConnection> connections,
             Map<EntityId, EntityPlacement> placements,
             @Nullable Validation components,
-            Path source) {
+            URI source) {
         for (SignalConnection connection : connections) {
             if (connection.signal().component().isPresent()
                     && connection.action().component().isPresent()) {
@@ -395,7 +405,7 @@ final class DefinitionGraphLoader {
             EndpointTarget target,
             Map<EntityId, EntityPlacement> placements,
             @Nullable Validation components,
-            Path source) {
+            URI source) {
         if (target.component().isPresent()) {
             return components == null
                     ? Optional.empty()
@@ -420,7 +430,7 @@ final class DefinitionGraphLoader {
             EndpointTarget target,
             Map<EntityId, EntityPlacement> placements,
             @Nullable Validation components,
-            Path source) {
+            URI source) {
         if (target.component().isPresent()) {
             return components == null
                     ? Optional.empty()
@@ -484,7 +494,7 @@ final class DefinitionGraphLoader {
     }
 
     /** Reports an absent public contract member. */
-    private void missingMember(Path source, EntityId placement, Object member) {
+    private void missingMember(URI source, EntityId placement, Object member) {
         addError(
                 source,
                 AssetDiagnosticCode.CONTRACT_MEMBER_MISSING,
@@ -493,7 +503,7 @@ final class DefinitionGraphLoader {
     }
 
     /** Reports incompatible public contract declarations. */
-    private void incompatiblePayload(Path source, Object exported, Object target) {
+    private void incompatiblePayload(URI source, Object exported, Object target) {
         addError(
                 source,
                 AssetDiagnosticCode.CONTRACT_PAYLOAD_INVALID,
@@ -502,26 +512,27 @@ final class DefinitionGraphLoader {
     }
 
     /** Resolves one stable identity and validates its expected kind. */
-    private Optional<AssetMetadata> resolve(AssetId id, AssetKind expectedKind, Path source, String location) {
-        Optional<AssetMetadata> metadata = catalog.find(id);
-        if (metadata.isEmpty()) {
+    private Optional<DefinitionAssetIndex.Source> resolve(
+            AssetId id, AssetKind expectedKind, URI source, String location) {
+        Optional<DefinitionAssetIndex.Source> resolved = definitions.find(id);
+        if (resolved.isEmpty()) {
             addError(source, AssetDiagnosticCode.REFERENCE_MISSING, "asset ID was not found: " + id, location);
             return Optional.empty();
         }
-        if (metadata.orElseThrow().kind() != expectedKind) {
+        if (resolved.orElseThrow().kind() != expectedKind) {
             addError(
                     source,
                     AssetDiagnosticCode.REFERENCE_KIND_INVALID,
-                    "asset " + id + " has kind " + metadata.orElseThrow().kind() + " but " + expectedKind
+                    "asset " + id + " has kind " + resolved.orElseThrow().kind() + " but " + expectedKind
                             + " is required",
                     location);
             return Optional.empty();
         }
-        return metadata;
+        return resolved;
     }
 
     /** Reports one inclusion cycle with its stable identity chain. */
-    private void addCycle(Path source, AssetId repeatedId) {
+    private void addCycle(URI source, AssetId repeatedId) {
         List<String> chain = visitingEntities.stream().map(AssetId::toString).collect(Collectors.toList());
         chain.add(repeatedId.toString());
         addError(
@@ -532,17 +543,17 @@ final class DefinitionGraphLoader {
     }
 
     /** Appends one structured graph diagnostic. */
-    private void addError(Path source, AssetDiagnosticCode code, String detail, String location) {
+    private void addError(URI source, AssetDiagnosticCode code, String detail, String location) {
         DiagnosticCollector collector = new DiagnosticCollector(source);
         collector.error(code, detail, location);
         diagnostics.addAll(collector.diagnostics());
     }
 
     /** Produces the public result, withholding the root definition after any transitive error. */
-    private <T> DefinitionLoadResult<T> result(Optional<T> value) {
+    private <T> DefinitionLoadResult<T> result(Optional<T> value, URI source) {
         boolean hasErrors =
                 diagnostics.stream().anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
-        return new DefinitionLoadResult<>(hasErrors ? Optional.empty() : value, diagnostics);
+        return new DefinitionLoadResult<>(source, hasErrors ? Optional.empty() : value, diagnostics);
     }
 
     /** Exact optional payload declaration used to compare local and placed endpoints uniformly.

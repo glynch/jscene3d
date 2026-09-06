@@ -41,6 +41,7 @@ import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -55,7 +56,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/** Strict JSON decoding and structural validation for authored definition assets. */
+/** Strict JSON decoding and structural validation for authored and generated definition assets. */
 public final class DefinitionDocumentReader {
     private static final int FORMAT_VERSION = 1;
     private static final String ENTITY_SCHEMA = "https://jscene3d.org/schemas/entity-definition-1.json";
@@ -63,17 +64,22 @@ public final class DefinitionDocumentReader {
     private static final AssetId INVALID_ASSET_ID = new AssetId(new UUID(0, 0));
 
     private final Path projectRoot;
-    private final AssetMetadata metadata;
+    private final AssetId expectedId;
+    private final AssetKind expectedKind;
+    private final int expectedFormatVersion;
     private final DiagnosticCollector diagnostics;
     private final ProjectValueDecoder values;
     private final Set<EntityId> entityIds = new HashSet<>();
     private long placeholderSequence = 1;
 
     /** Stores one source-local validation context. */
-    private DefinitionDocumentReader(Path projectRoot, AssetMetadata metadata) {
+    private DefinitionDocumentReader(
+            Path projectRoot, URI source, AssetId expectedId, AssetKind expectedKind, int expectedFormatVersion) {
         this.projectRoot = projectRoot;
-        this.metadata = metadata;
-        diagnostics = new DiagnosticCollector(metadata.path());
+        this.expectedId = expectedId;
+        this.expectedKind = expectedKind;
+        this.expectedFormatVersion = expectedFormatVersion;
+        diagnostics = new DiagnosticCollector(source);
         values = ProjectValueDecoder.withReferencesAndTargets(this::decodeReferenceValue, this::decodeTargetValue);
     }
 
@@ -85,11 +91,40 @@ public final class DefinitionDocumentReader {
      * @return immutable definition and ordered diagnostics
      */
     public static ReadResult<EntityDefinition> readEntity(Path projectRoot, AssetMetadata metadata) {
-        DefinitionDocumentReader reader = new DefinitionDocumentReader(projectRoot, metadata);
+        DefinitionDocumentReader reader = new DefinitionDocumentReader(
+                projectRoot, metadata.path().toUri(), metadata.id(), metadata.kind(), metadata.formatVersion());
         try (InputStream input = Files.newInputStream(metadata.path())) {
-            RawDefinitionDocuments.EntityDocument raw =
-                    ProjectJsonReader.strict().read(input, RawDefinitionDocuments.EntityDocument.class);
-            return reader.validateEntity(raw);
+            return reader.readEntity(input);
+        } catch (JsonProcessingException exception) {
+            reader.diagnostics.error(
+                    AssetDiagnosticCode.JSON_INVALID,
+                    "entity definition is invalid JSON: " + exception.getOriginalMessage(),
+                    "");
+        } catch (IOException exception) {
+            reader.diagnostics.error(
+                    AssetDiagnosticCode.FILE_READ_FAILED,
+                    "entity definition cannot be read: " + exception.getMessage(),
+                    "");
+        }
+        return reader.failure();
+    }
+
+    /**
+     * Reads one complete generated entity-definition document from caller-owned input.
+     *
+     * @param projectRoot normalized project root used to resolve project references
+     * @param source absolute logical source used for diagnostics
+     * @param expectedId authoritative generated asset identity
+     * @param expectedFormatVersion expected definition format version
+     * @param input generated document content, retained by the caller
+     * @return immutable definition and ordered diagnostics
+     */
+    public static ReadResult<EntityDefinition> readEntity(
+            Path projectRoot, URI source, AssetId expectedId, int expectedFormatVersion, InputStream input) {
+        DefinitionDocumentReader reader = new DefinitionDocumentReader(
+                projectRoot, source, expectedId, AssetKind.ENTITY_DEFINITION, expectedFormatVersion);
+        try {
+            return reader.readEntity(input);
         } catch (JsonProcessingException exception) {
             reader.diagnostics.error(
                     AssetDiagnosticCode.JSON_INVALID,
@@ -112,7 +147,8 @@ public final class DefinitionDocumentReader {
      * @return immutable definition and ordered diagnostics
      */
     public static ReadResult<WorldDefinition> readWorld(Path projectRoot, AssetMetadata metadata) {
-        DefinitionDocumentReader reader = new DefinitionDocumentReader(projectRoot, metadata);
+        DefinitionDocumentReader reader = new DefinitionDocumentReader(
+                projectRoot, metadata.path().toUri(), metadata.id(), metadata.kind(), metadata.formatVersion());
         try (InputStream input = Files.newInputStream(metadata.path())) {
             RawDefinitionDocuments.WorldDocument raw =
                     ProjectJsonReader.strict().read(input, RawDefinitionDocuments.WorldDocument.class);
@@ -129,6 +165,13 @@ public final class DefinitionDocumentReader {
                     "");
         }
         return reader.failure();
+    }
+
+    /** Decodes and validates one generated or authored entity stream. */
+    private ReadResult<EntityDefinition> readEntity(InputStream input) throws IOException {
+        RawDefinitionDocuments.EntityDocument raw =
+                ProjectJsonReader.strict().read(input, RawDefinitionDocuments.EntityDocument.class);
+        return validateEntity(raw);
     }
 
     /** Validates one reusable entity-definition document in source order. */
@@ -184,11 +227,9 @@ public final class DefinitionDocumentReader {
             int formatVersion,
             AssetKind expectedKind) {
         AssetId id = parseAssetId(rawId, "/assetId");
-        if (!id.equals(INVALID_ASSET_ID) && !id.equals(metadata.id())) {
+        if (!id.equals(INVALID_ASSET_ID) && !id.equals(expectedId)) {
             diagnostics.error(
-                    AssetDiagnosticCode.CATALOG_STALE,
-                    "assetId changed from " + metadata.id() + " to " + id,
-                    "/assetId");
+                    AssetDiagnosticCode.CATALOG_STALE, "assetId changed from " + expectedId + " to " + id, "/assetId");
         }
         if (!expectedKind.serializedName().equals(rawKind)) {
             diagnostics.error(
@@ -196,13 +237,13 @@ public final class DefinitionDocumentReader {
                     "assetType must be " + expectedKind.serializedName() + ": " + rawKind,
                     "/assetType");
         }
-        if (metadata.kind() != expectedKind) {
+        if (this.expectedKind != expectedKind) {
             diagnostics.error(
                     AssetDiagnosticCode.CATALOG_STALE,
-                    "catalog kind " + metadata.kind() + " does not match requested kind " + expectedKind,
+                    "catalog kind " + this.expectedKind + " does not match requested kind " + expectedKind,
                     "/assetType");
         }
-        if (formatVersion != FORMAT_VERSION || metadata.formatVersion() != FORMAT_VERSION) {
+        if (formatVersion != FORMAT_VERSION || expectedFormatVersion != FORMAT_VERSION) {
             diagnostics.error(
                     AssetDiagnosticCode.FORMAT_UNSUPPORTED,
                     "formatVersion must be " + FORMAT_VERSION + ": " + formatVersion,

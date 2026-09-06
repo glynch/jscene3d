@@ -5,11 +5,19 @@
 package io.github.glynch.jscene3d.project.importing;
 
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
+import java.util.List;
 import java.util.Optional;
 
 /** Opens logical artifacts from published import generations without exposing cache paths. */
-@FunctionalInterface
 public interface ImportedArtifactLookup {
+    /**
+     * Lists artifacts from the active published generation in deterministic publication order.
+     *
+     * @param definition structurally validated import definition
+     * @return immutable artifact metadata, or an empty list when no generation is published
+     */
+    List<ImportedArtifactMetadata> artifacts(ImportDefinition definition);
+
     /**
      * Opens one artifact from the active published generation for an import definition.
      *

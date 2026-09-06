@@ -32,7 +32,7 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,7 +51,7 @@ final class ComponentDefinitionValidator {
     private final Set<EntityId> addressableEntities = new HashSet<>();
 
     /** Stores one source-local component validation context. */
-    private ComponentDefinitionValidator(RegisteredTypeCatalog catalog, Path source) {
+    private ComponentDefinitionValidator(RegisteredTypeCatalog catalog, URI source) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         diagnostics = new DiagnosticCollector(source);
     }
@@ -62,7 +62,7 @@ final class ComponentDefinitionValidator {
             EntityContract contract,
             List<SignalConnection> connections,
             RegisteredTypeCatalog catalog,
-            Path source) {
+            URI source) {
         ComponentDefinitionValidator validator = new ComponentDefinitionValidator(catalog, source);
         validator.validateLocalEntity(root, "/root");
         validator.validateEntries(root.children(), "/root/children");
@@ -77,7 +77,7 @@ final class ComponentDefinitionValidator {
             List<? extends EntityEntry> roots,
             List<SignalConnection> connections,
             RegisteredTypeCatalog catalog,
-            Path source) {
+            URI source) {
         ComponentDefinitionValidator validator = new ComponentDefinitionValidator(catalog, source);
         validator.validateEntries(roots, "/roots");
         validator.validateTargetValues(roots, "/roots");

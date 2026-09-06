@@ -159,6 +159,24 @@ public final class ImportCoordinator {
     }
 
     /**
+     * Lists artifacts from the last successfully published generation, including when stale.
+     *
+     * @param definition owning import definition
+     * @return immutable artifact metadata in publication order
+     */
+    public List<ImportedArtifactMetadata> artifacts(ImportDefinition definition) {
+        ImportDefinition validDefinition = requireDefinition(definition);
+        try {
+            return cache.active(validDefinition.id()).stream()
+                    .flatMap(generation -> generation.index().artifacts().stream())
+                    .map(codec::metadata)
+                    .toList();
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to list imported artifacts for " + validDefinition.id(), exception);
+        }
+    }
+
+    /**
      * Opens an artifact from the last successfully published generation, including when stale.
      *
      * @param definition owning import definition

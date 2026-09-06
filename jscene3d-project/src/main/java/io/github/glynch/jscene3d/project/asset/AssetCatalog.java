@@ -18,7 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Immutable stable-ID index and typed loading interface for authored definition assets. */
-public final class AssetCatalog {
+public final class AssetCatalog implements DefinitionResolver {
     /** Current authored definition asset-format version. */
     public static final int FORMAT_VERSION = 1;
 
@@ -87,7 +87,8 @@ public final class AssetCatalog {
      * @return loaded definition or ordered structured diagnostics
      */
     public DefinitionLoadResult<EntityDefinition> loadEntity(AssetRef<EntityDefinition> reference) {
-        return DefinitionGraphLoader.loadEntity(this, Objects.requireNonNull(reference, "reference"));
+        return DefinitionGraphLoader.loadEntity(
+                DefinitionAssetIndex.builder(this).build(), Objects.requireNonNull(reference, "reference"));
     }
 
     /**
@@ -100,7 +101,9 @@ public final class AssetCatalog {
     public DefinitionLoadResult<EntityDefinition> loadEntity(
             AssetRef<EntityDefinition> reference, RegisteredTypeCatalog types) {
         return DefinitionGraphLoader.loadEntity(
-                this, Objects.requireNonNull(reference, "reference"), Objects.requireNonNull(types, "types"));
+                DefinitionAssetIndex.builder(this).build(),
+                Objects.requireNonNull(reference, "reference"),
+                Objects.requireNonNull(types, "types"));
     }
 
     /**
@@ -110,7 +113,8 @@ public final class AssetCatalog {
      * @return loaded definition or ordered structured diagnostics
      */
     public DefinitionLoadResult<WorldDefinition> loadWorld(AssetRef<WorldDefinition> reference) {
-        return DefinitionGraphLoader.loadWorld(this, Objects.requireNonNull(reference, "reference"));
+        return DefinitionGraphLoader.loadWorld(
+                DefinitionAssetIndex.builder(this).build(), Objects.requireNonNull(reference, "reference"));
     }
 
     /**
@@ -123,6 +127,8 @@ public final class AssetCatalog {
     public DefinitionLoadResult<WorldDefinition> loadWorld(
             AssetRef<WorldDefinition> reference, RegisteredTypeCatalog types) {
         return DefinitionGraphLoader.loadWorld(
-                this, Objects.requireNonNull(reference, "reference"), Objects.requireNonNull(types, "types"));
+                DefinitionAssetIndex.builder(this).build(),
+                Objects.requireNonNull(reference, "reference"),
+                Objects.requireNonNull(types, "types"));
     }
 }

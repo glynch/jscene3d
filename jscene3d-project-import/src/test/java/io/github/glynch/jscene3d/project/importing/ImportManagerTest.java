@@ -128,6 +128,11 @@ final class ImportManagerTest {
         }
 
         assertThat(manager.status(definition).state()).isEqualTo(ImportState.CURRENT);
+        assertThat(manager.artifacts(definition))
+                .extracting(ImportedArtifactMetadata::identity)
+                .containsExactly("definitions/main", "output/main");
+        assertThat(manager.artifacts(definition).getFirst().descriptor().assetId())
+                .contains(TestImportExtension.DEFINITION_ID);
         assertThat(read(manager, definition, "definitions/main"))
                 .contains("\"assetType\" : \"entity-definition\"", "\"name\" : \"Imported text\"");
         assertThat(read(manager, definition, "output/main")).isEqualTo("source-v1:dependency-v1");

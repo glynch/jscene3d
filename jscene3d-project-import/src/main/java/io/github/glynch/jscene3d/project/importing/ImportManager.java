@@ -138,6 +138,17 @@ public final class ImportManager implements ImportedArtifactLookup {
     }
 
     /**
+     * Lists artifacts from the active published generation in deterministic publication order.
+     *
+     * @param definition structurally validated import definition belonging to this project
+     * @return immutable published artifact metadata
+     */
+    @Override
+    public List<ImportedArtifactMetadata> artifacts(ImportDefinition definition) {
+        return coordinator.artifacts(definition);
+    }
+
+    /**
      * Opens an artifact from the last successfully published generation, including when stale.
      *
      * @param definition structurally validated import definition belonging to this project

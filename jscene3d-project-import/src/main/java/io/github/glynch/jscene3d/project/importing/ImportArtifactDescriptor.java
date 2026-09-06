@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.importing;
 
+import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.importing.internal.Preconditions;
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.Optional;
 public final class ImportArtifactDescriptor {
     private final String identity;
     private final ImportArtifactKind kind;
+    private final Optional<AssetId> assetId;
     private final Optional<RegisteredType> resourceType;
     private final Optional<String> mediaType;
     private final List<String> references;
@@ -22,11 +24,13 @@ public final class ImportArtifactDescriptor {
     private ImportArtifactDescriptor(
             String identity,
             ImportArtifactKind kind,
+            Optional<AssetId> assetId,
             Optional<RegisteredType> resourceType,
             Optional<String> mediaType,
             List<String> references) {
         this.identity = Preconditions.requirePortableIdentity(identity, "identity");
         this.kind = Objects.requireNonNull(kind, "kind");
+        this.assetId = Objects.requireNonNull(assetId, "assetId");
         this.resourceType = Objects.requireNonNull(resourceType, "resourceType");
         this.mediaType = Preconditions.requireOptionalNonBlank(mediaType, "mediaType");
         this.references = Preconditions.copyPortableIdentities(references, "references");
@@ -37,13 +41,15 @@ public final class ImportArtifactDescriptor {
      * Describes a serialized generated entity definition.
      *
      * @param identity deterministic importer-local output identity
+     * @param assetId authoritative project-wide identity declared by the generated definition
      * @param references other outputs referenced by the definition
      * @return entity-definition artifact descriptor
      */
-    public static ImportArtifactDescriptor entityDefinition(String identity, List<String> references) {
+    public static ImportArtifactDescriptor entityDefinition(String identity, AssetId assetId, List<String> references) {
         return new ImportArtifactDescriptor(
                 identity,
                 ImportArtifactKind.ENTITY_DEFINITION,
+                Optional.of(Objects.requireNonNull(assetId, "assetId")),
                 Optional.empty(),
                 Optional.of("application/json"),
                 references);
@@ -62,6 +68,7 @@ public final class ImportArtifactDescriptor {
         return new ImportArtifactDescriptor(
                 identity,
                 ImportArtifactKind.RESOURCE,
+                Optional.empty(),
                 Optional.of(resourceType),
                 Optional.of("application/json"),
                 references);
@@ -76,7 +83,12 @@ public final class ImportArtifactDescriptor {
      */
     public static ImportArtifactDescriptor payload(String identity, String mediaType) {
         return new ImportArtifactDescriptor(
-                identity, ImportArtifactKind.PAYLOAD, Optional.empty(), Optional.of(mediaType), List.of());
+                identity,
+                ImportArtifactKind.PAYLOAD,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(mediaType),
+                List.of());
     }
 
     /**
@@ -95,6 +107,15 @@ public final class ImportArtifactDescriptor {
      */
     public ImportArtifactKind kind() {
         return kind;
+    }
+
+    /**
+     * Returns the authoritative project-wide definition identity.
+     *
+     * @return asset identity exactly when {@link #kind()} is {@link ImportArtifactKind#ENTITY_DEFINITION}
+     */
+    public Optional<AssetId> assetId() {
+        return assetId;
     }
 
     /**
@@ -132,6 +153,7 @@ public final class ImportArtifactDescriptor {
         return other instanceof ImportArtifactDescriptor descriptor
                 && identity.equals(descriptor.identity)
                 && kind == descriptor.kind
+                && assetId.equals(descriptor.assetId)
                 && resourceType.equals(descriptor.resourceType)
                 && mediaType.equals(descriptor.mediaType)
                 && references.equals(descriptor.references);
@@ -139,17 +161,23 @@ public final class ImportArtifactDescriptor {
 
     @Override
     public int hashCode() {
-        return Objects.hash(identity, kind, resourceType, mediaType, references);
+        return Objects.hash(identity, kind, assetId, resourceType, mediaType, references);
     }
 
     @Override
     public String toString() {
-        return "ImportArtifactDescriptor[identity=" + identity + ", kind=" + kind + ", resourceType=" + resourceType
-                + ", mediaType=" + mediaType + ", references=" + references + ']';
+        return "ImportArtifactDescriptor[identity=" + identity + ", kind=" + kind + ", assetId=" + assetId
+                + ", resourceType=" + resourceType + ", mediaType=" + mediaType + ", references=" + references + ']';
     }
 
     /** Requires metadata appropriate to the selected artifact kind. */
     private void requireConsistentMetadata() {
+        if (kind == ImportArtifactKind.ENTITY_DEFINITION && assetId.isEmpty()) {
+            throw new IllegalArgumentException("entity-definition artifacts require assetId");
+        }
+        if (kind != ImportArtifactKind.ENTITY_DEFINITION && assetId.isPresent()) {
+            throw new IllegalArgumentException("assetId is valid only for entity-definition artifacts");
+        }
         if (kind == ImportArtifactKind.RESOURCE && resourceType.isEmpty()) {
             throw new IllegalArgumentException("resource artifacts require resourceType");
         }

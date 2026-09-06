@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
-import io.github.glynch.jscene3d.project.asset.AssetCatalog;
+import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.World;
@@ -25,7 +25,7 @@ public final class WorldCompositionEngine {
      * Allocates the complete graph, constructs components transactionally, and returns an inactive world.
      *
      * @param source world source used for runtime diagnostics
-     * @param assets authored asset catalog
+     * @param definitions authored and imported definition resolver
      * @param definition validated root world definition
      * @param types validated component descriptor catalog
      * @param extensions trusted executable runtime extensions
@@ -35,7 +35,7 @@ public final class WorldCompositionEngine {
      */
     public static World compose(
             URI source,
-            AssetCatalog assets,
+            DefinitionResolver definitions,
             WorldDefinition definition,
             RegisteredTypeCatalog types,
             Collection<ComponentRuntimeExtension> extensions,
@@ -44,7 +44,7 @@ public final class WorldCompositionEngine {
         FactoryBindings factories = WorldRuntimeExtensions.register(source, types, extensions);
         WorldModules worldModules = new WorldModules(modules);
         AllocatedWorld allocation =
-                new EntityGraphAllocator(assets, types, definition, worldModules, resources).allocate();
+                new EntityGraphAllocator(definitions, types, definition, worldModules, resources).allocate();
         return RuntimeComponentConstructor.construct(allocation, types, factories);
     }
 }

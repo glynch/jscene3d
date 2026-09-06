@@ -28,7 +28,7 @@ import java.util.UUID;
 final class TestImportExtension implements ProjectImportExtension {
     private static final RegisteredType IMPORTER =
             new RegisteredType("io.github.glynch.import-test/source-importer", 1);
-    private static final AssetId DEFINITION_ID = new AssetId(UUID.fromString("4e230064-13e5-4ad2-bba8-8fc7dbf4ab32"));
+    static final AssetId DEFINITION_ID = new AssetId(UUID.fromString("4e230064-13e5-4ad2-bba8-8fc7dbf4ab32"));
     private static final EntityId ROOT_ID = new EntityId(UUID.fromString("cb40d4a7-ef36-4bd4-9598-fe7180d78a24"));
 
     @Override
@@ -88,7 +88,8 @@ final class TestImportExtension implements ProjectImportExtension {
                     "Imported text",
                     new LocalEntity(ROOT_ID, "Imported text", true, List.of(), List.of()));
             context.artifact(
-                    ImportArtifactDescriptor.entityDefinition("definitions/main", List.of("output/main")),
+                    ImportArtifactDescriptor.entityDefinition(
+                            "definitions/main", DEFINITION_ID, List.of("output/main")),
                     output -> DefinitionWriter.write(output, definition));
             context.artifact(
                     ImportArtifactDescriptor.payload("output/main", "text/plain"),

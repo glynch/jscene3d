@@ -11,6 +11,7 @@ import org.jspecify.annotations.Nullable;
  *
  * @param identity importer-local artifact identity
  * @param kind serialized artifact kind
+ * @param assetId optional project-wide definition asset identity
  * @param resourceType optional registered resource type identity
  * @param resourceTypeVersion optional registered resource type version
  * @param mediaType serialized media type
@@ -22,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 public record CachedArtifact(
         String identity,
         String kind,
+        @Nullable String assetId,
         @Nullable String resourceType,
         @Nullable Integer resourceTypeVersion,
         String mediaType,

@@ -44,21 +44,31 @@ public interface Entity {
     Optional<String> name();
 
     /**
-     * Returns the entity's own initial enabled flag without considering its owner.
+     * Returns the entity's own current enabled flag without considering its owner.
      *
      * @return local enabled state
      */
     boolean isLocallyEnabled();
 
     /**
-     * Returns the initial enabled state inherited through the ownership hierarchy.
+     * Returns the current enabled state inherited through the ownership hierarchy.
      *
-     * <p>An inactive composed world does not invoke behavior merely because this value is {@code true}; lifecycle
-     * activation is a separate operation.
+     * <p>A pending or completed destruction request makes this value {@code false}. An inactive composed world does
+     * not invoke behavior merely because this value is {@code true}; lifecycle activation is a separate operation.
      *
-     * @return effective initial enabled state
+     * @return effective enabled state
      */
     boolean isEnabled();
+
+    /**
+     * Returns whether this entity has been permanently removed from its world.
+     *
+     * <p>Stable authored and runtime identity metadata remains readable from a retained entity reference after
+     * destruction. Its components and children are no longer exposed.
+     *
+     * @return {@code true} after structural destruction commits
+     */
+    boolean isDestroyed();
 
     /**
      * Returns the ownership parent, or empty for a world root.

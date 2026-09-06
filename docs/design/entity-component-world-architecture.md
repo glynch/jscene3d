@@ -581,14 +581,15 @@ constructing components, binding references, or registering modules rolls back
 the complete instance and releases acquired resources in reverse order. A
 partially active definition instance is never observable.
 
-The first implementation applies this contract to initial world activation and
-closure. `WorldComposer.compose(...)` publishes the complete graph in an
-inactive state without invoking semantic callbacks. `World.activate()` delivers
-creation to every component and activation to components on initially enabled
-entities. A callback failure compensates completed work, closes all constructed
-component values, leaves the world terminally closed, and identifies the event,
-entity, and component with `WorldLifecycleException`. Runtime enablement changes,
-individual destruction, and spawned-instance lifecycle remain later slices.
+`WorldComposer.compose(...)` publishes the complete graph in an inactive state
+without invoking semantic callbacks. `World.activate()` delivers creation to
+every component and activation to components on initially enabled entities.
+The active world accepts explicit enable, disable, and destroy commands. It
+propagates effective enablement without changing independently authored child
+flags and performs permanent subtree cleanup child first. A lifecycle callback
+failure closes the world after completing cleanup and identifies the event,
+entity, and component with `WorldLifecycleException`. Spawned-instance lifecycle
+remains a later slice.
 
 ## Scheduling, time, and concurrency
 
@@ -639,6 +640,11 @@ fixed tick and accumulated simulation time. A fixed advance runs every declared
 every declared `after-physics` callback. A frame advance runs declared
 `frame-update` callbacks using the completed simulation time.
 
+Each completed component-visible phase is also a structural commit point. An
+accepted mutation request still commits when later component code fails that
+phase; component updates are not transactional. Fixed tick and simulation time
+advance only after both fixed component phases and their commits succeed.
+
 Any component descriptor declaring an update phase requires its runtime value
 to implement `ComponentUpdateCallbacks`; implementing that Java interface does
 not itself place a component in a schedule. Phase schedules are compiled once
@@ -676,6 +682,22 @@ snapshot of listeners in authored order. An unconnected signal is valid.
 
 All structural changes are requested through the owning world. Direct list
 mutation on an entity is not the public runtime interface.
+
+The implemented live-mutation seam is `World.enable(entity)`,
+`World.disable(entity)`, and `World.destroy(entity)`. Calls made while the world
+is idle commit synchronously because the caller is already between phases.
+Calls from update callbacks are coalesced and commit after the current
+component-visible phase. Enable and disable preserve each descendant's local
+flag while recalculating effective participation. Destruction becomes
+effectively inactive when requested, then deactivates, destroys, closes, and
+removes the complete owned subtree at commit. Retained entity references expose
+stable identity and destroyed state but no longer expose children or components.
+
+Destroyed entities are removed from live lookup, ownership traversal, update
+schedules, and endpoint routes. Repeating destruction is harmless; enablement
+commands against pending or destroyed entities fail. A lifecycle or cleanup
+failure completes as much cleanup as possible and closes the world rather than
+publishing unreliable partially active state.
 
 Mutations commit between engine-defined phases:
 

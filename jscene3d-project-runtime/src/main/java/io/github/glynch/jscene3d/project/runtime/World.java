@@ -96,6 +96,51 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
     void advanceFrame(Duration elapsed, float interpolation);
 
     /**
+     * Requests that one live entity become locally enabled.
+     *
+     * <p>An idle active world applies the request immediately. A request made by an update callback commits after the
+     * current component-visible phase. Effective descendant activation is delivered owner first. Repeating an
+     * already-effective request is a no-op.
+     *
+     * @param entity entity owned by this world
+     * @throws IllegalArgumentException if {@code entity} belongs to another world
+     * @throws IllegalStateException if the world is not active, structural mutation is already committing, or the
+     *     entity is pending or completely destroyed
+     * @throws WorldLifecycleException if a lifecycle callback fails and closes the world
+     */
+    void enable(Entity entity);
+
+    /**
+     * Requests that one live entity become locally disabled.
+     *
+     * <p>An idle active world applies the request immediately. A request made by an update callback commits after the
+     * current component-visible phase. Effective descendant deactivation is delivered child first. Repeating an
+     * already-effective request is a no-op.
+     *
+     * @param entity entity owned by this world
+     * @throws IllegalArgumentException if {@code entity} belongs to another world
+     * @throws IllegalStateException if the world is not active, structural mutation is already committing, or the
+     *     entity is pending or completely destroyed
+     * @throws WorldLifecycleException if a lifecycle callback fails and closes the world
+     */
+    void disable(Entity entity);
+
+    /**
+     * Requests permanent destruction of one live entity and its owned subtree.
+     *
+     * <p>The subtree stops participating immediately. An idle active world commits destruction immediately; a request
+     * made by an update callback commits after the current component-visible phase. The commit deactivates and
+     * destroys child first, closes every owned component value, and removes the subtree from world lookup and the live
+     * hierarchy. Repeated destruction requests are no-ops.
+     *
+     * @param entity entity owned by this world
+     * @throws IllegalArgumentException if {@code entity} belongs to another world
+     * @throws IllegalStateException if the world is not active or structural mutation is already committing
+     * @throws WorldLifecycleException if a lifecycle callback fails and closes the world after cleanup
+     */
+    void destroy(Entity entity);
+
+    /**
      * Deactivates and destroys lifecycle participants, then releases component values in reverse order.
      *
      * @throws WorldLifecycleException if a declared cleanup callback fails after all cleanup has been attempted

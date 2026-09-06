@@ -26,12 +26,14 @@ final class InternalEntity implements Entity {
     private final EntityId authoredId;
     private final Optional<String> name;
     private final String scheduleIdentity;
-    private final boolean locallyEnabled;
-    private final boolean enabled;
+    private boolean locallyEnabled;
+    private boolean enabled;
     private final @Nullable InternalEntity parent;
     private final List<Entity> children = new ArrayList<>();
     private final Map<ComponentId, Object> components = new LinkedHashMap<>();
     private boolean complete;
+    private boolean pendingDestruction;
+    private boolean destroyed;
 
     /** Stores one allocated entity before its children and component values are attached. */
     InternalEntity(
@@ -80,7 +82,12 @@ final class InternalEntity implements Entity {
 
     @Override
     public boolean isEnabled() {
-        return enabled;
+        return enabled && !pendingDestruction && !destroyed;
+    }
+
+    @Override
+    public boolean isDestroyed() {
+        return destroyed;
     }
 
     @Override
@@ -133,9 +140,69 @@ final class InternalEntity implements Entity {
         complete = true;
     }
 
+    /** Applies one local enablement value at a structural commit point. */
+    void setLocallyEnabled(boolean value) {
+        requireLive();
+        locallyEnabled = value;
+    }
+
+    /** Recomputes effective enablement for this complete owned subtree. */
+    void refreshEnabled() {
+        enabled = locallyEnabled && (parent == null || parent.isEnabled()) && !pendingDestruction && !destroyed;
+        for (Entity child : children) {
+            ((InternalEntity) child).refreshEnabled();
+        }
+    }
+
+    /** Immediately excludes this complete owned subtree from runtime participation. */
+    void markPendingDestruction() {
+        if (pendingDestruction || destroyed) {
+            return;
+        }
+        pendingDestruction = true;
+        enabled = false;
+        for (Entity child : children) {
+            ((InternalEntity) child).markPendingDestruction();
+        }
+    }
+
+    /** Returns whether destruction has been requested but not yet structurally committed. */
+    boolean isPendingDestruction() {
+        return pendingDestruction;
+    }
+
+    /** Returns this entity and its owned descendants in owner-first order. */
+    List<InternalEntity> subtree() {
+        List<InternalEntity> result = new ArrayList<>();
+        collectSubtree(result);
+        return result;
+    }
+
+    /** Removes one direct child while committing structural destruction. */
+    void removeChild(InternalEntity child) {
+        children.remove(Objects.requireNonNull(child, "child"));
+    }
+
+    /** Marks committed destruction and releases references to live children and component values. */
+    void completeDestruction() {
+        destroyed = true;
+        pendingDestruction = false;
+        enabled = false;
+        children.clear();
+        components.clear();
+    }
+
     /** Returns an authored identity path used only as a stable scheduling tie-breaker. */
     String scheduleIdentity() {
         return scheduleIdentity;
+    }
+
+    /** Adds this complete subtree to an owner-first collection. */
+    private void collectSubtree(List<InternalEntity> result) {
+        result.add(this);
+        for (Entity child : children) {
+            ((InternalEntity) child).collectSubtree(result);
+        }
     }
 
     /** Builds an identity path independent of serialized sibling and component ordering. */
@@ -149,6 +216,13 @@ final class InternalEntity implements Entity {
     private void requireIncomplete() {
         if (complete) {
             throw new IllegalStateException("entity composition has already completed");
+        }
+    }
+
+    /** Rejects state changes after permanent destruction. */
+    private void requireLive() {
+        if (destroyed || pendingDestruction) {
+            throw new IllegalStateException("entity is pending or completely destroyed: " + id);
         }
     }
 }

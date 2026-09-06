@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.project.runtime.WorldLifecycleException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /** Owns world lifecycle state, callback ordering, compensation, and component-value release. */
@@ -21,7 +22,7 @@ final class WorldLifecycle {
     /** Takes ownership of fully constructed components and publishes the inactive state. */
     void complete(List<WorldComponentEntry> values) {
         requireState(State.BUILDING, "world composition is not open");
-        components = List.copyOf(values);
+        components = new ArrayList<>(List.copyOf(values));
         state = State.INACTIVE;
     }
 
@@ -55,6 +56,28 @@ final class WorldLifecycle {
     /** Returns whether composition failed, activation rolled back, or closure completed. */
     boolean isClosed() {
         return state == State.CLOSED;
+    }
+
+    /** Synchronizes active callbacks after committed entity enablement changes. */
+    void synchronizeActivation() {
+        requireState(State.ACTIVE, "world is not active");
+        @Nullable RuntimeException failure = deactivateDisabledComponents();
+        if (failure != null) {
+            throw failure;
+        }
+        activateNewlyEnabledComponents();
+    }
+
+    /** Permanently releases every component owned by a committed destroyed subtree. */
+    void destroy(Set<InternalEntity> entities) {
+        requireState(State.ACTIVE, "world is not active");
+        Set<InternalEntity> targets = Set.copyOf(Objects.requireNonNull(entities, "entities"));
+        @Nullable RuntimeException failure = deactivate(targets, null);
+        failure = destroyCreated(targets, failure);
+        failure = closeAndRemove(targets, failure);
+        if (failure != null) {
+            throw failure;
+        }
     }
 
     /** Releases semantic lifecycle and component values once in reverse order. */
@@ -95,6 +118,70 @@ final class WorldLifecycle {
         }
     }
 
+    /** Deactivates every component whose owner became effectively disabled. */
+    private @Nullable RuntimeException deactivateDisabledComponents() {
+        @Nullable RuntimeException failure = null;
+        for (int index = active.size() - 1; index >= 0; index--) {
+            WorldComponentEntry component = active.get(index);
+            if (!component.owner().isEnabled()) {
+                failure = invokeForCleanup(component, ComponentLifecycle.DEACTIVATED, failure);
+                active.remove(index);
+            }
+        }
+        return failure;
+    }
+
+    /** Activates every created component whose owner became effectively enabled. */
+    private void activateNewlyEnabledComponents() {
+        for (WorldComponentEntry component : components) {
+            if (created.contains(component) && component.owner().isEnabled() && !active.contains(component)) {
+                invoke(component, ComponentLifecycle.ACTIVATED);
+                active.add(component);
+            }
+        }
+    }
+
+    /** Deactivates active components owned by a destroyed subtree in reverse order. */
+    private @Nullable RuntimeException deactivate(Set<InternalEntity> entities, @Nullable RuntimeException existing) {
+        @Nullable RuntimeException failure = existing;
+        for (int index = active.size() - 1; index >= 0; index--) {
+            WorldComponentEntry component = active.get(index);
+            if (entities.contains(component.owner())) {
+                failure = invokeForCleanup(component, ComponentLifecycle.DEACTIVATED, failure);
+                active.remove(index);
+            }
+        }
+        return failure;
+    }
+
+    /** Destroys created components owned by a destroyed subtree in reverse order. */
+    private @Nullable RuntimeException destroyCreated(
+            Set<InternalEntity> entities, @Nullable RuntimeException existing) {
+        @Nullable RuntimeException failure = existing;
+        for (int index = created.size() - 1; index >= 0; index--) {
+            WorldComponentEntry component = created.get(index);
+            if (entities.contains(component.owner())) {
+                failure = invokeForCleanup(component, ComponentLifecycle.DESTROYED, failure);
+                created.remove(index);
+            }
+        }
+        return failure;
+    }
+
+    /** Closes and forgets component values owned by a destroyed subtree in reverse order. */
+    private @Nullable RuntimeException closeAndRemove(
+            Set<InternalEntity> entities, @Nullable RuntimeException existing) {
+        @Nullable RuntimeException failure = existing;
+        for (int index = components.size() - 1; index >= 0; index--) {
+            WorldComponentEntry component = components.get(index);
+            if (entities.contains(component.owner())) {
+                failure = closeValue(component.value(), failure);
+                components.remove(index);
+            }
+        }
+        return failure;
+    }
+
     /** Deactivates active entries and destroys created entries while retaining the first failure. */
     private @Nullable RuntimeException releaseLifecycle(@Nullable RuntimeException existing) {
         @Nullable RuntimeException failure = invokeReverse(active, ComponentLifecycle.DEACTIVATED, existing);
@@ -109,13 +196,20 @@ final class WorldLifecycle {
             List<WorldComponentEntry> entries, ComponentLifecycle event, @Nullable RuntimeException existing) {
         @Nullable RuntimeException failure = existing;
         for (int index = entries.size() - 1; index >= 0; index--) {
-            try {
-                invoke(entries.get(index), event);
-            } catch (RuntimeException callbackFailure) {
-                failure = accumulate(failure, callbackFailure);
-            }
+            failure = invokeForCleanup(entries.get(index), event, failure);
         }
         return failure;
+    }
+
+    /** Delivers one cleanup callback while retaining earlier failure precedence. */
+    private static @Nullable RuntimeException invokeForCleanup(
+            WorldComponentEntry component, ComponentLifecycle event, @Nullable RuntimeException existing) {
+        try {
+            invoke(component, event);
+            return existing;
+        } catch (RuntimeException callbackFailure) {
+            return accumulate(existing, callbackFailure);
+        }
     }
 
     /** Invokes one descriptor-authorized callback and identifies any implementation failure. */
@@ -139,17 +233,23 @@ final class WorldLifecycle {
     private @Nullable RuntimeException closeComponents(@Nullable RuntimeException existing) {
         @Nullable RuntimeException failure = existing;
         for (int index = components.size() - 1; index >= 0; index--) {
-            Object value = components.get(index).value();
-            if (value instanceof AutoCloseable closeable) {
-                try {
-                    closeable.close();
-                } catch (Exception closeFailure) {
-                    failure = accumulate(failure, new IllegalStateException("component cleanup failed", closeFailure));
-                }
-            }
+            failure = closeValue(components.get(index).value(), failure);
         }
         components = List.of();
         return failure;
+    }
+
+    /** Closes one component value and retains earlier failure precedence. */
+    private static @Nullable RuntimeException closeValue(Object value, @Nullable RuntimeException existing) {
+        if (!(value instanceof AutoCloseable closeable)) {
+            return existing;
+        }
+        try {
+            closeable.close();
+            return existing;
+        } catch (Exception closeFailure) {
+            return accumulate(existing, new IllegalStateException("component cleanup failed", closeFailure));
+        }
     }
 
     /** Retains the first cleanup failure and suppresses every later failure. */

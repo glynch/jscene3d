@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.runtime.RuntimeAction;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
+import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayloadAction;
 import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
@@ -17,13 +18,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 
 /** Synchronous declaration-ordered signal routing for one runtime. */
 final class EndpointRouter {
     private final Map<RuntimeEndpointAddress, ActionBinding> actions = new LinkedHashMap<>();
     private final Map<RuntimeEndpointAddress, List<ActionBinding>> routes = new LinkedHashMap<>();
+    private final Runnable dispatchBoundary;
     private boolean active;
+    private int dispatchDepth;
+
+    /** Stores the callback used to commit accepted mutations after outermost signal dispatch. */
+    EndpointRouter(Runnable dispatchBoundary) {
+        this.dispatchBoundary = Objects.requireNonNull(dispatchBoundary, "dispatchBoundary");
+    }
 
     /** Creates one signal emitter associated with a component in a composed world. */
     RuntimeSignal signal(RuntimeEndpointAddress address, EndpointDescriptor descriptor, BooleanSupplier enabled) {
@@ -74,6 +83,21 @@ final class EndpointRouter {
         active = false;
         actions.clear();
         routes.clear();
+    }
+
+    /** Removes every endpoint and route associated with permanently destroyed entities. */
+    void removeEntities(Set<RuntimeEntityId> entities) {
+        Set<RuntimeEntityId> targets = Set.copyOf(Objects.requireNonNull(entities, "entities"));
+        actions.keySet().removeIf(address -> targets.contains(address.entity()));
+        routes.entrySet().removeIf(entry -> targets.contains(entry.getKey().entity()));
+        routes.values()
+                .forEach(bindings -> bindings.removeIf(
+                        binding -> targets.contains(binding.key().entity())));
+    }
+
+    /** Returns whether one or more nested signal snapshots are currently dispatching. */
+    boolean isDispatching() {
+        return dispatchDepth > 0;
     }
 
     /** Adds one unique action implementation. */
@@ -180,8 +204,42 @@ final class EndpointRouter {
             if (!enabled.getAsBoolean()) {
                 return;
             }
+            dispatchDepth++;
+            boolean completionHandled = false;
+            try {
+                dispatch(payload);
+            } catch (RuntimeException failure) {
+                completionHandled = true;
+                completeFailedDispatch(failure);
+                throw failure;
+            } finally {
+                if (!completionHandled) {
+                    completeDispatch();
+                }
+            }
+        }
+
+        /** Dispatches one stable route snapshot while mutation remains deferred. */
+        private void dispatch(Optional<RuntimePayload> payload) {
             for (ActionBinding action : List.copyOf(routes.getOrDefault(source, List.of()))) {
                 action.execute(payload);
+            }
+        }
+
+        /** Leaves one nesting level and commits accepted mutations after the outermost dispatch. */
+        private void completeDispatch() {
+            dispatchDepth--;
+            if (dispatchDepth == 0) {
+                dispatchBoundary.run();
+            }
+        }
+
+        /** Preserves listener failure precedence when the following structural commit also fails. */
+        private void completeFailedDispatch(RuntimeException failure) {
+            try {
+                completeDispatch();
+            } catch (RuntimeException commitFailure) {
+                failure.addSuppressed(commitFailure);
             }
         }
     }

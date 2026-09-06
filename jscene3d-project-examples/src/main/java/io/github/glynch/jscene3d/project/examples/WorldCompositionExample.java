@@ -107,6 +107,13 @@ public final class WorldCompositionExample {
                 LOGGER.info(() -> root.id() + " " + root.name().orElse("unnamed") + " = " + label.value()
                         + ", bound label = " + link.label().value());
             }
+            Entity mutableRoot = world.roots().getLast();
+            world.disable(mutableRoot);
+            LOGGER.info(() -> mutableRoot.name().orElse("unnamed") + " enabled = " + mutableRoot.isEnabled());
+            world.enable(mutableRoot);
+            world.destroy(mutableRoot);
+            LOGGER.info(() -> mutableRoot.name().orElse("unnamed") + " destroyed = " + mutableRoot.isDestroyed()
+                    + ", remaining roots = " + world.roots().size());
         }
     }
 

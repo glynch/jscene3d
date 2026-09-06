@@ -206,6 +206,143 @@ final class WorldLifecycleTest {
                         "close:parent");
     }
 
+    /** Applies live enablement changes with ownership ordering. */
+    @Test
+    void changesLiveEnablementInOwnershipOrder() throws IOException {
+        List<String> events = new ArrayList<>();
+        World world = compose(world(true), descriptor(ALL_EVENTS), new LifecycleFactory(events, Map.of()));
+        world.activate();
+        Entity parent = world.roots().getFirst();
+        Entity child = parent.children().getFirst();
+        events.clear();
+
+        world.disable(parent);
+
+        assertThat(parent.isLocallyEnabled()).isFalse();
+        assertThat(parent.isEnabled()).isFalse();
+        assertThat(child.isLocallyEnabled()).isTrue();
+        assertThat(child.isEnabled()).isFalse();
+        assertThat(events).containsExactly("deactivated:child", "deactivated:parent");
+
+        events.clear();
+        world.enable(parent);
+
+        assertThat(parent.isEnabled()).isTrue();
+        assertThat(child.isEnabled()).isTrue();
+        assertThat(events).containsExactly("activated:parent", "activated:child");
+        world.close();
+    }
+
+    /** Preserves an independently disabled child when its parent is cycled. */
+    @Test
+    void preservesLocalChildDisablement() throws IOException {
+        List<String> events = new ArrayList<>();
+        World world = compose(world(true), descriptor(ALL_EVENTS), new LifecycleFactory(events, Map.of()));
+        world.activate();
+        Entity parent = world.roots().getFirst();
+        Entity child = parent.children().getFirst();
+        events.clear();
+
+        world.disable(child);
+        world.disable(parent);
+        world.enable(parent);
+
+        assertThat(parent.isEnabled()).isTrue();
+        assertThat(child.isLocallyEnabled()).isFalse();
+        assertThat(child.isEnabled()).isFalse();
+        assertThat(events).containsExactly("deactivated:child", "deactivated:parent", "activated:parent");
+
+        world.enable(child);
+
+        assertThat(child.isEnabled()).isTrue();
+        assertThat(events).endsWith("activated:child");
+        world.close();
+    }
+
+    /** Permanently removes and releases one complete ownership subtree. */
+    @Test
+    void destroysOwnedSubtreeAndMakesRepeatedRequestsSafe() throws IOException {
+        List<String> events = new ArrayList<>();
+        World world = compose(world(true), descriptor(ALL_EVENTS), new LifecycleFactory(events, Map.of()));
+        world.activate();
+        Entity parent = world.roots().getFirst();
+        Entity child = parent.children().getFirst();
+        RuntimeEntityId parentId = parent.id();
+        RuntimeEntityId childId = child.id();
+        events.clear();
+
+        world.destroy(parent);
+        world.destroy(parent);
+
+        assertThat(parent.isDestroyed()).isTrue();
+        assertThat(child.isDestroyed()).isTrue();
+        assertThat(parent.isEnabled()).isFalse();
+        assertThat(parent.children()).isEmpty();
+        assertThat(parent.component(COMPONENT_ID, RecordingLifecycle.class)).isEmpty();
+        assertThat(world.roots()).isEmpty();
+        assertThat(world.find(parentId)).isEmpty();
+        assertThat(world.find(childId)).isEmpty();
+        assertThat(events)
+                .containsExactly(
+                        "deactivated:child",
+                        "deactivated:parent",
+                        "destroyed:child",
+                        "destroyed:parent",
+                        "close:child",
+                        "close:parent");
+        world.close();
+    }
+
+    /** Rejects cross-world mutation and every mutation after closure. */
+    @Test
+    void rejectsInvalidMutationTargetsAndWorldState() throws IOException {
+        World first = compose(world(true), descriptor(ALL_EVENTS), new LifecycleFactory(new ArrayList<>(), Map.of()));
+        World second = compose(world(true), descriptor(ALL_EVENTS), new LifecycleFactory(new ArrayList<>(), Map.of()));
+        first.activate();
+        second.activate();
+        Entity firstRoot = first.roots().getFirst();
+        Entity secondRoot = second.roots().getFirst();
+
+        assertThatThrownBy(() -> first.disable(secondRoot))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("another world");
+
+        first.close();
+        assertThatThrownBy(() -> first.enable(firstRoot))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("closed");
+        second.close();
+    }
+
+    /** Completes targeted and remaining cleanup before closing after a mutation callback failure. */
+    @Test
+    void closesWorldAfterMutationLifecycleFailure() throws IOException {
+        List<String> events = new ArrayList<>();
+        Map<String, Set<ComponentLifecycle>> failures = Map.of("child", Set.of(ComponentLifecycle.DESTROYED));
+        World world = compose(world(true), descriptor(ALL_EVENTS), new LifecycleFactory(events, failures));
+        world.activate();
+        Entity child = world.roots().getFirst().children().getFirst();
+        RuntimeEntityId childId = child.id();
+        events.clear();
+
+        WorldLifecycleException failure =
+                catchThrowableOfType(WorldLifecycleException.class, () -> world.destroy(child));
+
+        assertThat(failure.event()).isEqualTo(ComponentLifecycle.DESTROYED);
+        assertThat(failure.entity()).isEqualTo(childId);
+        assertThat(child.isDestroyed()).isTrue();
+        assertThat(world.find(childId)).isEmpty();
+        assertThat(world.isClosed()).isTrue();
+        assertThat(events)
+                .containsExactly(
+                        "deactivated:child",
+                        "destroyed:child",
+                        "close:child",
+                        "deactivated:parent",
+                        "destroyed:parent",
+                        "close:parent");
+    }
+
     /** Rejects descriptor lifecycle declarations unsupported by the factory result and closes that result. */
     @Test
     void rejectsMissingLifecycleImplementation() throws IOException {

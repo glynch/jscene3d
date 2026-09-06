@@ -211,7 +211,8 @@ implementation class. World composition allocates the complete entity graph,
 constructs components, binds stable references and endpoints, and publishes an
 inactive `World` only when the whole operation succeeds. After activation, the
 world executes fixed and frame callbacks only for phases selected by each exact
-component descriptor.
+component descriptor. Live enable, disable, and subtree-destruction commands go
+through the owning world and commit safely between update phases.
 
 Run the headless world-composition example with:
 

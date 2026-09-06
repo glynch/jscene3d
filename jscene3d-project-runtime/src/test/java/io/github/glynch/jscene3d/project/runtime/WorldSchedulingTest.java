@@ -199,6 +199,71 @@ final class WorldSchedulingTest {
         world.close();
     }
 
+    /** Commits enablement after the requesting phase without changing its stable callback snapshot. */
+    @Test
+    void commitsDisablementBetweenUpdatePhases() throws IOException {
+        List<String> events = new ArrayList<>();
+        Map<ComponentType, ComponentFactory<?>> factories = new LinkedHashMap<>();
+        factories.put(ALPHA_TYPE, context -> new DisableOwnerUpdates(context.world(), context.owner(), events));
+        factories.put(ZULU_TYPE, context -> new RecordingUpdates("zulu", events));
+        World world = compose(
+                world(true, List.of(component(ZULU_ID, ZULU_TYPE), component(ALPHA_ID, ALPHA_TYPE))),
+                List.of(descriptor(ALPHA_TYPE, ALL_PHASES), descriptor(ZULU_TYPE, ALL_PHASES)),
+                factories);
+        world.activate();
+        Entity owner = world.roots().getFirst();
+
+        world.advanceFixed(STEP);
+
+        assertThat(events).containsExactly("before:disable", "before:zulu:0:PT0S");
+        assertThat(owner.isLocallyEnabled()).isFalse();
+        assertThat(owner.isEnabled()).isFalse();
+        world.close();
+    }
+
+    /** Makes pending destruction inactive immediately and removes it at the phase boundary. */
+    @Test
+    void commitsDestructionAtUpdatePhaseBoundary() throws IOException {
+        List<String> events = new ArrayList<>();
+        Map<ComponentType, ComponentFactory<?>> factories = new LinkedHashMap<>();
+        factories.put(ALPHA_TYPE, context -> new DestroyOwnerUpdates(context.world(), context.owner(), events));
+        factories.put(ZULU_TYPE, context -> new RecordingUpdates("zulu", events));
+        World world = compose(
+                world(true, List.of(component(ZULU_ID, ZULU_TYPE), component(ALPHA_ID, ALPHA_TYPE))),
+                List.of(descriptor(ALPHA_TYPE, ALL_PHASES), descriptor(ZULU_TYPE, ALL_PHASES)),
+                factories);
+        world.activate();
+        Entity owner = world.roots().getFirst();
+        RuntimeEntityId ownerId = owner.id();
+
+        world.advanceFixed(STEP);
+
+        assertThat(events).containsExactly("before:destroy");
+        assertThat(owner.isDestroyed()).isTrue();
+        assertThat(world.find(ownerId)).isEmpty();
+        assertThat(world.roots()).isEmpty();
+        world.close();
+    }
+
+    /** Commits accepted mutation requests even when later code aborts the requesting phase. */
+    @Test
+    void commitsMutationBeforeReportingUpdateFailure() throws IOException {
+        World world = compose(
+                world(true, List.of(component(ALPHA_ID, ALPHA_TYPE))),
+                List.of(descriptor(ALPHA_TYPE, Set.of(ComponentUpdatePhase.BEFORE_PHYSICS))),
+                Map.of(ALPHA_TYPE, context -> new DisableAndFailUpdates(context.world(), context.owner())));
+        world.activate();
+        Entity owner = world.roots().getFirst();
+
+        WorldUpdateException failure = catchThrowableOfType(WorldUpdateException.class, () -> world.advanceFixed(STEP));
+
+        assertThat(failure.phase()).isEqualTo(ComponentUpdatePhase.BEFORE_PHYSICS);
+        assertThat(owner.isLocallyEnabled()).isFalse();
+        assertThat(owner.isEnabled()).isFalse();
+        assertThat(world.isActive()).isTrue();
+        world.close();
+    }
+
     /** Writes and composes one fixture world, requiring success. */
     private World compose(
             WorldDefinition definition,
@@ -314,6 +379,38 @@ final class WorldSchedulingTest {
         @Override
         public void onBeforePhysics(FixedUpdateContext update) {
             world.close();
+        }
+    }
+
+    /** Runtime component requesting local disablement during its fixed callback. */
+    private record DisableOwnerUpdates(World world, Entity owner, List<String> events)
+            implements ComponentUpdateCallbacks {
+        /** Records and requests disablement at the next phase boundary. */
+        @Override
+        public void onBeforePhysics(FixedUpdateContext update) {
+            events.add("before:disable");
+            world.disable(owner);
+        }
+    }
+
+    /** Runtime component requesting owner destruction during its fixed callback. */
+    private record DestroyOwnerUpdates(World world, Entity owner, List<String> events)
+            implements ComponentUpdateCallbacks {
+        /** Records and requests immediately effective pending destruction. */
+        @Override
+        public void onBeforePhysics(FixedUpdateContext update) {
+            events.add("before:destroy");
+            world.destroy(owner);
+        }
+    }
+
+    /** Runtime component accepting disablement before deliberately failing its update. */
+    private record DisableAndFailUpdates(World world, Entity owner) implements ComponentUpdateCallbacks {
+        /** Requests disablement and then proves phase mutation commits are failure-safe. */
+        @Override
+        public void onBeforePhysics(FixedUpdateContext update) {
+            world.disable(owner);
+            throw new IllegalStateException("deliberate update failure after mutation request");
         }
     }
 }

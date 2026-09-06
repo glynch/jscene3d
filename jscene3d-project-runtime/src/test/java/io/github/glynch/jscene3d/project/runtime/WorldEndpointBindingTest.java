@@ -131,6 +131,54 @@ final class WorldEndpointBindingTest {
         world.close();
     }
 
+    /** Removes routes targeting a permanently destroyed entity. */
+    @Test
+    void removesDestroyedEntityEndpoints() throws IOException {
+        List<SignalConnection> connections = List.of(new SignalConnection(
+                EndpointTarget.placement(FIRST_PLACEMENT, PUBLIC_CHANGED),
+                EndpointTarget.placement(SECOND_PLACEMENT, PUBLIC_APPLY)));
+        World world = compose(definition(List.of()), placedWorld(connections), completeExtension(new ArrayList<>()))
+                .world()
+                .orElseThrow();
+        world.activate();
+        Entity first = world.roots().getFirst();
+        Entity second = world.roots().getLast();
+        SourceComponent source = source(first);
+        TargetComponent removedTarget = target(second);
+
+        world.destroy(second);
+        source.send("after-destruction");
+
+        assertThat(removedTarget.received()).isEmpty();
+        assertThat(world.roots()).containsExactly(first);
+        world.close();
+    }
+
+    /** Defers action-requested destruction until the stable signal snapshot has completed. */
+    @Test
+    void commitsMutationAfterOutermostSignalDispatch() throws IOException {
+        List<String> events = new ArrayList<>();
+        List<SignalConnection> connections = List.of(new SignalConnection(
+                EndpointTarget.placement(FIRST_PLACEMENT, PUBLIC_CHANGED),
+                EndpointTarget.placement(SECOND_PLACEMENT, PUBLIC_APPLY)));
+        World world = compose(definition(List.of()), placedWorld(connections), destroyingTargetExtension(events))
+                .world()
+                .orElseThrow();
+        world.activate();
+        Entity first = world.roots().getFirst();
+        Entity second = world.roots().getLast();
+        RuntimeEntityId secondId = second.id();
+        events.clear();
+
+        source(first).send("destroy");
+
+        assertThat(events).containsExactly("target-visible-during-action:true", "close:source");
+        assertThat(second.isDestroyed()).isTrue();
+        assertThat(world.find(secondId)).isEmpty();
+        assertThat(world.roots()).containsExactly(first);
+        world.close();
+    }
+
     /** Resolves endpoints re-exported through a nested definition without leaking private identities. */
     @Test
     void routesAcrossNestedContractReExports() throws IOException {
@@ -359,6 +407,24 @@ final class WorldEndpointBindingTest {
                 () -> new TargetComponent(events, targetIndex.getAndIncrement() == 0 ? "first" : "second"));
     }
 
+    /** Creates targets which destroy their owning entity from the payload action. */
+    private static ComponentRuntimeExtension destroyingTargetExtension(List<String> events) {
+        return new ComponentRuntimeExtension() {
+            @Override
+            public String id() {
+                return EXTENSION_ID;
+            }
+
+            @Override
+            public void register(ComponentFactoryRegistry registry) {
+                registry.register(SOURCE_TYPE, context -> new SourceComponent(events));
+                registry.register(
+                        TARGET_TYPE,
+                        context -> new DestroyingTargetComponent(context.world(), context.owner(), events));
+            }
+        };
+    }
+
     /** Creates one runtime extension from deterministic factory-result suppliers. */
     private static ComponentRuntimeExtension extension(List<String> events, FactoryValue source, FactoryValue target) {
         return new ComponentRuntimeExtension() {
@@ -489,6 +555,22 @@ final class WorldEndpointBindingTest {
         @Override
         public void close() {
             events.add("close:target");
+        }
+    }
+
+    /** Action implementation requesting destruction while its stable signal snapshot is dispatching. */
+    private record DestroyingTargetComponent(World world, Entity owner, List<String> events)
+            implements ComponentEndpointBinder {
+        @Override
+        public void bindEndpoints(ComponentEndpoints endpoints) {
+            endpoints.action(APPLY, payload -> destroyOwner());
+            endpoints.action(RESET, () -> {});
+        }
+
+        /** Requests destruction and records that physical removal remains deferred until action return. */
+        private void destroyOwner() {
+            world.destroy(owner);
+            events.add("target-visible-during-action:" + world.find(owner.id()).isPresent());
         }
     }
 

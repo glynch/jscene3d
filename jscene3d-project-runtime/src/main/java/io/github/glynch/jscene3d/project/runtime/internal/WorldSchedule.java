@@ -13,6 +13,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 /** Immutable descriptor-compiled schedules plus world-owned simulation timing. */
@@ -26,22 +28,24 @@ final class WorldSchedule {
     private final List<WorldComponentEntry> beforePhysics;
     private final List<WorldComponentEntry> afterPhysics;
     private final List<WorldComponentEntry> frameUpdates;
+    private final Runnable phaseBoundary;
     private long tick;
     private Duration simulationTime = Duration.ZERO;
     private boolean executing;
 
     /** Compiles each update phase once from authoritative descriptor declarations. */
-    WorldSchedule(List<WorldComponentEntry> components) {
+    WorldSchedule(List<WorldComponentEntry> components, Runnable phaseBoundary) {
         List<WorldComponentEntry> ordered = new ArrayList<>(List.copyOf(components));
         ordered.sort(ENTRY_ORDER);
-        beforePhysics = select(ordered, ComponentUpdatePhase.BEFORE_PHYSICS);
-        afterPhysics = select(ordered, ComponentUpdatePhase.AFTER_PHYSICS);
-        frameUpdates = select(ordered, ComponentUpdatePhase.FRAME_UPDATE);
+        beforePhysics = new ArrayList<>(select(ordered, ComponentUpdatePhase.BEFORE_PHYSICS));
+        afterPhysics = new ArrayList<>(select(ordered, ComponentUpdatePhase.AFTER_PHYSICS));
+        frameUpdates = new ArrayList<>(select(ordered, ComponentUpdatePhase.FRAME_UPDATE));
+        this.phaseBoundary = Objects.requireNonNull(phaseBoundary, "phaseBoundary");
     }
 
     /** Returns a schedule with no participants for an incomplete world shell. */
     static WorldSchedule empty() {
-        return new WorldSchedule(List.of());
+        return new WorldSchedule(List.of(), () -> {});
     }
 
     /** Advances both component-visible fixed phases around the reserved physics seam. */
@@ -52,13 +56,16 @@ final class WorldSchedule {
         long nextTick = Math.incrementExact(tick);
         executing = true;
         try {
-            invokeFixed(
+            runPhase(() -> invokeFixed(
                     beforePhysics,
                     ComponentUpdatePhase.BEFORE_PHYSICS,
                     update,
-                    ComponentUpdateCallbacks::onBeforePhysics);
-            invokeFixed(
-                    afterPhysics, ComponentUpdatePhase.AFTER_PHYSICS, update, ComponentUpdateCallbacks::onAfterPhysics);
+                    ComponentUpdateCallbacks::onBeforePhysics));
+            runPhase(() -> invokeFixed(
+                    afterPhysics,
+                    ComponentUpdatePhase.AFTER_PHYSICS,
+                    update,
+                    ComponentUpdateCallbacks::onAfterPhysics));
             simulationTime = nextSimulationTime;
             tick = nextTick;
         } finally {
@@ -72,7 +79,7 @@ final class WorldSchedule {
         FrameUpdateContext update = new FrameUpdateContext(elapsed, simulationTime, interpolation);
         executing = true;
         try {
-            invokeFrame(frameUpdates, update);
+            runPhase(() -> invokeFrame(frameUpdates, update));
         } finally {
             executing = false;
         }
@@ -81,6 +88,29 @@ final class WorldSchedule {
     /** Returns whether one callback schedule is currently on the call stack. */
     boolean isExecuting() {
         return executing;
+    }
+
+    /** Removes destroyed component values from every future phase schedule. */
+    void removeEntities(Set<InternalEntity> entities) {
+        Set<InternalEntity> targets = Set.copyOf(Objects.requireNonNull(entities, "entities"));
+        beforePhysics.removeIf(component -> targets.contains(component.owner()));
+        afterPhysics.removeIf(component -> targets.contains(component.owner()));
+        frameUpdates.removeIf(component -> targets.contains(component.owner()));
+    }
+
+    /** Commits requested mutations even when component behavior aborts the current phase. */
+    private void runPhase(Runnable callbacks) {
+        try {
+            callbacks.run();
+        } catch (RuntimeException callbackFailure) {
+            try {
+                phaseBoundary.run();
+            } catch (RuntimeException commitFailure) {
+                callbackFailure.addSuppressed(commitFailure);
+            }
+            throw callbackFailure;
+        }
+        phaseBoundary.run();
     }
 
     /** Selects one immutable phase schedule from descriptor-declared participation. */

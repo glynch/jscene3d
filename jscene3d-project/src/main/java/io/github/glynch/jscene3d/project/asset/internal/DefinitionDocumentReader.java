@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.project.component.EndpointId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.contract.EntityContract;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
@@ -73,7 +74,7 @@ public final class DefinitionDocumentReader {
         this.projectRoot = projectRoot;
         this.metadata = metadata;
         diagnostics = new DiagnosticCollector(metadata.path());
-        values = ProjectValueDecoder.withReferences(this::decodeReferenceValue);
+        values = ProjectValueDecoder.withReferencesAndTargets(this::decodeReferenceValue, this::decodeTargetValue);
     }
 
     /**
@@ -710,6 +711,37 @@ public final class DefinitionDocumentReader {
     /** Creates a constructible placeholder after a reference diagnostic. */
     private static ProjectValue.ReferenceValue invalidReferenceValue() {
         return new ProjectValue.ReferenceValue(ResourceReference.asset("invalid"));
+    }
+
+    /** Decodes one reserved authored target relative to the containing definition-instance scope. */
+    private ProjectValue decodeTargetValue(JsonNode raw, String location) {
+        JsonNode target = raw.get("$target");
+        if (raw.size() != 1 || target == null || !target.isObject()) {
+            diagnostics.error(
+                    AssetDiagnosticCode.VALUE_TARGET_INVALID,
+                    "target object must contain only one object-valued $target field",
+                    location);
+            return new ProjectValue.EntityTargetValue(placeholderReferenceEntityId());
+        }
+        JsonNode entity = target.get("entityId");
+        JsonNode component = target.get("componentId");
+        int expectedSize = component == null ? 1 : 2;
+        if (target.size() != expectedSize
+                || entity == null
+                || !entity.isTextual()
+                || component != null && !component.isTextual()) {
+            diagnostics.error(
+                    AssetDiagnosticCode.VALUE_TARGET_INVALID,
+                    "$target requires a textual entityId and an optional textual componentId",
+                    location + "/$target");
+            return new ProjectValue.EntityTargetValue(placeholderReferenceEntityId());
+        }
+        EntityId entityId = parseEntityReferenceId(entity.textValue(), location + "/$target/entityId");
+        if (component == null) {
+            return new ProjectValue.EntityTargetValue(entityId);
+        }
+        ComponentId componentId = parseComponentId(component.textValue(), location + "/$target/componentId");
+        return new ProjectValue.ComponentTargetValue(new ComponentTarget(entityId, componentId));
     }
 
     /** Requires one non-blank top-level display name. */

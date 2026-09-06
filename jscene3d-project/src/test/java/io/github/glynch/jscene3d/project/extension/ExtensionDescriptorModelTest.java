@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.ArrayList;
@@ -96,12 +97,15 @@ final class ExtensionDescriptorModelTest {
         ProjectValue accepted = new ProjectValue.ReferenceValue(ResourceReference.asset("mesh"));
         ProjectValue wrongKind = new ProjectValue.TextValue("mesh");
         ProjectValue wrongNamespace = new ProjectValue.ReferenceValue(ResourceReference.imported("mesh/output"));
+        PropertyDescriptor target = PropertyDescriptor.required(
+                "body", ProjectValueKind.COMPONENT_TARGET, PRESENTATION, Map.of(), Set.of());
 
         assertThat(reference.accepts(accepted)).isTrue();
         assertThat(reference.accepts(wrongKind)).isFalse();
         assertThat(reference.accepts(wrongNamespace)).isFalse();
         assertThat(ProjectValueKind.of(ProjectValue.NullValue.INSTANCE)).isEqualTo(ProjectValueKind.NULL);
         assertThat(ProjectValueKind.of(new ProjectValue.ArrayValue(List.of()))).isEqualTo(ProjectValueKind.ARRAY);
+        assertThat(target.accepts(new ProjectValue.TextValue("body"))).isFalse();
     }
 
     /** Rejects inconsistent descriptor construction. */
@@ -119,12 +123,16 @@ final class ExtensionDescriptorModelTest {
                 List.of(),
                 List.of(),
                 List.of());
+        ProjectValue target = new ProjectValue.EntityTargetValue(EntityId.from("f3c9430c-482b-4862-854a-17f6c51de14b"));
 
         assertThatThrownBy(() -> PropertyDescriptor.optionalWithDefault(
                         "visible", ProjectValueKind.BOOLEAN, text, PRESENTATION, editorMetadata, noReferences))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> PropertyDescriptor.optional(
                         "visible", ProjectValueKind.BOOLEAN, PRESENTATION, editorMetadata, projectReferences))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> PropertyDescriptor.optionalWithDefault(
+                        "owner", ProjectValueKind.ENTITY_TARGET, target, PRESENTATION, editorMetadata, noReferences))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> extension(foreignType)).isInstanceOf(IllegalArgumentException.class);
     }

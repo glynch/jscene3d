@@ -31,6 +31,18 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
     /** A runtime component does not implement its descriptor-declared lifecycle callbacks. */
     COMPONENT_LIFECYCLE_UNSUPPORTED(
             "runtime.component.lifecycle.unsupported", "A runtime component does not support its declared lifecycle"),
+    /** A runtime component cannot bind descriptor-declared target properties. */
+    COMPONENT_REFERENCE_BINDING_UNSUPPORTED(
+            "runtime.component.reference.unsupported", "A runtime component does not support authored references"),
+    /** A component reference-binding callback failed. */
+    COMPONENT_REFERENCE_BINDING_FAILED(
+            "runtime.component.reference.binding", "A runtime component failed to bind authored references"),
+    /** An authored entity or component target is absent from its live definition instance. */
+    COMPONENT_REFERENCE_MISSING(
+            "runtime.component.reference.missing", "An authored component reference target is missing"),
+    /** An authored component target has an incompatible runtime representation. */
+    COMPONENT_REFERENCE_TYPE_INVALID(
+            "runtime.component.reference.type", "An authored component reference has an incompatible runtime type"),
     /** A resource factory failed to create a value. */
     RESOURCE_FACTORY_CREATE_FAILED("runtime.factory.resource.create", "A resource factory failed to create a value"),
     /** A resource factory is missing. */

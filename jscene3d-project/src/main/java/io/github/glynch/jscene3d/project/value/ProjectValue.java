@@ -6,6 +6,8 @@ package io.github.glynch.jscene3d.project.value;
 
 import static io.github.glynch.jscene3d.project.internal.Preconditions.immutableProjectValues;
 
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
+import io.github.glynch.jscene3d.project.entity.EntityId;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +26,9 @@ public sealed interface ProjectValue
                 ProjectValue.TextValue,
                 ProjectValue.ArrayValue,
                 ProjectValue.ObjectValue,
-                ProjectValue.ReferenceValue {
+                ProjectValue.ReferenceValue,
+                ProjectValue.EntityTargetValue,
+                ProjectValue.ComponentTargetValue {
     /** Explicit JSON null. */
     enum NullValue implements ProjectValue {
         /** The only null-value instance. */
@@ -89,6 +93,28 @@ public sealed interface ProjectValue
         /** Validates the resource reference. */
         public ReferenceValue {
             Objects.requireNonNull(reference, "reference");
+        }
+    }
+
+    /** Stable target of an entity in the authored scope containing this value.
+     *
+     * @param entity local entity identity
+     */
+    record EntityTargetValue(EntityId entity) implements ProjectValue {
+        /** Validates the target identity. */
+        public EntityTargetValue {
+            Objects.requireNonNull(entity, "entity");
+        }
+    }
+
+    /** Stable target of a component in the authored scope containing this value.
+     *
+     * @param target local entity and component identities
+     */
+    record ComponentTargetValue(ComponentTarget target) implements ProjectValue {
+        /** Validates the component target. */
+        public ComponentTargetValue {
+            Objects.requireNonNull(target, "target");
         }
     }
 }

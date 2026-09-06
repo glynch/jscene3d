@@ -44,6 +44,9 @@ public final class PropertyDescriptor {
         if (valueKind != ProjectValueKind.REFERENCE && !this.acceptedReferenceKinds.isEmpty()) {
             throw new IllegalArgumentException("acceptedReferenceKinds require a reference property");
         }
+        if (isAuthoredTarget(valueKind) && this.defaultValue.isPresent()) {
+            throw new IllegalArgumentException("authored target properties cannot declare defaults");
+        }
         this.defaultValue.ifPresent(this::requireAcceptedValue);
     }
 
@@ -221,5 +224,10 @@ public final class PropertyDescriptor {
         if (!accepts(value)) {
             throw new IllegalArgumentException("defaultValue does not satisfy property " + id);
         }
+    }
+
+    /** Returns whether one kind requires an authored instance scope unavailable to descriptor defaults. */
+    private static boolean isAuthoredTarget(ProjectValueKind kind) {
+        return kind == ProjectValueKind.ENTITY_TARGET || kind == ProjectValueKind.COMPONENT_TARGET;
     }
 }

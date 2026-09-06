@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.contract.EntityContract;
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
@@ -326,7 +327,31 @@ public final class DefinitionWriter {
                 json.writeStringField("$ref", referenceValue.reference().toString());
                 json.writeEndObject();
             }
+            case ProjectValue.EntityTargetValue targetValue -> writeEntityTargetValue(json, targetValue);
+            case ProjectValue.ComponentTargetValue targetValue -> writeComponentTargetValue(json, targetValue);
         }
+    }
+
+    /** Writes one entity target using the reserved project-value discriminator. */
+    private static void writeEntityTargetValue(JsonGenerator json, ProjectValue.EntityTargetValue value)
+            throws IOException {
+        json.writeStartObject();
+        json.writeObjectFieldStart("$target");
+        json.writeStringField("entityId", value.entity().toString());
+        json.writeEndObject();
+        json.writeEndObject();
+    }
+
+    /** Writes one component target using the reserved project-value discriminator. */
+    private static void writeComponentTargetValue(JsonGenerator json, ProjectValue.ComponentTargetValue value)
+            throws IOException {
+        ComponentTarget target = value.target();
+        json.writeStartObject();
+        json.writeObjectFieldStart("$target");
+        json.writeStringField("entityId", target.entity().toString());
+        json.writeStringField("componentId", target.component().toString());
+        json.writeEndObject();
+        json.writeEndObject();
     }
 
     /** Creates parent directories as needed and replaces one complete target file. */

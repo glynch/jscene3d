@@ -22,7 +22,11 @@ public enum ProjectValueKind {
     /** Ordered object. */
     OBJECT,
     /** Typed project resource reference. */
-    REFERENCE;
+    REFERENCE,
+    /** Stable target of an entity in the containing authored scope. */
+    ENTITY_TARGET,
+    /** Stable target of a component in the containing authored scope. */
+    COMPONENT_TARGET;
 
     /**
      * Returns the structural kind of a portable project value.
@@ -40,6 +44,8 @@ public enum ProjectValueKind {
             case ProjectValue.ArrayValue ignored -> ARRAY;
             case ProjectValue.ObjectValue ignored -> OBJECT;
             case ProjectValue.ReferenceValue ignored -> REFERENCE;
+            case ProjectValue.EntityTargetValue ignored -> ENTITY_TARGET;
+            case ProjectValue.ComponentTargetValue ignored -> COMPONENT_TARGET;
         };
     }
 }

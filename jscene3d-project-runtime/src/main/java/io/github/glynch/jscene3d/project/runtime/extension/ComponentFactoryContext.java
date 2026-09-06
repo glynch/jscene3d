@@ -17,7 +17,9 @@ import java.util.Map;
  * Bounded construction context supplied to one registered component factory.
  *
  * <p>The eventual world composer owns implementations of this interface. The context exposes validated effective
- * configuration and shared runtime-resource lookup without exposing mutable composer internals.
+ * configuration and shared runtime-resource lookup without exposing mutable composer internals. Target-valued
+ * properties remain authored values during construction; components resolve them later through
+ * {@link ComponentReferenceBinder} after every factory has completed.
  */
 public interface ComponentFactoryContext extends RuntimeResourceLookup {
     /**

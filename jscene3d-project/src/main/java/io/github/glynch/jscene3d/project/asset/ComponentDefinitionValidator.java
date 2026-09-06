@@ -16,9 +16,11 @@ import io.github.glynch.jscene3d.project.component.EndpointId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.contract.EntityContract;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
+import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.entity.PropertyTarget;
 import io.github.glynch.jscene3d.project.entity.SignalConnection;
@@ -46,6 +48,7 @@ final class ComponentDefinitionValidator {
     private final RegisteredTypeCatalog catalog;
     private final DiagnosticCollector diagnostics;
     private final Map<EntityId, EntityComponents> entities = new LinkedHashMap<>();
+    private final Set<EntityId> addressableEntities = new HashSet<>();
 
     /** Stores one source-local component validation context. */
     private ComponentDefinitionValidator(RegisteredTypeCatalog catalog, Path source) {
@@ -63,6 +66,7 @@ final class ComponentDefinitionValidator {
         ComponentDefinitionValidator validator = new ComponentDefinitionValidator(catalog, source);
         validator.validateLocalEntity(root, "/root");
         validator.validateEntries(root.children(), "/root/children");
+        validator.validateLocalTargetValues(root, "/root");
         validator.validateContract(contract);
         validator.validateConnections(connections);
         return new Validation(validator.entities, validator.diagnostics.diagnostics());
@@ -76,6 +80,7 @@ final class ComponentDefinitionValidator {
             Path source) {
         ComponentDefinitionValidator validator = new ComponentDefinitionValidator(catalog, source);
         validator.validateEntries(roots, "/roots");
+        validator.validateTargetValues(roots, "/roots");
         validator.validateConnections(connections);
         return new Validation(validator.entities, validator.diagnostics.diagnostics());
     }
@@ -88,12 +93,15 @@ final class ComponentDefinitionValidator {
                 String entityLocation = location + "/" + index;
                 validateLocalEntity(entity, entityLocation);
                 validateEntries(entity.children(), entityLocation + "/children");
+            } else {
+                addressableEntities.add(entry.id());
             }
         }
     }
 
     /** Resolves and validates every component on one entity. */
     private void validateLocalEntity(LocalEntity entity, String location) {
+        addressableEntities.add(entity.id());
         Map<ComponentId, ResolvedComponent> resolved = new LinkedHashMap<>();
         List<ComponentDefinition> components = entity.components();
         for (int index = 0; index < components.size(); index++) {
@@ -122,6 +130,74 @@ final class ComponentDefinitionValidator {
         ComponentTypeDescriptor resolved = descriptor.orElseThrow();
         validateProperties(component, resolved, location + "/properties");
         return Optional.of(new ResolvedComponent(component, resolved));
+    }
+
+    /** Validates every authored target after the complete source-local identity index exists. */
+    private void validateTargetValues(List<? extends EntityEntry> entries, String location) {
+        for (int index = 0; index < entries.size(); index++) {
+            EntityEntry entry = entries.get(index);
+            String entryLocation = location + "/" + index;
+            if (entry instanceof LocalEntity local) {
+                validateLocalTargetValues(local, entryLocation);
+            } else if (entry instanceof EntityPlacement placement) {
+                validateValueTargets(placement.arguments(), entryLocation + "/arguments");
+            }
+        }
+    }
+
+    /** Validates target-valued properties and descendants of one local entity. */
+    private void validateLocalTargetValues(LocalEntity local, String location) {
+        validateComponentTargetValues(local.components(), location + "/components");
+        validateTargetValues(local.children(), location + "/children");
+    }
+
+    /** Validates target-valued properties on locally authored components. */
+    private void validateComponentTargetValues(List<ComponentDefinition> components, String location) {
+        for (int index = 0; index < components.size(); index++) {
+            validateValueTargets(components.get(index).properties(), location + "/" + index + "/properties");
+        }
+    }
+
+    /** Validates target values in one named value map while preserving diagnostic locations. */
+    private void validateValueTargets(Map<?, ProjectValue> values, String location) {
+        values.forEach((key, value) -> validateValueTarget(value, location + "/" + key));
+    }
+
+    /** Recursively validates one target value without interpreting ordinary object data. */
+    private void validateValueTarget(ProjectValue value, String location) {
+        switch (value) {
+            case ProjectValue.EntityTargetValue target -> validateEntityTarget(target.entity(), location);
+            case ProjectValue.ComponentTargetValue target -> validateComponentTarget(target.target(), location);
+            case ProjectValue.ArrayValue array -> {
+                for (int index = 0; index < array.values().size(); index++) {
+                    validateValueTarget(array.values().get(index), location + "/" + index);
+                }
+            }
+            case ProjectValue.ObjectValue object -> validateValueTargets(object.values(), location);
+            default -> {
+                // Scalar and resource-reference values carry no local entity identity.
+            }
+        }
+    }
+
+    /** Requires an entity target to identify a local entity or placement in the same authored asset. */
+    private void validateEntityTarget(EntityId entity, String location) {
+        if (!addressableEntities.contains(entity)) {
+            error(
+                    AssetDiagnosticCode.TARGET_INVALID,
+                    "entity target does not exist in this asset: " + entity,
+                    location);
+        }
+    }
+
+    /** Requires a component target to identify a locally authored component without crossing a placement seam. */
+    private void validateComponentTarget(ComponentTarget target, String location) {
+        if (localComponent(target.entity(), target.component()).isEmpty()) {
+            error(
+                    AssetDiagnosticCode.TARGET_INVALID,
+                    "component target does not identify a local component: " + target,
+                    location);
+        }
     }
 
     /** Validates required, unknown, and structurally invalid component properties. */

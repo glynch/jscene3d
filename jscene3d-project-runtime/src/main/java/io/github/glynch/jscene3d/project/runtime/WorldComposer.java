@@ -28,8 +28,8 @@ import java.util.Objects;
  * Validates and transactionally composes authored worlds through registered component factories.
  *
  * <p>The single operation hides definition loading, placement expansion, instance scoping, complete graph allocation,
- * factory registration, effective-property resolution, and rollback. Success returns a complete inactive world;
- * failure returns ordered structured diagnostics and never publishes the partial world.
+ * factory registration, effective-property resolution, authored reference binding, and rollback. Success returns a
+ * complete inactive world; failure returns ordered structured diagnostics and never publishes the partial world.
  */
 public final class WorldComposer {
     /** Prevents construction of this stateless composition entry point. */
@@ -40,10 +40,11 @@ public final class WorldComposer {
     /**
      * Loads, validates, and transactionally composes one inactive world.
      *
-     * <p>All entity shells are allocated before the first component factory is invoked. Runtime extensions register
-     * only executable factories for component descriptors they own. The supplied resource lookup remains owned by
-     * the caller; the resulting world delegates resource resolution to it and closes only component values created by
-     * this operation.
+     * <p>All entity shells are allocated before the first component factory is invoked. All component factories finish
+     * before authored references are bound, and every binding succeeds before the inactive world is published. Runtime
+     * extensions register only executable factories for component descriptors they own. The supplied resource lookup
+     * remains owned by the caller; the resulting world delegates resource resolution to it and closes only component
+     * values created by this operation.
      *
      * @param assets stable authored asset catalog
      * @param reference startup world-definition reference

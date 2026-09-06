@@ -17,7 +17,6 @@ import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -83,7 +82,7 @@ final class EntityGraphAllocator {
             @Nullable InternalEntity parent,
             String location) {
         EntityDefinition definition = load(placement);
-        Map<PropertyId, ProjectValue> arguments = effectiveArguments(containingScope, placement);
+        Map<PropertyId, ScopedProjectValue> arguments = effectiveArguments(containingScope, placement);
         EntityInstanceScope definitionScope =
                 new EntityInstanceScope(definition.id(), InstanceOverrides.resolve(definition.contract(), arguments));
         LocalEntity root = definition.root();
@@ -110,8 +109,9 @@ final class EntityGraphAllocator {
         List<ComponentDefinition> componentDefinitions = source.components();
         for (int index = 0; index < componentDefinitions.size(); index++) {
             ComponentDefinition component = componentDefinitions.get(index);
-            Map<PropertyId, ProjectValue> overrides = scope.overrides().component(source.id(), component.id());
-            components.add(new ComponentPlan(owner, component, overrides, location + "/components/" + index));
+            Map<PropertyId, ScopedProjectValue> overrides = scope.overrides().component(source.id(), component.id());
+            components.add(new ComponentPlan(
+                    owner, scope, source.id(), component, overrides, location + "/components/" + index));
         }
     }
 
@@ -150,9 +150,12 @@ final class EntityGraphAllocator {
     }
 
     /** Merges authored placement arguments with overrides supplied through its containing contract. */
-    private static Map<PropertyId, ProjectValue> effectiveArguments(
+    private static Map<PropertyId, ScopedProjectValue> effectiveArguments(
             EntityInstanceScope containingScope, EntityPlacement placement) {
-        Map<PropertyId, ProjectValue> result = new LinkedHashMap<>(placement.arguments());
+        Map<PropertyId, ScopedProjectValue> result = new LinkedHashMap<>();
+        placement
+                .arguments()
+                .forEach((property, value) -> result.put(property, new ScopedProjectValue(value, containingScope)));
         result.putAll(containingScope.overrides().placement(placement.id()));
         return result;
     }

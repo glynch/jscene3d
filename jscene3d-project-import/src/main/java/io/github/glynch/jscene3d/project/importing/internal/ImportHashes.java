@@ -125,6 +125,15 @@ public final class ImportHashes {
                 update(digest, "reference");
                 update(digest, referenceValue.reference().toString());
             }
+            case ProjectValue.EntityTargetValue targetValue -> {
+                update(digest, "entity-target");
+                update(digest, targetValue.entity().toString());
+            }
+            case ProjectValue.ComponentTargetValue targetValue -> {
+                update(digest, "component-target");
+                update(digest, targetValue.target().entity().toString());
+                update(digest, targetValue.target().component().toString());
+            }
         }
     }
 

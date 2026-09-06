@@ -9,7 +9,6 @@ import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.contract.EntityContract;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.PropertyTarget;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -19,13 +18,13 @@ import java.util.Objects;
 final class InstanceOverrides {
     private static final InstanceOverrides EMPTY = new InstanceOverrides(Map.of(), Map.of());
 
-    private final Map<ComponentTarget, Map<PropertyId, ProjectValue>> components;
-    private final Map<EntityId, Map<PropertyId, ProjectValue>> placements;
+    private final Map<ComponentTarget, Map<PropertyId, ScopedProjectValue>> components;
+    private final Map<EntityId, Map<PropertyId, ScopedProjectValue>> placements;
 
     /** Stores immutable override indexes. */
     private InstanceOverrides(
-            Map<ComponentTarget, Map<PropertyId, ProjectValue>> components,
-            Map<EntityId, Map<PropertyId, ProjectValue>> placements) {
+            Map<ComponentTarget, Map<PropertyId, ScopedProjectValue>> components,
+            Map<EntityId, Map<PropertyId, ScopedProjectValue>> placements) {
         this.components = immutableNestedMap(components);
         this.placements = immutableNestedMap(placements);
     }
@@ -36,11 +35,11 @@ final class InstanceOverrides {
     }
 
     /** Resolves supplied public arguments to private component properties or nested placement arguments. */
-    static InstanceOverrides resolve(EntityContract contract, Map<PropertyId, ProjectValue> arguments) {
+    static InstanceOverrides resolve(EntityContract contract, Map<PropertyId, ScopedProjectValue> arguments) {
         Objects.requireNonNull(contract, "contract");
-        Map<ComponentTarget, Map<PropertyId, ProjectValue>> components = new LinkedHashMap<>();
-        Map<EntityId, Map<PropertyId, ProjectValue>> placements = new LinkedHashMap<>();
-        for (Map.Entry<PropertyId, ProjectValue> argument : arguments.entrySet()) {
+        Map<ComponentTarget, Map<PropertyId, ScopedProjectValue>> components = new LinkedHashMap<>();
+        Map<EntityId, Map<PropertyId, ScopedProjectValue>> placements = new LinkedHashMap<>();
+        for (Map.Entry<PropertyId, ScopedProjectValue> argument : arguments.entrySet()) {
             PropertyTarget target = target(contract, argument.getKey());
             if (target.component().isPresent()) {
                 ComponentTarget component =
@@ -58,12 +57,12 @@ final class InstanceOverrides {
     }
 
     /** Returns component property overrides for one local target. */
-    Map<PropertyId, ProjectValue> component(EntityId entity, ComponentId component) {
+    Map<PropertyId, ScopedProjectValue> component(EntityId entity, ComponentId component) {
         return components.getOrDefault(new ComponentTarget(entity, component), Map.of());
     }
 
     /** Returns public arguments supplied through the containing definition to one nested placement. */
-    Map<PropertyId, ProjectValue> placement(EntityId placement) {
+    Map<PropertyId, ScopedProjectValue> placement(EntityId placement) {
         return placements.getOrDefault(placement, Map.of());
     }
 
@@ -81,9 +80,9 @@ final class InstanceOverrides {
     }
 
     /** Deeply copies a two-level ordered map. */
-    private static <K> Map<K, Map<PropertyId, ProjectValue>> immutableNestedMap(
-            Map<K, Map<PropertyId, ProjectValue>> source) {
-        Map<K, Map<PropertyId, ProjectValue>> result = new LinkedHashMap<>();
+    private static <K> Map<K, Map<PropertyId, ScopedProjectValue>> immutableNestedMap(
+            Map<K, Map<PropertyId, ScopedProjectValue>> source) {
+        Map<K, Map<PropertyId, ScopedProjectValue>> result = new LinkedHashMap<>();
         source.forEach((key, values) -> result.put(key, Collections.unmodifiableMap(new LinkedHashMap<>(values))));
         return Collections.unmodifiableMap(result);
     }

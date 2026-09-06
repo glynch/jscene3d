@@ -7,19 +7,18 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
-import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -38,11 +37,14 @@ final class RuntimeComponentConstructor {
             RuntimeResourceLookup resources) {
         List<Object> created = new ArrayList<>();
         List<WorldComponentEntry> entries = new ArrayList<>();
+        List<ComponentBindingEntry> bindings = new ArrayList<>();
         Set<Object> identities = Collections.newSetFromMap(new IdentityHashMap<>());
         try {
             for (ComponentPlan plan : allocation.components()) {
                 ComponentTypeDescriptor descriptor = descriptor(plan, catalog);
-                Object value = create(plan, allocation.world(), descriptor, factories, resources);
+                EffectiveComponentProperties properties = EffectiveComponentProperties.merge(
+                        descriptor, plan.definition(), plan.overrides(), plan.scope());
+                Object value = create(plan, allocation.world(), descriptor, properties, factories, resources);
                 if (!identities.add(value)) {
                     throw new RuntimeCompositionException(
                             RuntimeDiagnosticCode.FACTORY_CREATE_FAILED,
@@ -51,10 +53,18 @@ final class RuntimeComponentConstructor {
                 }
                 created.add(value);
                 requireLifecycleSupport(plan, descriptor, value);
+                boolean bindsReferences = declaresTargetProperties(descriptor);
+                requireReferenceSupport(plan, bindsReferences, value);
                 plan.owner().addComponent(plan.definition().id(), value);
+                plan.scope()
+                        .bindComponent(plan.authoredEntity(), plan.definition().id(), value);
+                if (bindsReferences && value instanceof ComponentReferenceBinder binder) {
+                    bindings.add(new ComponentBindingEntry(plan, binder, properties));
+                }
                 entries.add(
                         new WorldComponentEntry(plan.owner(), plan.definition().id(), value, descriptor.lifecycle()));
             }
+            bindReferences(bindings);
             allocation.world().complete(entries);
             return allocation.world();
         } catch (RuntimeException failure) {
@@ -68,13 +78,12 @@ final class RuntimeComponentConstructor {
             ComponentPlan plan,
             InternalWorld world,
             ComponentTypeDescriptor descriptor,
+            EffectiveComponentProperties properties,
             FactoryBindings factories,
             RuntimeResourceLookup resources) {
         ComponentDefinition definition = plan.definition();
         ComponentType type = new ComponentType(definition.type(), definition.typeVersion());
         ComponentFactory<?> factory = factories.requireComponent(type, plan.location());
-        Map<PropertyId, ProjectValue> properties =
-                EffectiveComponentProperties.merge(descriptor, definition, plan.overrides());
         ComponentCreationContext context =
                 new ComponentCreationContext(plan.owner(), world, definition, descriptor, properties, resources);
         try {
@@ -105,6 +114,54 @@ final class RuntimeComponentConstructor {
                     "component factory result does not implement ComponentLifecycleCallbacks",
                     plan.location());
         }
+    }
+
+    /** Returns whether safe metadata declares at least one target-valued property. */
+    private static boolean declaresTargetProperties(ComponentTypeDescriptor descriptor) {
+        return descriptor.properties().values().stream()
+                .map(property -> property.valueKind())
+                .anyMatch(RuntimeComponentConstructor::isTargetKind);
+    }
+
+    /** Requires target-valued component types to expose the one binding callback. */
+    private static void requireReferenceSupport(ComponentPlan plan, boolean bindsReferences, Object value) {
+        if (bindsReferences && !(value instanceof ComponentReferenceBinder)) {
+            throw new RuntimeCompositionException(
+                    RuntimeDiagnosticCode.COMPONENT_REFERENCE_BINDING_UNSUPPORTED,
+                    "component factory result does not implement ComponentReferenceBinder",
+                    plan.location());
+        }
+    }
+
+    /** Returns whether one safe property declaration contains a definition-instance target. */
+    private static boolean isTargetKind(ProjectValueKind kind) {
+        return kind == ProjectValueKind.ENTITY_TARGET || kind == ProjectValueKind.COMPONENT_TARGET;
+    }
+
+    /** Binds every component only after all factory-created values have entered their instance indexes. */
+    private static void bindReferences(List<ComponentBindingEntry> bindings) {
+        for (ComponentBindingEntry binding : bindings) {
+            ComponentReferenceBindingContext references = new ComponentReferenceBindingContext(
+                    binding.properties(), binding.plan().location());
+            try {
+                binding.binder().bindReferences(references);
+            } catch (RuntimeCompositionException failure) {
+                throw failure;
+            } catch (RuntimeException failure) {
+                throw bindingFailure(binding.plan(), failure);
+            } finally {
+                references.expire();
+            }
+        }
+    }
+
+    /** Wraps an arbitrary implementation failure in one stable binding diagnostic. */
+    private static RuntimeCompositionException bindingFailure(ComponentPlan plan, RuntimeException failure) {
+        String detail = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+        return new RuntimeCompositionException(
+                RuntimeDiagnosticCode.COMPONENT_REFERENCE_BINDING_FAILED,
+                "reference binding failed for component " + plan.definition().id() + ": " + detail,
+                plan.location());
     }
 
     /** Wraps arbitrary factory failure in one stable structured composition failure. */

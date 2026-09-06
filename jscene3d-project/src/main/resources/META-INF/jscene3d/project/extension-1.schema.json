@@ -273,7 +273,9 @@
             "text",
             "array",
             "object",
-            "reference"
+            "reference",
+            "entity_target",
+            "component_target"
           ]
         },
         "required": {

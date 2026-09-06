@@ -23,6 +23,8 @@ import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -32,6 +34,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -40,8 +43,11 @@ public final class WorldCompositionExample {
     private static final String EXTENSION_ID = "io.github.glynch.jscene3d.world-example";
     private static final AssetId WORLD_ID = AssetId.from("0fbb5faf-b309-4684-a24c-8dd2295bb483");
     private static final ComponentId LABEL_COMPONENT = ComponentId.from("14b0558a-1f72-4773-a03c-af7001323f92");
+    private static final ComponentId LABEL_LINK_COMPONENT = ComponentId.from("34d922c8-dd18-4d4c-8fd4-2a0daaa1cd08");
     private static final ComponentType LABEL_TYPE = ComponentType.of(EXTENSION_ID + "/label", 1);
+    private static final ComponentType LABEL_LINK_TYPE = ComponentType.of(EXTENSION_ID + "/label-link", 1);
     private static final PropertyId LABEL = new PropertyId("label");
+    private static final PropertyId LABEL_TARGET = new PropertyId("label-target");
     private static final Logger LOGGER = Logger.getLogger(WorldCompositionExample.class.getName());
     private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
         @Override
@@ -79,7 +85,10 @@ public final class WorldCompositionExample {
             for (Entity root : world.roots()) {
                 LabelComponent label =
                         root.component(LABEL_COMPONENT, LabelComponent.class).orElseThrow();
-                LOGGER.info(() -> root.id() + " " + root.name().orElse("unnamed") + " = " + label.value());
+                LabelLinkComponent link = root.component(LABEL_LINK_COMPONENT, LabelLinkComponent.class)
+                        .orElseThrow();
+                LOGGER.info(() -> root.id() + " " + root.name().orElse("unnamed") + " = " + label.value()
+                        + ", bound label = " + link.label().value());
             }
         }
     }
@@ -93,7 +102,7 @@ public final class WorldCompositionExample {
                 DescriptorPresentation.named("Label"),
                 Map.of(),
                 Set.of());
-        ComponentTypeDescriptor component = ComponentTypeDescriptor.builder(
+        ComponentTypeDescriptor labelType = ComponentTypeDescriptor.builder(
                         LABEL_TYPE, DescriptorPresentation.named("Label"))
                 .properties(List.of(label))
                 .lifecycle(Set.of(
@@ -102,13 +111,23 @@ public final class WorldCompositionExample {
                         ComponentLifecycle.DEACTIVATED,
                         ComponentLifecycle.DESTROYED))
                 .build();
+        PropertyDescriptor target = PropertyDescriptor.required(
+                LABEL_TARGET.value(),
+                ProjectValueKind.COMPONENT_TARGET,
+                DescriptorPresentation.named("Label target"),
+                Map.of(),
+                Set.of());
+        ComponentTypeDescriptor linkType = ComponentTypeDescriptor.builder(
+                        LABEL_LINK_TYPE, DescriptorPresentation.named("Label link"))
+                .properties(List.of(target))
+                .build();
         return new ExtensionDescriptor(
                 EXTENSION_ID,
                 "1.0.0",
                 ">=0.1.0 <0.2.0",
                 DescriptorPresentation.named("World example"),
                 List.of(),
-                List.of(component));
+                List.of(labelType, linkType));
     }
 
     /** Supplies the executable factory independently of the safe descriptor. */
@@ -124,6 +143,7 @@ public final class WorldCompositionExample {
                 ProjectValue value = Objects.requireNonNull(context.properties().get(LABEL), "label");
                 return new LabelComponent(((ProjectValue.TextValue) value).value());
             });
+            registry.registerComponent(LABEL_LINK_TYPE, context -> new LabelLinkComponent());
         }
     }
 
@@ -147,6 +167,21 @@ public final class WorldCompositionExample {
         @Override
         public void onDestroyed() {
             LOGGER.info(() -> "Destroyed " + value);
+        }
+    }
+
+    /** Component proving that stable authored targets bind independently inside repeated definition placements. */
+    private static final class LabelLinkComponent implements ComponentReferenceBinder {
+        private Optional<LabelComponent> label = Optional.empty();
+
+        @Override
+        public void bindReferences(ComponentReferenceResolver references) {
+            label = Optional.of(references.component(LABEL_TARGET, LabelComponent.class));
+        }
+
+        /** Returns the direct component reference established before world activation. */
+        private LabelComponent label() {
+            return label.orElseThrow(() -> new IllegalStateException("label reference is not bound"));
         }
     }
 }

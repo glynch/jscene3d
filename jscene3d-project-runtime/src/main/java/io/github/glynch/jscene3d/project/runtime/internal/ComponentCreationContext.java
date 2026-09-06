@@ -13,8 +13,6 @@ import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -33,13 +31,13 @@ final class ComponentCreationContext implements ComponentFactoryContext {
             World world,
             ComponentDefinition definition,
             ComponentTypeDescriptor descriptor,
-            Map<PropertyId, ProjectValue> properties,
+            EffectiveComponentProperties properties,
             RuntimeResourceLookup resources) {
         this.owner = Objects.requireNonNull(owner, "owner");
         this.world = Objects.requireNonNull(world, "world");
         this.definition = Objects.requireNonNull(definition, "definition");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
-        this.properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
+        this.properties = properties.values();
         this.resources = Objects.requireNonNull(resources, "resources");
     }
 

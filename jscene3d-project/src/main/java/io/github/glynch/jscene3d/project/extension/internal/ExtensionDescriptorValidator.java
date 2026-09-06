@@ -453,7 +453,7 @@ public final class ExtensionDescriptorValidator {
         } catch (IllegalArgumentException ignored) {
             diagnostics.error(
                     ExtensionDiagnosticCode.PROPERTY_KIND_INVALID,
-                    "valueKind must be null, boolean, number, text, array, object, or reference",
+                    "valueKind must be null, boolean, number, text, array, object, reference, entity_target, or component_target",
                     location);
             return ProjectValueKind.NULL;
         }

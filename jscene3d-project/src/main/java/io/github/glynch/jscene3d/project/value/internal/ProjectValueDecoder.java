@@ -17,10 +17,12 @@ import java.util.Optional;
 /** Converts Jackson values into the renderer-independent project value model. */
 public final class ProjectValueDecoder {
     private final Optional<ReferenceDecoder> referenceDecoder;
+    private final Optional<TargetDecoder> targetDecoder;
 
     /** Stores optional resource-reference decoding behavior. */
-    private ProjectValueDecoder(Optional<ReferenceDecoder> referenceDecoder) {
+    private ProjectValueDecoder(Optional<ReferenceDecoder> referenceDecoder, Optional<TargetDecoder> targetDecoder) {
         this.referenceDecoder = referenceDecoder;
+        this.targetDecoder = targetDecoder;
     }
 
     /**
@@ -29,7 +31,7 @@ public final class ProjectValueDecoder {
      * @return plain project-value decoder
      */
     public static ProjectValueDecoder plain() {
-        return new ProjectValueDecoder(Optional.empty());
+        return new ProjectValueDecoder(Optional.empty(), Optional.empty());
     }
 
     /**
@@ -39,7 +41,19 @@ public final class ProjectValueDecoder {
      * @return reference-aware project-value decoder
      */
     public static ProjectValueDecoder withReferences(ReferenceDecoder referenceDecoder) {
-        return new ProjectValueDecoder(Optional.of(referenceDecoder));
+        return new ProjectValueDecoder(Optional.of(referenceDecoder), Optional.empty());
+    }
+
+    /**
+     * Creates a decoder for resource references and authored entity/component targets.
+     *
+     * @param referenceDecoder project-specific resource-reference decoder
+     * @param targetDecoder authored target decoder
+     * @return reference- and target-aware project-value decoder
+     */
+    public static ProjectValueDecoder withReferencesAndTargets(
+            ReferenceDecoder referenceDecoder, TargetDecoder targetDecoder) {
+        return new ProjectValueDecoder(Optional.of(referenceDecoder), Optional.of(targetDecoder));
     }
 
     /**
@@ -66,6 +80,9 @@ public final class ProjectValueDecoder {
         }
         if (value.isArray()) {
             return decodeArray(value, location);
+        }
+        if (value.has("$target") && targetDecoder.isPresent()) {
+            return targetDecoder.orElseThrow().decode(value, location);
         }
         if (value.has("$ref") && referenceDecoder.isPresent()) {
             return referenceDecoder.orElseThrow().decode(value, location);
@@ -109,5 +126,18 @@ public final class ProjectValueDecoder {
          * @return decoded reference value
          */
         ProjectValue.ReferenceValue decode(JsonNode raw, String location);
+    }
+
+    /** Decodes a reserved authored target without exposing JSON types in the public value model. */
+    @FunctionalInterface
+    public interface TargetDecoder {
+        /**
+         * Decodes one object containing a {@code $target} property.
+         *
+         * @param raw target object
+         * @param location JSON Pointer location
+         * @return decoded entity or component target value
+         */
+        ProjectValue decode(JsonNode raw, String location);
     }
 }

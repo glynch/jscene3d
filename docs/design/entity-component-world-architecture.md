@@ -340,6 +340,15 @@ composition. A successful world owns its component values and releases them in
 reverse construction order when it is closed. The caller retains ownership of
 the resource lookup supplied to the composer.
 
+Composition constructs every component value before binding authored entity or
+component targets. A component type with `entity_target` or `component_target`
+properties returns a value implementing `ComponentReferenceBinder`. Its single
+binding callback receives a short-lived `ComponentReferenceResolver`; resolving
+by property identity produces a direct live `Entity` or component reference.
+Every binding succeeds before the inactive world is published. Binding failure
+therefore uses the same complete reverse-order rollback as factory failure and
+no lifecycle callback has yet run.
+
 The implemented boundary includes initial lifecycle activation but deliberately
 does not schedule updates or support runtime structural mutation. Scheduling,
 module accessors, and mutation are subsequent slices on top of the same composed
@@ -437,6 +446,32 @@ AssetId + local EntityId + optional ComponentId + optional PropertyId
 
 A live target additionally includes definition-instance scope. Public Java
 types should prevent accidental interchange of these identity kinds.
+
+Component properties persist entity and component targets as distinct portable
+value kinds. Their canonical JSON representation is:
+
+```json
+{
+  "body": {
+    "$target": {
+      "entityId": "a stable entity UUID",
+      "componentId": "a stable component UUID"
+    }
+  }
+}
+```
+
+Omitting `componentId` produces an `entity_target`; including it produces a
+`component_target`. The target is interpreted in the authored scope containing
+the value, not in the eventual hierarchy position. When a target value passes
+through a placed definition's public parameter, composition preserves its
+original containing instance scope. This permits an explicit public dependency
+without making a repeated definition bind back into the wrong placement.
+
+An outer asset may target a placement entity itself, but it cannot name a
+private component inside that placement. Such a dependency must be deliberately
+exported by the reusable definition's public contract. Target validation and
+runtime lookup both enforce that seam.
 
 Animation tracks, component dependencies, collision-shape membership, signal
 connections, and action targets use these stable identities. They never use

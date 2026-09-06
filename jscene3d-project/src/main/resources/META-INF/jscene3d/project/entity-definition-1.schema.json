@@ -73,7 +73,7 @@
       "properties": {
         "id": {"$ref": "#/$defs/localId"},
         "valueKind": {
-          "enum": ["null", "boolean", "number", "text", "array", "object", "reference"]
+          "enum": ["null", "boolean", "number", "text", "array", "object", "reference", "entity_target", "component_target"]
         },
         "required": {"type": "boolean"},
         "target": {"$ref": "#/$defs/propertyTarget"}

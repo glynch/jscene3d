@@ -46,6 +46,8 @@ public enum AssetDiagnosticCode implements DiagnosticCode {
     VALUE_NOT_OBJECT("asset.value.object", "The definition value must be an object"),
     /** A reserved project-value reference object is invalid. */
     VALUE_REFERENCE_INVALID("asset.value.reference", "The definition value reference is invalid"),
+    /** A reserved project-value entity or component target object is invalid. */
+    VALUE_TARGET_INVALID("asset.value.target", "The definition value target is invalid"),
     /** A component type identifier is invalid. */
     COMPONENT_TYPE_INVALID("asset.component.type", "The component type identifier is invalid"),
     /** A component type version is invalid. */

@@ -1,0 +1,81 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/world-definition-1.json",
+  "assetId" : "91d7de40-0364-4d1e-b357-8f255cf46d56",
+  "assetType" : "world-definition",
+  "formatVersion" : 1,
+  "name" : "Descriptor-backed 3D presentation",
+  "connections" : [ ],
+  "roots" : [ {
+    "entryType" : "local",
+    "entityId" : "237742f4-00ec-464f-8e29-61bd04cc69d7",
+    "name" : "Camera",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "fce4e620-7d4a-44da-a7d2-cdb385c5d9ad",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "position" : [ 0, 0, 7 ]
+      }
+    }, {
+      "componentId" : "1362dd1c-dcac-4084-8ff6-50d5762cd634",
+      "type" : "io.github.glynch.jscene3d.spatial3d/perspective-camera-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "field-of-view-degrees" : 50,
+        "near" : 0.1,
+        "far" : 100,
+        "primary" : true
+      }
+    } ],
+    "children" : [ ]
+  }, {
+    "entryType" : "local",
+    "entityId" : "f23b0dd4-cefb-48a8-91a9-c32e579766f2",
+    "name" : "Sun",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "a4e98a78-fb25-4e1b-85b5-53e763e7426e",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "position" : [ 4, 6, 5 ]
+      }
+    }, {
+      "componentId" : "f76d4011-2fd5-4109-9914-c9374fd1ef76",
+      "type" : "io.github.glynch.jscene3d.spatial3d/directional-light-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "color" : [ 1, 0.92, 0.8 ],
+        "intensity" : 2.5,
+        "target" : [ 0, 0, 0 ]
+      }
+    } ],
+    "children" : [ ]
+  }, {
+    "entryType" : "local",
+    "entityId" : "a0bd64f6-eb0b-4019-962c-08f48fba0291",
+    "name" : "Cube",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "ef97052c-8dbb-4cb7-b3f2-bce92385f4af",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : { }
+    }, {
+      "componentId" : "e7989543-6ad9-4c91-a4bf-8ba822e7d25f",
+      "type" : "io.github.glynch.jscene3d.spatial3d/mesh-renderer-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "mesh" : {
+          "$ref" : "asset:example-cube-mesh"
+        },
+        "material" : {
+          "$ref" : "asset:example-blue-material"
+        },
+        "visible" : true
+      }
+    } ],
+    "children" : [ ]
+  } ]
+}

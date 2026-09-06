@@ -22,11 +22,35 @@ public final class Spatial3dRuntimeExtension implements ComponentRuntimeExtensio
 
     @Override
     public void register(ComponentFactoryRegistry registry) {
-        Objects.requireNonNull(registry, "registry").register(Spatial3dDescriptors.transformType(), context -> {
+        ComponentFactoryRegistry validRegistry = Objects.requireNonNull(registry, "registry");
+        validRegistry.register(Spatial3dDescriptors.transformType(), context -> {
             AuthoredTransform3d authored = AuthoredTransform3d.from(context.properties());
             Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
             return spatial.createTransform(
                     context.owner(), authored.position(), authored.orientation(), authored.scale());
+        });
+        validRegistry.register(Spatial3dDescriptors.perspectiveCameraType(), context -> {
+            AuthoredPresentation3d.Camera authored = AuthoredPresentation3d.camera(context.properties());
+            Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
+            return spatial.createPerspectiveCamera(
+                    context.owner(),
+                    authored.fieldOfViewDegrees(),
+                    authored.near(),
+                    authored.far(),
+                    authored.primary());
+        });
+        validRegistry.register(Spatial3dDescriptors.directionalLightType(), context -> {
+            AuthoredPresentation3d.Light authored = AuthoredPresentation3d.light(context.properties());
+            Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
+            return spatial.createDirectionalLight(
+                    context.owner(), authored.color(), authored.intensity(), authored.target());
+        });
+        validRegistry.register(Spatial3dDescriptors.meshRendererType(), context -> {
+            AuthoredPresentation3d.MeshRenderer authored = AuthoredPresentation3d.meshRenderer(context.properties());
+            Mesh3dResource mesh = context.resolveResource(authored.mesh(), Mesh3dResource.class);
+            Material3dResource material = context.resolveResource(authored.material(), Material3dResource.class);
+            Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
+            return spatial.createMeshRenderer(context.owner(), mesh, material, authored.visible());
         });
     }
 }

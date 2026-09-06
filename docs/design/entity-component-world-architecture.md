@@ -378,11 +378,13 @@ dispatch, safe enablement and destruction commits, exact host-supplied
 world-module lookup, and world-owned runtime-resource leases. Scheduled
 callbacks and signal dispatch are enabled only after successful world activation
 and stop before world cleanup. The first 3D adapter slice adds descriptor-backed
-`Transform3d`, automatic compatible direct-parent world transforms, and
-world-owned cleanup while keeping its internal `Object3D` hierarchy behind the
-`Spatial3dWorldModule` seam. Spawning and concrete rendering, physics, audio,
-and input adapters remain subsequent slices on top of the same composed entity
-graph.
+`Transform3d`, perspective-camera, directional-light, and mesh-renderer
+components. It maintains automatic compatible direct-parent world transforms,
+selects one explicitly authored primary camera, resolves shared mesh and material
+resources through world-owned leases, and submits the resulting presentation
+through `Spatial3dWorldModule`. Its internal `Scene`, `Object3D`, camera, light,
+and mesh objects remain adapter details. Spawning, physics, audio, and input
+adapters remain subsequent slices on top of the same composed entity graph.
 
 ## Definition placement and composition
 

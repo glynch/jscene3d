@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.component.ComponentId;
+import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -21,6 +22,7 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -73,6 +75,7 @@ public final class WorldCompositionExample {
                 NO_RESOURCES);
         try (World world = result.world()
                 .orElseThrow(() -> new IllegalStateException("world composition failed: " + result.diagnostics()))) {
+            world.activate();
             for (Entity root : world.roots()) {
                 LabelComponent label =
                         root.component(LABEL_COMPONENT, LabelComponent.class).orElseThrow();
@@ -93,6 +96,11 @@ public final class WorldCompositionExample {
         ComponentTypeDescriptor component = ComponentTypeDescriptor.builder(
                         LABEL_TYPE, DescriptorPresentation.named("Label"))
                 .properties(List.of(label))
+                .lifecycle(Set.of(
+                        ComponentLifecycle.CREATED,
+                        ComponentLifecycle.ACTIVATED,
+                        ComponentLifecycle.DEACTIVATED,
+                        ComponentLifecycle.DESTROYED))
                 .build();
         return new ExtensionDescriptor(
                 EXTENSION_ID,
@@ -120,5 +128,25 @@ public final class WorldCompositionExample {
     }
 
     /** Immutable component value independently created for each placed entity. */
-    private record LabelComponent(String value) {}
+    private record LabelComponent(String value) implements ComponentLifecycleCallbacks {
+        @Override
+        public void onCreated() {
+            LOGGER.info(() -> "Created " + value);
+        }
+
+        @Override
+        public void onActivated() {
+            LOGGER.info(() -> "Activated " + value);
+        }
+
+        @Override
+        public void onDeactivated() {
+            LOGGER.info(() -> "Deactivated " + value);
+        }
+
+        @Override
+        public void onDestroyed() {
+            LOGGER.info(() -> "Destroyed " + value);
+        }
+    }
 }

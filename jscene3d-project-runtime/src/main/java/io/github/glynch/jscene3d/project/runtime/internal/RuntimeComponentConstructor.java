@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,10 +37,12 @@ final class RuntimeComponentConstructor {
             FactoryBindings factories,
             RuntimeResourceLookup resources) {
         List<Object> created = new ArrayList<>();
+        List<WorldComponentEntry> entries = new ArrayList<>();
         Set<Object> identities = Collections.newSetFromMap(new IdentityHashMap<>());
         try {
             for (ComponentPlan plan : allocation.components()) {
-                Object value = create(plan, allocation.world(), catalog, factories, resources);
+                ComponentTypeDescriptor descriptor = descriptor(plan, catalog);
+                Object value = create(plan, allocation.world(), descriptor, factories, resources);
                 if (!identities.add(value)) {
                     throw new RuntimeCompositionException(
                             RuntimeDiagnosticCode.FACTORY_CREATE_FAILED,
@@ -47,9 +50,12 @@ final class RuntimeComponentConstructor {
                             plan.location());
                 }
                 created.add(value);
+                requireLifecycleSupport(plan, descriptor, value);
                 plan.owner().addComponent(plan.definition().id(), value);
+                entries.add(
+                        new WorldComponentEntry(plan.owner(), plan.definition().id(), value, descriptor.lifecycle()));
             }
-            allocation.world().complete(created);
+            allocation.world().complete(entries);
             return allocation.world();
         } catch (RuntimeException failure) {
             rollback(allocation.world(), created, failure);
@@ -61,16 +67,11 @@ final class RuntimeComponentConstructor {
     private static Object create(
             ComponentPlan plan,
             InternalWorld world,
-            RegisteredTypeCatalog catalog,
+            ComponentTypeDescriptor descriptor,
             FactoryBindings factories,
             RuntimeResourceLookup resources) {
         ComponentDefinition definition = plan.definition();
         ComponentType type = new ComponentType(definition.type(), definition.typeVersion());
-        ComponentTypeDescriptor descriptor = catalog.findComponent(type)
-                .orElseThrow(() -> new RuntimeCompositionException(
-                        RuntimeDiagnosticCode.TYPE_MISSING,
-                        "component descriptor is absent after validation: " + type,
-                        plan.location()));
         ComponentFactory<?> factory = factories.requireComponent(type, plan.location());
         Map<PropertyId, ProjectValue> properties =
                 EffectiveComponentProperties.merge(descriptor, definition, plan.overrides());
@@ -82,6 +83,27 @@ final class RuntimeComponentConstructor {
             throw exception;
         } catch (RuntimeException exception) {
             throw factoryFailure(type, plan, exception);
+        }
+    }
+
+    /** Returns the descriptor which catalog-aware validation already established for one plan. */
+    private static ComponentTypeDescriptor descriptor(ComponentPlan plan, RegisteredTypeCatalog catalog) {
+        ComponentDefinition definition = plan.definition();
+        ComponentType type = new ComponentType(definition.type(), definition.typeVersion());
+        return catalog.findComponent(type)
+                .orElseThrow(() -> new RuntimeCompositionException(
+                        RuntimeDiagnosticCode.TYPE_MISSING,
+                        "component descriptor is absent after validation: " + type,
+                        plan.location()));
+    }
+
+    /** Requires a callback implementation whenever safe metadata declares lifecycle participation. */
+    private static void requireLifecycleSupport(ComponentPlan plan, ComponentTypeDescriptor descriptor, Object value) {
+        if (!descriptor.lifecycle().isEmpty() && !(value instanceof ComponentLifecycleCallbacks)) {
+            throw new RuntimeCompositionException(
+                    RuntimeDiagnosticCode.COMPONENT_LIFECYCLE_UNSUPPORTED,
+                    "component factory result does not implement ComponentLifecycleCallbacks",
+                    plan.location());
         }
     }
 

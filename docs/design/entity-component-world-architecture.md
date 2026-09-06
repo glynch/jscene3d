@@ -335,13 +335,15 @@ live entity before invoking a component factory, applies descriptor defaults
 and instance-contract arguments, and returns either a complete inactive
 `World` or ordered structured diagnostics. A failed composition publishes no
 world and releases already-created `AutoCloseable` component values in reverse
-construction order. A successful world owns those values and releases them,
-also in reverse construction order, when it is closed. The caller retains
-ownership of the resource lookup supplied to the composer.
+construction order. The caller explicitly calls `World.activate()` after
+composition. A successful world owns its component values and releases them in
+reverse construction order when it is closed. The caller retains ownership of
+the resource lookup supplied to the composer.
 
-This boundary deliberately does not activate components or schedule updates.
-Lifecycle activation, module accessors, and mutation are subsequent slices on
-top of the same composed entity graph.
+The implemented boundary includes initial lifecycle activation but deliberately
+does not schedule updates or support runtime structural mutation. Scheduling,
+module accessors, and mutation are subsequent slices on top of the same composed
+entity graph.
 
 ## Definition placement and composition
 
@@ -512,8 +514,11 @@ Disabling a parent effectively disables its descendants. Each descendant keeps
 its own enabled flag, so re-enabling the parent does not enable a child that was
 independently disabled.
 
-Components may opt into these semantic lifecycle points; final Java method
-names remain an interface-design detail:
+Components opt into these semantic lifecycle points through safe descriptor
+metadata. A runtime value whose descriptor declares any lifecycle event
+implements `ComponentLifecycleCallbacks`. The descriptor remains authoritative:
+the world invokes only declared events even when the Java value overrides other
+callback methods.
 
 1. **Created** once, after the full graph exists and references are resolved.
 2. **Activated** whenever the component becomes effectively active.
@@ -529,6 +534,15 @@ Activation is transactional. Failure while validating, acquiring resources,
 constructing components, binding references, or registering modules rolls back
 the complete instance and releases acquired resources in reverse order. A
 partially active definition instance is never observable.
+
+The first implementation applies this contract to initial world activation and
+closure. `WorldComposer.compose(...)` publishes the complete graph in an
+inactive state without invoking semantic callbacks. `World.activate()` delivers
+creation to every component and activation to components on initially enabled
+entities. A callback failure compensates completed work, closes all constructed
+component values, leaves the world terminally closed, and identifies the event,
+entity, and component with `WorldLifecycleException`. Runtime enablement changes,
+individual destruction, and spawned-instance lifecycle remain later slices.
 
 ## Scheduling, time, and concurrency
 

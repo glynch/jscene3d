@@ -28,6 +28,9 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
     COMPONENT_FACTORY_MISSING("runtime.factory.component.missing", "A component factory is missing"),
     /** A runtime factory failed to create an object. */
     FACTORY_CREATE_FAILED("runtime.factory.create", "A runtime factory failed to create an object"),
+    /** A runtime component does not implement its descriptor-declared lifecycle callbacks. */
+    COMPONENT_LIFECYCLE_UNSUPPORTED(
+            "runtime.component.lifecycle.unsupported", "A runtime component does not support its declared lifecycle"),
     /** A resource factory failed to create a value. */
     RESOURCE_FACTORY_CREATE_FAILED("runtime.factory.resource.create", "A resource factory failed to create a value"),
     /** A resource factory is missing. */

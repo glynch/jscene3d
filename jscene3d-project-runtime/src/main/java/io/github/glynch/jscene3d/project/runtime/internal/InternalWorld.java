@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 
 /** Composition-time world implementation which owns all constructed component values. */
 final class InternalWorld implements World {
@@ -24,9 +23,8 @@ final class InternalWorld implements World {
     private final RuntimeResourceLookup resources;
     private final List<Entity> roots = new ArrayList<>();
     private final Map<RuntimeEntityId, Entity> entities = new LinkedHashMap<>();
-    private List<Object> components = List.of();
+    private final WorldLifecycle lifecycle = new WorldLifecycle();
     private boolean complete;
-    private boolean closed;
 
     /** Creates an empty world shell visible to factories while its complete graph is constructed. */
     InternalWorld(WorldDefinition definition, RuntimeResourceLookup resources) {
@@ -50,13 +48,23 @@ final class InternalWorld implements World {
     }
 
     @Override
+    public void activate() {
+        lifecycle.activate();
+    }
+
+    @Override
+    public boolean isActive() {
+        return lifecycle.isActive();
+    }
+
+    @Override
     public boolean isClosed() {
-        return closed;
+        return lifecycle.isClosed();
     }
 
     @Override
     public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
-        if (closed) {
+        if (lifecycle.isClosed()) {
             throw new IllegalStateException("world is closed");
         }
         return resources.resolveResource(reference, valueType);
@@ -64,17 +72,7 @@ final class InternalWorld implements World {
 
     @Override
     public void close() {
-        if (closed) {
-            return;
-        }
-        closed = true;
-        @Nullable RuntimeException failure = null;
-        for (int index = components.size() - 1; index >= 0; index--) {
-            failure = closeComponent(components.get(index), failure);
-        }
-        if (failure != null) {
-            throw failure;
-        }
+        lifecycle.close();
     }
 
     /** Adds one allocated entity to the world lookup. */
@@ -92,41 +90,22 @@ final class InternalWorld implements World {
     }
 
     /** Freezes the successfully built graph and takes ownership of component values. */
-    void complete(List<Object> values) {
+    void complete(List<WorldComponentEntry> values) {
         requireBuilding();
         entities.values().stream().map(InternalEntity.class::cast).forEach(InternalEntity::complete);
-        components = List.copyOf(values);
+        lifecycle.complete(values);
         complete = true;
     }
 
     /** Marks an unsuccessfully composed world unusable without closing values owned by the caller's rollback. */
     void fail() {
-        closed = true;
+        lifecycle.failComposition();
     }
 
     /** Requires that structural composition has not completed or failed. */
     private void requireBuilding() {
-        if (complete || closed) {
+        if (complete || lifecycle.isClosed()) {
             throw new IllegalStateException("world composition is not open");
-        }
-    }
-
-    /** Closes one component and accumulates failures without skipping later cleanup. */
-    private static @Nullable RuntimeException closeComponent(Object component, @Nullable RuntimeException existing) {
-        if (!(component instanceof AutoCloseable closeable)) {
-            return existing;
-        }
-        try {
-            closeable.close();
-            return existing;
-        } catch (Exception exception) {
-            @Nullable RuntimeException failure = existing;
-            if (failure == null) {
-                failure = new IllegalStateException("component cleanup failed", exception);
-            } else {
-                failure.addSuppressed(exception);
-            }
-            return failure;
         }
     }
 }

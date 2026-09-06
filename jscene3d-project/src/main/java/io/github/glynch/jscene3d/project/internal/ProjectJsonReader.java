@@ -7,10 +7,13 @@ package io.github.glynch.jscene3d.project.internal;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /** Strict JSON deserialization shared by versioned project formats. */
 public final class ProjectJsonReader {
@@ -45,6 +48,17 @@ public final class ProjectJsonReader {
         return objectMapper.readValue(Objects.requireNonNull(input, "input"), Objects.requireNonNull(type, "type"));
     }
 
+    /**
+     * Reads one JSON document as a tree with duplicate and trailing-token checks.
+     *
+     * @param input JSON input stream
+     * @return parsed JSON tree
+     * @throws IOException when the document cannot be read or parsed
+     */
+    public @Nullable JsonNode readTree(InputStream input) throws IOException {
+        return objectMapper.readTree(Objects.requireNonNull(input, "input"));
+    }
+
     /** Creates the shared strictly configured mapper. */
     private static ObjectMapper createObjectMapper() {
         JsonFactory factory = JsonFactory.builder()
@@ -54,6 +68,8 @@ public final class ProjectJsonReader {
         return new ObjectMapper(factory)
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-                .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
+                .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .configure(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+                .configure(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES, false);
     }
 }

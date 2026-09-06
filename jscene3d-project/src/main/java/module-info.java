@@ -21,6 +21,8 @@ module io.github.glynch.jscene3d.project {
     exports io.github.glynch.jscene3d.project.value;
     exports io.github.glynch.jscene3d.project.world;
 
+    opens io.github.glynch.jscene3d.project.asset.internal to
+            com.fasterxml.jackson.databind;
     opens io.github.glynch.jscene3d.project.extension.internal to
             com.fasterxml.jackson.databind;
     opens io.github.glynch.jscene3d.project.input.internal to

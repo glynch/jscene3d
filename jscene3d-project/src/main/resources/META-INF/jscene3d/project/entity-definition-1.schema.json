@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jscene3d.org/schemas/entity-definition-1.json",
+  "title": "JScene3D Entity Definition version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assetId", "assetType", "formatVersion", "name", "root"],
+  "properties": {
+    "$schema": {"type": "string", "format": "uri"},
+    "assetId": {"type": "string", "format": "uuid"},
+    "assetType": {"const": "entity-definition"},
+    "formatVersion": {"const": 1},
+    "name": {"type": "string", "minLength": 1},
+    "root": {"$ref": "#/$defs/localEntry"}
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["componentId", "type", "typeVersion"],
+      "properties": {
+        "componentId": {"type": "string", "format": "uuid"},
+        "type": {"type": "string"},
+        "typeVersion": {"type": "integer", "minimum": 1},
+        "properties": {"type": "object"}
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId"],
+      "properties": {
+        "assetId": {"type": "string", "format": "uuid"},
+        "pathHint": {"type": "string", "minLength": 1}
+      }
+    },
+    "localEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entryType", "entityId"],
+      "properties": {
+        "entryType": {"const": "local"},
+        "entityId": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "enabled": {"type": "boolean", "default": true},
+        "components": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/component"}
+        },
+        "children": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/entry"}
+        }
+      }
+    },
+    "placementEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entryType", "entityId", "definition"],
+      "properties": {
+        "entryType": {"const": "placement"},
+        "entityId": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "enabled": {"type": "boolean", "default": true},
+        "definition": {"$ref": "#/$defs/reference"},
+        "arguments": {"type": "object"}
+      }
+    },
+    "entry": {
+      "oneOf": [
+        {"$ref": "#/$defs/localEntry"},
+        {"$ref": "#/$defs/placementEntry"}
+      ]
+    }
+  }
+}

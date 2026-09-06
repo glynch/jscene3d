@@ -7,7 +7,9 @@ package io.github.glynch.jscene3d.project.runtime.extension;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
+import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Map;
 
@@ -18,6 +20,20 @@ import java.util.Map;
  * configuration and shared runtime-resource lookup without exposing mutable composer internals.
  */
 public interface ComponentFactoryContext extends RuntimeResourceLookup {
+    /**
+     * Returns the completely allocated entity which will own the component.
+     *
+     * @return owning entity
+     */
+    Entity owner();
+
+    /**
+     * Returns the completely allocated but inactive owning world.
+     *
+     * @return owning world
+     */
+    World world();
+
     /**
      * Returns the authored component definition being constructed.
      *

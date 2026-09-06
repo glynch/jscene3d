@@ -1,0 +1,33 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/world-definition-1.json",
+  "assetId" : "0fbb5faf-b309-4684-a24c-8dd2295bb483",
+  "assetType" : "world-definition",
+  "formatVersion" : 1,
+  "name" : "Garden",
+  "connections" : [ ],
+  "roots" : [ {
+    "entryType" : "placement",
+    "entityId" : "2fac941e-1b50-43ac-b6dd-1152fbb91902",
+    "name" : "North beacon",
+    "enabled" : true,
+    "definition" : {
+      "assetId" : "9c88cdb1-723a-4fd2-b7a5-b403b23b676d",
+      "pathHint" : "beacon.entity.json"
+    },
+    "arguments" : {
+      "label" : "North"
+    }
+  }, {
+    "entryType" : "placement",
+    "entityId" : "58f5c1a8-79fa-45bb-a48a-dcc901c00dd0",
+    "name" : "South beacon",
+    "enabled" : true,
+    "definition" : {
+      "assetId" : "9c88cdb1-723a-4fd2-b7a5-b403b23b676d",
+      "pathHint" : "beacon.entity.json"
+    },
+    "arguments" : {
+      "label" : "South"
+    }
+  } ]
+}

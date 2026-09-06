@@ -73,6 +73,32 @@
 
     <profiles>
         <profile>
+            <id>run-world-composition-example</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-world-composition-example</id>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>io.github.glynch.jscene3d.project.examples.WorldCompositionExample</mainClass>
+                                    <arguments>
+                                        <argument>${project.basedir}/src/main/world-project</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>run-import-example</id>
             <build>
                 <plugins>

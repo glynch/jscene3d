@@ -329,6 +329,20 @@ Components receive their owning `World` or a bounded context explicitly. They
 do not discover a static global world, create backend implementations, or use
 an implicit service locator.
 
+The first implemented composition boundary is `WorldComposer.compose(...)`.
+It loads and validates the complete authored definition graph, allocates every
+live entity before invoking a component factory, applies descriptor defaults
+and instance-contract arguments, and returns either a complete inactive
+`World` or ordered structured diagnostics. A failed composition publishes no
+world and releases already-created `AutoCloseable` component values in reverse
+construction order. A successful world owns those values and releases them,
+also in reverse construction order, when it is closed. The caller retains
+ownership of the resource lookup supplied to the composer.
+
+This boundary deliberately does not activate components or schedule updates.
+Lifecycle activation, module accessors, and mutation are subsequent slices on
+top of the same composed entity graph.
+
 ## Definition placement and composition
 
 Loading or importing an `EntityDefinition` does not create live entities. The
@@ -354,6 +368,13 @@ Nested definitions preserve logical instance identity, public contract, state,
 and lifecycle even if the runtime flattens their representation internally.
 Definition-instance scope is runtime bookkeeping, not a second public object in
 the live hierarchy.
+
+Each live entity receives a fresh world-local `RuntimeEntityId`. Its authored
+asset and entity identities remain available separately for inspection and
+diagnostics. Repeated placements therefore retain the same definition-local
+IDs internally while owning distinct live entities and component values. A
+placed root reports the containing asset and placement ID publicly; descendants
+report the reusable definition asset and their definition-local IDs.
 
 ### No authored definition inheritance
 

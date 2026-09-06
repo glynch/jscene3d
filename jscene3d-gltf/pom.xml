@@ -23,6 +23,14 @@
             <artifactId>jscene3d-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-import</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-3d</artifactId>
+        </dependency>
+        <dependency>
             <groupId>de.javagl</groupId>
             <artifactId>jgltf-model</artifactId>
         </dependency>

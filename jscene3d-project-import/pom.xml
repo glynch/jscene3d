@@ -27,6 +27,10 @@
             <artifactId>jscene3d-project</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-runtime</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>

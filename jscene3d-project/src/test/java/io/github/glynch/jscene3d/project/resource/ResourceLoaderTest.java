@@ -12,12 +12,15 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -197,6 +200,27 @@ final class ResourceLoaderTest {
         assertThat(input.isClosed()).isFalse();
         input.close();
         assertThat(input.isClosed()).isTrue();
+    }
+
+    /** Round-trips generated resource documents while preserving property declaration order. */
+    @Test
+    void writesCanonicalGeneratedResource() throws IOException {
+        Map<String, ProjectValue> properties = new LinkedHashMap<>();
+        properties.put("label", new ProjectValue.TextValue("Steel"));
+        properties.put("source", new ProjectValue.ReferenceValue(ResourceReference.asset("source-data")));
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        ResourceWriter.write(output, new RegisteredType("example.resource-test/material", 2), properties);
+        byte[] content = output.toByteArray();
+        ResourceLoadResult result = new ResourceLoader()
+                .load(loadedProject, URI.create("import:materials/steel"), new ByteArrayInputStream(content));
+
+        assertThat(new String(content, StandardCharsets.UTF_8))
+                .startsWith("{\n  \"$schema\" : \"https://jscene3d.org/schemas/resource-1.json\"")
+                .containsSubsequence("\"label\"", "\"source\"")
+                .endsWith("}\n");
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.resource().orElseThrow().properties().keySet()).containsExactly("label", "source");
     }
 
     /** Publishes the Resource version-one schema for editors and validation tools. */

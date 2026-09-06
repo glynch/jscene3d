@@ -59,14 +59,17 @@ import io.github.glynch.jscene3d.textures.TextureCoordinateSet;
 import io.github.glynch.jscene3d.textures.TextureFilter;
 import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -146,15 +149,196 @@ final class GltfConverter {
 
     /** Reads and converts one source file. */
     static LoadedGltf load(Path source) throws IOException {
-        GltfAsset asset = new GltfAssetReader().read(source);
-        if (!(asset instanceof GltfAssetV2 assetV2)) {
-            throw new GltfLoadException(source, "Only glTF 2.0 assets are supported", null);
-        }
+        GltfAssetV2 assetV2 = readAsset(source);
         GlTF gltf = assetV2.getGltf();
         validateRootCapabilities(source, gltf);
         int sceneIndex = gltf.getScene() == null ? 0 : gltf.getScene();
         GltfConverter converter = new GltfConverter(source, gltf, GltfModelCreatorV2.create(assetV2), sceneIndex);
         return converter.convert();
+    }
+
+    /** Inspects selectable scenes and external source dependencies without decoding render resources. */
+    static GltfProjectInspection inspectProject(Path source) throws IOException {
+        GltfAssetV2 asset = readAsset(source);
+        GlTF root = asset.getGltf();
+        validateRootCapabilities(source, root);
+        List<String> names = new ArrayList<>();
+        var scenes = root.getScenes();
+        if (scenes != null) {
+            for (int index = 0; index < scenes.size(); index++) {
+                String name = scenes.get(index).getName();
+                names.add(name == null || name.isBlank() ? "Scene " + (index + 1) : name);
+            }
+        }
+        return new GltfProjectInspection(names, externalDependencies(source, root));
+    }
+
+    /** Converts one selected source scene into project-native nodes and resource values. */
+    static GltfProjectContent loadProject(Path source, int sceneIndex) throws IOException {
+        GltfAssetV2 asset = readAsset(source);
+        GlTF gltf = asset.getGltf();
+        validateRootCapabilities(source, gltf);
+        GltfConverter converter = new GltfConverter(source, gltf, GltfModelCreatorV2.create(asset), sceneIndex);
+        return converter.convertProject(sceneIndex);
+    }
+
+    /** Reads one glTF 2.0 source into parser-owned state. */
+    private static GltfAssetV2 readAsset(Path source) throws IOException {
+        GltfAsset asset = new GltfAssetReader().read(source);
+        if (!(asset instanceof GltfAssetV2 assetV2)) {
+            throw new GltfLoadException(source, "Only glTF 2.0 assets are supported", null);
+        }
+        return assetV2;
+    }
+
+    /** Resolves relative external buffer and image URIs used for deterministic invalidation. */
+    private static List<Path> externalDependencies(Path source, GlTF root) {
+        List<Path> dependencies = new ArrayList<>();
+        if (root.getBuffers() != null) {
+            root.getBuffers().forEach(buffer -> addExternalDependency(source, buffer.getUri(), dependencies));
+        }
+        if (root.getImages() != null) {
+            root.getImages().forEach(image -> addExternalDependency(source, image.getUri(), dependencies));
+        }
+        return List.copyOf(dependencies);
+    }
+
+    /** Adds one file-backed relative URI while ignoring embedded data. */
+    private static void addExternalDependency(Path source, @Nullable String value, List<Path> dependencies) {
+        if (value == null || value.startsWith("data:")) {
+            return;
+        }
+        URI uri = URI.create(value);
+        if (uri.isAbsolute()
+                || uri.getRawAuthority() != null
+                || uri.getRawQuery() != null
+                || uri.getRawFragment() != null) {
+            throw new GltfLoadException(source, "External glTF dependencies must use relative file URIs", null);
+        }
+        String decoded = Objects.requireNonNull(uri.getPath(), "external glTF dependency path");
+        Path parent = Objects.requireNonNull(source.toAbsolutePath().normalize().getParent(), "glTF source parent");
+        dependencies.add(parent.resolve(decoded).normalize());
+    }
+
+    /** Converts a deliberately bounded static project scene and transfers resource ownership. */
+    private GltfProjectContent convertProject(int sceneIndex) {
+        try {
+            if (!model.getAnimationModels().isEmpty()) {
+                unsupported("animations in project imports");
+            }
+            List<SceneModel> scenes = model.getSceneModels();
+            if (sceneIndex < 0 || sceneIndex >= scenes.size()) {
+                throw failure("Selected scene index is outside the scene list: " + sceneIndex, null);
+            }
+            Map<NodeModel, Integer> nodeIndices = identityIndices(model.getNodeModels());
+            Map<MeshModel, Integer> meshIndices = identityIndices(model.getMeshModels());
+            Map<MaterialModel, Integer> materialIndices = identityIndices(model.getMaterialModels());
+            Set<NodeModel> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+            List<GltfProjectContent.Node> roots = new ArrayList<>();
+            for (NodeModel root : scenes.get(sceneIndex).getNodeModels()) {
+                roots.add(convertProjectNode(root, nodeIndices, meshIndices, materialIndices, visited));
+            }
+            String name = scenes.get(sceneIndex).getName();
+            if (name == null || name.isBlank()) {
+                name = "Scene " + (sceneIndex + 1);
+            }
+            return new GltfProjectContent(name, roots, geometries, materials, textures);
+        } catch (RuntimeException failure) {
+            closePartialResources();
+            throw failure;
+        }
+    }
+
+    /** Converts one selected node recursively without creating renderer scene objects. */
+    private GltfProjectContent.Node convertProjectNode(
+            NodeModel node,
+            Map<NodeModel, Integer> nodeIndices,
+            Map<MeshModel, Integer> meshIndices,
+            Map<MaterialModel, Integer> materialIndices,
+            Set<NodeModel> visited) {
+        if (!visited.add(node)) {
+            throw failure("Selected scene does not form a strict node tree", null);
+        }
+        if (node.getCameraModel() != null) {
+            unsupported("camera node in project imports");
+        }
+        if (node.getSkinModel() != null) {
+            unsupported("skins in project imports");
+        }
+        List<GltfProjectContent.Primitive> primitives = new ArrayList<>();
+        for (MeshModel mesh : node.getMeshModels()) {
+            int meshIndex = requireIdentityIndex(meshIndices, mesh, "mesh");
+            List<MeshPrimitiveModel> sourcePrimitives = mesh.getMeshPrimitiveModels();
+            for (int primitiveIndex = 0; primitiveIndex < sourcePrimitives.size(); primitiveIndex++) {
+                primitives.add(convertProjectPrimitive(
+                        sourcePrimitives.get(primitiveIndex), meshIndex, primitiveIndex, materialIndices));
+            }
+        }
+        List<GltfProjectContent.Node> children = new ArrayList<>();
+        for (NodeModel child : node.getChildren()) {
+            children.add(convertProjectNode(child, nodeIndices, meshIndices, materialIndices, visited));
+        }
+        int nodeIndex = requireIdentityIndex(nodeIndices, node, "node");
+        String name = node.getName();
+        return new GltfProjectContent.Node(
+                nodeIndex,
+                name == null || name.isBlank() ? "Node " + (nodeIndex + 1) : name,
+                sourceTransform(node),
+                primitives,
+                children);
+    }
+
+    /** Converts one static triangle primitive directly into independently published resources. */
+    private GltfProjectContent.Primitive convertProjectPrimitive(
+            MeshPrimitiveModel primitive,
+            int meshIndex,
+            int primitiveIndex,
+            Map<MaterialModel, Integer> materialIndices) {
+        if (primitive.getMode() != GltfConstants.GL_TRIANGLES) {
+            unsupported("non-triangle primitive mode " + primitive.getMode());
+        }
+        if (!primitive.getTargets().isEmpty()) {
+            unsupported("morph targets in project imports");
+        }
+        BufferGeometry geometry = geometryCache.computeIfAbsent(primitive, this::createGeometry);
+        MaterialModel sourceMaterial = primitive.getMaterialModel();
+        StandardMaterial material = materialFor(sourceMaterial);
+        if (primitive.getAttributes().containsKey("COLOR_0")) {
+            material.setUsesVertexColors(true);
+        }
+        requireTextureFree(material);
+        int materialIndex =
+                sourceMaterial == null ? -1 : requireIdentityIndex(materialIndices, sourceMaterial, "material");
+        return new GltfProjectContent.Primitive(meshIndex, primitiveIndex, materialIndex, geometry, material);
+    }
+
+    /** Requires a texture-free resource representable by the current project format. */
+    private void requireTextureFree(StandardMaterial material) {
+        if (material.colorMap().isPresent()
+                || material.metalnessRoughnessMap().isPresent()
+                || material.normalMap().isPresent()
+                || material.occlusionMap().isPresent()
+                || material.emissiveMap().isPresent()) {
+            unsupported("textures in project imports");
+        }
+    }
+
+    /** Builds stable source-order indices using reference identity. */
+    private static <T> Map<T, Integer> identityIndices(List<T> values) {
+        Map<T, Integer> indices = new IdentityHashMap<>();
+        for (int index = 0; index < values.size(); index++) {
+            indices.put(values.get(index), index);
+        }
+        return indices;
+    }
+
+    /** Returns one parser-model source index. */
+    private int requireIdentityIndex(Map<?, Integer> indices, Object value, String label) {
+        Integer index = indices.get(value);
+        if (index == null) {
+            throw failure("Selected scene contains an unknown " + label, null);
+        }
+        return index;
     }
 
     /** Converts and transfers ownership, closing partial resources after any failure. */
@@ -393,27 +577,38 @@ final class GltfConverter {
 
     /** Applies either a decomposed matrix or explicit glTF TRS values. */
     private void applyTransform(NodeModel node, Object3D target) {
+        GltfProjectContent.Transform transform = sourceTransform(node);
+        target.setPosition(transform.position());
+        target.setQuaternion(transform.orientation());
+        target.setScale(transform.scale());
+    }
+
+    /** Returns either a decomposed matrix or explicit glTF TRS values. */
+    private GltfProjectContent.Transform sourceTransform(NodeModel node) {
         float[] matrix = node.getMatrix();
         if (matrix != null) {
-            applyMatrix(matrix, target);
-            return;
+            return decomposeMatrix(matrix);
         }
+        Vector3f position = new Vector3f();
+        Quaternionf orientation = new Quaternionf();
+        Vector3f scaleValue = new Vector3f(1.0F);
         float[] translation = node.getTranslation();
         if (translation != null) {
-            target.setPosition(translation[0], translation[1], translation[2]);
+            position.set(translation[0], translation[1], translation[2]);
         }
         float[] rotation = node.getRotation();
         if (rotation != null) {
-            target.setQuaternion(rotation[0], rotation[1], rotation[2], rotation[3]);
+            orientation.set(rotation[0], rotation[1], rotation[2], rotation[3]);
         }
         float[] scale = node.getScale();
         if (scale != null) {
-            target.setScale(scale[0], scale[1], scale[2]);
+            scaleValue.set(scale[0], scale[1], scale[2]);
         }
+        return new GltfProjectContent.Transform(position, orientation, scaleValue);
     }
 
     /** Decomposes an affine matrix and rejects transforms containing unsupported shear. */
-    private void applyMatrix(float[] values, Object3D target) {
+    private GltfProjectContent.Transform decomposeMatrix(float[] values) {
         if (values.length != 16) {
             throw failure("Node matrix must contain 16 values", null);
         }
@@ -427,9 +622,7 @@ final class GltfConverter {
                 unsupported("node matrices containing shear or reflection");
             }
         }
-        target.setPosition(translation);
-        target.setQuaternion(rotation);
-        target.setScale(scale);
+        return new GltfProjectContent.Transform(translation, rotation, scale);
     }
 
     /** Converts one triangle primitive into a mesh sharing cached resources. */

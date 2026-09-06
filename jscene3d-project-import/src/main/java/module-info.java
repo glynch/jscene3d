@@ -6,6 +6,7 @@
 module io.github.glynch.jscene3d.project.importing {
     requires io.github.glynch.jscene3d.core;
     requires transitive io.github.glynch.jscene3d.project;
+    requires transitive io.github.glynch.jscene3d.project.runtime;
     requires com.fasterxml.jackson.databind;
     requires static org.jspecify;
 

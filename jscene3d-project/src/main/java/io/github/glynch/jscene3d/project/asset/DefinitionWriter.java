@@ -9,7 +9,6 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.contract.EntityContract;
-import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
@@ -19,7 +18,7 @@ import io.github.glynch.jscene3d.project.entity.PropertyTarget;
 import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.entity.SpatialTarget;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.value.internal.ProjectValueJsonWriter;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -29,7 +28,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -298,7 +296,7 @@ public final class DefinitionWriter {
                 }
                 json.writeEndObject();
                 json.writeObjectFieldStart("arguments");
-                writeValues(json, placement.arguments());
+                ProjectValueJsonWriter.writeValues(json, placement.arguments());
                 json.writeEndObject();
             }
         }
@@ -322,66 +320,7 @@ public final class DefinitionWriter {
         json.writeStringField("type", component.type().toString());
         json.writeNumberField("typeVersion", component.typeVersion());
         json.writeObjectFieldStart("properties");
-        writeValues(json, component.properties());
-        json.writeEndObject();
-        json.writeEndObject();
-    }
-
-    /** Writes a declaration-ordered map of portable values. */
-    private static <K> void writeValues(JsonGenerator json, Map<K, ProjectValue> values) throws IOException {
-        for (Map.Entry<K, ProjectValue> entry : values.entrySet()) {
-            json.writeFieldName(entry.getKey().toString());
-            writeValue(json, entry.getValue());
-        }
-    }
-
-    /** Writes one value from the closed portable-value family. */
-    private static void writeValue(JsonGenerator json, ProjectValue value) throws IOException {
-        switch (value) {
-            case ProjectValue.NullValue ignored -> json.writeNull();
-            case ProjectValue.BooleanValue booleanValue -> json.writeBoolean(booleanValue.value());
-            case ProjectValue.NumberValue numberValue -> json.writeNumber(numberValue.value());
-            case ProjectValue.TextValue textValue -> json.writeString(textValue.value());
-            case ProjectValue.ArrayValue arrayValue -> {
-                json.writeStartArray();
-                for (ProjectValue element : arrayValue.values()) {
-                    writeValue(json, element);
-                }
-                json.writeEndArray();
-            }
-            case ProjectValue.ObjectValue objectValue -> {
-                json.writeStartObject();
-                writeValues(json, objectValue.values());
-                json.writeEndObject();
-            }
-            case ProjectValue.ReferenceValue referenceValue -> {
-                json.writeStartObject();
-                json.writeStringField("$ref", referenceValue.reference().toString());
-                json.writeEndObject();
-            }
-            case ProjectValue.EntityTargetValue targetValue -> writeEntityTargetValue(json, targetValue);
-            case ProjectValue.ComponentTargetValue targetValue -> writeComponentTargetValue(json, targetValue);
-        }
-    }
-
-    /** Writes one entity target using the reserved project-value discriminator. */
-    private static void writeEntityTargetValue(JsonGenerator json, ProjectValue.EntityTargetValue value)
-            throws IOException {
-        json.writeStartObject();
-        json.writeObjectFieldStart("$target");
-        json.writeStringField("entityId", value.entity().toString());
-        json.writeEndObject();
-        json.writeEndObject();
-    }
-
-    /** Writes one component target using the reserved project-value discriminator. */
-    private static void writeComponentTargetValue(JsonGenerator json, ProjectValue.ComponentTargetValue value)
-            throws IOException {
-        ComponentTarget target = value.target();
-        json.writeStartObject();
-        json.writeObjectFieldStart("$target");
-        json.writeStringField("entityId", target.entity().toString());
-        json.writeStringField("componentId", target.component().toString());
+        ProjectValueJsonWriter.writeValues(json, component.properties());
         json.writeEndObject();
         json.writeEndObject();
     }

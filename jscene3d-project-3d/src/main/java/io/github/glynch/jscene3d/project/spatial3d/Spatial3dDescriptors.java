@@ -15,6 +15,9 @@ import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.RegisteredType;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -30,6 +33,8 @@ public final class Spatial3dDescriptors {
     private static final ComponentType PERSPECTIVE_CAMERA_TYPE = type("perspective-camera-3d");
     private static final ComponentType DIRECTIONAL_LIGHT_TYPE = type("directional-light-3d");
     private static final ComponentType MESH_RENDERER_TYPE = type("mesh-renderer-3d");
+    private static final RegisteredType MESH_RESOURCE_TYPE = resourceType("mesh-resource");
+    private static final RegisteredType MATERIAL_RESOURCE_TYPE = resourceType("standard-material-resource");
 
     private static final CapabilityId SPATIAL_CAPABILITY = new CapabilityId(EXTENSION_ID + "/spatial-3d");
 
@@ -46,6 +51,7 @@ public final class Spatial3dDescriptors {
     private static final PropertyId MESH = new PropertyId("mesh");
     private static final PropertyId MATERIAL = new PropertyId("material");
     private static final PropertyId VISIBLE = new PropertyId("visible");
+    private static final String PAYLOAD = "payload";
 
     private static final Set<ComponentLifecycle> PRESENTATION_LIFECYCLE =
             Set.of(ComponentLifecycle.ACTIVATED, ComponentLifecycle.DEACTIVATED);
@@ -99,6 +105,24 @@ public final class Spatial3dDescriptors {
      */
     public static ComponentType meshRendererType() {
         return MESH_RENDERER_TYPE;
+    }
+
+    /**
+     * Returns the exact version-one binary mesh resource type.
+     *
+     * @return mesh resource type
+     */
+    public static RegisteredType meshResourceType() {
+        return MESH_RESOURCE_TYPE;
+    }
+
+    /**
+     * Returns the exact version-one standard-material resource type.
+     *
+     * @return material resource type
+     */
+    public static RegisteredType materialResourceType() {
+        return MATERIAL_RESOURCE_TYPE;
     }
 
     /**
@@ -243,8 +267,55 @@ public final class Spatial3dDescriptors {
                 "1.0.0",
                 ">=0.1.0 <0.2.0",
                 DescriptorPresentation.named("JScene3D 3D components"),
-                List.of(),
+                List.of(meshResourceDescriptor(), materialResourceDescriptor()),
                 List.of(transformDescriptor(), cameraDescriptor(), lightDescriptor(), meshRendererDescriptor()));
+    }
+
+    /** Describes one geometry document referencing an opaque binary payload. */
+    private static RegisteredTypeDescriptor meshResourceDescriptor() {
+        return resourceDescriptor(
+                MESH_RESOURCE_TYPE,
+                "Mesh resource",
+                "Immutable renderer-independent vertex and index data",
+                List.of(PropertyDescriptor.required(
+                        PAYLOAD,
+                        ProjectValueKind.REFERENCE,
+                        DescriptorPresentation.described("Payload", "Binary mesh payload"),
+                        Map.of(),
+                        Set.of())));
+    }
+
+    /** Describes one texture-free metallic-roughness material. */
+    private static RegisteredTypeDescriptor materialResourceDescriptor() {
+        return resourceDescriptor(
+                MATERIAL_RESOURCE_TYPE,
+                "Standard material resource",
+                "Immutable texture-free metallic-roughness material",
+                List.of(
+                        arrayProperty("color", "Color", "Linear-sRGB base color", numbers(1.0F, 1.0F, 1.0F)),
+                        numberProperty("metalness", "Metalness", "Metallic contribution", 0.0F),
+                        numberProperty("roughness", "Roughness", "Perceptual surface roughness", 1.0F),
+                        arrayProperty("emissive", "Emissive", "Linear-sRGB emissive color", numbers(0.0F, 0.0F, 0.0F)),
+                        numberProperty("emissive-intensity", "Emissive intensity", "Emissive multiplier", 1.0F),
+                        numberProperty("opacity", "Opacity", "Surface opacity", 1.0F),
+                        textProperty("alpha-mode", "Alpha mode", "Opaque, mask, or blend", "opaque"),
+                        numberProperty("alpha-cutoff", "Alpha cutoff", "Masked-alpha cutoff", 0.5F),
+                        textProperty("side", "Side", "Front, back, or double", "front"),
+                        booleanProperty(
+                                "vertex-colors", "Vertex colors", "Multiply by the geometry color attribute", false)));
+    }
+
+    /** Creates one registered resource descriptor without executable endpoints. */
+    private static RegisteredTypeDescriptor resourceDescriptor(
+            RegisteredType type, String name, String description, List<PropertyDescriptor> properties) {
+        return new RegisteredTypeDescriptor(
+                type,
+                RegisteredTypeScope.RESOURCE,
+                DescriptorPresentation.described(name, description),
+                properties,
+                List.of(),
+                List.of(),
+                List.of());
     }
 
     /** Describes the unique primary spatial authority. */
@@ -311,8 +382,13 @@ public final class Spatial3dDescriptors {
 
     /** Creates one optional numeric property. */
     private static PropertyDescriptor numberProperty(PropertyId id, String name, String description, float value) {
+        return numberProperty(id.value(), name, description, value);
+    }
+
+    /** Creates one optional numeric resource property. */
+    private static PropertyDescriptor numberProperty(String id, String name, String description, float value) {
         return PropertyDescriptor.optionalWithDefault(
-                id.value(),
+                id,
                 ProjectValueKind.NUMBER,
                 number(value),
                 DescriptorPresentation.described(name, description),
@@ -322,10 +398,38 @@ public final class Spatial3dDescriptors {
 
     /** Creates one optional boolean property. */
     private static PropertyDescriptor booleanProperty(PropertyId id, String name, String description, boolean value) {
+        return booleanProperty(id.value(), name, description, value);
+    }
+
+    /** Creates one optional boolean resource property. */
+    private static PropertyDescriptor booleanProperty(String id, String name, String description, boolean value) {
         return PropertyDescriptor.optionalWithDefault(
-                id.value(),
+                id,
                 ProjectValueKind.BOOLEAN,
                 new ProjectValue.BooleanValue(value),
+                DescriptorPresentation.described(name, description),
+                Map.of(),
+                Set.of());
+    }
+
+    /** Creates one optional text resource property. */
+    private static PropertyDescriptor textProperty(String id, String name, String description, String value) {
+        return PropertyDescriptor.optionalWithDefault(
+                id,
+                ProjectValueKind.TEXT,
+                new ProjectValue.TextValue(value),
+                DescriptorPresentation.described(name, description),
+                Map.of(),
+                Set.of());
+    }
+
+    /** Creates one optional array resource property. */
+    private static PropertyDescriptor arrayProperty(
+            String id, String name, String description, ProjectValue.ArrayValue value) {
+        return PropertyDescriptor.optionalWithDefault(
+                id,
+                ProjectValueKind.ARRAY,
+                value,
                 DescriptorPresentation.described(name, description),
                 Map.of(),
                 Set.of());
@@ -355,7 +459,7 @@ public final class Spatial3dDescriptors {
 
     /** Creates one portable number. */
     private static ProjectValue.NumberValue number(float value) {
-        return new ProjectValue.NumberValue(BigDecimal.valueOf(value));
+        return new ProjectValue.NumberValue(new BigDecimal(Float.toString(value)));
     }
 
     /** Creates one portable numeric array. */
@@ -370,5 +474,10 @@ public final class Spatial3dDescriptors {
     /** Creates an exact version-one component type. */
     private static ComponentType type(String localName) {
         return ComponentType.of(EXTENSION_ID + '/' + localName, 1);
+    }
+
+    /** Creates an exact version-one non-component type. */
+    private static RegisteredType resourceType(String localName) {
+        return new RegisteredType(EXTENSION_ID + '/' + localName, 1);
     }
 }

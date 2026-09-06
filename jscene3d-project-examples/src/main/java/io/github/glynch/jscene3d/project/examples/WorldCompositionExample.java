@@ -11,17 +11,24 @@ import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
+import io.github.glynch.jscene3d.project.component.EndpointId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
+import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.Entity;
+import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
+import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
@@ -46,8 +53,11 @@ public final class WorldCompositionExample {
     private static final ComponentId LABEL_LINK_COMPONENT = ComponentId.from("34d922c8-dd18-4d4c-8fd4-2a0daaa1cd08");
     private static final ComponentType LABEL_TYPE = ComponentType.of(EXTENSION_ID + "/label", 1);
     private static final ComponentType LABEL_LINK_TYPE = ComponentType.of(EXTENSION_ID + "/label-link", 1);
+    private static final RegisteredType LABEL_UPDATE_TYPE = new RegisteredType(EXTENSION_ID + "/label-update", 1);
     private static final PropertyId LABEL = new PropertyId("label");
     private static final PropertyId LABEL_TARGET = new PropertyId("label-target");
+    private static final EndpointId LABEL_UPDATE_SIGNAL = new EndpointId("label-update-requested");
+    private static final EndpointId LABEL_UPDATE_ACTION = new EndpointId("update-label");
     private static final Logger LOGGER = Logger.getLogger(WorldCompositionExample.class.getName());
     private static final RuntimeResourceLookup NO_RESOURCES = new RuntimeResourceLookup() {
         @Override
@@ -87,6 +97,7 @@ public final class WorldCompositionExample {
                         root.component(LABEL_COMPONENT, LabelComponent.class).orElseThrow();
                 LabelLinkComponent link = root.component(LABEL_LINK_COMPONENT, LabelLinkComponent.class)
                         .orElseThrow();
+                link.updateLabel(label.value() + " signalled");
                 LOGGER.info(() -> root.id() + " " + root.name().orElse("unnamed") + " = " + label.value()
                         + ", bound label = " + link.label().value());
             }
@@ -105,6 +116,8 @@ public final class WorldCompositionExample {
         ComponentTypeDescriptor labelType = ComponentTypeDescriptor.builder(
                         LABEL_TYPE, DescriptorPresentation.named("Label"))
                 .properties(List.of(label))
+                .actions(List.of(EndpointDescriptor.withPayload(
+                        LABEL_UPDATE_ACTION.value(), LABEL_UPDATE_TYPE, DescriptorPresentation.named("Update label"))))
                 .lifecycle(Set.of(
                         ComponentLifecycle.CREATED,
                         ComponentLifecycle.ACTIVATED,
@@ -120,6 +133,10 @@ public final class WorldCompositionExample {
         ComponentTypeDescriptor linkType = ComponentTypeDescriptor.builder(
                         LABEL_LINK_TYPE, DescriptorPresentation.named("Label link"))
                 .properties(List.of(target))
+                .signals(List.of(EndpointDescriptor.withPayload(
+                        LABEL_UPDATE_SIGNAL.value(),
+                        LABEL_UPDATE_TYPE,
+                        DescriptorPresentation.named("Label update requested"))))
                 .build();
         return new ExtensionDescriptor(
                 EXTENSION_ID,
@@ -147,36 +164,67 @@ public final class WorldCompositionExample {
         }
     }
 
-    /** Immutable component value independently created for each placed entity. */
-    private record LabelComponent(String value) implements ComponentLifecycleCallbacks {
+    /** Mutable label independently created for each placed entity and changed through its declared action. */
+    private static final class LabelComponent implements ComponentLifecycleCallbacks, ComponentEndpointBinder {
+        private String value;
+
+        /** Stores the initial effective authored label. */
+        private LabelComponent(String value) {
+            this.value = Objects.requireNonNull(value, "value");
+        }
+
+        @Override
+        public void bindEndpoints(ComponentEndpoints endpoints) {
+            endpoints.action(LABEL_UPDATE_ACTION, payload -> value = (String) payload.value());
+        }
+
+        /** Returns the current label. */
+        private String value() {
+            return value;
+        }
+
         @Override
         public void onCreated() {
-            LOGGER.info(() -> "Created " + value);
+            LOGGER.info(() -> "Created " + value());
         }
 
         @Override
         public void onActivated() {
-            LOGGER.info(() -> "Activated " + value);
+            LOGGER.info(() -> "Activated " + value());
         }
 
         @Override
         public void onDeactivated() {
-            LOGGER.info(() -> "Deactivated " + value);
+            LOGGER.info(() -> "Deactivated " + value());
         }
 
         @Override
         public void onDestroyed() {
-            LOGGER.info(() -> "Destroyed " + value);
+            LOGGER.info(() -> "Destroyed " + value());
         }
     }
 
     /** Component proving that stable authored targets bind independently inside repeated definition placements. */
-    private static final class LabelLinkComponent implements ComponentReferenceBinder {
+    private static final class LabelLinkComponent implements ComponentReferenceBinder, ComponentEndpointBinder {
         private Optional<LabelComponent> label = Optional.empty();
+        private Optional<RuntimeSignal> updateLabel = Optional.empty();
 
         @Override
         public void bindReferences(ComponentReferenceResolver references) {
             label = Optional.of(references.component(LABEL_TARGET, LabelComponent.class));
+        }
+
+        @Override
+        public void bindEndpoints(ComponentEndpoints endpoints) {
+            updateLabel = Optional.of(endpoints.signal(LABEL_UPDATE_SIGNAL));
+        }
+
+        /** Requests a label change through the authored signal/action connection. */
+        private void updateLabel(String value) {
+            RuntimePayload payload = new RuntimePayload(LABEL_UPDATE_TYPE, value);
+            updateLabel
+                    .orElseThrow(() -> new IllegalStateException("label update signal is not bound"))
+                    .emit(payload);
         }
 
         /** Returns the direct component reference established before world activation. */

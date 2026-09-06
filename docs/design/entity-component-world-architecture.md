@@ -349,10 +349,20 @@ Every binding succeeds before the inactive world is published. Binding failure
 therefore uses the same complete reverse-order rollback as factory failure and
 no lifecycle callback has yet run.
 
+After reference binding, each component type declaring signals or actions binds
+them through `ComponentEndpointBinder`. The short-lived `ComponentEndpoints`
+context supplies persistent signal handles and accepts synchronous action
+callbacks. Descriptor metadata is authoritative: every declared endpoint must
+be implemented exactly once, its direction and payload presence must match, and
+arbitrary implementation failure rolls back the whole composition. The composer
+then resolves internal connections and definition-contract exports to the exact
+live component endpoints in each definition-instance scope.
+
 The implemented boundary includes initial lifecycle activation but deliberately
-does not schedule updates or support runtime structural mutation. Scheduling,
-module accessors, and mutation are subsequent slices on top of the same composed
-entity graph.
+does not schedule updates or support runtime structural mutation. Runtime signal
+dispatch is enabled only after successful world activation and disabled before
+world cleanup. Scheduling, module accessors, and mutation are subsequent slices
+on top of the same composed entity graph.
 
 ## Definition placement and composition
 
@@ -636,6 +646,14 @@ Connections within one authored asset address stable entity and component IDs.
 Connections across a placed definition's seam use its exported signals and
 actions. A signal may legitimately have no listeners; a required target or
 contract reference may not be silently absent.
+
+The first implemented endpoint seam compiles authored connections during world
+composition, after all component values and stable references exist but before
+the inactive world is published. Components obtain world-owned `RuntimeSignal`
+handles and register action callbacks through their descriptor-backed endpoint
+binder. Emission requires an active world, verifies the exact registered payload
+identity, ignores disabled sources, skips disabled actions, and dispatches to a
+snapshot of listeners in authored order. An unconnected signal is valid.
 
 ## Structural mutation and spawning
 

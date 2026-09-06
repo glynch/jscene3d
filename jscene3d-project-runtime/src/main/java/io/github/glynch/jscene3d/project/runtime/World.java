@@ -14,8 +14,8 @@ import java.util.Optional;
  * <p>Composition returns an inactive world: its complete graph and component objects exist, but no lifecycle callback
  * has run. {@link #activate()} transactionally creates and activates declared component lifecycles. This interface is
  * not thread-safe; composition, activation, queries, and closure belong to one caller-owned logical simulation thread.
- * Closing releases lifecycle participation and factory-created values in reverse ownership and construction order.
- * Closing is idempotent and terminal.
+ * Endpoint dispatch begins only after successful activation and stops before closure releases lifecycle participation
+ * and factory-created values in reverse ownership and construction order. Closing is idempotent and terminal.
  */
 public interface World extends RuntimeResourceLookup, AutoCloseable {
     /**

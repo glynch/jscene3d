@@ -21,7 +21,18 @@
     "attachments" : [ ],
     "resourceBindings" : [ ]
   },
-  "connections" : [ ],
+  "connections" : [ {
+    "signal" : {
+      "entityId" : "616e9bb7-ad60-4b78-96f7-f079f4c8c777",
+      "componentId" : "34d922c8-dd18-4d4c-8fd4-2a0daaa1cd08",
+      "endpointId" : "label-update-requested"
+    },
+    "action" : {
+      "entityId" : "616e9bb7-ad60-4b78-96f7-f079f4c8c777",
+      "componentId" : "14b0558a-1f72-4773-a03c-af7001323f92",
+      "endpointId" : "update-label"
+    }
+  } ],
   "root" : {
     "entryType" : "local",
     "entityId" : "616e9bb7-ad60-4b78-96f7-f079f4c8c777",

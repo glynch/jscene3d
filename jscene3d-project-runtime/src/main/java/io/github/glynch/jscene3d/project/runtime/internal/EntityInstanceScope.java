@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.entity.ComponentTarget;
+import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -19,6 +20,8 @@ final class EntityInstanceScope {
     private final InstanceOverrides overrides;
     private final Map<EntityId, InternalEntity> entities = new LinkedHashMap<>();
     private final Map<ComponentTarget, Object> components = new LinkedHashMap<>();
+    private final Map<EndpointTarget, RuntimeEndpointAddress> exportedSignals = new LinkedHashMap<>();
+    private final Map<EndpointTarget, RuntimeEndpointAddress> exportedActions = new LinkedHashMap<>();
 
     /** Creates one empty instance-local identity table. */
     EntityInstanceScope(AssetId asset, InstanceOverrides overrides) {
@@ -59,5 +62,52 @@ final class EntityInstanceScope {
     /** Finds one locally authored component in this exact live definition instance. */
     Optional<Object> findComponent(ComponentTarget target) {
         return Optional.ofNullable(components.get(Objects.requireNonNull(target, "target")));
+    }
+
+    /** Binds one placed definition's public signal to the private live endpoint it exports. */
+    void bindExportedSignal(EndpointTarget target, RuntimeEndpointAddress address) {
+        bindExportedEndpoint(exportedSignals, target, address, "signal");
+    }
+
+    /** Binds one placed definition's public action to the private live endpoint it exports. */
+    void bindExportedAction(EndpointTarget target, RuntimeEndpointAddress address) {
+        bindExportedEndpoint(exportedActions, target, address, "action");
+    }
+
+    /** Resolves one local or placed-definition signal within exactly this definition instance. */
+    Optional<RuntimeEndpointAddress> findSignal(EndpointTarget target) {
+        return findEndpoint(exportedSignals, target);
+    }
+
+    /** Resolves one local or placed-definition action within exactly this definition instance. */
+    Optional<RuntimeEndpointAddress> findAction(EndpointTarget target) {
+        return findEndpoint(exportedActions, target);
+    }
+
+    /** Adds one unique placement-contract endpoint mapping. */
+    private static void bindExportedEndpoint(
+            Map<EndpointTarget, RuntimeEndpointAddress> endpoints,
+            EndpointTarget target,
+            RuntimeEndpointAddress address,
+            String kind) {
+        EndpointTarget validTarget = Objects.requireNonNull(target, "target");
+        if (validTarget.component().isPresent()) {
+            throw new IllegalArgumentException("exported " + kind + " target must identify a placement contract");
+        }
+        if (endpoints.putIfAbsent(validTarget, Objects.requireNonNull(address, "address")) != null) {
+            throw new IllegalStateException("exported " + kind + " identity is duplicated: " + validTarget);
+        }
+    }
+
+    /** Resolves a direct component endpoint or a previously bound placement-contract endpoint. */
+    private Optional<RuntimeEndpointAddress> findEndpoint(
+            Map<EndpointTarget, RuntimeEndpointAddress> exports, EndpointTarget target) {
+        EndpointTarget validTarget = Objects.requireNonNull(target, "target");
+        if (validTarget.component().isEmpty()) {
+            return Optional.ofNullable(exports.get(validTarget));
+        }
+        return findEntity(validTarget.entity())
+                .map(entity -> new RuntimeEndpointAddress(
+                        entity.id(), validTarget.component().orElseThrow(), validTarget.endpoint()));
     }
 }

@@ -31,6 +31,18 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
     /** A runtime component does not implement its descriptor-declared lifecycle callbacks. */
     COMPONENT_LIFECYCLE_UNSUPPORTED(
             "runtime.component.lifecycle.unsupported", "A runtime component does not support its declared lifecycle"),
+    /** A runtime component cannot bind descriptor-declared signals or actions. */
+    COMPONENT_ENDPOINT_BINDING_UNSUPPORTED(
+            "runtime.component.endpoint.unsupported", "A runtime component does not support its declared endpoints"),
+    /** A component endpoint-binding callback failed. */
+    COMPONENT_ENDPOINT_BINDING_FAILED(
+            "runtime.component.endpoint.binding", "A runtime component failed to bind its declared endpoints"),
+    /** A declared signal or action has no runtime implementation. */
+    COMPONENT_ENDPOINT_UNIMPLEMENTED(
+            "runtime.component.endpoint.unimplemented", "A declared component endpoint is not implemented"),
+    /** An authored signal or action is absent from its live definition instance. */
+    COMPONENT_ENDPOINT_MISSING(
+            "runtime.component.endpoint.missing", "An authored component endpoint target is missing"),
     /** A runtime component cannot bind descriptor-declared target properties. */
     COMPONENT_REFERENCE_BINDING_UNSUPPORTED(
             "runtime.component.reference.unsupported", "A runtime component does not support authored references"),

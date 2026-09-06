@@ -24,6 +24,7 @@ final class InternalWorld implements World {
     private final List<Entity> roots = new ArrayList<>();
     private final Map<RuntimeEntityId, Entity> entities = new LinkedHashMap<>();
     private final WorldLifecycle lifecycle = new WorldLifecycle();
+    private final EndpointRouter endpointRouter = new EndpointRouter();
     private boolean complete;
 
     /** Creates an empty world shell visible to factories while its complete graph is constructed. */
@@ -50,6 +51,7 @@ final class InternalWorld implements World {
     @Override
     public void activate() {
         lifecycle.activate();
+        endpointRouter.activate();
     }
 
     @Override
@@ -72,6 +74,7 @@ final class InternalWorld implements World {
 
     @Override
     public void close() {
+        endpointRouter.deactivate();
         lifecycle.close();
     }
 
@@ -97,8 +100,15 @@ final class InternalWorld implements World {
         complete = true;
     }
 
+    /** Returns the world-owned endpoint router during transactional composition. */
+    EndpointRouter endpointRouter() {
+        requireBuilding();
+        return endpointRouter;
+    }
+
     /** Marks an unsuccessfully composed world unusable without closing values owned by the caller's rollback. */
     void fail() {
+        endpointRouter.deactivate();
         lifecycle.failComposition();
     }
 

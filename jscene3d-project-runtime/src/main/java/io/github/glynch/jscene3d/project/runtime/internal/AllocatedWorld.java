@@ -7,11 +7,12 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 import java.util.List;
 import java.util.Objects;
 
-/** Complete entity allocation plus component work awaiting transactional construction. */
-record AllocatedWorld(InternalWorld world, List<ComponentPlan> components) {
+/** Complete entity allocation plus component and connection work awaiting transactional construction. */
+record AllocatedWorld(InternalWorld world, List<ComponentPlan> components, List<RuntimeConnectionPlan> connections) {
     /** Copies one allocation result. */
     AllocatedWorld {
         Objects.requireNonNull(world, "world");
         components = List.copyOf(components);
+        connections = List.copyOf(connections);
     }
 }

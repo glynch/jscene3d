@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
@@ -38,6 +39,7 @@ final class RuntimeComponentConstructor {
         List<Object> created = new ArrayList<>();
         List<WorldComponentEntry> entries = new ArrayList<>();
         List<ComponentBindingEntry> bindings = new ArrayList<>();
+        List<ComponentEndpointBindingEntry> endpointBindings = new ArrayList<>();
         Set<Object> identities = Collections.newSetFromMap(new IdentityHashMap<>());
         try {
             for (ComponentPlan plan : allocation.components()) {
@@ -55,16 +57,23 @@ final class RuntimeComponentConstructor {
                 requireLifecycleSupport(plan, descriptor, value);
                 boolean bindsReferences = declaresTargetProperties(descriptor);
                 requireReferenceSupport(plan, bindsReferences, value);
+                boolean bindsEndpoints = declaresEndpoints(descriptor);
+                requireEndpointSupport(plan, bindsEndpoints, value);
                 plan.owner().addComponent(plan.definition().id(), value);
                 plan.scope()
                         .bindComponent(plan.authoredEntity(), plan.definition().id(), value);
                 if (bindsReferences && value instanceof ComponentReferenceBinder binder) {
                     bindings.add(new ComponentBindingEntry(plan, binder, properties));
                 }
+                if (bindsEndpoints && value instanceof ComponentEndpointBinder binder) {
+                    endpointBindings.add(new ComponentEndpointBindingEntry(plan, descriptor, binder));
+                }
                 entries.add(
                         new WorldComponentEntry(plan.owner(), plan.definition().id(), value, descriptor.lifecycle()));
             }
             bindReferences(bindings);
+            bindEndpoints(endpointBindings, allocation.world().endpointRouter());
+            allocation.world().endpointRouter().connectWorld(allocation.connections());
             allocation.world().complete(entries);
             return allocation.world();
         } catch (RuntimeException failure) {
@@ -138,6 +147,21 @@ final class RuntimeComponentConstructor {
         return kind == ProjectValueKind.ENTITY_TARGET || kind == ProjectValueKind.COMPONENT_TARGET;
     }
 
+    /** Returns whether safe metadata declares at least one signal or action. */
+    private static boolean declaresEndpoints(ComponentTypeDescriptor descriptor) {
+        return !descriptor.signals().isEmpty() || !descriptor.actions().isEmpty();
+    }
+
+    /** Requires endpoint-declaring component types to expose the one binding callback. */
+    private static void requireEndpointSupport(ComponentPlan plan, boolean bindsEndpoints, Object value) {
+        if (bindsEndpoints && !(value instanceof ComponentEndpointBinder)) {
+            throw new RuntimeCompositionException(
+                    RuntimeDiagnosticCode.COMPONENT_ENDPOINT_BINDING_UNSUPPORTED,
+                    "component factory result does not implement ComponentEndpointBinder",
+                    plan.location());
+        }
+    }
+
     /** Binds every component only after all factory-created values have entered their instance indexes. */
     private static void bindReferences(List<ComponentBindingEntry> bindings) {
         for (ComponentBindingEntry binding : bindings) {
@@ -153,6 +177,32 @@ final class RuntimeComponentConstructor {
                 references.expire();
             }
         }
+    }
+
+    /** Binds every descriptor-declared endpoint after all authored references have resolved. */
+    private static void bindEndpoints(List<ComponentEndpointBindingEntry> bindings, EndpointRouter router) {
+        for (ComponentEndpointBindingEntry binding : bindings) {
+            ComponentEndpointBindingContext endpoints = new ComponentEndpointBindingContext(binding, router);
+            try {
+                binding.binder().bindEndpoints(endpoints);
+                endpoints.requireComplete();
+            } catch (RuntimeCompositionException failure) {
+                throw failure;
+            } catch (RuntimeException failure) {
+                throw endpointBindingFailure(binding.plan(), failure);
+            } finally {
+                endpoints.expire();
+            }
+        }
+    }
+
+    /** Wraps an arbitrary endpoint implementation failure in one stable binding diagnostic. */
+    private static RuntimeCompositionException endpointBindingFailure(ComponentPlan plan, RuntimeException failure) {
+        String detail = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+        return new RuntimeCompositionException(
+                RuntimeDiagnosticCode.COMPONENT_ENDPOINT_BINDING_FAILED,
+                "endpoint binding failed for component " + plan.definition().id() + ": " + detail,
+                plan.location());
     }
 
     /** Wraps an arbitrary implementation failure in one stable binding diagnostic. */

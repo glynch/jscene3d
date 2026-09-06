@@ -54,6 +54,28 @@ public enum AssetDiagnosticCode implements DiagnosticCode {
     ENTITY_ID_DUPLICATE("asset.entity.id.duplicate", "An entity identity is duplicated within an asset"),
     /** A component identity is duplicated on one entity. */
     COMPONENT_ID_DUPLICATE("asset.component.id.duplicate", "A component identity is duplicated on an entity"),
+    /** A property identity is invalid. */
+    PROPERTY_ID_INVALID("asset.property.id", "A property identity is invalid"),
+    /** An endpoint identity is invalid. */
+    ENDPOINT_ID_INVALID("asset.endpoint.id", "An endpoint identity is invalid"),
+    /** An attachment-point identity is invalid. */
+    ATTACHMENT_ID_INVALID("asset.attachment.id", "An attachment-point identity is invalid"),
+    /** A capability identity is invalid. */
+    CAPABILITY_ID_INVALID("asset.capability.id", "A capability identity is invalid"),
+    /** An exported contract declaration is duplicated. */
+    CONTRACT_DUPLICATE("asset.contract.duplicate", "An exported contract declaration is duplicated"),
+    /** An authored stable target does not exist or crosses a definition seam illegally. */
+    TARGET_INVALID("asset.target", "An authored stable target is invalid"),
+    /** A placement supplies an argument not declared by its target definition. */
+    CONTRACT_ARGUMENT_UNKNOWN("asset.contract.argument.unknown", "A placement argument is not exported"),
+    /** A placement omits a required exported argument. */
+    CONTRACT_ARGUMENT_REQUIRED("asset.contract.argument.required", "A required placement argument is missing"),
+    /** A placement argument does not satisfy its exported declaration. */
+    CONTRACT_ARGUMENT_TYPE("asset.contract.argument.type", "A placement argument has the wrong type"),
+    /** A placed definition does not export the referenced contract member. */
+    CONTRACT_MEMBER_MISSING("asset.contract.member.missing", "A referenced contract member is not exported"),
+    /** Connected or re-exported endpoints have incompatible payload declarations. */
+    CONTRACT_PAYLOAD_INVALID("asset.contract.payload", "Endpoint payload declarations are incompatible"),
     /** The optional schema reference does not identify the expected bundled schema. */
     SCHEMA_URI_INVALID("asset.schema.uri", "The asset schema URI is invalid");
 

@@ -4,13 +4,17 @@
   "title": "JScene3D World Definition version 1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["assetId", "assetType", "formatVersion", "name", "roots"],
+  "required": ["assetId", "assetType", "formatVersion", "name", "connections", "roots"],
   "properties": {
     "$schema": {"type": "string", "format": "uri"},
     "assetId": {"type": "string", "format": "uuid"},
     "assetType": {"const": "world-definition"},
     "formatVersion": {"const": 1},
     "name": {"type": "string", "minLength": 1},
+    "connections": {
+      "type": "array",
+      "items": {"$ref": "entity-definition-1.schema.json#/$defs/connection"}
+    },
     "roots": {
       "type": "array",
       "items": {"$ref": "entity-definition-1.schema.json#/$defs/entry"}

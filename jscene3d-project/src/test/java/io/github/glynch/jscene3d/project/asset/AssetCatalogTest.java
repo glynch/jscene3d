@@ -6,13 +6,24 @@ package io.github.glynch.jscene3d.project.asset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.project.component.AttachmentPointId;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentTypeId;
+import io.github.glynch.jscene3d.project.component.EndpointId;
+import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.contract.EntityContract;
+import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
+import io.github.glynch.jscene3d.project.entity.PropertyTarget;
+import io.github.glynch.jscene3d.project.entity.SignalConnection;
+import io.github.glynch.jscene3d.project.entity.SpatialTarget;
+import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
+import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -24,6 +35,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -35,6 +47,8 @@ final class AssetCatalogTest {
     private static final AssetId MISSING_ASSET = AssetId.from("ed20a5a2-f237-43f0-960b-cd93d02b7a8a");
     private static final EntityId BEACON_ROOT = EntityId.from("853f50a0-17dc-46ac-9f04-f772e54c44b2");
     private static final EntityId BEACON_PLACEMENT = EntityId.from("722c16bf-922b-41a5-9499-b23b68d8ab8e");
+    private static final EntityId SECOND_PLACEMENT = EntityId.from("4b2fefc2-4d1e-441d-814d-fe94b5b23f09");
+    private static final EntityId THIRD_PLACEMENT = EntityId.from("8faf21ab-2b6c-4399-809b-52355ccb55d7");
     private static final ComponentId TRANSFORM = ComponentId.from("b991ca3e-66bb-4ef0-a682-74773bbef0d0");
 
     @TempDir
@@ -80,8 +94,23 @@ final class AssetCatalogTest {
         assertThat(second).isEqualTo(first).endsWith("\n");
         assertThat(first)
                 .containsSubsequence(
-                        "\"$schema\"", "\"assetId\"", "\"assetType\"", "\"formatVersion\"", "\"name\"", "\"root\"")
-                .contains("\"nothing\" : null", "\"enabled\" : true");
+                        "\"$schema\"",
+                        "\"assetId\"",
+                        "\"assetType\"",
+                        "\"formatVersion\"",
+                        "\"name\"",
+                        "\"contract\"",
+                        "\"connections\"",
+                        "\"root\"")
+                .contains(
+                        "\"nothing\" : null",
+                        "\"enabled\" : true",
+                        "\"parameters\"",
+                        "\"signals\"",
+                        "\"actions\"",
+                        "\"capabilities\"",
+                        "\"attachments\"",
+                        "\"resourceBindings\"");
         assertThat(catalog.loadEntity(AssetRef.to(BEACON_ASSET)).definition()).contains(definition);
     }
 
@@ -188,6 +217,89 @@ final class AssetCatalogTest {
         });
     }
 
+    /** Validates every placement argument against the referenced definition's exported contract. */
+    @Test
+    void rejectsInvalidPlacementArguments() throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("projectile.entity.json"), requiredSpeedDefinition());
+        List<EntityPlacement> placements = List.of(
+                new EntityPlacement(BEACON_PLACEMENT, true, AssetRef.to(BEACON_ASSET), Map.of()),
+                new EntityPlacement(
+                        SECOND_PLACEMENT,
+                        true,
+                        AssetRef.to(BEACON_ASSET),
+                        Map.of(property("unknown"), new ProjectValue.NumberValue(BigDecimal.ONE))),
+                new EntityPlacement(
+                        THIRD_PLACEMENT,
+                        true,
+                        AssetRef.to(BEACON_ASSET),
+                        Map.of(property("speed"), new ProjectValue.TextValue("fast"))));
+        DefinitionWriter.write(
+                temporaryDirectory.resolve("garden.world.json"),
+                new WorldDefinition(GARDEN_ASSET, "Garden", placements));
+        AssetCatalog catalog = scanValidCatalog();
+
+        DefinitionLoadResult<WorldDefinition> result = catalog.loadWorld(AssetRef.to(GARDEN_ASSET));
+
+        assertThat(result.definition()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains(
+                        "asset.contract.argument.required",
+                        "asset.contract.argument.unknown",
+                        "asset.contract.argument.type");
+    }
+
+    /** Allows a containing definition contract to supply a required nested placement argument. */
+    @Test
+    void acceptsRequiredArgumentReexportedByContainingDefinition() throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("projectile.entity.json"), requiredSpeedDefinition());
+        EntityPlacement nested = new EntityPlacement(BEACON_PLACEMENT, true, AssetRef.to(BEACON_ASSET), Map.of());
+        PropertyId speed = property("speed");
+        EntityContract contract = new EntityContract(
+                List.of(new EntityContract.Parameter(
+                        speed,
+                        ProjectValueKind.NUMBER,
+                        EntityContract.Requirement.REQUIRED,
+                        PropertyTarget.placement(BEACON_PLACEMENT, speed))),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
+        EntityDefinition launcher = new EntityDefinition(
+                SECOND_ASSET,
+                "Launcher",
+                contract,
+                List.of(),
+                new LocalEntity(BEACON_ROOT, true, List.of(), List.of(nested)));
+        DefinitionWriter.write(temporaryDirectory.resolve("launcher.entity.json"), launcher);
+        AssetCatalog catalog = scanValidCatalog();
+
+        assertThat(catalog.loadEntity(AssetRef.to(SECOND_ASSET)).definition()).contains(launcher);
+    }
+
+    /** Requires placed connection endpoints to exist and declare compatible payloads. */
+    @Test
+    void rejectsInvalidPlacedEndpointConnections() throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("source.entity.json"), endpointDefinition());
+        EntityPlacement placement = new EntityPlacement(BEACON_PLACEMENT, true, AssetRef.to(BEACON_ASSET), Map.of());
+        EndpointTarget emitted = EndpointTarget.placement(BEACON_PLACEMENT, new EndpointId("emitted"));
+        List<SignalConnection> connections = List.of(
+                new SignalConnection(emitted, EndpointTarget.placement(BEACON_PLACEMENT, new EndpointId("accept"))),
+                new SignalConnection(emitted, EndpointTarget.placement(BEACON_PLACEMENT, new EndpointId("missing"))));
+        DefinitionWriter.write(
+                temporaryDirectory.resolve("garden.world.json"),
+                new WorldDefinition(GARDEN_ASSET, "Garden", connections, List.of(placement)));
+        AssetCatalog catalog = scanValidCatalog();
+
+        DefinitionLoadResult<WorldDefinition> result = catalog.loadWorld(AssetRef.to(GARDEN_ASSET));
+
+        assertThat(result.definition()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains("asset.contract.payload", "asset.contract.member.missing");
+    }
+
     /** Collects structural identity and entry diagnostics from a complete definition read. */
     @Test
     void rejectsInvalidDefinitionStructure() throws IOException {
@@ -229,6 +341,51 @@ final class AssetCatalogTest {
                         "asset.reference.hint");
     }
 
+    /** Collects malformed public-contract diagnostics without aborting at the first declaration. */
+    @Test
+    void rejectsMalformedContractDeclarations() throws IOException {
+        write("invalid-contract.entity.json", """
+                {
+                  "assetId":"4c189475-9845-4810-b7f9-af744d3cc726",
+                  "assetType":"entity-definition",
+                  "formatVersion":1,
+                  "name":"Invalid contract",
+                  "contract":{
+                    "parameters":[null,{"id":"not valid","valueKind":"unknown","target":null}],
+                    "signals":[null,{"id":"bad/id","payload":{"id":"bad","version":0},"target":null}],
+                    "actions":[null],
+                    "capabilities":[null,"bad"],
+                    "attachments":[null,{"id":"bad id","target":null}],
+                    "resourceBindings":[null,{"id":"bad id","acceptedKinds":["import","IMPORT","unknown",null],"target":null}]
+                  },
+                  "connections":[null,{"signal":null,"action":null}],
+                  "root":{
+                    "entryType":"local",
+                    "entityId":"853f50a0-17dc-46ac-9f04-f772e54c44b2",
+                    "components":[],
+                    "children":[]
+                  }
+                }
+                """);
+        AssetCatalog catalog = scanValidCatalog();
+
+        DefinitionLoadResult<EntityDefinition> result = catalog.loadEntity(AssetRef.to(BEACON_ASSET));
+
+        assertThat(result.definition()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains(
+                        "asset.field.required",
+                        "asset.property.id",
+                        "asset.endpoint.id",
+                        "asset.attachment.id",
+                        "asset.capability.id",
+                        "asset.contract.argument.type",
+                        "asset.value.reference",
+                        "asset.component.type",
+                        "asset.component.version");
+    }
+
     /** Rejects strict JSON unknown fields and detects files changed after catalog scanning. */
     @Test
     void rejectsUnknownAndChangedDefinitionHeaders() throws IOException {
@@ -260,21 +417,51 @@ final class AssetCatalogTest {
 
     /** Creates one entity definition containing representative portable property values. */
     private static EntityDefinition beaconDefinition() {
-        Map<String, ProjectValue> properties = new LinkedHashMap<>();
-        properties.put("nothing", ProjectValue.NullValue.INSTANCE);
-        properties.put("visible", new ProjectValue.BooleanValue(true));
-        properties.put("intensity", new ProjectValue.NumberValue(new BigDecimal("2.50")));
-        properties.put("label", new ProjectValue.TextValue("Beacon"));
+        Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
+        properties.put(property("nothing"), ProjectValue.NullValue.INSTANCE);
+        properties.put(property("visible"), new ProjectValue.BooleanValue(true));
+        properties.put(property("intensity"), new ProjectValue.NumberValue(new BigDecimal("2.50")));
+        properties.put(property("label"), new ProjectValue.TextValue("Beacon"));
         properties.put(
-                "position",
+                property("position"),
                 new ProjectValue.ArrayValue(List.of(
                         new ProjectValue.NumberValue(BigDecimal.ZERO), new ProjectValue.NumberValue(BigDecimal.ONE))));
-        properties.put("metadata", new ProjectValue.ObjectValue(Map.of("mode", new ProjectValue.TextValue("pulse"))));
-        properties.put("mesh", new ProjectValue.ReferenceValue(ResourceReference.imported("garden/mesh/beacon")));
+        properties.put(
+                property("metadata"),
+                new ProjectValue.ObjectValue(Map.of("mode", new ProjectValue.TextValue("pulse"))));
+        properties.put(
+                property("mesh"), new ProjectValue.ReferenceValue(ResourceReference.imported("garden/mesh/beacon")));
         ComponentDefinition transform = new ComponentDefinition(
                 TRANSFORM, new ComponentTypeId("io.github.glynch.jscene3d/transform-3d"), 1, properties);
+        EndpointId activated = new EndpointId("activated");
+        EndpointId deactivate = new EndpointId("deactivate");
+        RegisteredType pulse = new RegisteredType("io.github.glynch.beacon/pulse", 1);
+        EntityContract contract = new EntityContract(
+                List.of(new EntityContract.Parameter(
+                        property("color"),
+                        ProjectValueKind.TEXT,
+                        EntityContract.Requirement.OPTIONAL,
+                        PropertyTarget.component(BEACON_ROOT, TRANSFORM, property("color")))),
+                List.of(new EntityContract.Signal(
+                        activated, pulse, EndpointTarget.component(BEACON_ROOT, TRANSFORM, activated))),
+                List.of(new EntityContract.Action(
+                        deactivate, pulse, EndpointTarget.component(BEACON_ROOT, TRANSFORM, deactivate))),
+                List.of(new CapabilityId("io.github.glynch.beacon/illuminates")),
+                List.of(new EntityContract.Attachment(
+                        new AttachmentPointId("light-origin"), SpatialTarget.component(BEACON_ROOT, TRANSFORM))),
+                List.of(new EntityContract.ResourceBinding(
+                        property("mesh"),
+                        EntityContract.Requirement.OPTIONAL,
+                        Set.of(ResourceReference.Kind.IMPORT),
+                        PropertyTarget.component(BEACON_ROOT, TRANSFORM, property("mesh")))));
         return new EntityDefinition(
-                BEACON_ASSET, "Beacon", new LocalEntity(BEACON_ROOT, "Beacon", true, List.of(transform), List.of()));
+                BEACON_ASSET,
+                "Beacon",
+                contract,
+                List.of(new SignalConnection(
+                        EndpointTarget.component(BEACON_ROOT, TRANSFORM, activated),
+                        EndpointTarget.component(BEACON_ROOT, TRANSFORM, deactivate))),
+                new LocalEntity(BEACON_ROOT, "Beacon", true, List.of(transform), List.of()));
     }
 
     /** Creates one world placing the reusable beacon through a deliberately replaceable path hint. */
@@ -284,7 +471,7 @@ final class AssetCatalogTest {
                 "Beacon A",
                 true,
                 AssetRef.to(BEACON_ASSET, pathHint),
-                Map.of("color", new ProjectValue.TextValue("green")));
+                Map.of(property("color"), new ProjectValue.TextValue("green")));
         return new WorldDefinition(GARDEN_ASSET, "Garden", List.of(placement));
     }
 
@@ -293,6 +480,62 @@ final class AssetCatalogTest {
         EntityPlacement placement = new EntityPlacement(BEACON_PLACEMENT, true, AssetRef.to(target), Map.of());
         LocalEntity root = new LocalEntity(BEACON_ROOT, name, true, List.of(), List.of(placement));
         return new EntityDefinition(id, name, root);
+    }
+
+    /** Creates a definition requiring one numeric placement argument. */
+    private static EntityDefinition requiredSpeedDefinition() {
+        PropertyId speed = property("speed");
+        EntityContract contract = new EntityContract(
+                List.of(new EntityContract.Parameter(
+                        speed,
+                        ProjectValueKind.NUMBER,
+                        EntityContract.Requirement.REQUIRED,
+                        PropertyTarget.component(BEACON_ROOT, TRANSFORM, speed))),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
+        ComponentDefinition component = new ComponentDefinition(
+                TRANSFORM, new ComponentTypeId("io.github.glynch.jscene3d/transform-3d"), 1, Map.of());
+        return new EntityDefinition(
+                BEACON_ASSET,
+                "Projectile",
+                contract,
+                List.of(),
+                new LocalEntity(BEACON_ROOT, true, List.of(component), List.of()));
+    }
+
+    /** Creates a definition with deliberately incompatible signal and action payloads. */
+    private static EntityDefinition endpointDefinition() {
+        EndpointId emitted = new EndpointId("emitted");
+        EndpointId accept = new EndpointId("accept");
+        EntityContract contract = new EntityContract(
+                List.of(),
+                List.of(new EntityContract.Signal(
+                        emitted,
+                        new RegisteredType("io.github.glynch.game/emitted", 1),
+                        EndpointTarget.component(BEACON_ROOT, TRANSFORM, emitted))),
+                List.of(new EntityContract.Action(
+                        accept,
+                        new RegisteredType("io.github.glynch.game/accepted", 1),
+                        EndpointTarget.component(BEACON_ROOT, TRANSFORM, accept))),
+                List.of(),
+                List.of(),
+                List.of());
+        ComponentDefinition component = new ComponentDefinition(
+                TRANSFORM, new ComponentTypeId("io.github.glynch.jscene3d/transform-3d"), 1, Map.of());
+        return new EntityDefinition(
+                BEACON_ASSET,
+                "Source",
+                contract,
+                List.of(),
+                new LocalEntity(BEACON_ROOT, true, List.of(component), List.of()));
+    }
+
+    /** Creates one stable local property identity. */
+    private static PropertyId property(String value) {
+        return new PropertyId(value);
     }
 
     /** Scans the temporary project and requires success. */

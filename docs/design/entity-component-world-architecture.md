@@ -658,11 +658,11 @@ serialized record as opaque data, displays the missing type ID, and permits
 unrelated inspection. Required unavailable components prevent play/export.
 They are never discarded merely because their descriptor is missing.
 
-A conceptual entity-definition document is:
+The version-one entity-definition shape is:
 
 ```json
 {
-  "$schema": "https://jscene3d.dev/schema/entity-definition-1.json",
+  "$schema": "https://jscene3d.org/schemas/entity-definition-1.json",
   "assetId": "4c189475-9845-4810-b7f9-af744d3cc726",
   "assetType": "entity-definition",
   "formatVersion": 1,
@@ -671,16 +671,20 @@ A conceptual entity-definition document is:
     "parameters": [],
     "signals": [],
     "actions": [],
-    "attachments": []
+    "capabilities": [],
+    "attachments": [],
+    "resourceBindings": []
   },
+  "connections": [],
   "root": {
+    "entryType": "local",
     "entityId": "853f50a0-17dc-46ac-9f04-f772e54c44b2",
     "name": "Bullet",
     "enabled": true,
     "components": [
       {
         "componentId": "b991ca3e-66bb-4ef0-a682-74773bbef0d0",
-        "type": "jscene3d/transform-3d",
+        "type": "io.github.glynch.jscene3d/transform-3d",
         "typeVersion": 1,
         "properties": {
           "translation": [0.0, 0.0, 0.0]
@@ -692,8 +696,10 @@ A conceptual entity-definition document is:
 }
 ```
 
-This example fixes the semantic fields, not the final schema URI, UUID version,
-or Java naming.
+Contract targets and connections store stable entity, component, property,
+endpoint, and attachment identities. Omitting `componentId` addresses the
+public contract of a nested definition placement; it never exposes that
+definition's private components.
 
 ## Validation and diagnostics
 

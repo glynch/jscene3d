@@ -4,23 +4,148 @@
   "title": "JScene3D Entity Definition version 1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["assetId", "assetType", "formatVersion", "name", "root"],
+  "required": ["assetId", "assetType", "formatVersion", "name", "contract", "connections", "root"],
   "properties": {
     "$schema": {"type": "string", "format": "uri"},
     "assetId": {"type": "string", "format": "uuid"},
     "assetType": {"const": "entity-definition"},
     "formatVersion": {"const": 1},
     "name": {"type": "string", "minLength": 1},
+    "contract": {"$ref": "#/$defs/contract"},
+    "connections": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/connection"}
+    },
     "root": {"$ref": "#/$defs/localEntry"}
   },
   "$defs": {
+    "localId": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "registeredTypeId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "registeredType": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/registeredTypeId"},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "propertyTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entityId", "propertyId"],
+      "properties": {
+        "entityId": {"type": "string", "format": "uuid"},
+        "componentId": {"type": "string", "format": "uuid"},
+        "propertyId": {"$ref": "#/$defs/localId"}
+      }
+    },
+    "endpointTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entityId", "endpointId"],
+      "properties": {
+        "entityId": {"type": "string", "format": "uuid"},
+        "componentId": {"type": "string", "format": "uuid"},
+        "endpointId": {"$ref": "#/$defs/localId"}
+      }
+    },
+    "spatialTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entityId"],
+      "properties": {
+        "entityId": {"type": "string", "format": "uuid"},
+        "componentId": {"type": "string", "format": "uuid"},
+        "attachmentId": {"$ref": "#/$defs/localId"}
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "valueKind", "required", "target"],
+      "properties": {
+        "id": {"$ref": "#/$defs/localId"},
+        "valueKind": {
+          "enum": ["null", "boolean", "number", "text", "array", "object", "reference"]
+        },
+        "required": {"type": "boolean"},
+        "target": {"$ref": "#/$defs/propertyTarget"}
+      }
+    },
+    "contractEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "target"],
+      "properties": {
+        "id": {"$ref": "#/$defs/localId"},
+        "payload": {"$ref": "#/$defs/registeredType"},
+        "target": {"$ref": "#/$defs/endpointTarget"}
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "target"],
+      "properties": {
+        "id": {"$ref": "#/$defs/localId"},
+        "target": {"$ref": "#/$defs/spatialTarget"}
+      }
+    },
+    "resourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "required", "acceptedKinds", "target"],
+      "properties": {
+        "id": {"$ref": "#/$defs/localId"},
+        "required": {"type": "boolean"},
+        "acceptedKinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["project", "asset", "import"]}
+        },
+        "target": {"$ref": "#/$defs/propertyTarget"}
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parameters", "signals", "actions", "capabilities", "attachments", "resourceBindings"],
+      "properties": {
+        "parameters": {"type": "array", "items": {"$ref": "#/$defs/parameter"}},
+        "signals": {"type": "array", "items": {"$ref": "#/$defs/contractEndpoint"}},
+        "actions": {"type": "array", "items": {"$ref": "#/$defs/contractEndpoint"}},
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/registeredTypeId"}
+        },
+        "attachments": {"type": "array", "items": {"$ref": "#/$defs/attachment"}},
+        "resourceBindings": {"type": "array", "items": {"$ref": "#/$defs/resourceBinding"}}
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal", "action"],
+      "properties": {
+        "signal": {"$ref": "#/$defs/endpointTarget"},
+        "action": {"$ref": "#/$defs/endpointTarget"}
+      }
+    },
     "component": {
       "type": "object",
       "additionalProperties": false,
       "required": ["componentId", "type", "typeVersion"],
       "properties": {
         "componentId": {"type": "string", "format": "uuid"},
-        "type": {"type": "string"},
+        "type": {"$ref": "#/$defs/registeredTypeId"},
         "typeVersion": {"type": "integer", "minimum": 1},
         "properties": {"type": "object"}
       }

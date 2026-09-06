@@ -10,6 +10,7 @@ module io.github.glynch.jscene3d.project {
 
     exports io.github.glynch.jscene3d.project.asset;
     exports io.github.glynch.jscene3d.project.component;
+    exports io.github.glynch.jscene3d.project.contract;
     exports io.github.glynch.jscene3d.project.diagnostic;
     exports io.github.glynch.jscene3d.project.entity;
     exports io.github.glynch.jscene3d.project.extension;

@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentTypeId;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.math.BigDecimal;
@@ -43,7 +44,7 @@ final class EntityDefinitionModelTest {
                 "Preview Bullet",
                 true,
                 reference,
-                Map.of("speed", new ProjectValue.NumberValue(BigDecimal.TEN)));
+                Map.of(property("speed"), new ProjectValue.NumberValue(BigDecimal.TEN)));
         LocalEntity camera = new LocalEntity(CAMERA, "Camera", true, List.of(transformDefinition(Map.of())), List.of());
         WorldDefinition world = new WorldDefinition(WORLD_ASSET, "Garden", List.of(camera, placement));
 
@@ -53,7 +54,7 @@ final class EntityDefinitionModelTest {
                 .isEqualTo(BULLET_PLACEMENT)
                 .isNotEqualTo(bullet.root().id());
         assertThat(placement.definition()).isEqualTo(reference);
-        assertThat(placement.arguments()).containsKey("speed");
+        assertThat(placement.arguments()).containsKey(property("speed"));
         assertThat(placement.name()).contains("Preview Bullet");
         assertThat(placement.isEnabled()).isTrue();
     }
@@ -76,8 +77,8 @@ final class EntityDefinitionModelTest {
     /** Defensively copies authored properties and hierarchy collections. */
     @Test
     void copiesAuthoredCollections() {
-        Map<String, ProjectValue> mutableProperties = new LinkedHashMap<>();
-        mutableProperties.put("mass", new ProjectValue.NumberValue(BigDecimal.ONE));
+        Map<PropertyId, ProjectValue> mutableProperties = new LinkedHashMap<>();
+        mutableProperties.put(property("mass"), new ProjectValue.NumberValue(BigDecimal.ONE));
         ComponentDefinition component = transformDefinition(mutableProperties);
         List<ComponentDefinition> mutableComponents = new ArrayList<>(List.of(component));
         List<EntityEntry> mutableChildren = new ArrayList<>();
@@ -89,11 +90,11 @@ final class EntityDefinitionModelTest {
         mutableComponents.clear();
         mutableChildren.add(new LocalEntity(CAMERA, true, List.of(), List.of()));
         mutableRoots.clear();
-        Map<String, ProjectValue> immutableProperties = component.properties();
+        Map<PropertyId, ProjectValue> immutableProperties = component.properties();
         List<EntityEntry> immutableChildren = root.children();
         List<EntityEntry> immutableRoots = world.roots();
 
-        assertThat(component.properties()).containsKey("mass");
+        assertThat(component.properties()).containsKey(property("mass"));
         assertThat(root.components()).containsExactly(component);
         assertThat(root.children()).isEmpty();
         assertThat(world.roots()).containsExactly(root);
@@ -106,7 +107,8 @@ final class EntityDefinitionModelTest {
     @Test
     void rejectsDuplicateComponentIds() {
         ComponentDefinition first = transformDefinition(Map.of());
-        ComponentDefinition duplicate = transformDefinition(Map.of("x", new ProjectValue.NumberValue(BigDecimal.ONE)));
+        ComponentDefinition duplicate =
+                transformDefinition(Map.of(property("x"), new ProjectValue.NumberValue(BigDecimal.ONE)));
         List<ComponentDefinition> components = List.of(first, duplicate);
         List<EntityEntry> noChildren = List.of();
 
@@ -167,7 +169,7 @@ final class EntityDefinitionModelTest {
     void validatesScalarDefinitionValues() {
         UUID uuid = UUID.fromString("4c189475-9845-4810-b7f9-af744d3cc726");
         ComponentTypeId type = new ComponentTypeId("io.github.glynch.jscene3d/transform-3d");
-        Map<String, ProjectValue> properties = Map.of();
+        Map<PropertyId, ProjectValue> properties = Map.of();
         LocalEntity unnamed = unnamedEntity();
 
         assertThat(new AssetId(uuid).toString()).isEqualTo(uuid.toString());
@@ -199,9 +201,14 @@ final class EntityDefinitionModelTest {
     }
 
     /** Creates the repeated transform-component fixture. */
-    private static ComponentDefinition transformDefinition(Map<String, ProjectValue> properties) {
+    private static ComponentDefinition transformDefinition(Map<PropertyId, ProjectValue> properties) {
         return new ComponentDefinition(
                 TRANSFORM, new ComponentTypeId("io.github.glynch.jscene3d/transform-3d"), 1, properties);
+    }
+
+    /** Creates one stable local property identity. */
+    private static PropertyId property(String value) {
+        return new PropertyId(value);
     }
 
     /** Creates one unnamed local entity for scalar and optional-name checks. */

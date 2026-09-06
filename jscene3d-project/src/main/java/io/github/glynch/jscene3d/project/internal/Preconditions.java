@@ -203,13 +203,14 @@ public final class Preconditions {
     /**
      * Returns an immutable ordered copy of project values.
      *
+     * @param <K> property-key type
      * @param values project values to validate and copy
      * @param name argument name used in failures
      * @return immutable validated values
      */
-    public static Map<String, ProjectValue> immutableProjectValues(Map<String, ProjectValue> values, String name) {
+    public static <K> Map<K, ProjectValue> immutableProjectValues(Map<K, ProjectValue> values, String name) {
         Objects.requireNonNull(values, name);
-        Map<String, ProjectValue> copied = new LinkedHashMap<>();
+        Map<K, ProjectValue> copied = new LinkedHashMap<>();
         values.forEach((key, value) ->
                 copied.put(Objects.requireNonNull(key, name + " key"), Objects.requireNonNull(value, name + " value")));
         return Collections.unmodifiableMap(copied);

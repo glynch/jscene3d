@@ -16,7 +16,7 @@ public final class ComponentDefinition {
     private final ComponentId id;
     private final ComponentTypeId type;
     private final int typeVersion;
-    private final Map<String, ProjectValue> properties;
+    private final Map<PropertyId, ProjectValue> properties;
 
     /**
      * Creates an authored component definition.
@@ -27,7 +27,7 @@ public final class ComponentDefinition {
      * @param properties authored property values in declaration order
      */
     public ComponentDefinition(
-            ComponentId id, ComponentTypeId type, int typeVersion, Map<String, ProjectValue> properties) {
+            ComponentId id, ComponentTypeId type, int typeVersion, Map<PropertyId, ProjectValue> properties) {
         this.id = Objects.requireNonNull(id, "id");
         this.type = Objects.requireNonNull(type, "type");
         this.typeVersion = requirePositive(typeVersion, "typeVersion");
@@ -66,7 +66,7 @@ public final class ComponentDefinition {
      *
      * @return authored properties
      */
-    public Map<String, ProjectValue> properties() {
+    public Map<PropertyId, ProjectValue> properties() {
         return properties;
     }
 

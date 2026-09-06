@@ -8,6 +8,7 @@ import static io.github.glynch.jscene3d.project.internal.Preconditions.immutable
 import static io.github.glynch.jscene3d.project.internal.Preconditions.requireNonBlank;
 
 import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Map;
 import java.util.Objects;
@@ -24,7 +25,7 @@ public final class EntityPlacement implements EntityEntry {
     private final Optional<String> name;
     private final boolean enabled;
     private final AssetRef<EntityDefinition> definition;
-    private final Map<String, ProjectValue> arguments;
+    private final Map<PropertyId, ProjectValue> arguments;
 
     /**
      * Creates an unnamed reusable-definition placement.
@@ -35,7 +36,10 @@ public final class EntityPlacement implements EntityEntry {
      * @param arguments exported contract arguments
      */
     public EntityPlacement(
-            EntityId id, boolean enabled, AssetRef<EntityDefinition> definition, Map<String, ProjectValue> arguments) {
+            EntityId id,
+            boolean enabled,
+            AssetRef<EntityDefinition> definition,
+            Map<PropertyId, ProjectValue> arguments) {
         this(id, Optional.empty(), enabled, definition, arguments);
     }
 
@@ -53,7 +57,7 @@ public final class EntityPlacement implements EntityEntry {
             String name,
             boolean enabled,
             AssetRef<EntityDefinition> definition,
-            Map<String, ProjectValue> arguments) {
+            Map<PropertyId, ProjectValue> arguments) {
         this(id, Optional.of(requireNonBlank(name, "name")), enabled, definition, arguments);
     }
 
@@ -63,7 +67,7 @@ public final class EntityPlacement implements EntityEntry {
             Optional<String> name,
             boolean enabled,
             AssetRef<EntityDefinition> definition,
-            Map<String, ProjectValue> arguments) {
+            Map<PropertyId, ProjectValue> arguments) {
         this.id = Objects.requireNonNull(id, "id");
         this.name = Objects.requireNonNull(name, "name");
         this.enabled = enabled;
@@ -100,7 +104,7 @@ public final class EntityPlacement implements EntityEntry {
      *
      * @return placement arguments
      */
-    public Map<String, ProjectValue> arguments() {
+    public Map<PropertyId, ProjectValue> arguments() {
         return arguments;
     }
 

@@ -5,12 +5,21 @@
 package io.github.glynch.jscene3d.project.asset;
 
 import io.github.glynch.jscene3d.project.asset.internal.DefinitionDocumentReader;
+import io.github.glynch.jscene3d.project.component.AttachmentPointId;
+import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.contract.EntityContract;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
+import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
+import io.github.glynch.jscene3d.project.entity.PropertyTarget;
+import io.github.glynch.jscene3d.project.entity.SignalConnection;
+import io.github.glynch.jscene3d.project.entity.SpatialTarget;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -54,8 +63,10 @@ final class DefinitionGraphLoader {
                 loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, catalog.root(), "");
         Optional<WorldDefinition> definition = metadata.flatMap(loader::readWorld);
         if (metadata.isPresent() && definition.isPresent()) {
-            loader.validateEntries(
-                    definition.orElseThrow().roots(), metadata.orElseThrow().path());
+            WorldDefinition world = definition.orElseThrow();
+            Path source = metadata.orElseThrow().path();
+            loader.validateEntries(world.roots(), EntityContract.empty(), source);
+            loader.validateConnections(world.connections(), loader.indexPlacements(world.roots()), source);
         }
         return loader.result(definition);
     }
@@ -87,34 +98,30 @@ final class DefinitionGraphLoader {
             return;
         }
         loadedEntities.put(id, definition);
-        validateEntries(List.of(definition.root()), metadata.path());
+        validateEntries(List.of(definition.root()), definition.contract(), metadata.path());
+        Map<EntityId, EntityPlacement> placements = indexPlacements(List.of(definition.root()));
+        validateContractSeams(definition.contract(), placements, metadata.path());
+        validateConnections(definition.connections(), placements, metadata.path());
         visitingEntities.remove(id);
         validatedEntities.add(id);
     }
 
     /** Traverses placements in deterministic authored hierarchy order. */
-    private void validateEntries(List<? extends EntityEntry> entries, Path source) {
+    private void validateEntries(List<? extends EntityEntry> entries, EntityContract contract, Path source) {
         for (EntityEntry entry : entries) {
             if (entry instanceof EntityPlacement placement) {
-                validatePlacement(placement, source);
+                validatePlacement(placement, contract, source);
             } else if (entry instanceof LocalEntity local) {
-                validateEntries(local.children(), source);
+                validateEntries(local.children(), contract, source);
             }
         }
     }
 
     /** Resolves and recursively validates one placed reusable entity definition. */
-    private void validatePlacement(EntityPlacement placement, Path source) {
+    private void validatePlacement(EntityPlacement placement, EntityContract containingContract, Path source) {
         AssetId id = placement.definition().id();
         Optional<AssetMetadata> metadata = resolve(id, AssetKind.ENTITY_DEFINITION, source, "");
         if (metadata.isEmpty()) {
-            return;
-        }
-        if (visitingEntities.contains(id)) {
-            addCycle(source, id);
-            return;
-        }
-        if (validatedEntities.contains(id)) {
             return;
         }
         EntityDefinition definition = loadedEntities.get(id);
@@ -126,7 +133,292 @@ final class DefinitionGraphLoader {
             definition = loaded.orElseThrow();
             loadedEntities.put(id, definition);
         }
+        validatePlacementArguments(placement, definition.contract(), containingContract, source);
+        if (visitingEntities.contains(id)) {
+            addCycle(source, id);
+            return;
+        }
+        if (validatedEntities.contains(id)) {
+            return;
+        }
         validateEntityGraph(metadata.orElseThrow(), definition);
+    }
+
+    /** Validates supplied and required arguments against one placed definition's exported contract. */
+    private void validatePlacementArguments(
+            EntityPlacement placement, EntityContract target, EntityContract containingContract, Path source) {
+        for (Map.Entry<PropertyId, ProjectValue> argument :
+                placement.arguments().entrySet()) {
+            EntityContract.Parameter parameter = target.parameters().get(argument.getKey());
+            EntityContract.ResourceBinding binding = target.resourceBindings().get(argument.getKey());
+            if (parameter == null && binding == null) {
+                addError(
+                        source,
+                        AssetDiagnosticCode.CONTRACT_ARGUMENT_UNKNOWN,
+                        "placement " + placement.id() + " supplies undeclared argument " + argument.getKey(),
+                        "");
+            } else if (parameter != null && !parameter.accepts(argument.getValue())
+                    || binding != null && !binding.accepts(argument.getValue())) {
+                addError(
+                        source,
+                        AssetDiagnosticCode.CONTRACT_ARGUMENT_TYPE,
+                        "placement " + placement.id() + " supplies an incompatible value for " + argument.getKey(),
+                        "");
+            }
+        }
+        Set<PropertyId> reexported = reexportedArguments(containingContract, placement.id());
+        target.parameters().values().stream()
+                .filter(EntityContract.Parameter::isRequired)
+                .map(EntityContract.Parameter::id)
+                .forEach(id -> requireArgument(placement, id, reexported, source));
+        target.resourceBindings().values().stream()
+                .filter(EntityContract.ResourceBinding::isRequired)
+                .map(EntityContract.ResourceBinding::id)
+                .forEach(id -> requireArgument(placement, id, reexported, source));
+    }
+
+    /** Returns nested placement arguments supplied through the containing definition's public contract. */
+    private Set<PropertyId> reexportedArguments(EntityContract contract, EntityId placement) {
+        Set<PropertyId> result = new HashSet<>();
+        contract.parameters().values().stream()
+                .map(EntityContract.Parameter::target)
+                .filter(target -> isPlacementTarget(target, placement))
+                .map(PropertyTarget::property)
+                .forEach(result::add);
+        contract.resourceBindings().values().stream()
+                .map(EntityContract.ResourceBinding::target)
+                .filter(target -> isPlacementTarget(target, placement))
+                .map(PropertyTarget::property)
+                .forEach(result::add);
+        return result;
+    }
+
+    /** Reports one omitted argument unless it is supplied by a containing public contract. */
+    private void requireArgument(EntityPlacement placement, PropertyId id, Set<PropertyId> reexported, Path source) {
+        if (!placement.arguments().containsKey(id) && !reexported.contains(id)) {
+            addError(
+                    source,
+                    AssetDiagnosticCode.CONTRACT_ARGUMENT_REQUIRED,
+                    "placement " + placement.id() + " omits required argument " + id,
+                    "");
+        }
+    }
+
+    /** Validates public members which deliberately re-export a nested placement contract. */
+    private void validateContractSeams(
+            EntityContract contract, Map<EntityId, EntityPlacement> placements, Path source) {
+        contract.parameters().values().forEach(parameter -> validateReexportedParameter(parameter, placements, source));
+        contract.resourceBindings()
+                .values()
+                .forEach(binding -> validateReexportedResourceBinding(binding, placements, source));
+        contract.signals().values().forEach(signal -> validateReexportedSignal(signal, placements, source));
+        contract.actions().values().forEach(action -> validateReexportedAction(action, placements, source));
+        contract.attachments()
+                .values()
+                .forEach(attachment -> validateReexportedAttachment(attachment, placements, source));
+    }
+
+    /** Validates one parameter re-exported from a nested placement. */
+    private void validateReexportedParameter(
+            EntityContract.Parameter parameter, Map<EntityId, EntityPlacement> placements, Path source) {
+        PropertyTarget target = parameter.target();
+        if (target.component().isPresent()) {
+            return;
+        }
+        EntityContract.Parameter nested = nestedContract(target.entity(), placements)
+                .map(EntityContract::parameters)
+                .map(parameters -> parameters.get(target.property()))
+                .orElse(null);
+        if (nested == null) {
+            missingMember(source, target.entity(), target.property());
+        } else if (nested.valueKind() != parameter.valueKind()) {
+            incompatiblePayload(source, parameter.id(), target.property());
+        }
+    }
+
+    /** Validates one resource binding re-exported from a nested placement. */
+    private void validateReexportedResourceBinding(
+            EntityContract.ResourceBinding binding, Map<EntityId, EntityPlacement> placements, Path source) {
+        PropertyTarget target = binding.target();
+        if (target.component().isPresent()) {
+            return;
+        }
+        EntityContract.ResourceBinding nested = nestedContract(target.entity(), placements)
+                .map(EntityContract::resourceBindings)
+                .map(bindings -> bindings.get(target.property()))
+                .orElse(null);
+        if (nested == null) {
+            missingMember(source, target.entity(), target.property());
+        } else if (!acceptsAll(nested.acceptedKinds(), binding.acceptedKinds())) {
+            incompatiblePayload(source, binding.id(), target.property());
+        }
+    }
+
+    /** Validates one attachment re-exported from a nested placement. */
+    private void validateReexportedAttachment(
+            EntityContract.Attachment attachment, Map<EntityId, EntityPlacement> placements, Path source) {
+        SpatialTarget target = attachment.target();
+        if (target.component().isPresent() || target.attachment().isEmpty()) {
+            return;
+        }
+        AttachmentPointId id = target.attachment().orElseThrow();
+        boolean exists = nestedContract(target.entity(), placements)
+                .map(EntityContract::attachments)
+                .map(attachments -> attachments.containsKey(id))
+                .orElse(false);
+        if (!exists) {
+            missingMember(source, target.entity(), id);
+        }
+    }
+
+    /** Validates one re-exported signal and its payload declaration. */
+    private void validateReexportedSignal(
+            EntityContract.Signal signal, Map<EntityId, EntityPlacement> placements, Path source) {
+        EndpointTarget target = signal.target();
+        if (target.component().isPresent()) {
+            return;
+        }
+        EntityContract.Signal nested = nestedContract(target.entity(), placements)
+                .map(EntityContract::signals)
+                .map(signals -> signals.get(target.endpoint()))
+                .orElse(null);
+        if (nested == null) {
+            missingMember(source, target.entity(), target.endpoint());
+        } else if (!nested.payload().equals(signal.payload())) {
+            incompatiblePayload(source, signal.id(), target.endpoint());
+        }
+    }
+
+    /** Validates one re-exported action and its payload declaration. */
+    private void validateReexportedAction(
+            EntityContract.Action action, Map<EntityId, EntityPlacement> placements, Path source) {
+        EndpointTarget target = action.target();
+        if (target.component().isPresent()) {
+            return;
+        }
+        EntityContract.Action nested = nestedContract(target.entity(), placements)
+                .map(EntityContract::actions)
+                .map(actions -> actions.get(target.endpoint()))
+                .orElse(null);
+        if (nested == null) {
+            missingMember(source, target.entity(), target.endpoint());
+        } else if (!nested.payload().equals(action.payload())) {
+            incompatiblePayload(source, action.id(), target.endpoint());
+        }
+    }
+
+    /** Validates placed-definition endpoints used by authored signal/action connections. */
+    private void validateConnections(
+            List<SignalConnection> connections, Map<EntityId, EntityPlacement> placements, Path source) {
+        for (SignalConnection connection : connections) {
+            Optional<EntityContract.Signal> signal = resolveSignal(connection.signal(), placements, source);
+            Optional<EntityContract.Action> action = resolveAction(connection.action(), placements, source);
+            if (signal.isPresent()
+                    && action.isPresent()
+                    && !signal.orElseThrow()
+                            .payload()
+                            .equals(action.orElseThrow().payload())) {
+                incompatiblePayload(
+                        source,
+                        connection.signal().endpoint(),
+                        connection.action().endpoint());
+            }
+        }
+    }
+
+    /** Resolves a placed signal declaration, reporting a missing exported member. */
+    private Optional<EntityContract.Signal> resolveSignal(
+            EndpointTarget target, Map<EntityId, EntityPlacement> placements, Path source) {
+        if (!isPlacedEndpoint(target, placements)) {
+            return Optional.empty();
+        }
+        EntityContract.Signal signal = nestedContract(target.entity(), placements)
+                .map(EntityContract::signals)
+                .map(signals -> signals.get(target.endpoint()))
+                .orElse(null);
+        if (signal == null) {
+            missingMember(source, target.entity(), target.endpoint());
+            return Optional.empty();
+        }
+        return Optional.of(signal);
+    }
+
+    /** Resolves a placed action declaration, reporting a missing exported member. */
+    private Optional<EntityContract.Action> resolveAction(
+            EndpointTarget target, Map<EntityId, EntityPlacement> placements, Path source) {
+        if (!isPlacedEndpoint(target, placements)) {
+            return Optional.empty();
+        }
+        EntityContract.Action action = nestedContract(target.entity(), placements)
+                .map(EntityContract::actions)
+                .map(actions -> actions.get(target.endpoint()))
+                .orElse(null);
+        if (action == null) {
+            missingMember(source, target.entity(), target.endpoint());
+            return Optional.empty();
+        }
+        return Optional.of(action);
+    }
+
+    /** Looks up the resolved contract of one placement in the current asset. */
+    private Optional<EntityContract> nestedContract(EntityId placementId, Map<EntityId, EntityPlacement> placements) {
+        EntityPlacement placement = placements.get(placementId);
+        if (placement == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(loadedEntities.get(placement.definition().id()))
+                .map(EntityDefinition::contract);
+    }
+
+    /** Returns all placements within an authored hierarchy by stable identity. */
+    private Map<EntityId, EntityPlacement> indexPlacements(List<? extends EntityEntry> entries) {
+        Map<EntityId, EntityPlacement> placements = new HashMap<>();
+        indexPlacements(entries, placements);
+        return placements;
+    }
+
+    /** Accumulates placements in authored hierarchy order. */
+    private void indexPlacements(List<? extends EntityEntry> entries, Map<EntityId, EntityPlacement> placements) {
+        for (EntityEntry entry : entries) {
+            if (entry instanceof EntityPlacement placement) {
+                placements.put(placement.id(), placement);
+            } else if (entry instanceof LocalEntity local) {
+                indexPlacements(local.children(), placements);
+            }
+        }
+    }
+
+    /** Returns whether a property target addresses one nested placement contract. */
+    private boolean isPlacementTarget(PropertyTarget target, EntityId placement) {
+        return target.component().isEmpty() && target.entity().equals(placement);
+    }
+
+    /** Returns whether an endpoint target addresses a placement rather than a local component. */
+    private boolean isPlacedEndpoint(EndpointTarget target, Map<EntityId, EntityPlacement> placements) {
+        return target.component().isEmpty() && placements.containsKey(target.entity());
+    }
+
+    /** Returns whether every value accepted by an outer binding is accepted by its nested target. */
+    private boolean acceptsAll(Set<?> nested, Set<?> outer) {
+        return nested.isEmpty() || !outer.isEmpty() && nested.containsAll(outer);
+    }
+
+    /** Reports an absent public contract member. */
+    private void missingMember(Path source, EntityId placement, Object member) {
+        addError(
+                source,
+                AssetDiagnosticCode.CONTRACT_MEMBER_MISSING,
+                "placement " + placement + " does not export " + member,
+                "");
+    }
+
+    /** Reports incompatible public contract declarations. */
+    private void incompatiblePayload(Path source, Object exported, Object target) {
+        addError(
+                source,
+                AssetDiagnosticCode.CONTRACT_PAYLOAD_INVALID,
+                "contract member " + exported + " is incompatible with target " + target,
+                "");
     }
 
     /** Resolves one stable identity and validates its expected kind. */

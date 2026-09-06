@@ -6,11 +6,18 @@ package io.github.glynch.jscene3d.project.asset;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
+import io.github.glynch.jscene3d.project.contract.EntityContract;
+import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
+import io.github.glynch.jscene3d.project.entity.PropertyTarget;
+import io.github.glynch.jscene3d.project.entity.SignalConnection;
+import io.github.glynch.jscene3d.project.entity.SpatialTarget;
+import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayOutputStream;
@@ -18,8 +25,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Deterministic UTF-8 JSON writer for authored entity and world definitions. */
 public final class DefinitionWriter {
@@ -65,6 +75,8 @@ public final class DefinitionWriter {
             json.writeStartObject();
             writeEnvelope(json, ENTITY_SCHEMA, definition.id(), AssetKind.ENTITY_DEFINITION);
             json.writeStringField("name", definition.name());
+            writeContract(json, definition.contract());
+            writeConnections(json, definition.connections());
             json.writeFieldName("root");
             writeEntry(json, definition.root());
             json.writeEndObject();
@@ -79,6 +91,7 @@ public final class DefinitionWriter {
             json.writeStartObject();
             writeEnvelope(json, WORLD_SCHEMA, definition.id(), AssetKind.WORLD_DEFINITION);
             json.writeStringField("name", definition.name());
+            writeConnections(json, definition.connections());
             json.writeArrayFieldStart("roots");
             for (EntityEntry root : definition.roots()) {
                 writeEntry(json, root);
@@ -96,6 +109,133 @@ public final class DefinitionWriter {
         json.writeStringField("assetId", id.toString());
         json.writeStringField("assetType", kind.serializedName());
         json.writeNumberField("formatVersion", AssetCatalog.FORMAT_VERSION);
+    }
+
+    /** Writes one complete exported entity-definition contract. */
+    private static void writeContract(JsonGenerator json, EntityContract contract) throws IOException {
+        json.writeObjectFieldStart("contract");
+        json.writeArrayFieldStart("parameters");
+        for (EntityContract.Parameter parameter : contract.parameters().values()) {
+            json.writeStartObject();
+            json.writeStringField("id", parameter.id().toString());
+            json.writeStringField("valueKind", parameter.valueKind().name().toLowerCase(Locale.ROOT));
+            json.writeBooleanField("required", parameter.isRequired());
+            json.writeFieldName("target");
+            writePropertyTarget(json, parameter.target());
+            json.writeEndObject();
+        }
+        json.writeEndArray();
+        json.writeArrayFieldStart("signals");
+        for (EntityContract.Signal signal : contract.signals().values()) {
+            writeContractEndpoint(json, signal.id().toString(), signal.payload(), signal.target());
+        }
+        json.writeEndArray();
+        json.writeArrayFieldStart("actions");
+        for (EntityContract.Action action : contract.actions().values()) {
+            writeContractEndpoint(json, action.id().toString(), action.payload(), action.target());
+        }
+        json.writeEndArray();
+        json.writeArrayFieldStart("capabilities");
+        for (CapabilityId capability : contract.capabilities()) {
+            json.writeString(capability.toString());
+        }
+        json.writeEndArray();
+        json.writeArrayFieldStart("attachments");
+        for (EntityContract.Attachment attachment : contract.attachments().values()) {
+            json.writeStartObject();
+            json.writeStringField("id", attachment.id().toString());
+            json.writeFieldName("target");
+            writeSpatialTarget(json, attachment.target());
+            json.writeEndObject();
+        }
+        json.writeEndArray();
+        json.writeArrayFieldStart("resourceBindings");
+        for (EntityContract.ResourceBinding binding :
+                contract.resourceBindings().values()) {
+            json.writeStartObject();
+            json.writeStringField("id", binding.id().toString());
+            json.writeBooleanField("required", binding.isRequired());
+            json.writeArrayFieldStart("acceptedKinds");
+            for (var kind : binding.acceptedKinds().stream().sorted().toList()) {
+                json.writeString(kind.name().toLowerCase(Locale.ROOT));
+            }
+            json.writeEndArray();
+            json.writeFieldName("target");
+            writePropertyTarget(json, binding.target());
+            json.writeEndObject();
+        }
+        json.writeEndArray();
+        json.writeEndObject();
+    }
+
+    /** Writes one exported signal or action. */
+    private static void writeContractEndpoint(
+            JsonGenerator json, String id, Optional<RegisteredType> payload, EndpointTarget target) throws IOException {
+        json.writeStartObject();
+        json.writeStringField("id", id);
+        if (payload.isPresent()) {
+            RegisteredType type = payload.orElseThrow();
+            json.writeObjectFieldStart("payload");
+            json.writeStringField("id", type.id());
+            json.writeNumberField("version", type.version());
+            json.writeEndObject();
+        }
+        json.writeFieldName("target");
+        writeEndpointTarget(json, target);
+        json.writeEndObject();
+    }
+
+    /** Writes internal signal/action connections in declaration order. */
+    private static void writeConnections(JsonGenerator json, List<SignalConnection> connections) throws IOException {
+        json.writeArrayFieldStart("connections");
+        for (SignalConnection connection : connections) {
+            json.writeStartObject();
+            json.writeFieldName("signal");
+            writeEndpointTarget(json, connection.signal());
+            json.writeFieldName("action");
+            writeEndpointTarget(json, connection.action());
+            json.writeEndObject();
+        }
+        json.writeEndArray();
+    }
+
+    /** Writes one stable property target. */
+    private static void writePropertyTarget(JsonGenerator json, PropertyTarget target) throws IOException {
+        json.writeStartObject();
+        json.writeStringField("entityId", target.entity().toString());
+        if (target.component().isPresent()) {
+            json.writeStringField(
+                    "componentId", target.component().orElseThrow().toString());
+        }
+        json.writeStringField("propertyId", target.property().toString());
+        json.writeEndObject();
+    }
+
+    /** Writes one stable signal or action target. */
+    private static void writeEndpointTarget(JsonGenerator json, EndpointTarget target) throws IOException {
+        json.writeStartObject();
+        json.writeStringField("entityId", target.entity().toString());
+        if (target.component().isPresent()) {
+            json.writeStringField(
+                    "componentId", target.component().orElseThrow().toString());
+        }
+        json.writeStringField("endpointId", target.endpoint().toString());
+        json.writeEndObject();
+    }
+
+    /** Writes one stable spatial target. */
+    private static void writeSpatialTarget(JsonGenerator json, SpatialTarget target) throws IOException {
+        json.writeStartObject();
+        json.writeStringField("entityId", target.entity().toString());
+        if (target.component().isPresent()) {
+            json.writeStringField(
+                    "componentId", target.component().orElseThrow().toString());
+        }
+        if (target.attachment().isPresent()) {
+            json.writeStringField(
+                    "attachmentId", target.attachment().orElseThrow().toString());
+        }
+        json.writeEndObject();
     }
 
     /** Writes one discriminated entity entry. */
@@ -155,9 +295,9 @@ public final class DefinitionWriter {
     }
 
     /** Writes a declaration-ordered map of portable values. */
-    private static void writeValues(JsonGenerator json, Map<String, ProjectValue> values) throws IOException {
-        for (Map.Entry<String, ProjectValue> entry : values.entrySet()) {
-            json.writeFieldName(entry.getKey());
+    private static <K> void writeValues(JsonGenerator json, Map<K, ProjectValue> values) throws IOException {
+        for (Map.Entry<K, ProjectValue> entry : values.entrySet()) {
+            json.writeFieldName(entry.getKey().toString());
             writeValue(json, entry.getValue());
         }
     }

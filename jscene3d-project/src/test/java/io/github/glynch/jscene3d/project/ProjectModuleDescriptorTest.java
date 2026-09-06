@@ -30,6 +30,7 @@ final class ProjectModuleDescriptorTest {
                 .containsExactlyInAnyOrder(
                         "io.github.glynch.jscene3d.project.asset",
                         "io.github.glynch.jscene3d.project.component",
+                        "io.github.glynch.jscene3d.project.contract",
                         "io.github.glynch.jscene3d.project.diagnostic",
                         "io.github.glynch.jscene3d.project.entity",
                         "io.github.glynch.jscene3d.project.extension",

@@ -18,6 +18,7 @@ import java.util.Set;
 public final class PropertyDescriptor {
     private final String id;
     private final ProjectValueKind valueKind;
+    private final Optional<ProjectValueKind> elementKind;
     private final boolean required;
     private final Optional<ProjectValue> defaultValue;
     private final DescriptorPresentation presentation;
@@ -27,14 +28,16 @@ public final class PropertyDescriptor {
     /** Stores one validated property descriptor. */
     private PropertyDescriptor(
             String id,
-            ProjectValueKind valueKind,
+            ValueShape valueShape,
             boolean required,
             Optional<ProjectValue> defaultValue,
             DescriptorPresentation presentation,
             Map<String, ProjectValue> editorMetadata,
             Set<ResourceReference.Kind> acceptedReferenceKinds) {
         this.id = requireLocalId(id, "id");
-        this.valueKind = Objects.requireNonNull(valueKind, "valueKind");
+        ValueShape validShape = Objects.requireNonNull(valueShape, "valueShape");
+        valueKind = validShape.valueKind();
+        elementKind = validShape.elementKind();
         this.required = required;
         this.defaultValue = Objects.requireNonNull(defaultValue, "defaultValue");
         this.presentation = Objects.requireNonNull(presentation, "presentation");
@@ -44,7 +47,14 @@ public final class PropertyDescriptor {
         if (valueKind != ProjectValueKind.REFERENCE && !this.acceptedReferenceKinds.isEmpty()) {
             throw new IllegalArgumentException("acceptedReferenceKinds require a reference property");
         }
-        if (isAuthoredTarget(valueKind) && this.defaultValue.isPresent()) {
+        if (this.elementKind.isPresent() && valueKind != ProjectValueKind.ARRAY) {
+            throw new IllegalArgumentException("elementKind requires an array property");
+        }
+        if ((isAuthoredTarget(valueKind)
+                        || this.elementKind
+                                .filter(PropertyDescriptor::isAuthoredTarget)
+                                .isPresent())
+                && this.defaultValue.isPresent()) {
             throw new IllegalArgumentException("authored target properties cannot declare defaults");
         }
         this.defaultValue.ifPresent(this::requireAcceptedValue);
@@ -67,7 +77,75 @@ public final class PropertyDescriptor {
             Map<String, ProjectValue> editorMetadata,
             Set<ResourceReference.Kind> acceptedReferenceKinds) {
         return new PropertyDescriptor(
-                id, valueKind, true, Optional.empty(), presentation, editorMetadata, acceptedReferenceKinds);
+                id,
+                ValueShape.scalar(valueKind),
+                true,
+                Optional.empty(),
+                presentation,
+                editorMetadata,
+                acceptedReferenceKinds);
+    }
+
+    /**
+     * Creates a required array whose elements all have one structural kind.
+     *
+     * @param id stable local property identifier
+     * @param elementKind required structural kind for every array element
+     * @param presentation human-readable property metadata
+     * @param editorMetadata generic editor hints
+     * @return required homogeneous array property descriptor
+     */
+    public static PropertyDescriptor requiredArray(
+            String id,
+            ProjectValueKind elementKind,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editorMetadata) {
+        return new PropertyDescriptor(
+                id, ValueShape.array(elementKind), true, Optional.empty(), presentation, editorMetadata, Set.of());
+    }
+
+    /**
+     * Creates an optional array whose elements all have one structural kind.
+     *
+     * @param id stable local property identifier
+     * @param elementKind required structural kind for every array element
+     * @param presentation human-readable property metadata
+     * @param editorMetadata generic editor hints
+     * @return optional homogeneous array property descriptor
+     */
+    public static PropertyDescriptor optionalArray(
+            String id,
+            ProjectValueKind elementKind,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editorMetadata) {
+        return new PropertyDescriptor(
+                id, ValueShape.array(elementKind), false, Optional.empty(), presentation, editorMetadata, Set.of());
+    }
+
+    /**
+     * Creates an optional array with a homogeneous default value.
+     *
+     * @param id stable local property identifier
+     * @param elementKind required structural kind for every array element
+     * @param defaultValue default array value
+     * @param presentation human-readable property metadata
+     * @param editorMetadata generic editor hints
+     * @return optional homogeneous array property descriptor with a default
+     */
+    public static PropertyDescriptor optionalArrayWithDefault(
+            String id,
+            ProjectValueKind elementKind,
+            ProjectValue.ArrayValue defaultValue,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editorMetadata) {
+        return new PropertyDescriptor(
+                id,
+                ValueShape.array(elementKind),
+                false,
+                Optional.of(defaultValue),
+                presentation,
+                editorMetadata,
+                Set.of());
     }
 
     /**
@@ -87,7 +165,13 @@ public final class PropertyDescriptor {
             Map<String, ProjectValue> editorMetadata,
             Set<ResourceReference.Kind> acceptedReferenceKinds) {
         return new PropertyDescriptor(
-                id, valueKind, false, Optional.empty(), presentation, editorMetadata, acceptedReferenceKinds);
+                id,
+                ValueShape.scalar(valueKind),
+                false,
+                Optional.empty(),
+                presentation,
+                editorMetadata,
+                acceptedReferenceKinds);
     }
 
     /**
@@ -109,7 +193,13 @@ public final class PropertyDescriptor {
             Map<String, ProjectValue> editorMetadata,
             Set<ResourceReference.Kind> acceptedReferenceKinds) {
         return new PropertyDescriptor(
-                id, valueKind, false, Optional.of(defaultValue), presentation, editorMetadata, acceptedReferenceKinds);
+                id,
+                ValueShape.scalar(valueKind),
+                false,
+                Optional.of(defaultValue),
+                presentation,
+                editorMetadata,
+                acceptedReferenceKinds);
     }
 
     /**
@@ -128,6 +218,15 @@ public final class PropertyDescriptor {
      */
     public ProjectValueKind valueKind() {
         return valueKind;
+    }
+
+    /**
+     * Returns the required homogeneous array-element kind, when declared.
+     *
+     * @return optional element kind
+     */
+    public Optional<ProjectValueKind> elementKind() {
+        return elementKind;
     }
 
     /**
@@ -186,9 +285,15 @@ public final class PropertyDescriptor {
         if (ProjectValueKind.of(validValue) != valueKind) {
             return false;
         }
-        return !(validValue instanceof ProjectValue.ReferenceValue referenceValue)
-                || acceptedReferenceKinds.isEmpty()
-                || acceptedReferenceKinds.contains(referenceValue.reference().kind());
+        if (validValue instanceof ProjectValue.ReferenceValue referenceValue) {
+            return acceptedReferenceKinds.isEmpty()
+                    || acceptedReferenceKinds.contains(
+                            referenceValue.reference().kind());
+        }
+        return !(validValue instanceof ProjectValue.ArrayValue array)
+                || elementKind.isEmpty()
+                || array.values().stream()
+                        .allMatch(element -> ProjectValueKind.of(element) == elementKind.orElseThrow());
     }
 
     @Override
@@ -200,6 +305,7 @@ public final class PropertyDescriptor {
                 && required == descriptor.required
                 && id.equals(descriptor.id)
                 && valueKind == descriptor.valueKind
+                && elementKind.equals(descriptor.elementKind)
                 && defaultValue.equals(descriptor.defaultValue)
                 && presentation.equals(descriptor.presentation)
                 && editorMetadata.equals(descriptor.editorMetadata)
@@ -209,14 +315,21 @@ public final class PropertyDescriptor {
     @Override
     public int hashCode() {
         return Objects.hash(
-                id, valueKind, required, defaultValue, presentation, editorMetadata, acceptedReferenceKinds);
+                id,
+                valueKind,
+                elementKind,
+                required,
+                defaultValue,
+                presentation,
+                editorMetadata,
+                acceptedReferenceKinds);
     }
 
     @Override
     public String toString() {
-        return "PropertyDescriptor[id=" + id + ", valueKind=" + valueKind + ", required=" + required
-                + ", defaultValue=" + defaultValue + ", presentation=" + presentation + ", editorMetadata="
-                + editorMetadata + ", acceptedReferenceKinds=" + acceptedReferenceKinds + ']';
+        return "PropertyDescriptor[id=" + id + ", valueKind=" + valueKind + ", elementKind=" + elementKind
+                + ", required=" + required + ", defaultValue=" + defaultValue + ", presentation=" + presentation
+                + ", editorMetadata=" + editorMetadata + ", acceptedReferenceKinds=" + acceptedReferenceKinds + ']';
     }
 
     /** Rejects a default inconsistent with this property. */
@@ -229,5 +342,19 @@ public final class PropertyDescriptor {
     /** Returns whether one kind requires an authored instance scope unavailable to descriptor defaults. */
     private static boolean isAuthoredTarget(ProjectValueKind kind) {
         return kind == ProjectValueKind.ENTITY_TARGET || kind == ProjectValueKind.COMPONENT_TARGET;
+    }
+
+    /** Structural value declaration kept cohesive so constructor arity remains bounded. */
+    private record ValueShape(ProjectValueKind valueKind, Optional<ProjectValueKind> elementKind) {
+        /** Creates one scalar or unconstrained-container declaration. */
+        private static ValueShape scalar(ProjectValueKind valueKind) {
+            return new ValueShape(Objects.requireNonNull(valueKind, "valueKind"), Optional.empty());
+        }
+
+        /** Creates one homogeneous array declaration. */
+        private static ValueShape array(ProjectValueKind elementKind) {
+            return new ValueShape(
+                    ProjectValueKind.ARRAY, Optional.of(Objects.requireNonNull(elementKind, "elementKind")));
+        }
     }
 }

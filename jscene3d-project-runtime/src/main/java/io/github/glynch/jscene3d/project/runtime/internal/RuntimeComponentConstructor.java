@@ -16,6 +16,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -52,7 +53,7 @@ final class RuntimeComponentConstructor {
                 created.add(value);
                 requireLifecycleSupport(plan, descriptor, value);
                 requireUpdateSupport(plan, descriptor, value);
-                boolean bindsReferences = declaresTargetProperties(descriptor);
+                boolean bindsReferences = declaresTargetProperties(descriptor, properties);
                 requireReferenceSupport(plan, bindsReferences, value);
                 boolean bindsEndpoints = declaresEndpoints(descriptor);
                 requireEndpointSupport(plan, bindsEndpoints, value);
@@ -145,10 +146,14 @@ final class RuntimeComponentConstructor {
     }
 
     /** Returns whether safe metadata declares at least one target-valued property. */
-    private static boolean declaresTargetProperties(ComponentTypeDescriptor descriptor) {
+    private static boolean declaresTargetProperties(
+            ComponentTypeDescriptor descriptor, EffectiveComponentProperties properties) {
         return descriptor.properties().values().stream()
-                .map(property -> property.valueKind())
-                .anyMatch(RuntimeComponentConstructor::isTargetKind);
+                        .anyMatch(property -> isTargetKind(property.valueKind())
+                                || property.elementKind()
+                                        .filter(RuntimeComponentConstructor::isTargetKind)
+                                        .isPresent())
+                || properties.values().values().stream().anyMatch(RuntimeComponentConstructor::containsTarget);
     }
 
     /** Requires target-valued component types to expose the one binding callback. */
@@ -164,6 +169,19 @@ final class RuntimeComponentConstructor {
     /** Returns whether one safe property declaration contains a definition-instance target. */
     private static boolean isTargetKind(ProjectValueKind kind) {
         return kind == ProjectValueKind.ENTITY_TARGET || kind == ProjectValueKind.COMPONENT_TARGET;
+    }
+
+    /** Finds target values nested inside portable arrays or objects. */
+    private static boolean containsTarget(ProjectValue value) {
+        return switch (value) {
+            case ProjectValue.EntityTargetValue ignored -> true;
+            case ProjectValue.ComponentTargetValue ignored -> true;
+            case ProjectValue.ArrayValue array ->
+                array.values().stream().anyMatch(RuntimeComponentConstructor::containsTarget);
+            case ProjectValue.ObjectValue object ->
+                object.values().values().stream().anyMatch(RuntimeComponentConstructor::containsTarget);
+            default -> false;
+        };
     }
 
     /** Returns whether safe metadata declares at least one signal or action. */

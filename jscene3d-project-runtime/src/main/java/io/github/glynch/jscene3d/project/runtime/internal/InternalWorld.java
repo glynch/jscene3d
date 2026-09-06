@@ -183,7 +183,7 @@ final class InternalWorld implements World {
         requireBuilding();
         entities.values().stream().map(InternalEntity.class::cast).forEach(InternalEntity::complete);
         lifecycle.complete(values);
-        schedule = new WorldSchedule(values, this::commitMutations);
+        schedule = new WorldSchedule(values, modules::advancePhysics, this::commitMutations);
         complete = true;
     }
 

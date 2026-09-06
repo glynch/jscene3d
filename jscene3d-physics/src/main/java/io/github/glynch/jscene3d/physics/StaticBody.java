@@ -12,4 +12,18 @@ public final class StaticBody extends CollisionBody {
     StaticBody(PhysicsWorld world, long id, Vector3fc position, Quaternionfc orientation) {
         super(world, id, position, orientation);
     }
+
+    /**
+     * Replaces the world-space transform and updates every attached collider.
+     *
+     * <p>This operation synchronizes an authored or externally edited static transform; it does not make the body
+     * dynamically simulated.
+     *
+     * @param newPosition new world-space position
+     * @param newOrientation new world-space orientation; normalized internally
+     */
+    public void setTransform(Vector3fc newPosition, Quaternionfc newOrientation) {
+        requireRegistered();
+        world().updateTransform(this, newPosition, newOrientation);
+    }
 }

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /** Immutable descriptor-compiled schedules plus world-owned simulation timing. */
 final class WorldSchedule {
@@ -28,24 +29,27 @@ final class WorldSchedule {
     private final List<WorldComponentEntry> beforePhysics;
     private final List<WorldComponentEntry> afterPhysics;
     private final List<WorldComponentEntry> frameUpdates;
+    private final Consumer<FixedUpdateContext> physicsStep;
     private final Runnable phaseBoundary;
     private long tick;
     private Duration simulationTime = Duration.ZERO;
     private boolean executing;
 
     /** Compiles each update phase once from authoritative descriptor declarations. */
-    WorldSchedule(List<WorldComponentEntry> components, Runnable phaseBoundary) {
+    WorldSchedule(
+            List<WorldComponentEntry> components, Consumer<FixedUpdateContext> physicsStep, Runnable phaseBoundary) {
         List<WorldComponentEntry> ordered = new ArrayList<>(List.copyOf(components));
         ordered.sort(ENTRY_ORDER);
         beforePhysics = new ArrayList<>(select(ordered, ComponentUpdatePhase.BEFORE_PHYSICS));
         afterPhysics = new ArrayList<>(select(ordered, ComponentUpdatePhase.AFTER_PHYSICS));
         frameUpdates = new ArrayList<>(select(ordered, ComponentUpdatePhase.FRAME_UPDATE));
+        this.physicsStep = Objects.requireNonNull(physicsStep, "physicsStep");
         this.phaseBoundary = Objects.requireNonNull(phaseBoundary, "phaseBoundary");
     }
 
     /** Returns a schedule with no participants for an incomplete world shell. */
     static WorldSchedule empty() {
-        return new WorldSchedule(List.of(), () -> {});
+        return new WorldSchedule(List.of(), ignored -> {}, () -> {});
     }
 
     /** Advances both component-visible fixed phases around the reserved physics seam. */
@@ -61,6 +65,7 @@ final class WorldSchedule {
                     ComponentUpdatePhase.BEFORE_PHYSICS,
                     update,
                     ComponentUpdateCallbacks::onBeforePhysics));
+            runPhase(() -> physicsStep.accept(update));
             runPhase(() -> invokeFixed(
                     afterPhysics,
                     ComponentUpdatePhase.AFTER_PHYSICS,

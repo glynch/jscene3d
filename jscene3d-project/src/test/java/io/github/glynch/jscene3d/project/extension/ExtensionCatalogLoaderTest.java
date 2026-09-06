@@ -94,6 +94,13 @@ final class ExtensionCatalogLoaderTest {
                       "valueKind": "number",
                       "required": true,
                       "displayName": "Speed"
+                    },
+                    {
+                      "id": "targets",
+                      "valueKind": "array",
+                      "elementKind": "component_target",
+                      "required": true,
+                      "displayName": "Targets"
                     }
                   ],
                   "signals": [
@@ -374,7 +381,8 @@ final class ExtensionCatalogLoaderTest {
                     .contains("\"$id\": \"https://jscene3d.org/schemas/extension-1.json\"")
                     .contains("\"node-controller\"")
                     .contains("\"componentTypeDescriptor\"")
-                    .contains("\"acceptedReferences\"");
+                    .contains("\"acceptedReferences\"")
+                    .contains("\"elementKind\"");
         }
     }
 
@@ -397,8 +405,11 @@ final class ExtensionCatalogLoaderTest {
     private static void assertMoverComponent(RegisteredTypeCatalog catalog) {
         var component =
                 catalog.findComponent(ComponentType.of("example.game/mover", 1)).orElseThrow();
+        PropertyDescriptor targets =
+                Objects.requireNonNull(component.properties().get(new PropertyId("targets")));
 
         assertThat(component.properties()).containsKey(new PropertyId("speed"));
+        assertThat(targets.elementKind()).contains(ProjectValueKind.COMPONENT_TARGET);
         assertThat(component.signals()).containsKey(new EndpointId("moved"));
         assertThat(component.actions()).containsKey(new EndpointId("stop"));
         assertThat(component.providedCapabilities()).containsExactly(new CapabilityId("example.game/movement"));

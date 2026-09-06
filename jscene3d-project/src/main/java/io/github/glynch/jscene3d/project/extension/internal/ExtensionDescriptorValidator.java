@@ -328,6 +328,7 @@ public final class ExtensionDescriptorValidator {
         }
         String id = fields.requiredLocalId(raw.id(), location + "/id");
         ProjectValueKind valueKind = valueKind(raw.valueKind(), location + "/valueKind");
+        Optional<ProjectValueKind> elementKind = elementKind(raw.elementKind(), valueKind, location + "/elementKind");
         boolean required = raw.required() != null && raw.required();
         String displayName = fields.requiredText(raw.displayName(), location + "/displayName");
         Optional<String> description = fields.optionalText(raw.description(), location + "/description");
@@ -335,7 +336,8 @@ public final class ExtensionDescriptorValidator {
         Set<ResourceReference.Kind> acceptedReferences =
                 referenceKinds(raw.acceptedReferences(), valueKind, location + "/acceptedReferences");
         Optional<ProjectValue> defaultValue = optionalValue(raw.defaultValue(), location + "/defaultValue");
-        if (defaultValue.isPresent() && !accepts(valueKind, acceptedReferences, defaultValue.orElseThrow())) {
+        if (defaultValue.isPresent()
+                && !accepts(valueKind, elementKind, acceptedReferences, defaultValue.orElseThrow())) {
             diagnostics.error(
                     ExtensionDiagnosticCode.PROPERTY_DEFAULT_INVALID,
                     "defaultValue does not satisfy valueKind and acceptedReferences",
@@ -352,6 +354,9 @@ public final class ExtensionDescriptorValidator {
             return Optional.empty();
         }
         DescriptorPresentation metadata = presentation(displayName, description);
+        if (elementKind.isPresent()) {
+            return Optional.of(arrayProperty(id, elementKind.orElseThrow(), required, defaultValue, metadata, editor));
+        }
         if (required) {
             return Optional.of(PropertyDescriptor.required(id, valueKind, metadata, editor, acceptedReferences));
         }
@@ -360,6 +365,24 @@ public final class ExtensionDescriptorValidator {
                     id, valueKind, defaultValue.orElseThrow(), metadata, editor, acceptedReferences));
         }
         return Optional.of(PropertyDescriptor.optional(id, valueKind, metadata, editor, acceptedReferences));
+    }
+
+    /** Creates the declared homogeneous array variant after common validation. */
+    private static PropertyDescriptor arrayProperty(
+            String id,
+            ProjectValueKind elementKind,
+            boolean required,
+            Optional<ProjectValue> defaultValue,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editor) {
+        if (required) {
+            return PropertyDescriptor.requiredArray(id, elementKind, presentation, editor);
+        }
+        if (defaultValue.isPresent()) {
+            ProjectValue.ArrayValue array = (ProjectValue.ArrayValue) defaultValue.orElseThrow();
+            return PropertyDescriptor.optionalArrayWithDefault(id, elementKind, array, presentation, editor);
+        }
+        return PropertyDescriptor.optionalArray(id, elementKind, presentation, editor);
     }
 
     /** Validates signal or action descriptors. */
@@ -457,6 +480,30 @@ public final class ExtensionDescriptorValidator {
                     location);
             return ProjectValueKind.NULL;
         }
+    }
+
+    /** Parses an optional homogeneous array-element kind. */
+    private Optional<ProjectValueKind> elementKind(
+            @Nullable String value, ProjectValueKind valueKind, String location) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        ProjectValueKind parsed;
+        try {
+            parsed = ProjectValueKind.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.PROPERTY_KIND_INVALID,
+                    "elementKind must be null, boolean, number, text, array, object, reference, entity_target, or component_target",
+                    location);
+            return Optional.empty();
+        }
+        if (valueKind != ProjectValueKind.ARRAY) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.PROPERTY_KIND_INVALID, "elementKind requires valueKind array", location);
+            return Optional.empty();
+        }
+        return Optional.of(parsed);
     }
 
     /** Parses optional reference namespace constraints. */
@@ -677,13 +724,21 @@ public final class ExtensionDescriptorValidator {
 
     /** Returns whether a default value satisfies property constraints. */
     private static boolean accepts(
-            ProjectValueKind kind, Set<ResourceReference.Kind> referenceKinds, ProjectValue value) {
+            ProjectValueKind kind,
+            Optional<ProjectValueKind> elementKind,
+            Set<ResourceReference.Kind> referenceKinds,
+            ProjectValue value) {
         if (ProjectValueKind.of(value) != kind) {
             return false;
         }
-        return !(value instanceof ProjectValue.ReferenceValue reference)
-                || referenceKinds.isEmpty()
-                || referenceKinds.contains(reference.reference().kind());
+        if (value instanceof ProjectValue.ReferenceValue reference) {
+            return referenceKinds.isEmpty()
+                    || referenceKinds.contains(reference.reference().kind());
+        }
+        return !(value instanceof ProjectValue.ArrayValue array)
+                || elementKind.isEmpty()
+                || array.values().stream()
+                        .allMatch(element -> ProjectValueKind.of(element) == elementKind.orElseThrow());
     }
 
     /** Converts an optional raw JSON value without interpreting resource references. */

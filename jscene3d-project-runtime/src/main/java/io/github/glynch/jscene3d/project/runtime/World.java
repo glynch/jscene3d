@@ -95,7 +95,8 @@ public interface World extends AutoCloseable {
     boolean isClosed();
 
     /**
-     * Advances one fixed simulation step through the before-physics and after-physics component phases.
+     * Advances one fixed simulation step through before-physics components, bound physics modules, physics-signal
+     * delivery, and after-physics components.
      *
      * <p>The world owns the zero-based tick and accumulated simulation time supplied to callbacks. Components
      * participate only when their exact descriptor declares the corresponding phase and their owning entity is
@@ -105,6 +106,7 @@ public interface World extends AutoCloseable {
      * @throws IllegalArgumentException if {@code step} is not positive
      * @throws IllegalStateException if the world is not active or another update is executing
      * @throws WorldUpdateException if a scheduled component callback fails
+     * @throws WorldModuleUpdateException if a bound physics module fails
      */
     void advanceFixed(Duration step);
 

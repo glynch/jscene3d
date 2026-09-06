@@ -65,6 +65,7 @@ public record RawExtensionDescriptor(
     record Property(
             @Nullable String id,
             @Nullable String valueKind,
+            @Nullable String elementKind,
             @Nullable Boolean required,
             @Nullable JsonNode defaultValue,
             @Nullable String displayName,

@@ -10,6 +10,8 @@ import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /** Short-lived resolver for one component's effective target-valued properties. */
@@ -37,19 +39,48 @@ final class ComponentReferenceBindingContext implements ComponentReferenceResolv
     public <T> T component(PropertyId property, Class<T> valueType) {
         Class<T> expectedType = Objects.requireNonNull(valueType, "valueType");
         ScopedProjectValue scoped = required(property);
-        if (!(scoped.value() instanceof ProjectValue.ComponentTargetValue targetValue)) {
+        return resolveComponent(scoped, scoped.value(), expectedType, property, propertyLocation(property));
+    }
+
+    @Override
+    public <T> List<T> components(PropertyId property, Class<T> valueType) {
+        Class<T> expectedType = Objects.requireNonNull(valueType, "valueType");
+        ScopedProjectValue scoped = required(property);
+        if (!(scoped.value() instanceof ProjectValue.ArrayValue array)) {
+            throw invalidKind(property, "array of component_target values");
+        }
+        List<T> resolved = new ArrayList<>(array.values().size());
+        for (int index = 0; index < array.values().size(); index++) {
+            resolved.add(resolveComponent(
+                    scoped,
+                    array.values().get(index),
+                    expectedType,
+                    property,
+                    propertyLocation(property) + '/' + index));
+        }
+        return List.copyOf(resolved);
+    }
+
+    /** Resolves one component target using the containing property's preserved instance scope. */
+    private <T> T resolveComponent(
+            ScopedProjectValue scoped,
+            ProjectValue value,
+            Class<T> expectedType,
+            PropertyId property,
+            String valueLocation) {
+        if (!(value instanceof ProjectValue.ComponentTargetValue targetValue)) {
             throw invalidKind(property, "component_target");
         }
         ComponentTarget target = targetValue.target();
-        Object value = scoped.targetScope().findComponent(target).orElseThrow(() -> missing(property, target));
-        if (!expectedType.isInstance(value)) {
+        Object resolved = scoped.targetScope().findComponent(target).orElseThrow(() -> missing(property, target));
+        if (!expectedType.isInstance(resolved)) {
             throw new RuntimeCompositionException(
                     RuntimeDiagnosticCode.COMPONENT_REFERENCE_TYPE_INVALID,
-                    "target " + target + " has runtime type " + value.getClass().getName() + " instead of "
-                            + expectedType.getName(),
-                    propertyLocation(property));
+                    "target " + target + " has runtime type "
+                            + resolved.getClass().getName() + " instead of " + expectedType.getName(),
+                    valueLocation);
         }
-        return expectedType.cast(value);
+        return expectedType.cast(resolved);
     }
 
     /** Prevents a component from retaining and later reusing this composition-only resolver. */

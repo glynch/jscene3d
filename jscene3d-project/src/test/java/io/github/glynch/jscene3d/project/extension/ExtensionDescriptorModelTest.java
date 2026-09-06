@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.project.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.project.component.ComponentId;
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
@@ -106,6 +108,23 @@ final class ExtensionDescriptorModelTest {
         assertThat(ProjectValueKind.of(ProjectValue.NullValue.INSTANCE)).isEqualTo(ProjectValueKind.NULL);
         assertThat(ProjectValueKind.of(new ProjectValue.ArrayValue(List.of()))).isEqualTo(ProjectValueKind.ARRAY);
         assertThat(target.accepts(new ProjectValue.TextValue("body"))).isFalse();
+    }
+
+    /** Validates homogeneous array element kinds without treating editor metadata as schema. */
+    @Test
+    void checksHomogeneousArrayElements() {
+        PropertyDescriptor targets =
+                PropertyDescriptor.requiredArray("shapes", ProjectValueKind.COMPONENT_TARGET, PRESENTATION, Map.of());
+        EntityId entity = EntityId.from("f3c9430c-482b-4862-854a-17f6c51de14b");
+        ComponentId component = ComponentId.from("65a5af52-2488-4ca3-be63-7161a8a65a76");
+        ProjectValue target = new ProjectValue.ComponentTargetValue(new ComponentTarget(entity, component));
+
+        assertThat(targets.valueKind()).isEqualTo(ProjectValueKind.ARRAY);
+        assertThat(targets.elementKind()).contains(ProjectValueKind.COMPONENT_TARGET);
+        assertThat(targets.accepts(new ProjectValue.ArrayValue(List.of(target))))
+                .isTrue();
+        assertThat(targets.accepts(new ProjectValue.ArrayValue(List.of(new ProjectValue.TextValue("shape")))))
+                .isFalse();
     }
 
     /** Rejects inconsistent descriptor construction. */

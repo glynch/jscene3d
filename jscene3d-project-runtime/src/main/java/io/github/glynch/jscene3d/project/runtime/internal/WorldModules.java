@@ -4,10 +4,13 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
+import io.github.glynch.jscene3d.project.runtime.FixedUpdateContext;
+import io.github.glynch.jscene3d.project.runtime.PhysicsStepWorldModule;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.WorldModule;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleCloseException;
+import io.github.glynch.jscene3d.project.runtime.WorldModuleUpdateException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -63,6 +66,21 @@ final class WorldModules {
     <T extends WorldModule> T require(Class<T> type) {
         Class<T> validType = Objects.requireNonNull(type, "type");
         return find(validType).orElseThrow(() -> new MissingWorldModuleException(validType));
+    }
+
+    /** Advances every physics-capable module in deterministic host binding order. */
+    void advancePhysics(FixedUpdateContext update) {
+        requireOpen();
+        FixedUpdateContext validUpdate = Objects.requireNonNull(update, "update");
+        for (WorldModuleBinding<?> binding : bindings) {
+            if (binding.module() instanceof PhysicsStepWorldModule physics) {
+                try {
+                    physics.stepPhysics(validUpdate);
+                } catch (RuntimeException failure) {
+                    throw new WorldModuleUpdateException(binding.type(), validUpdate.tick(), failure);
+                }
+            }
+        }
     }
 
     /** Closes every owned module in reverse binding order while retaining the first failure. */

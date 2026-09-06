@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.WorldModule;
 import io.github.glynch.jscene3d.render.Renderer;
+import java.util.Optional;
 import org.joml.Quaternionfc;
 import org.joml.Vector3fc;
 
@@ -31,6 +32,29 @@ public interface Spatial3dWorldModule extends WorldModule {
      * @throws IllegalStateException if this module is closed
      */
     Transform3d createTransform(Entity owner, Vector3fc position, Quaternionfc orientation, Vector3fc scale);
+
+    /**
+     * Finds the unique primary three-dimensional transform registered for one entity.
+     *
+     * @param owner live entity owned by the same world
+     * @return registered transform, when present
+     * @throws IllegalArgumentException if the entity belongs to another world
+     * @throws IllegalStateException if this module is closed
+     */
+    Optional<Transform3d> findTransform(Entity owner);
+
+    /**
+     * Returns the unique primary three-dimensional transform registered for one entity.
+     *
+     * @param owner live entity owned by the same world
+     * @return registered transform
+     * @throws IllegalArgumentException if the entity belongs to another world or has no registered transform
+     * @throws IllegalStateException if this module is closed
+     */
+    default Transform3d requireTransform(Entity owner) {
+        return findTransform(owner)
+                .orElseThrow(() -> new IllegalArgumentException("entity has no registered Transform3d: " + owner.id()));
+    }
 
     /**
      * Creates a perspective camera attached to an entity's primary transform.

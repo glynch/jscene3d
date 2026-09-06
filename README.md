@@ -223,6 +223,12 @@ Run the headless world-composition example with:
 ./mvnw -pl jscene3d-project-examples -am -Prun-world-composition-example compile
 ```
 
+Run the headless authored-collision example with:
+
+```shell
+./mvnw -pl jscene3d-project-examples -am -Prun-collision-3d-example compile
+```
+
 ## WAD archives
 
 The optional `jscene3d-wad` artifact validates IWAD and PWAD containers without

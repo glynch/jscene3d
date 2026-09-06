@@ -1,0 +1,119 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/world-definition-1.json",
+  "assetId" : "89c78715-7849-41fe-a999-d316c2de4c0d",
+  "assetType" : "world-definition",
+  "formatVersion" : 1,
+  "name" : "Authored collision",
+  "connections" : [ {
+    "signal" : {
+      "entityId" : "b8b5cb73-607d-4e58-b249-18f09f134c61",
+      "componentId" : "cf61b40e-09d8-42f4-bbd3-72132f225dfd",
+      "endpointId" : "overlap-entered"
+    },
+    "action" : {
+      "entityId" : "c0c5361f-7bc2-45a2-a1fe-5fd7a01bbb2a",
+      "componentId" : "22ddd9bb-18ac-4725-94ce-cddf4f4ff8c9",
+      "endpointId" : "record-entered"
+    }
+  }, {
+    "signal" : {
+      "entityId" : "b8b5cb73-607d-4e58-b249-18f09f134c61",
+      "componentId" : "cf61b40e-09d8-42f4-bbd3-72132f225dfd",
+      "endpointId" : "overlap-exited"
+    },
+    "action" : {
+      "entityId" : "c0c5361f-7bc2-45a2-a1fe-5fd7a01bbb2a",
+      "componentId" : "22ddd9bb-18ac-4725-94ce-cddf4f4ff8c9",
+      "endpointId" : "record-exited"
+    }
+  } ],
+  "roots" : [ {
+    "entryType" : "local",
+    "entityId" : "65a022a2-d842-489f-a545-f155f1de3791",
+    "name" : "Static target",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "fa52798f-6a4c-4e2d-8d6a-fbab834c6eb7",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : { }
+    }, {
+      "componentId" : "9ca6a9fc-d179-4b9a-a7b1-65ea5c38087d",
+      "type" : "io.github.glynch.jscene3d.physics3d/collision-shape-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "shape" : { "$ref" : "asset:target-box" }
+      }
+    }, {
+      "componentId" : "c2574642-4b15-403f-b05e-355347e24cc4",
+      "type" : "io.github.glynch.jscene3d.physics3d/static-body-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "shapes" : [ {
+          "$target" : {
+            "entityId" : "65a022a2-d842-489f-a545-f155f1de3791",
+            "componentId" : "9ca6a9fc-d179-4b9a-a7b1-65ea5c38087d"
+          }
+        } ]
+      }
+    } ],
+    "children" : [ ]
+  }, {
+    "entryType" : "local",
+    "entityId" : "b8b5cb73-607d-4e58-b249-18f09f134c61",
+    "name" : "Two-shape sensor",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "aa955eb7-5741-428c-ae4a-df5365f7f1f8",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : { }
+    }, {
+      "componentId" : "b45205e3-9f23-4ee0-9354-f72b4e19bbf4",
+      "type" : "io.github.glynch.jscene3d.physics3d/collision-shape-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "shape" : { "$ref" : "asset:sensor-box" },
+        "local-position" : [ -0.5, 0, 0 ]
+      }
+    }, {
+      "componentId" : "3f62f5e7-47fe-40ad-a46e-363751053c8b",
+      "type" : "io.github.glynch.jscene3d.physics3d/collision-shape-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "shape" : { "$ref" : "asset:sensor-sphere" },
+        "local-position" : [ 0.5, 0, 0 ]
+      }
+    }, {
+      "componentId" : "cf61b40e-09d8-42f4-bbd3-72132f225dfd",
+      "type" : "io.github.glynch.jscene3d.physics3d/collision-sensor-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "shapes" : [ {
+          "$target" : {
+            "entityId" : "b8b5cb73-607d-4e58-b249-18f09f134c61",
+            "componentId" : "b45205e3-9f23-4ee0-9354-f72b4e19bbf4"
+          }
+        }, {
+          "$target" : {
+            "entityId" : "b8b5cb73-607d-4e58-b249-18f09f134c61",
+            "componentId" : "3f62f5e7-47fe-40ad-a46e-363751053c8b"
+          }
+        } ]
+      }
+    } ],
+    "children" : [ ]
+  }, {
+    "entryType" : "local",
+    "entityId" : "c0c5361f-7bc2-45a2-a1fe-5fd7a01bbb2a",
+    "name" : "Collision behavior",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "22ddd9bb-18ac-4725-94ce-cddf4f4ff8c9",
+      "type" : "io.github.glynch.jscene3d.collision-example/overlap-recorder",
+      "typeVersion" : 1,
+      "properties" : { }
+    } ],
+    "children" : [ ]
+  } ]
+}

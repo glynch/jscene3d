@@ -278,6 +278,19 @@
             "component_target"
           ]
         },
+        "elementKind": {
+          "enum": [
+            "null",
+            "boolean",
+            "number",
+            "text",
+            "array",
+            "object",
+            "reference",
+            "entity_target",
+            "component_target"
+          ]
+        },
         "required": {
           "type": "boolean",
           "default": false
@@ -307,6 +320,20 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "required": [
+              "elementKind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "valueKind": {
+                "const": "array"
+              }
+            }
+          }
+        },
         {
           "if": {
             "properties": {

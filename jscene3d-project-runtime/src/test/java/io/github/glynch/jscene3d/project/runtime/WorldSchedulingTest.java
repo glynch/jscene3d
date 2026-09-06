@@ -108,6 +108,59 @@ final class WorldSchedulingTest {
         assertThat(events).containsExactly("after:alpha:0:PT0S");
     }
 
+    /** Runs host physics after before-physics mutation commits and before after-physics behavior. */
+    @Test
+    void runsPhysicsWorldModulesAtTheReservedPhase() throws IOException {
+        List<String> events = new ArrayList<>();
+        RecordingPhysicsModule physics = new RecordingPhysicsModule(events);
+        WorldDefinition definition = world(true, List.of(component(ALPHA_ID, ALPHA_TYPE)));
+        List<ComponentTypeDescriptor> descriptors = List.of(descriptor(ALPHA_TYPE, ALL_PHASES));
+        Map<ComponentType, ComponentFactory<?>> factories =
+                Map.of(ALPHA_TYPE, context -> new RecordingUpdates("alpha", events));
+        WorldModuleBinding<PhysicsStepWorldModule> binding =
+                WorldModuleBinding.of(PhysicsStepWorldModule.class, physics);
+        World world = composeResult(definition, descriptors, factories, List.of(binding))
+                .world()
+                .orElseThrow();
+        world.activate();
+
+        world.advanceFixed(STEP);
+
+        assertThat(events).containsExactly("before:alpha:0:PT0S", "physics:0:PT0S", "after:alpha:0:PT0S");
+        world.close();
+        assertThat(physics.closed()).isTrue();
+    }
+
+    /** Attributes a physics failure to the exact host module binding and current tick. */
+    @Test
+    void identifiesPhysicsWorldModuleFailure() throws IOException {
+        PhysicsStepWorldModule physics = new PhysicsStepWorldModule() {
+            @Override
+            public void stepPhysics(FixedUpdateContext update) {
+                throw new IllegalStateException("deliberate physics failure");
+            }
+
+            @Override
+            public void close() {
+                // The fixture owns no resources.
+            }
+        };
+        WorldModuleBinding<PhysicsStepWorldModule> binding =
+                WorldModuleBinding.of(PhysicsStepWorldModule.class, physics);
+        World world = composeResult(world(true, List.of()), List.of(), Map.of(), List.of(binding))
+                .world()
+                .orElseThrow();
+        world.activate();
+
+        WorldModuleUpdateException failure =
+                catchThrowableOfType(WorldModuleUpdateException.class, () -> world.advanceFixed(STEP));
+
+        assertThat(failure.moduleType()).isEqualTo(PhysicsStepWorldModule.class);
+        assertThat(failure.tick()).isZero();
+        assertThat(failure).hasCauseInstanceOf(IllegalStateException.class);
+        world.close();
+    }
+
     /** Omits every scheduled callback owned by an effectively disabled entity. */
     @Test
     void skipsDisabledEntities() throws IOException {
@@ -279,6 +332,16 @@ final class WorldSchedulingTest {
             List<ComponentTypeDescriptor> descriptors,
             Map<ComponentType, ComponentFactory<?>> factories)
             throws IOException {
+        return composeResult(definition, descriptors, factories, List.of());
+    }
+
+    /** Writes and composes one fixture world with explicit host modules. */
+    private WorldCompositionResult composeResult(
+            WorldDefinition definition,
+            List<ComponentTypeDescriptor> descriptors,
+            Map<ComponentType, ComponentFactory<?>> factories,
+            List<WorldModuleBinding<?>> modules)
+            throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("schedule.world.json"), definition);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
@@ -289,7 +352,7 @@ final class WorldSchedulingTest {
                 List.of(),
                 descriptors)));
         return WorldComposer.compose(
-                assets, AssetRef.to(definition.id()), types, List.of(extension(factories)), List.of(), NO_RESOURCES);
+                assets, AssetRef.to(definition.id()), types, List.of(extension(factories)), modules, NO_RESOURCES);
     }
 
     /** Creates the fixture runtime extension using the supplied deterministic registration order. */
@@ -411,6 +474,32 @@ final class WorldSchedulingTest {
         public void onBeforePhysics(FixedUpdateContext update) {
             world.disable(owner);
             throw new IllegalStateException("deliberate update failure after mutation request");
+        }
+    }
+
+    /** World module recording its reserved fixed-step invocation and terminal cleanup. */
+    private static final class RecordingPhysicsModule implements PhysicsStepWorldModule {
+        private final List<String> events;
+        private boolean closed;
+
+        /** Stores the shared observation list. */
+        private RecordingPhysicsModule(List<String> events) {
+            this.events = events;
+        }
+
+        @Override
+        public void stepPhysics(FixedUpdateContext update) {
+            events.add("physics:" + update.tick() + ':' + update.simulationTime());
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+
+        /** Returns whether world-owned cleanup ran. */
+        private boolean closed() {
+            return closed;
         }
     }
 }

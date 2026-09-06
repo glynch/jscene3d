@@ -15,6 +15,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.joml.Quaternionfc;
 import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
@@ -57,6 +58,11 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
         transforms.put(validOwner, transform);
         registrations.add(transform);
         return transform;
+    }
+
+    @Override
+    public Optional<Transform3d> findTransform(Entity owner) {
+        return Optional.ofNullable(transforms.get(requireOwner(owner)));
     }
 
     @Override

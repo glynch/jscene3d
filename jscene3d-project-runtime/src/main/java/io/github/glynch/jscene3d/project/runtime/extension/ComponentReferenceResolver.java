@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.runtime.extension;
 
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
+import java.util.List;
 
 /**
  * Resolves target-valued component properties within their original definition-instance scopes.
@@ -34,4 +35,18 @@ public interface ComponentReferenceResolver {
      * @throws IllegalStateException if the resolver is used outside its binding invocation
      */
     <T> T component(PropertyId property, Class<T> valueType);
+
+    /**
+     * Resolves one required array of {@code component_target} values and verifies every runtime representation.
+     *
+     * <p>Result order is the authored array order. Every target is resolved in the original definition-instance scope
+     * of the containing property.
+     *
+     * @param <T> expected runtime component type
+     * @param property array-valued property identity
+     * @param valueType expected Java representation for every target
+     * @return immutable resolved component list
+     * @throws IllegalStateException if the resolver is used outside its binding invocation
+     */
+    <T> List<T> components(PropertyId property, Class<T> valueType);
 }

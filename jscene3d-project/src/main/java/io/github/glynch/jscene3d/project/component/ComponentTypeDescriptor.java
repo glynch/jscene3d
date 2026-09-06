@@ -166,7 +166,7 @@ public final class ComponentTypeDescriptor {
     }
 
     /**
-     * Returns the component's spatial participation.
+     * Returns the primary spatial authority supplied by this component.
      *
      * @return spatial domain
      */
@@ -375,7 +375,7 @@ public final class ComponentTypeDescriptor {
         }
 
         /**
-         * Sets spatial participation.
+         * Sets the primary spatial authority supplied by this component.
          *
          * @param value spatial domain
          * @return this builder

@@ -72,6 +72,9 @@ public enum AssetDiagnosticCode implements DiagnosticCode {
     /** A required component capability has more than one provider. */
     COMPONENT_CAPABILITY_AMBIGUOUS(
             "asset.component.catalog.capability.ambiguous", "A required component capability is ambiguous"),
+    /** More than one component on an entity claims primary spatial authority. */
+    COMPONENT_SPATIAL_DOMAIN_AMBIGUOUS(
+            "asset.component.catalog.spatial.ambiguous", "An entity has more than one primary spatial component"),
     /** A component endpoint target is not declared by its component type. */
     COMPONENT_ENDPOINT_MISSING(
             "asset.component.catalog.endpoint.missing", "A component endpoint target is not declared"),

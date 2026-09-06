@@ -114,6 +114,7 @@ final class ComponentDefinitionValidator {
         validateMultiplicity(entityComponents, location);
         validateConflicts(entityComponents, location);
         validateCapabilities(entityComponents, location);
+        validateSpatialDomain(entityComponents, location);
     }
 
     /** Resolves an exact descriptor and validates authored property values. */
@@ -292,6 +293,20 @@ final class ComponentDefinitionValidator {
                             location + "/components");
                 }
             }
+        }
+    }
+
+    /** Requires at most one component on an entity to claim primary spatial authority. */
+    private void validateSpatialDomain(EntityComponents entity, String location) {
+        List<ComponentSpatialDomain> domains = entity.components().stream()
+                .map(component -> component.descriptor().spatialDomain())
+                .filter(domain -> domain != ComponentSpatialDomain.NONE)
+                .toList();
+        if (domains.size() > 1) {
+            error(
+                    AssetDiagnosticCode.COMPONENT_SPATIAL_DOMAIN_AMBIGUOUS,
+                    "entity has multiple primary spatial components: " + domains,
+                    location + "/components");
         }
     }
 

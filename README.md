@@ -633,6 +633,9 @@ license notices, and exact selected filenames are recorded beside the assets in
   generated-asset publication, provenance, and disposable cache management.
 - `jscene3d-project-runtime`: transactional composition of entity definitions
   and world placements through descriptor-backed component factories.
+- `jscene3d-project-3d`: descriptor-backed `Transform3d` components and the
+  world-scoped adapter that maps entity ownership to an internal `Object3D`
+  hierarchy.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives

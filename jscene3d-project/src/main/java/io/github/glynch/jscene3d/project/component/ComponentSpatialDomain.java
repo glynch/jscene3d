@@ -4,14 +4,14 @@
  */
 package io.github.glynch.jscene3d.project.component;
 
-/** Spatial domain in which a component participates. */
+/** Primary spatial authority supplied by a component. */
 public enum ComponentSpatialDomain {
-    /** The component has no spatial participation. */
+    /** The component does not supply primary spatial state. */
     NONE,
-    /** The component participates in a three-dimensional spatial hierarchy. */
+    /** The component supplies primary three-dimensional spatial state. */
     THREE_DIMENSIONAL,
-    /** The component participates in a two-dimensional spatial hierarchy. */
+    /** The component supplies primary two-dimensional spatial state. */
     TWO_DIMENSIONAL,
-    /** The component participates in a user-interface layout hierarchy. */
+    /** The component supplies primary user-interface layout state. */
     USER_INTERFACE
 }

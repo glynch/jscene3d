@@ -177,7 +177,8 @@ conveniences that create an ordinary entity and add `Transform3d`,
 
 ### Spatial domain
 
-Spatial domain is determined by capability:
+Primary spatial authority is declared by the component descriptor's spatial
+domain and exposed to sibling components through capability:
 
 - `Transform3d` provides `Spatial3d`;
 - `Transform2d` provides `Spatial2d`;
@@ -188,6 +189,8 @@ An entity may have at most one primary spatial-domain component. Crossing
 between domains uses an owned child entity and an explicit bridge or
 projection. A 3D renderer or collider requires `Spatial3d`; a 2D renderer or
 collider requires `Spatial2d`; a UI renderer requires the UI layout capability.
+Renderers, colliders, and other spatial consumers require the capability but do
+not themselves claim the primary spatial domain.
 
 Ownership may contain mixed domains. Spatial inheritance applies only between
 compatible domains.
@@ -374,7 +377,10 @@ descriptor-compiled fixed and frame schedules, synchronous runtime signal
 dispatch, safe enablement and destruction commits, exact host-supplied
 world-module lookup, and world-owned runtime-resource leases. Scheduled
 callbacks and signal dispatch are enabled only after successful world activation
-and stop before world cleanup. Spawning and concrete rendering, physics, audio,
+and stop before world cleanup. The first 3D adapter slice adds descriptor-backed
+`Transform3d`, automatic compatible direct-parent world transforms, and
+world-owned cleanup while keeping its internal `Object3D` hierarchy behind the
+`Spatial3dWorldModule` seam. Spawning and concrete rendering, physics, audio,
 and input adapters remain subsequent slices on top of the same composed entity
 graph.
 

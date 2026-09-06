@@ -100,6 +100,27 @@ final class ComponentDefinitionValidationTest {
                         "asset.component.catalog.capability.ambiguous");
     }
 
+    /** Rejects multiple components claiming primary spatial authority even across different domains. */
+    @Test
+    void rejectsMultiplePrimarySpatialComponents() throws IOException {
+        ComponentDefinition transform3d = component(TRANSFORM, TRANSFORM_TYPE, Map.of());
+        ComponentDefinition transform2d = component(
+                ComponentId.from("4516a7de-fcde-470a-97c5-b107db5ce0d1"),
+                new ComponentTypeId("example.game/transform-2d"),
+                Map.of());
+        LocalEntity root = new LocalEntity(ROOT, true, List.of(transform3d, transform2d), List.of());
+        EntityDefinition definition = new EntityDefinition(ASSET_ID, "Ambiguous spatial entity", root);
+
+        DefinitionLoadResult<EntityDefinition> result =
+                load(definition, transformDescriptor(), transform2dDescriptor());
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code()).isEqualTo(AssetDiagnosticCode.COMPONENT_SPATIAL_DOMAIN_AMBIGUOUS);
+            assertThat(diagnostic.location()).isEqualTo("/root/components");
+        });
+    }
+
     /** Rejects public and connected endpoints that disagree with their private component declarations. */
     @Test
     void rejectsInvalidLocalContractTargets() throws IOException {
@@ -187,6 +208,14 @@ final class ComponentDefinitionValidationTest {
                 .providedCapabilities(Set.of(TRANSFORM_CAPABILITY))
                 .spatialDomain(ComponentSpatialDomain.THREE_DIMENSIONAL)
                 .attachments(Set.of(new AttachmentPointId("socket")))
+                .build();
+    }
+
+    /** Declares a second primary spatial component in another domain for ambiguity validation. */
+    private static ComponentTypeDescriptor transform2dDescriptor() {
+        return ComponentTypeDescriptor.builder(
+                        ComponentType.of("example.game/transform-2d", 1), DescriptorPresentation.named("Transform 2d"))
+                .spatialDomain(ComponentSpatialDomain.TWO_DIMENSIONAL)
                 .build();
     }
 

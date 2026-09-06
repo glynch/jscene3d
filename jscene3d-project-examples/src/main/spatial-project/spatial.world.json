@@ -1,0 +1,38 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/world-definition-1.json",
+  "assetId" : "9b76c125-3c5f-4a38-8571-199b79b3d77e",
+  "assetType" : "world-definition",
+  "formatVersion" : 1,
+  "name" : "Spatial hierarchy",
+  "connections" : [ ],
+  "roots" : [ {
+    "entryType" : "local",
+    "entityId" : "4623800c-54ae-4a87-b91f-5b2054f44657",
+    "name" : "Parent",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "70ef8d19-70c3-4268-93d7-fc9750d2d0dc",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "position" : [ 10, 0, 0 ],
+        "scale" : [ 2, 2, 2 ]
+      }
+    } ],
+    "children" : [ {
+      "entryType" : "local",
+      "entityId" : "600f9396-a59f-4b1f-841c-ee2511653772",
+      "name" : "Child",
+      "enabled" : true,
+      "components" : [ {
+        "componentId" : "f34c69a4-9d74-450a-ae13-9f4362b84f8b",
+        "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+        "typeVersion" : 1,
+        "properties" : {
+          "position" : [ 0, 2, 0 ]
+        }
+      } ],
+      "children" : [ ]
+    } ]
+  } ]
+}

@@ -8,6 +8,8 @@ import static io.github.glynch.jscene3d.project.internal.Preconditions.requirePr
 import static io.github.glynch.jscene3d.project.internal.Preconditions.requireSemanticVersion;
 import static io.github.glynch.jscene3d.project.internal.Preconditions.requireSemanticVersionRequirement;
 
+import io.github.glynch.jscene3d.project.component.ComponentType;
+import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -20,6 +22,7 @@ public final class ExtensionDescriptor {
     private final String engineRequirement;
     private final DescriptorPresentation presentation;
     private final List<RegisteredTypeDescriptor> types;
+    private final List<ComponentTypeDescriptor> components;
 
     /**
      * Creates one immutable extension descriptor.
@@ -36,11 +39,32 @@ public final class ExtensionDescriptor {
             String engineRequirement,
             DescriptorPresentation presentation,
             List<RegisteredTypeDescriptor> types) {
+        this(id, version, engineRequirement, presentation, types, List.of());
+    }
+
+    /**
+     * Creates one immutable extension descriptor including component metadata.
+     *
+     * @param id stable reverse-domain extension identifier
+     * @param version semantic extension version
+     * @param engineRequirement compatible JScene3D engine versions
+     * @param presentation human-readable metadata
+     * @param types non-component registered types in declaration order
+     * @param components component types in declaration order
+     */
+    public ExtensionDescriptor(
+            String id,
+            String version,
+            String engineRequirement,
+            DescriptorPresentation presentation,
+            List<RegisteredTypeDescriptor> types,
+            List<ComponentTypeDescriptor> components) {
         this.id = requireProjectId(id, "id");
         this.version = requireSemanticVersion(version, "version");
         this.engineRequirement = requireSemanticVersionRequirement(engineRequirement, "engineRequirement");
         this.presentation = Objects.requireNonNull(presentation, "presentation");
         this.types = List.copyOf(types);
+        this.components = List.copyOf(components);
         validateTypes();
     }
 
@@ -89,6 +113,15 @@ public final class ExtensionDescriptor {
         return types;
     }
 
+    /**
+     * Returns registered component descriptors in declaration order.
+     *
+     * @return immutable component descriptors
+     */
+    public List<ComponentTypeDescriptor> components() {
+        return components;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -99,18 +132,19 @@ public final class ExtensionDescriptor {
                 && version.equals(descriptor.version)
                 && engineRequirement.equals(descriptor.engineRequirement)
                 && presentation.equals(descriptor.presentation)
-                && types.equals(descriptor.types);
+                && types.equals(descriptor.types)
+                && components.equals(descriptor.components);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, version, engineRequirement, presentation, types);
+        return Objects.hash(id, version, engineRequirement, presentation, types, components);
     }
 
     @Override
     public String toString() {
         return "ExtensionDescriptor[id=" + id + ", version=" + version + ", engineRequirement=" + engineRequirement
-                + ", presentation=" + presentation + ", types=" + types + ']';
+                + ", presentation=" + presentation + ", types=" + types + ", components=" + components + ']';
     }
 
     /** Requires every type to belong to this extension and have a unique identity and version. */
@@ -125,6 +159,22 @@ public final class ExtensionDescriptor {
             }
             if (!unique.add(type)) {
                 throw new IllegalArgumentException("registered type is duplicated: " + type);
+            }
+        }
+        Set<ComponentType> uniqueComponents = new HashSet<>();
+        for (ComponentTypeDescriptor descriptor : components) {
+            ComponentType type =
+                    Objects.requireNonNull(descriptor, "components entry").type();
+            if (!type.id().value().startsWith(prefix)) {
+                throw new IllegalArgumentException("component type does not belong to extension " + id + ": " + type);
+            }
+            if (!uniqueComponents.add(type)) {
+                throw new IllegalArgumentException("component type is duplicated: " + type);
+            }
+            RegisteredType registered = new RegisteredType(type.id().value(), type.version());
+            if (unique.contains(registered)) {
+                throw new IllegalArgumentException(
+                        "type identity is used by both a component and another type: " + type);
             }
         }
     }

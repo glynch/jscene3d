@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.doom.map.DoomMap;
 import io.github.glynch.jscene3d.doom.runtime.internal.DoomRuntimeExtension;
+import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
@@ -20,6 +21,7 @@ import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.resource.ResourceLoader;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ResourceFactory;
@@ -160,6 +162,11 @@ final class DoomRuntimeExtensionTest {
     private static final class CapturingRegistry implements ProjectRuntimeRegistry {
         private RegisteredType type;
         private ResourceFactory factory;
+
+        @Override
+        public void registerComponent(ComponentType componentType, ComponentFactory<?> componentFactory) {
+            throw new AssertionError("Doom runtime must not register components");
+        }
 
         @Override
         public void registerSceneNode(RegisteredType registeredType, SceneNodeFactory sceneNodeFactory) {

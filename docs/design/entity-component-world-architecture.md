@@ -236,6 +236,46 @@ Runtime components are ordinary Java objects and may contain behavior. There
 is no privileged controller or script slot. A game may add several behavioral
 components to the same entity when their descriptors allow it.
 
+Component descriptors are safe extension metadata. They are declared in the
+extension descriptor's `components` array and can therefore be discovered and
+validated without loading executable extension code. For example:
+
+```json
+{
+  "id": "example.game/mover",
+  "typeVersion": 1,
+  "displayName": "Mover",
+  "properties": [
+    {
+      "id": "speed",
+      "valueKind": "number",
+      "required": true,
+      "displayName": "Speed"
+    }
+  ],
+  "signals": [
+    { "id": "moved", "displayName": "Moved" }
+  ],
+  "actions": [
+    { "id": "stop", "displayName": "Stop" }
+  ],
+  "requiredCapabilities": ["example.game/transform"],
+  "multiplicity": "single",
+  "conflicts": ["example.game/teleporter"],
+  "spatialDomain": "none",
+  "lifecycle": ["created", "destroyed"],
+  "updatePhases": ["after-physics"]
+}
+```
+
+`RegisteredTypeCatalog` indexes these descriptors by the exact pair of
+`ComponentTypeId` and configuration-schema version. Catalog-aware entity and
+world loading checks authored properties, multiplicity, conflicts, sibling
+capability providers, local contract targets, and local signal/action payloads.
+The structural loading overloads remain useful for an editor that must preserve
+and display definitions whose extensions are unavailable; play and export use
+catalog-aware loading and reject unresolved component types.
+
 Component dependencies use declared capabilities or explicit stable component
 identity. General `getComponent(Class<?>)` lookup and nearest-ancestor searches
 are not the dependency model. A missing, conflicting, or ambiguous required
@@ -262,6 +302,28 @@ construction seam. It may inject world module interfaces and game-owned
 dependencies, but it must not become part of serialized data or the public
 engine model. JScene3D does not initially depend on Spring or any other DI
 container.
+
+Executable code is registered separately by the trusted runtime extension:
+
+```java
+private static final ComponentType MOVER =
+        ComponentType.of("example.game/mover", 1);
+
+@Override
+public void register(ProjectRuntimeRegistry registry) {
+    registry.registerComponent(MOVER, context ->
+            new Mover(context.properties()));
+}
+```
+
+Registration must match an exact descriptor owned by that extension. Duplicate,
+foreign, undeclared, and late registrations fail immediately. A missing factory
+for a validated component is a structured composition failure. The
+`ComponentFactoryContext` exposes the immutable authored definition, its exact
+descriptor, effective property values, and runtime resource lookup; it does not
+expose mutable composer internals. Descriptor discovery and validation therefore
+do not depend on executable class loading, and serialized files never name the
+factory or implementation class.
 
 Components receive their owning `World` or a bounded context explicitly. They
 do not discover a static global world, create backend implementations, or use

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.asset;
 
+import io.github.glynch.jscene3d.project.asset.ComponentDefinitionValidator.Validation;
 import io.github.glynch.jscene3d.project.asset.internal.DefinitionDocumentReader;
 import io.github.glynch.jscene3d.project.component.AttachmentPointId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -18,6 +19,9 @@ import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.entity.PropertyTarget;
 import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.entity.SpatialTarget;
+import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
+import io.github.glynch.jscene3d.project.extension.RegisteredType;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -31,24 +35,38 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 
 /** Resolves typed assets and validates their transitive entity-definition graph. */
 final class DefinitionGraphLoader {
     private final AssetCatalog catalog;
+    private final @Nullable RegisteredTypeCatalog componentTypes;
     private final List<ProjectDiagnostic> diagnostics = new ArrayList<>();
     private final Map<AssetId, EntityDefinition> loadedEntities = new HashMap<>();
     private final Set<AssetId> validatedEntities = new HashSet<>();
     private final LinkedHashSet<AssetId> visitingEntities = new LinkedHashSet<>();
 
     /** Stores one catalog-local graph load. */
-    private DefinitionGraphLoader(AssetCatalog catalog) {
+    private DefinitionGraphLoader(AssetCatalog catalog, @Nullable RegisteredTypeCatalog componentTypes) {
         this.catalog = catalog;
+        this.componentTypes = componentTypes;
     }
 
     /** Loads one entity definition and validates its complete inclusion graph. */
     static DefinitionLoadResult<EntityDefinition> loadEntity(
             AssetCatalog catalog, AssetRef<EntityDefinition> reference) {
-        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog);
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, null);
+        Optional<AssetMetadata> metadata =
+                loader.resolve(reference.id(), AssetKind.ENTITY_DEFINITION, catalog.root(), "");
+        Optional<EntityDefinition> definition = metadata.flatMap(loader::readEntity);
+        metadata.ifPresent(value -> definition.ifPresent(asset -> loader.validateEntityGraph(value, asset)));
+        return loader.result(definition);
+    }
+
+    /** Loads one entity graph and validates its components through safe descriptor metadata. */
+    static DefinitionLoadResult<EntityDefinition> loadEntity(
+            AssetCatalog catalog, AssetRef<EntityDefinition> reference, RegisteredTypeCatalog componentTypes) {
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, componentTypes);
         Optional<AssetMetadata> metadata =
                 loader.resolve(reference.id(), AssetKind.ENTITY_DEFINITION, catalog.root(), "");
         Optional<EntityDefinition> definition = metadata.flatMap(loader::readEntity);
@@ -58,7 +76,7 @@ final class DefinitionGraphLoader {
 
     /** Loads one world and validates every transitively placed entity definition. */
     static DefinitionLoadResult<WorldDefinition> loadWorld(AssetCatalog catalog, AssetRef<WorldDefinition> reference) {
-        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog);
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, null);
         Optional<AssetMetadata> metadata =
                 loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, catalog.root(), "");
         Optional<WorldDefinition> definition = metadata.flatMap(loader::readWorld);
@@ -66,7 +84,25 @@ final class DefinitionGraphLoader {
             WorldDefinition world = definition.orElseThrow();
             Path source = metadata.orElseThrow().path();
             loader.validateEntries(world.roots(), EntityContract.empty(), source);
-            loader.validateConnections(world.connections(), loader.indexPlacements(world.roots()), source);
+            Validation components = loader.validateWorldComponents(world.roots(), world.connections(), source);
+            loader.validateConnections(world.connections(), loader.indexPlacements(world.roots()), components, source);
+        }
+        return loader.result(definition);
+    }
+
+    /** Loads one world graph and validates its components through safe descriptor metadata. */
+    static DefinitionLoadResult<WorldDefinition> loadWorld(
+            AssetCatalog catalog, AssetRef<WorldDefinition> reference, RegisteredTypeCatalog componentTypes) {
+        DefinitionGraphLoader loader = new DefinitionGraphLoader(catalog, componentTypes);
+        Optional<AssetMetadata> metadata =
+                loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, catalog.root(), "");
+        Optional<WorldDefinition> definition = metadata.flatMap(loader::readWorld);
+        if (metadata.isPresent() && definition.isPresent()) {
+            WorldDefinition world = definition.orElseThrow();
+            Path source = metadata.orElseThrow().path();
+            loader.validateEntries(world.roots(), EntityContract.empty(), source);
+            Validation components = loader.validateWorldComponents(world.roots(), world.connections(), source);
+            loader.validateConnections(world.connections(), loader.indexPlacements(world.roots()), components, source);
         }
         return loader.result(definition);
     }
@@ -101,9 +137,32 @@ final class DefinitionGraphLoader {
         validateEntries(List.of(definition.root()), definition.contract(), metadata.path());
         Map<EntityId, EntityPlacement> placements = indexPlacements(List.of(definition.root()));
         validateContractSeams(definition.contract(), placements, metadata.path());
-        validateConnections(definition.connections(), placements, metadata.path());
+        Validation components = validateEntityComponents(definition, metadata.path());
+        validateConnections(definition.connections(), placements, components, metadata.path());
         visitingEntities.remove(id);
         validatedEntities.add(id);
+    }
+
+    /** Validates components when a safe component catalog was supplied. */
+    private @Nullable Validation validateEntityComponents(EntityDefinition definition, Path source) {
+        if (componentTypes == null) {
+            return null;
+        }
+        Validation validation = ComponentDefinitionValidator.validateEntity(
+                definition.root(), definition.contract(), definition.connections(), componentTypes, source);
+        diagnostics.addAll(validation.diagnostics());
+        return validation;
+    }
+
+    /** Validates world components when a safe component catalog was supplied. */
+    private @Nullable Validation validateWorldComponents(
+            List<? extends EntityEntry> roots, List<SignalConnection> connections, Path source) {
+        if (componentTypes == null) {
+            return null;
+        }
+        Validation validation = ComponentDefinitionValidator.validateWorld(roots, connections, componentTypes, source);
+        diagnostics.addAll(validation.diagnostics());
+        return validation;
     }
 
     /** Traverses placements in deterministic authored hierarchy order. */
@@ -309,15 +368,20 @@ final class DefinitionGraphLoader {
 
     /** Validates placed-definition endpoints used by authored signal/action connections. */
     private void validateConnections(
-            List<SignalConnection> connections, Map<EntityId, EntityPlacement> placements, Path source) {
+            List<SignalConnection> connections,
+            Map<EntityId, EntityPlacement> placements,
+            @Nullable Validation components,
+            Path source) {
         for (SignalConnection connection : connections) {
-            Optional<EntityContract.Signal> signal = resolveSignal(connection.signal(), placements, source);
-            Optional<EntityContract.Action> action = resolveAction(connection.action(), placements, source);
+            if (connection.signal().component().isPresent()
+                    && connection.action().component().isPresent()) {
+                continue;
+            }
+            Optional<EndpointSignature> signal = resolveSignal(connection.signal(), placements, components, source);
+            Optional<EndpointSignature> action = resolveAction(connection.action(), placements, components, source);
             if (signal.isPresent()
                     && action.isPresent()
-                    && !signal.orElseThrow()
-                            .payload()
-                            .equals(action.orElseThrow().payload())) {
+                    && !signal.orElseThrow().equals(action.orElseThrow())) {
                 incompatiblePayload(
                         source,
                         connection.signal().endpoint(),
@@ -327,8 +391,16 @@ final class DefinitionGraphLoader {
     }
 
     /** Resolves a placed signal declaration, reporting a missing exported member. */
-    private Optional<EntityContract.Signal> resolveSignal(
-            EndpointTarget target, Map<EntityId, EntityPlacement> placements, Path source) {
+    private Optional<EndpointSignature> resolveSignal(
+            EndpointTarget target,
+            Map<EntityId, EntityPlacement> placements,
+            @Nullable Validation components,
+            Path source) {
+        if (target.component().isPresent()) {
+            return components == null
+                    ? Optional.empty()
+                    : components.signal(target).map(EndpointSignature::from);
+        }
         if (!isPlacedEndpoint(target, placements)) {
             return Optional.empty();
         }
@@ -340,12 +412,20 @@ final class DefinitionGraphLoader {
             missingMember(source, target.entity(), target.endpoint());
             return Optional.empty();
         }
-        return Optional.of(signal);
+        return Optional.of(EndpointSignature.from(signal));
     }
 
     /** Resolves a placed action declaration, reporting a missing exported member. */
-    private Optional<EntityContract.Action> resolveAction(
-            EndpointTarget target, Map<EntityId, EntityPlacement> placements, Path source) {
+    private Optional<EndpointSignature> resolveAction(
+            EndpointTarget target,
+            Map<EntityId, EntityPlacement> placements,
+            @Nullable Validation components,
+            Path source) {
+        if (target.component().isPresent()) {
+            return components == null
+                    ? Optional.empty()
+                    : components.action(target).map(EndpointSignature::from);
+        }
         if (!isPlacedEndpoint(target, placements)) {
             return Optional.empty();
         }
@@ -357,7 +437,7 @@ final class DefinitionGraphLoader {
             missingMember(source, target.entity(), target.endpoint());
             return Optional.empty();
         }
-        return Optional.of(action);
+        return Optional.of(EndpointSignature.from(action));
     }
 
     /** Looks up the resolved contract of one placement in the current asset. */
@@ -463,5 +543,26 @@ final class DefinitionGraphLoader {
         boolean hasErrors =
                 diagnostics.stream().anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         return new DefinitionLoadResult<>(hasErrors ? Optional.empty() : value, diagnostics);
+    }
+
+    /** Exact optional payload declaration used to compare local and placed endpoints uniformly.
+     *
+     * @param payload registered payload type, or {@code null} for a payload-free endpoint
+     */
+    private record EndpointSignature(@Nullable RegisteredType payload) {
+        /** Creates a signature from one local component endpoint. */
+        private static EndpointSignature from(EndpointDescriptor endpoint) {
+            return new EndpointSignature(endpoint.payload().orElse(null));
+        }
+
+        /** Creates a signature from one exported signal. */
+        private static EndpointSignature from(EntityContract.Signal signal) {
+            return new EndpointSignature(signal.payload().orElse(null));
+        }
+
+        /** Creates a signature from one exported action. */
+        private static EndpointSignature from(EntityContract.Action action) {
+            return new EndpointSignature(action.payload().orElse(null));
+        }
     }
 }

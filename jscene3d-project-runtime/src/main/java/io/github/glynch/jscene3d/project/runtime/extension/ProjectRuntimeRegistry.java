@@ -4,10 +4,19 @@
  */
 package io.github.glynch.jscene3d.project.runtime.extension;
 
+import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 
 /** Construction-time registry binding safe type descriptors to trusted factories. */
 public interface ProjectRuntimeRegistry {
+    /**
+     * Registers the construction adapter for one component type.
+     *
+     * @param type exact descriptor-declared component type
+     * @param factory trusted component factory
+     */
+    void registerComponent(ComponentType type, ComponentFactory<?> factory);
+
     /**
      * Registers the factory for one scene-node type.
      *

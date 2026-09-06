@@ -24,6 +24,8 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
     EXTENSION_REGISTRATION_FAILED("runtime.extension.registration", "Runtime extension registration failed"),
     /** A controller factory is missing. */
     CONTROLLER_FACTORY_MISSING("runtime.factory.controller.missing", "A controller factory is missing"),
+    /** A component factory is missing. */
+    COMPONENT_FACTORY_MISSING("runtime.factory.component.missing", "A component factory is missing"),
     /** A runtime factory failed to create an object. */
     FACTORY_CREATE_FAILED("runtime.factory.create", "A runtime factory failed to create an object"),
     /** A resource factory failed to create a value. */

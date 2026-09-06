@@ -50,6 +50,35 @@ public enum AssetDiagnosticCode implements DiagnosticCode {
     COMPONENT_TYPE_INVALID("asset.component.type", "The component type identifier is invalid"),
     /** A component type version is invalid. */
     COMPONENT_VERSION_INVALID("asset.component.version", "The component type version is invalid"),
+    /** An authored component type is not registered. */
+    COMPONENT_TYPE_MISSING("asset.component.catalog.type", "The component type is not registered"),
+    /** A required component property is missing. */
+    COMPONENT_PROPERTY_REQUIRED(
+            "asset.component.catalog.property.required", "A required component property is missing"),
+    /** An authored component property is not declared. */
+    COMPONENT_PROPERTY_UNKNOWN("asset.component.catalog.property.unknown", "A component property is not declared"),
+    /** An authored component property value violates its declaration. */
+    COMPONENT_PROPERTY_VALUE_INVALID("asset.component.catalog.property.value", "A component property value is invalid"),
+    /** A single-instance component type occurs more than once on an entity. */
+    COMPONENT_MULTIPLICITY_INVALID(
+            "asset.component.catalog.multiplicity", "A component type exceeds its allowed multiplicity"),
+    /** Conflicting component types occur on the same entity. */
+    COMPONENT_CONFLICT("asset.component.catalog.conflict", "Conflicting component types occur on one entity"),
+    /** A required component capability has no provider. */
+    COMPONENT_CAPABILITY_MISSING(
+            "asset.component.catalog.capability.missing", "A required component capability has no provider"),
+    /** A required component capability has more than one provider. */
+    COMPONENT_CAPABILITY_AMBIGUOUS(
+            "asset.component.catalog.capability.ambiguous", "A required component capability is ambiguous"),
+    /** A component endpoint target is not declared by its component type. */
+    COMPONENT_ENDPOINT_MISSING(
+            "asset.component.catalog.endpoint.missing", "A component endpoint target is not declared"),
+    /** A component property target is not declared by its component type. */
+    COMPONENT_PROPERTY_MISSING(
+            "asset.component.catalog.property.missing", "A component property target is not declared"),
+    /** A component attachment target is not declared by its component type. */
+    COMPONENT_ATTACHMENT_MISSING(
+            "asset.component.catalog.attachment.missing", "A component attachment target is not declared"),
     /** A local entity identity is duplicated. */
     ENTITY_ID_DUPLICATE("asset.entity.id.duplicate", "An entity identity is duplicated within an asset"),
     /** A component identity is duplicated on one entity. */

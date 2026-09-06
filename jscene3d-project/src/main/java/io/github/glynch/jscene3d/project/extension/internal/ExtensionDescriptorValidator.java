@@ -8,6 +8,15 @@ import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isPr
 import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isRegisteredTypeId;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.glynch.jscene3d.project.component.AttachmentPointId;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
+import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
+import io.github.glynch.jscene3d.project.component.ComponentMultiplicity;
+import io.github.glynch.jscene3d.project.component.ComponentSpatialDomain;
+import io.github.glynch.jscene3d.project.component.ComponentType;
+import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
+import io.github.glynch.jscene3d.project.component.ComponentTypeId;
+import io.github.glynch.jscene3d.project.component.ComponentUpdatePhase;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
 import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
@@ -28,10 +37,13 @@ import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -93,11 +105,13 @@ public final class ExtensionDescriptorValidator {
         Optional<String> description = fields.optionalText(raw.description(), "/description");
         String safeId = isProjectId(id) ? id : "invalid.extension";
         List<RegisteredTypeDescriptor> types = validateTypes(raw.types(), safeId);
+        List<ComponentTypeDescriptor> components = validateComponents(raw.components(), safeId);
+        validateCrossTypeIdentities(types, components);
         if (diagnostics.hasErrors()) {
             return Optional.empty();
         }
         DescriptorPresentation presentation = presentation(displayName, description);
-        return Optional.of(new ExtensionDescriptor(id, version, engineRequires, presentation, types));
+        return Optional.of(new ExtensionDescriptor(id, version, engineRequires, presentation, types, components));
     }
 
     /** Validates the authoritative schema version and optional canonical URI. */
@@ -154,6 +168,97 @@ public final class ExtensionDescriptorValidator {
             }
         }
         return List.copyOf(types);
+    }
+
+    /** Validates component types and removes invalid placeholders from the public result. */
+    private List<ComponentTypeDescriptor> validateComponents(
+            @Nullable List<RawExtensionDescriptor.@Nullable Component> rawComponents, String extensionId) {
+        if (rawComponents == null) {
+            return List.of();
+        }
+        List<ComponentTypeDescriptor> components = new ArrayList<>();
+        Set<ComponentType> unique = new HashSet<>();
+        for (int index = 0; index < rawComponents.size(); index++) {
+            String location = "/components/" + index;
+            Optional<ComponentTypeDescriptor> descriptor =
+                    validateComponent(rawComponents.get(index), extensionId, location);
+            if (descriptor.isPresent() && !unique.add(descriptor.orElseThrow().type())) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.TYPE_DUPLICATE,
+                        "component type is duplicated: "
+                                + descriptor.orElseThrow().type(),
+                        location);
+            } else {
+                descriptor.ifPresent(components::add);
+            }
+        }
+        return List.copyOf(components);
+    }
+
+    /** Validates one component type and its authoring and execution declarations. */
+    private Optional<ComponentTypeDescriptor> validateComponent(
+            RawExtensionDescriptor.@Nullable Component raw, String extensionId, String location) {
+        if (raw == null) {
+            diagnostics.error(ExtensionDiagnosticCode.FIELD_REQUIRED, "component must be an object", location);
+            return Optional.empty();
+        }
+        String id = fields.requiredText(raw.id(), location + "/id");
+        boolean validId = isRegisteredTypeId(id) && id.startsWith(extensionId + '/');
+        if (!id.isEmpty() && !validId) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.TYPE_ID_INVALID,
+                    "component id must be qualified by its owning extension: " + extensionId,
+                    location + "/id");
+        }
+        int version = positiveVersion(raw.typeVersion(), location + "/typeVersion");
+        String displayName = fields.requiredText(raw.displayName(), location + "/displayName");
+        Optional<String> description = fields.optionalText(raw.description(), location + "/description");
+        ComponentTypeDescriptor.Builder builder = ComponentTypeDescriptor.builder(
+                        new ComponentType(
+                                new ComponentTypeId(validId ? id : "invalid.extension/invalid"), Math.max(version, 1)),
+                        presentation(displayName.isEmpty() ? "Invalid component" : displayName, description))
+                .properties(validateProperties(raw.properties(), location + "/properties"))
+                .signals(validateEndpoints(raw.signals(), location + "/signals"))
+                .actions(validateEndpoints(raw.actions(), location + "/actions"))
+                .providedCapabilities(capabilitySet(
+                        raw.providedCapabilities(), location + "/providedCapabilities", "provided capability"))
+                .requiredCapabilities(capabilitySet(
+                        raw.requiredCapabilities(), location + "/requiredCapabilities", "required capability"))
+                .attachments(attachmentSet(raw.attachments(), location + "/attachments"))
+                .multiplicity(multiplicity(raw.multiplicity(), location + "/multiplicity"))
+                .conflicts(componentTypeSet(raw.conflicts(), location + "/conflicts"))
+                .spatialDomain(spatialDomain(raw.spatialDomain(), location + "/spatialDomain"))
+                .lifecycle(lifecycleSet(raw.lifecycle(), location + "/lifecycle"))
+                .updatePhases(updatePhaseSet(raw.updatePhases(), location + "/updatePhases"));
+        if (!validId || version < 1 || displayName.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(builder.build());
+        } catch (IllegalArgumentException exception) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.COMPONENT_DESCRIPTOR_INVALID,
+                    Objects.requireNonNullElse(exception.getMessage(), "component descriptor is invalid"),
+                    location);
+            return Optional.empty();
+        }
+    }
+
+    /** Reports a versioned identity declared as both a component and another extension type. */
+    private void validateCrossTypeIdentities(
+            List<RegisteredTypeDescriptor> types, List<ComponentTypeDescriptor> components) {
+        Set<RegisteredType> identities = new HashSet<>();
+        types.stream().map(RegisteredTypeDescriptor::type).forEach(identities::add);
+        for (int index = 0; index < components.size(); index++) {
+            ComponentType component = components.get(index).type();
+            RegisteredType identity = new RegisteredType(component.id().value(), component.version());
+            if (identities.contains(identity)) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.TYPE_DUPLICATE,
+                        "type identity is used by both a component and another type: " + component,
+                        "/components/" + index + "/id");
+            }
+        }
     }
 
     /** Validates one registered type. */
@@ -385,7 +490,7 @@ public final class ExtensionDescriptorValidator {
                     location);
             return Set.of();
         }
-        return Set.copyOf(result);
+        return Collections.unmodifiableSet(result);
     }
 
     /** Validates an ordered list of extension-qualified type identifiers. */
@@ -412,6 +517,162 @@ public final class ExtensionDescriptorValidator {
             }
         }
         return List.copyOf(result);
+    }
+
+    /** Parses an optional component multiplicity, defaulting to one instance per entity. */
+    private ComponentMultiplicity multiplicity(@Nullable String value, String location) {
+        if (value == null) {
+            return ComponentMultiplicity.SINGLE;
+        }
+        return enumValue(
+                value,
+                ComponentMultiplicity.class,
+                ComponentMultiplicity.SINGLE,
+                ExtensionDiagnosticCode.COMPONENT_MULTIPLICITY_INVALID,
+                "multiplicity must be single or multiple",
+                location);
+    }
+
+    /** Parses an optional component spatial domain, defaulting to non-spatial. */
+    private ComponentSpatialDomain spatialDomain(@Nullable String value, String location) {
+        if (value == null) {
+            return ComponentSpatialDomain.NONE;
+        }
+        return enumValue(
+                value,
+                ComponentSpatialDomain.class,
+                ComponentSpatialDomain.NONE,
+                ExtensionDiagnosticCode.COMPONENT_SPATIAL_DOMAIN_INVALID,
+                "spatialDomain must be none, three-dimensional, two-dimensional, or user-interface",
+                location);
+    }
+
+    /** Parses unique component lifecycle declarations. */
+    private Set<ComponentLifecycle> lifecycleSet(@Nullable List<@Nullable String> values, String location) {
+        return enumSet(
+                values,
+                ComponentLifecycle.class,
+                ExtensionDiagnosticCode.COMPONENT_LIFECYCLE_INVALID,
+                "lifecycle value must be created, activated, deactivated, or destroyed",
+                location);
+    }
+
+    /** Parses unique component update-phase declarations. */
+    private Set<ComponentUpdatePhase> updatePhaseSet(@Nullable List<@Nullable String> values, String location) {
+        return enumSet(
+                values,
+                ComponentUpdatePhase.class,
+                ExtensionDiagnosticCode.COMPONENT_UPDATE_PHASE_INVALID,
+                "update phase must be before-physics, after-physics, or frame-update",
+                location);
+    }
+
+    /** Parses unique extension-qualified capability identities. */
+    private Set<CapabilityId> capabilitySet(
+            @Nullable List<@Nullable String> values, String location, String description) {
+        if (values == null) {
+            return Set.of();
+        }
+        Set<CapabilityId> result = new LinkedHashSet<>();
+        for (int index = 0; index < values.size(); index++) {
+            String itemLocation = location + "/" + index;
+            String value = fields.requiredText(values.get(index), itemLocation);
+            if (!value.isEmpty() && !isRegisteredTypeId(value)) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.CAPABILITY_ID_INVALID,
+                        description + " must be an extension-qualified identifier",
+                        itemLocation);
+            } else if (!value.isEmpty() && !result.add(new CapabilityId(value))) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.CAPABILITY_DUPLICATE,
+                        description + " is duplicated: " + value,
+                        itemLocation);
+            }
+        }
+        return Collections.unmodifiableSet(result);
+    }
+
+    /** Parses unique local attachment identities. */
+    private Set<AttachmentPointId> attachmentSet(@Nullable List<@Nullable String> values, String location) {
+        if (values == null) {
+            return Set.of();
+        }
+        Set<AttachmentPointId> result = new LinkedHashSet<>();
+        for (int index = 0; index < values.size(); index++) {
+            String itemLocation = location + "/" + index;
+            String value = fields.requiredLocalId(values.get(index), itemLocation);
+            if (!value.isEmpty() && !result.add(new AttachmentPointId(value))) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.COMPONENT_ATTACHMENT_DUPLICATE,
+                        "component attachment is duplicated: " + value,
+                        itemLocation);
+            }
+        }
+        return Collections.unmodifiableSet(result);
+    }
+
+    /** Parses unique extension-qualified conflicting component types. */
+    private Set<ComponentTypeId> componentTypeSet(@Nullable List<@Nullable String> values, String location) {
+        if (values == null) {
+            return Set.of();
+        }
+        Set<ComponentTypeId> result = new LinkedHashSet<>();
+        for (int index = 0; index < values.size(); index++) {
+            String itemLocation = location + "/" + index;
+            String value = fields.requiredText(values.get(index), itemLocation);
+            if (!value.isEmpty() && !isRegisteredTypeId(value)) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.COMPONENT_CONFLICT_INVALID,
+                        "conflicting component must be an extension-qualified identifier",
+                        itemLocation);
+            } else if (!value.isEmpty() && !result.add(new ComponentTypeId(value))) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.COMPONENT_CONFLICT_DUPLICATE,
+                        "conflicting component is duplicated: " + value,
+                        itemLocation);
+            }
+        }
+        return Collections.unmodifiableSet(result);
+    }
+
+    /** Parses one serialized enum value and reports a focused diagnostic on failure. */
+    private <E extends Enum<E>> E enumValue(
+            String value, Class<E> type, E fallback, ExtensionDiagnosticCode code, String message, String location) {
+        try {
+            return Enum.valueOf(type, value.replace('-', '_').toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            diagnostics.error(code, message, location);
+            return fallback;
+        }
+    }
+
+    /** Parses a unique set of serialized enum values. */
+    private <E extends Enum<E>> Set<E> enumSet(
+            @Nullable List<@Nullable String> values,
+            Class<E> type,
+            ExtensionDiagnosticCode code,
+            String message,
+            String location) {
+        if (values == null) {
+            return Set.of();
+        }
+        Set<E> result = new LinkedHashSet<>();
+        for (int index = 0; index < values.size(); index++) {
+            String itemLocation = location + "/" + index;
+            String value = fields.requiredText(values.get(index), itemLocation);
+            if (value.isEmpty()) {
+                continue;
+            }
+            try {
+                E parsed = Enum.valueOf(type, value.replace('-', '_').toUpperCase(Locale.ROOT));
+                if (!result.add(parsed)) {
+                    diagnostics.error(code, "value is duplicated: " + value, itemLocation);
+                }
+            } catch (IllegalArgumentException ignored) {
+                diagnostics.error(code, message, itemLocation);
+            }
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     /** Returns whether a default value satisfies property constraints. */

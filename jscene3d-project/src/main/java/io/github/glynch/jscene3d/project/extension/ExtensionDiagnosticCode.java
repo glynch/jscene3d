@@ -12,6 +12,29 @@ public enum ExtensionDiagnosticCode implements DiagnosticCode {
     CAPABILITY_DUPLICATE("extension.capability.duplicate", "An extension capability is duplicated"),
     /** A capability identifier is invalid. */
     CAPABILITY_ID_INVALID("extension.capability.id", "An extension capability identifier is invalid"),
+    /** A component attachment identity is duplicated. */
+    COMPONENT_ATTACHMENT_DUPLICATE(
+            "extension.component.attachment.duplicate", "A component attachment identity is duplicated"),
+    /** A component attachment identity is invalid. */
+    COMPONENT_ATTACHMENT_INVALID(
+            "extension.component.attachment.invalid", "A component attachment identity is invalid"),
+    /** A component conflict type is duplicated. */
+    COMPONENT_CONFLICT_DUPLICATE("extension.component.conflict.duplicate", "A component conflict type is duplicated"),
+    /** A component conflict type is invalid. */
+    COMPONENT_CONFLICT_INVALID("extension.component.conflict.invalid", "A component conflict type is invalid"),
+    /** A component descriptor contains an invalid combination of declarations. */
+    COMPONENT_DESCRIPTOR_INVALID("extension.component.descriptor.invalid", "A component descriptor is invalid"),
+    /** A component lifecycle declaration is invalid. */
+    COMPONENT_LIFECYCLE_INVALID(
+            "extension.component.lifecycle.invalid", "A component lifecycle declaration is invalid"),
+    /** A component multiplicity declaration is invalid. */
+    COMPONENT_MULTIPLICITY_INVALID(
+            "extension.component.multiplicity.invalid", "A component multiplicity declaration is invalid"),
+    /** A component spatial-domain declaration is invalid. */
+    COMPONENT_SPATIAL_DOMAIN_INVALID(
+            "extension.component.spatial-domain.invalid", "A component spatial domain is invalid"),
+    /** A component update-phase declaration is invalid. */
+    COMPONENT_UPDATE_PHASE_INVALID("extension.component.update-phase.invalid", "A component update phase is invalid"),
     /** Extension descriptors cannot be enumerated. */
     DISCOVERY_READ_FAILED("extension.discovery.read", "Extension descriptors could not be enumerated"),
     /** An extension descriptor is duplicated. */

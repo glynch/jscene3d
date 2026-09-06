@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.asset;
 import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireNormalizedAbsolute;
 
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -90,6 +91,19 @@ public final class AssetCatalog {
     }
 
     /**
+     * Resolves and validates an entity definition through both its asset graph and component descriptors.
+     *
+     * @param reference typed entity-definition reference
+     * @param types resolved safe extension metadata
+     * @return loaded definition or ordered structural and component diagnostics
+     */
+    public DefinitionLoadResult<EntityDefinition> loadEntity(
+            AssetRef<EntityDefinition> reference, RegisteredTypeCatalog types) {
+        return DefinitionGraphLoader.loadEntity(
+                this, Objects.requireNonNull(reference, "reference"), Objects.requireNonNull(types, "types"));
+    }
+
+    /**
      * Resolves, loads, and validates one world definition and its transitive definition references.
      *
      * @param reference typed world-definition reference
@@ -97,5 +111,18 @@ public final class AssetCatalog {
      */
     public DefinitionLoadResult<WorldDefinition> loadWorld(AssetRef<WorldDefinition> reference) {
         return DefinitionGraphLoader.loadWorld(this, Objects.requireNonNull(reference, "reference"));
+    }
+
+    /**
+     * Resolves and validates a world through both its asset graph and component descriptors.
+     *
+     * @param reference typed world-definition reference
+     * @param types resolved safe extension metadata
+     * @return loaded world or ordered structural and component diagnostics
+     */
+    public DefinitionLoadResult<WorldDefinition> loadWorld(
+            AssetRef<WorldDefinition> reference, RegisteredTypeCatalog types) {
+        return DefinitionGraphLoader.loadWorld(
+                this, Objects.requireNonNull(reference, "reference"), Objects.requireNonNull(types, "types"));
     }
 }

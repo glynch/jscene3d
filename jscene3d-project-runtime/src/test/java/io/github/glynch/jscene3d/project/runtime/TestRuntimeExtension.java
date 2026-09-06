@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.runtime;
 
 import io.github.glynch.jscene3d.game.FixedUpdate;
 import io.github.glynch.jscene3d.game.FrameUpdate;
+import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.runtime.extension.NodeControllerContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ProjectRuntimeExtension;
@@ -22,6 +23,7 @@ import java.util.Optional;
 /** Executable test contribution discovered through the production service boundary. */
 public final class TestRuntimeExtension implements ProjectRuntimeExtension {
     private static final String PREFIX = "io.github.glynch.runtime-test/";
+    private static final ComponentType BLINK = ComponentType.of(PREFIX + "blink", 1);
     private static final RegisteredType GROUP = new RegisteredType(PREFIX + "group-3d", 1);
     private static final RegisteredType TIMER = new RegisteredType(PREFIX + "timer", 1);
     private static final RegisteredType INDICATOR = new RegisteredType(PREFIX + "indicator-3d", 1);
@@ -41,6 +43,7 @@ public final class TestRuntimeExtension implements ProjectRuntimeExtension {
 
     @Override
     public void register(ProjectRuntimeRegistry registry) {
+        registry.registerComponent(BLINK, context -> new Object());
         registry.registerSceneNode(GROUP, this::createGroup);
         registry.registerSceneNode(TIMER, this::createTimer);
         registry.registerSceneNode(INDICATOR, this::createIndicator);

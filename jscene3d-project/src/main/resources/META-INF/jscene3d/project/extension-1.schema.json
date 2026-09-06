@@ -44,6 +44,12 @@
       "items": {
         "$ref": "#/$defs/registeredTypeDescriptor"
       }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/componentTypeDescriptor"
+      }
     }
   },
   "$defs": {
@@ -131,6 +137,117 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/registeredTypeId"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "componentTypeDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "typeVersion",
+        "displayName"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/registeredTypeId"
+        },
+        "typeVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property"
+          }
+        },
+        "signals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/endpoint"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/endpoint"
+          }
+        },
+        "providedCapabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/registeredTypeId"
+          },
+          "uniqueItems": true
+        },
+        "requiredCapabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/registeredTypeId"
+          },
+          "uniqueItems": true
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/localId"
+          },
+          "uniqueItems": true
+        },
+        "multiplicity": {
+          "enum": [
+            "single",
+            "multiple"
+          ],
+          "default": "single"
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/registeredTypeId"
+          },
+          "uniqueItems": true
+        },
+        "spatialDomain": {
+          "enum": [
+            "none",
+            "three-dimensional",
+            "two-dimensional",
+            "user-interface"
+          ],
+          "default": "none"
+        },
+        "lifecycle": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "created",
+              "activated",
+              "deactivated",
+              "destroyed"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "updatePhases": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "before-physics",
+              "after-physics",
+              "frame-update"
+            ]
           },
           "uniqueItems": true
         }

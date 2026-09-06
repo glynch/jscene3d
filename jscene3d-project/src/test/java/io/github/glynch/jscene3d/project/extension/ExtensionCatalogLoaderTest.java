@@ -7,6 +7,15 @@ package io.github.glynch.jscene3d.project.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.project.component.AttachmentPointId;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
+import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
+import io.github.glynch.jscene3d.project.component.ComponentMultiplicity;
+import io.github.glynch.jscene3d.project.component.ComponentSpatialDomain;
+import io.github.glynch.jscene3d.project.component.ComponentType;
+import io.github.glynch.jscene3d.project.component.ComponentUpdatePhase;
+import io.github.glynch.jscene3d.project.component.EndpointId;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
@@ -73,6 +82,37 @@ final class ExtensionCatalogLoaderTest {
                   "scope": "resource",
                   "displayName": "Selection"
                 }
+              ],
+              "components": [
+                {
+                  "id": "example.game/mover",
+                  "typeVersion": 1,
+                  "displayName": "Mover",
+                  "properties": [
+                    {
+                      "id": "speed",
+                      "valueKind": "number",
+                      "required": true,
+                      "displayName": "Speed"
+                    }
+                  ],
+                  "signals": [
+                    {
+                      "id": "moved",
+                      "payload": {"type": "example.game/selection", "typeVersion": 1},
+                      "displayName": "Moved"
+                    }
+                  ],
+                  "actions": [{"id": "stop", "displayName": "Stop"}],
+                  "providedCapabilities": ["example.game/movement"],
+                  "requiredCapabilities": ["example.game/transform"],
+                  "attachments": ["trail"],
+                  "multiplicity": "multiple",
+                  "conflicts": ["example.game/teleporter"],
+                  "spatialDomain": "three-dimensional",
+                  "lifecycle": ["created", "destroyed"],
+                  "updatePhases": ["before-physics"]
+                }
               ]
             }
             """;
@@ -97,6 +137,7 @@ final class ExtensionCatalogLoaderTest {
                 assertThat(extension.presentation().description()).contains("Test extension metadata.");
             });
             assertGroupType(result.catalog());
+            assertMoverComponent(result.catalog());
             assertThat(classLoader.extensionClassLoads()).isZero();
         }
     }
@@ -332,6 +373,7 @@ final class ExtensionCatalogLoaderTest {
             assertThat(schema)
                     .contains("\"$id\": \"https://jscene3d.org/schemas/extension-1.json\"")
                     .contains("\"node-controller\"")
+                    .contains("\"componentTypeDescriptor\"")
                     .contains("\"acceptedReferences\"");
         }
     }
@@ -349,6 +391,23 @@ final class ExtensionCatalogLoaderTest {
         assertThat(visible.editorMetadata()).containsEntry("group", new ProjectValue.TextValue("Rendering"));
         assertThat(selected.payload()).contains(new RegisteredType("example.game/selection", 1));
         assertThat(type.actions()).containsKey("show");
+    }
+
+    /** Verifies representative component metadata independently from executable extension code. */
+    private static void assertMoverComponent(RegisteredTypeCatalog catalog) {
+        var component =
+                catalog.findComponent(ComponentType.of("example.game/mover", 1)).orElseThrow();
+
+        assertThat(component.properties()).containsKey(new PropertyId("speed"));
+        assertThat(component.signals()).containsKey(new EndpointId("moved"));
+        assertThat(component.actions()).containsKey(new EndpointId("stop"));
+        assertThat(component.providedCapabilities()).containsExactly(new CapabilityId("example.game/movement"));
+        assertThat(component.requiredCapabilities()).containsExactly(new CapabilityId("example.game/transform"));
+        assertThat(component.attachments()).containsExactly(new AttachmentPointId("trail"));
+        assertThat(component.multiplicity()).isEqualTo(ComponentMultiplicity.MULTIPLE);
+        assertThat(component.spatialDomain()).isEqualTo(ComponentSpatialDomain.THREE_DIMENSIONAL);
+        assertThat(component.lifecycle()).containsExactly(ComponentLifecycle.CREATED, ComponentLifecycle.DESTROYED);
+        assertThat(component.updatePhases()).containsExactly(ComponentUpdatePhase.BEFORE_PHYSICS);
     }
 
     /** Creates a minimal valid project declaring one extension requirement. */

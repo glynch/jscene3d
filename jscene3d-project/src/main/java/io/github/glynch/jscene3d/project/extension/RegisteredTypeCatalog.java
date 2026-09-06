@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.project.extension;
 
+import io.github.glynch.jscene3d.project.component.ComponentType;
+import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.resource.internal.ResourceCatalogValidator;
@@ -20,19 +22,38 @@ import java.util.Optional;
 public final class RegisteredTypeCatalog {
     private final List<ExtensionDescriptor> extensions;
     private final Map<RegisteredType, RegisteredTypeDescriptor> types;
+    private final Map<ComponentType, ComponentTypeDescriptor> components;
 
     /** Builds a catalog from validated descriptors. */
     RegisteredTypeCatalog(List<ExtensionDescriptor> extensions) {
         this.extensions = List.copyOf(extensions);
         Map<RegisteredType, RegisteredTypeDescriptor> indexed = new LinkedHashMap<>();
+        Map<ComponentType, ComponentTypeDescriptor> indexedComponents = new LinkedHashMap<>();
         for (ExtensionDescriptor extension : this.extensions) {
             for (RegisteredTypeDescriptor descriptor : extension.types()) {
                 if (indexed.putIfAbsent(descriptor.type(), descriptor) != null) {
                     throw new IllegalArgumentException("registered type is duplicated: " + descriptor.type());
                 }
             }
+            for (ComponentTypeDescriptor descriptor : extension.components()) {
+                if (indexedComponents.putIfAbsent(descriptor.type(), descriptor) != null) {
+                    throw new IllegalArgumentException("component type is duplicated: " + descriptor.type());
+                }
+            }
         }
         types = Collections.unmodifiableMap(indexed);
+        components = Collections.unmodifiableMap(indexedComponents);
+    }
+
+    /**
+     * Composes already validated extension descriptors into a deterministic catalog.
+     *
+     * @param extensions safe extension descriptors in resolution order
+     * @return registered-type and component catalog
+     * @throws IllegalArgumentException if an exact type is contributed more than once
+     */
+    public static RegisteredTypeCatalog of(List<ExtensionDescriptor> extensions) {
+        return new RegisteredTypeCatalog(Objects.requireNonNull(extensions, "extensions"));
     }
 
     /**
@@ -61,6 +82,25 @@ public final class RegisteredTypeCatalog {
      */
     public Optional<RegisteredTypeDescriptor> find(RegisteredType type) {
         return Optional.ofNullable(types.get(Objects.requireNonNull(type, "type")));
+    }
+
+    /**
+     * Returns component descriptors in deterministic extension and declaration order.
+     *
+     * @return immutable component descriptors
+     */
+    public List<ComponentTypeDescriptor> componentTypes() {
+        return List.copyOf(components.values());
+    }
+
+    /**
+     * Returns the exact component type version when available.
+     *
+     * @param type exact component type
+     * @return matching descriptor when registered
+     */
+    public Optional<ComponentTypeDescriptor> findComponent(ComponentType type) {
+        return Optional.ofNullable(components.get(Objects.requireNonNull(type, "type")));
     }
 
     /**

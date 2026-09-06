@@ -4,6 +4,14 @@
   "version": "1.0.0",
   "engineRequires": ">=0.1.0-SNAPSHOT <0.2.0",
   "displayName": "Runtime Test",
+  "components": [
+    {
+      "id": "io.github.glynch.runtime-test/blink",
+      "typeVersion": 1,
+      "displayName": "Blink",
+      "updatePhases": ["frame-update"]
+    }
+  ],
   "types": [
     {
       "id": "io.github.glynch.runtime-test/group-3d",

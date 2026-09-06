@@ -5,11 +5,11 @@ primary direction while leaving room for optional third-party adapters. The
 renderer-independent `jscene3d-physics` artifact will own simulation concepts;
 it will not mutate `Object3D` instances or depend on render-frame timing.
 
-The optional `jscene3d-game` artifact will coordinate the eventual game runtime
-and own Physics Bindings between Rigid Bodies and scene objects. This boundary
-keeps physics independently testable, permits fixed simulation updates with
-interpolated rendering, and prevents scene-graph and rendering concerns from
-becoming part of the physics model.
+The game/world integration layer will adapt Entity physics components to the
+Physics World while keeping one explicit transform authority. Presentation may
+interpolate simulation state without allowing physics to own renderer
+`Object3D` instances. This separation keeps physics independently testable and
+prevents entity and rendering concerns from becoming part of its model.
 
 The first physics capability profile will be deliberately bounded rather than
 attempting immediate parity with mature general-purpose engines. It will begin

@@ -8,7 +8,10 @@ module io.github.glynch.jscene3d.project {
     requires com.fasterxml.jackson.databind;
     requires static org.jspecify;
 
+    exports io.github.glynch.jscene3d.project.asset;
+    exports io.github.glynch.jscene3d.project.component;
     exports io.github.glynch.jscene3d.project.diagnostic;
+    exports io.github.glynch.jscene3d.project.entity;
     exports io.github.glynch.jscene3d.project.extension;
     exports io.github.glynch.jscene3d.project.input;
     exports io.github.glynch.jscene3d.project.imports;
@@ -16,6 +19,7 @@ module io.github.glynch.jscene3d.project {
     exports io.github.glynch.jscene3d.project.resource;
     exports io.github.glynch.jscene3d.project.scene;
     exports io.github.glynch.jscene3d.project.value;
+    exports io.github.glynch.jscene3d.project.world;
 
     opens io.github.glynch.jscene3d.project.extension.internal to
             com.fasterxml.jackson.databind;

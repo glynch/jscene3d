@@ -1,145 +1,109 @@
 # Doom-compatible game foundation
 
-This document records the reusable foundation for JScene3D's first Game
-Application. The earlier proposal for a small original Doom-style level without
-WAD compatibility has been superseded by the project and import direction in
-[`game-projects-and-wad-import.md`](game-projects-and-wad-import.md). Doomed
-Corridors now intends to load a pinned Freedoom Phase 2 WAD and progressively
-implement vanilla Doom II data and gameplay semantics.
+This document records the reusable engine foundation and migration direction
+for Doomed Corridors. New game composition follows the accepted
+[entity-component world architecture](../design/entity-component-world-architecture.md),
+while WAD-specific publication is defined in
+[`doom-wad-import.md`](doom-wad-import.md).
 
-## Artifact boundaries
+## Artifact responsibilities
 
-The implementation will be divided by responsibility:
+- `jscene3d-core` remains the renderer-independent graphics foundation.
+- `jscene3d-physics` remains a renderer-independent physics module containing
+  collision objects, shapes, queries, and simulation rather than rendered or
+  game-specific objects.
+- `jscene3d-game` owns genre-independent host lifecycle, input, clocks, and
+  coordination needed by a `World`.
+- `jscene3d-project` owns the safe asset/definition model, loading, validation,
+  migration, catalogs, and diagnostics.
+- World composition owns live entities, components, module registration,
+  scheduling, signals, resource leases, and transactional mutation.
+- Doomed Corridors owns its level rules, actors, weapons, inventory, combat,
+  campaign, HUD, presentation, content selection, and packaging.
 
-- `jscene3d-physics` is an original, pure-Java, renderer-independent Physics
-  Engine. It contains no scene objects, rendering behavior, game rules, WAD
-  concepts, or Doom-specific collision rules.
-- `jscene3d-game` is a reusable, genre-independent Game Engine. It coordinates
-  lifecycle, fixed and rendered updates, input actions, assets, game states,
-  physics bindings, animation, audio, and rendering without defining a
-  particular game's world or rules.
-- `jscene3d-project` is a headless, genre-independent project definition and
-  loading artifact. It exposes validated metadata and runtime configuration to
-  standalone launchers, tools, and the future editor without executing a game.
-- A separately named Game Application artifact owns the first playable title.
-  It contains the level representation, player rules, weapons, enemies,
-  pickups, doors, combat, HUD composition, selected third-party content, and
-  application packaging.
+Generic functionality moves into a reusable module only after it has a clear
+game-independent interface and a demonstrated reuse case.
 
-Generic capabilities will not be promoted out of the Game Application merely
-because another game might hypothetically use them. Promotion requires a clear,
-genre-independent contract and a demonstrated reuse case.
+## Existing reusable capabilities
 
-## Freedoom content strategy
+The current codebase already contains substantial implementation that can be
+adapted behind the new interfaces rather than discarded automatically.
 
-[Freedoom](https://freedoom.github.io/) supplies original levels, artwork,
-sounds, and music for Doom-compatible engines. It is content rather than an
-engine. The first Game Application will reuse a selected, pinned set of Freedoom
-assets under the project's
-[3-clause BSD license](https://github.com/freedoom/freedoom/blob/master/COPYING.adoc),
-retain its copyright notice and disclaimer, and show appropriate attribution.
-Assets will be stored or converted into formats consumed directly by JScene3D;
-they will not be downloaded at runtime.
+### Rendering
 
-The pinned `freedoom2.wad` will remain the authoritative source for its levels
-and content. `jscene3d-wad` validates and exposes ordered opaque WAD lumps, and
-the optional `jscene3d-doom` extension discovers and decodes classic map data
-without graphics, audio, physics, or gameplay dependencies. Its project
-importer emits typed map resources while retaining source provenance. Later
-import slices convert additional Doom content into engine-native runtime
-representations. Doom-compatible gameplay behavior remains in Doomed Corridors,
-not in the Physics Engine or Game Engine.
+JScene3D supports textured and generated geometry, lighting, fog, transparency,
+instancing, custom shaders, ray casting, overlays, glTF loading, animation, and
+line-based debug visualization. Renderer `Scene` and `Object3D` remain
+lower-level implementation concepts; neither becomes the game-facing `World`
+or `Entity` hierarchy.
 
-## Existing rendering foundation
+### Input and timing
 
-JScene3D already provides the rendering capabilities required by the initial
-game: textured and generated geometry, alpha masking, transparency, fog,
-lighting, instancing, custom per-instance attributes, custom shaders,
-raycasting, overlays, GUI controls, glTF loading, animation, and line-based
-debug visualization. The first game does not require PBR materials,
-environment lighting, skeletal animation, post-processing, or shadows, even
-though several are already supported.
+The LWJGL layer provides captured cursor mode, raw mouse motion where available,
+focus state, and input restoration. The game layer provides fixed and rendered
+updates, semantic input actions, bounded catch-up, and camera-relative movement.
+These capabilities should be exposed through the `World` host and scheduling
+interfaces rather than a parallel application runtime.
 
-## Reusable foundation status
+### Physics
 
-### Platform input
+The physics module provides static collision, kinematic bodies, primitive
+shapes, broad- and narrow-phase queries, ray and overlap queries, shape sweeps,
+gravity, floor detection, wall sliding, step traversal, collision sensors,
+overlap events, and debug snapshots.
 
-The LWJGL platform layer now provides a captured cursor mode, optional raw mouse
-motion when GLFW supports it, observable focus state, reliable input and cursor
-restoration on focus loss, and reusable pointer-lock controls.
-
-### Physics Engine
-
-The first `jscene3d-physics` slice provides fixed updates, static collision,
-kinematic bodies, box, sphere, and capsule shapes, broad- and narrow-phase
-collision, ray and overlap queries, shape sweeps, gravity, floor detection, wall
-sliding, bounded step traversal, collision sensors, overlap events, debug lines,
-and a reusable `CharacterController` proven by the physics obstacle course and
-game sandbox.
-
-### Game Engine
-
-The initial `jscene3d-game` slice now provides a lifecycle with separate fixed
-and rendered updates, semantic input action mapping, bounded catch-up behavior,
-camera-relative character movement, and Physics Bindings with render
-interpolation. First- and third-person sandboxes prove that the character
-movement interface remains independent of camera policy. Game-state
-transitions, asset lifetime management, sprite-frame animation, and
-camera-facing billboard batches remain later reusable slices. Static spherical
-and upright cylindrical billboards are now part of the rendering foundation;
-the game module does not own their camera-facing transform policy. The artifact
-must not define sectors, weapons, enemies, damage rules, or a Doom level format.
+Entity physics components will adapt these objects into a `World`. Rendering
+and collision remain independently authored. Each spatial entity has one
+declared transform authority, and presentation interpolation reads physics
+state without transferring physics ownership into the renderer.
 
 ### Audio
 
-A recognizable action game requires positional effects, non-positional user
-interface effects, music, camera-listener updates, and separate master, music,
-and effects volumes. The optional `jscene3d-audio` artifact now provides this
-foundation through buffered Ogg Vorbis clips and an OpenAL implementation. Its
-public interface exposes application audio concepts rather than native handles.
-A multi-backend adapter hierarchy will not be added until a second backend
-creates a real integration seam.
+The audio module supports buffered Ogg Vorbis clips, positional effects,
+non-positional interface effects, music, listener updates, and independent
+master/music/effects gains through OpenAL. A world audio interface hides native
+handles and backend lifetime from components.
 
-## First Game Application slices
+## Freedoom content
 
-The first headless milestone will contain:
+Freedoom supplies content rather than engine behavior. Doomed Corridors uses a
+pinned `freedoom2.wad` under its 3-clause BSD license, retaining the required
+notices and attribution. The WAD remains authoritative and is not downloaded at
+runtime.
 
-- A versioned JScene3D Project Manifest
-- A validated Doomed Corridors project descriptor
-- A pinned and attributed Freedoom Phase 2 WAD source
-- Headless WAD inspection and map/resource enumeration
+Generic WAD access and Doom decoding remain separate from rendering, physics,
+audio, and gameplay. Generated content enters a Doomed Corridors world as
+assets, immutable runtime resources, entity definitions, and ordinary component
+configuration.
 
-The first visual milestone will import and render Freedoom Phase 2 `MAP01`.
-Collision, thing spawning, combat, Doom actor behavior, sector actions, HUD, and
-campaign progression then proceed as independently verifiable vertical slices.
-The initial compatibility target excludes Boom, MBF, Hexen-format, UDMF, and
-GZDoom extensions. Multiplayer, save games, scripting, generalized mod support,
-and exact software-renderer reproduction also remain later work.
+## Migration sequence
 
-## Delivery sequence
+Beacon Garden establishes the generic architecture before Doomed Corridors is
+migrated. The Doomed Corridors sequence is then:
 
-The first six reusable foundation slices are complete:
+1. Adapt the project manifest and asset catalog to reference the startup
+   `WorldDefinition` and WAD import recipe.
+2. Publish `MAP01` through generated assets and a read-only map
+   `EntityDefinition` where entity structure is appropriate.
+3. Render the placed map through entity rendering components.
+4. Register map collision through explicit collision components and shapes.
+5. Compose the player from transform, character physics, input behavior,
+   camera, weapon, and audio components/entities.
+6. Prepare and spawn one projectile definition and complete one combat loop.
+7. Add enemies, pickups, doors, switches, lifts, teleports, exits, sector
+   effects, HUD, and campaign progression in independently testable slices.
+8. Progressively cover the pinned Freedoom campaign.
 
-1. Cursor capture, raw mouse support, focus state, and pointer-lock controls.
-2. The collision-query foundation in `jscene3d-physics`.
-3. Explicit kinematic movement, collision-sensor overlap transitions, and
-   renderer-independent physics debug snapshots, proven by an interactive
-   obstacle-course example in the separate `jscene3d-physics-examples` suite.
-4. A game lifecycle, semantic input actions, and interpolated Physics Bindings,
-   proven by an interactive first-person sandbox in the separate
-   `jscene3d-game-examples` suite.
-5. Reusable named sprite-atlas animations, independent animated-billboard
-   playback, and observable frame, loop, and completion events.
-6. Buffered Ogg Vorbis playback, positional effects, listener updates, and
-   independent master, music, and effects volumes in `jscene3d-audio`, proven
-   by the separate `jscene3d-audio-examples` suite using CC0 assets.
+The first migration target is behavioral parity with the existing playable
+`MAP01` path. New Doom features follow parity rather than distorting the generic
+architecture bootstrap.
 
-The remaining sequence is:
+## Deferred game scope
 
-1. Establish Project Manifest version 1 and prove it with the separate Game
-   Application.
-2. Read and inspect the pinned Freedoom Phase 2 WAD headlessly.
-3. Import and render `MAP01`, then add collision and thing spawning.
-4. Build one complete combat loop before expanding Doom compatibility.
-5. Progressively support the complete pinned Freedoom campaign without
-   broadening reusable artifacts with title-specific concepts.
+Boom, MBF, Hexen-format, UDMF, and GZDoom extensions are outside the first
+compatibility target. Multiplayer, save games, scripting, generalized mod
+support, and exact software-renderer reproduction also remain later work.
+
+The engine may later add rigid-body features, broader resource streaming,
+specialized high-volume simulation, and richer animation. None requires a
+second entity, definition, world, or collision model.

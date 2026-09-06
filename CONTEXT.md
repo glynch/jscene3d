@@ -266,15 +266,10 @@ One deterministic-duration advancement of a Physics World, independent of
 render-frame timing.
 _Avoid_: Render frame, variable update
 
-**Physics Binding**:
-A game-layer association that synchronizes a Rigid Body with a scene object and
-may interpolate between Fixed Updates for presentation.
-_Avoid_: Physics-owned Object3D
-
 **Game Engine**:
-The optional, genre-independent runtime that coordinates application lifecycle,
-game states, input, assets, physics, animation, and rendering through JScene3D.
-It contains no rules, content formats, or assets belonging to a particular game.
+The optional, genre-independent runtime foundation used to host Worlds and
+coordinate application lifecycle, input, assets, physics, animation, audio, and
+rendering. It contains no rules or content belonging to a particular game.
 _Avoid_: Renderer, Physics World, game application
 
 **Game Application**:
@@ -282,11 +277,76 @@ An independently packaged playable title built on the Game Engine. It owns its
 genre-specific rules, world representation, content, assets, and presentation.
 _Avoid_: Game Engine, Feature Example
 
-**Scene Persistence**:
-Future saving and restoration of JScene3D-specific scene state, identities, and
-resource sharing through a versioned native format. It is separate from Asset
-Import.
-_Avoid_: Asset Import, Java object serialization
+**Asset**:
+Independently stored and persistently identified project content, including
+world and entity definitions as well as meshes, materials, textures, audio,
+animation, and imported content.
+_Avoid_: Runtime Resource, Java object
+
+**Project Manifest**:
+The versioned project-level asset that identifies a game project, its startup
+World Definition, enabled modules, asset roots, and project-wide configuration.
+_Avoid_: World Definition, world, entity hierarchy
+
+**World Definition**:
+An authored asset describing one World's settings and its locally authored or
+reusable root-entity placements.
+_Avoid_: Scene Definition, Prefab, Entity Definition
+
+**Entity Definition**:
+An immutable, reusable, single-root authored entity hierarchy with component
+configuration and an explicit public contract.
+_Avoid_: Scene Definition, Prefab, Model Definition
+
+**Entity**:
+A live identity and ownership element composed from typed Components within
+exactly one World. Spatial, rendering, physics, audio, and game behavior are
+provided by Components rather than Entity subclasses.
+_Avoid_: Node, GameObject, Object3D
+
+**Component**:
+A typed capability and its instance state owned by one Entity. A Component may
+contain behavior but does not own world traversal or global scheduling.
+_Avoid_: Controller, script slot, child Entity
+
+**Component Type Descriptor**:
+The registered, versioned description of a Component type's properties,
+capabilities, dependencies, multiplicity, lifecycle participation, signals,
+actions, and editor presentation.
+_Avoid_: Java class name, untyped property bag
+
+**World**:
+The runtime composition and lifetime owner of root Entities and coordinated
+modules such as scheduling, physics, rendering, audio, input, and resources.
+It is neither an Entity nor a JVM-global singleton.
+_Avoid_: Scene, Project Runtime, global service locator
+
+**Placement**:
+An authored occurrence of an Entity Definition in a World Definition or
+another Entity Definition. Its referenced definition root becomes the live
+instance Entity without an additional wrapper.
+_Avoid_: Scene Instance node, copied definition
+
+**Exported Attachment Point**:
+A stable named spatial target in an Entity Definition's public contract that
+allows external attachment without exposing the definition's private internal
+hierarchy.
+_Avoid_: Public mount, hierarchy path, internal entity name
+
+**Runtime Resource**:
+A loaded immutable value derived from an Asset and shareable by live Entity
+instances within the lifetime rules of a World.
+_Avoid_: Asset, mutable instance state
+
+**Spawn**:
+Transactional creation and activation of live Entities from a prepared Entity
+Definition at an explicit ownership and spatial target.
+_Avoid_: Java construction, implicit asset loading
+
+**Runtime Persistence**:
+Future saving and restoration of mutable World and Entity instance state. It is
+separate from authored definitions, Asset Import, and Java object serialization.
+_Avoid_: Scene Persistence, Asset Import, authoring format
 
 **Verified Platform**:
 An operating-system and CPU combination on which the complete current test suite

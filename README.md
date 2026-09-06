@@ -633,25 +633,19 @@ license notices, and exact selected filenames are recorded beside the assets in
 - `jscene3d-gui`: optional themed controls and monitors with bundled TrueType
   text rendering.
 - `jscene3d-gltf`: optional, renderer-independent glTF 2.0 and GLB loading.
-- `jscene3d-project`: versioned project manifests, extension descriptors,
-  scenes, resources, import definitions, and structured validation diagnostics.
+- `jscene3d-project`: versioned project manifests, typed assets,
+  `WorldDefinition` and `EntityDefinition` data, component descriptors,
+  migrations, catalogs, and structured validation diagnostics.
 - `jscene3d-project-import`: deterministic import inspection, preparation,
-  cache publication, and logical artifact access.
-- `jscene3d-project-runtime`: trusted scene composition, shared runtime resource
-  resolution, and deterministic before-physics, physics, and after-physics
-  fixed-update scheduling.
-- `jscene3d-project-runtime-3d`: platform-neutral native 3d scene composition
-  for declarative projects.
-- `jscene3d-project-runtime-lwjgl`: LWJGL render-host adapter for native 3d
-  project runtimes.
+  generated-asset publication, provenance, and disposable cache management.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives
   and opaque lumps as selectable source items and cached artifacts.
 - `jscene3d-doom`: optional classic Doom map discovery, decoding, validation,
   and project import over the generic WAD capability.
-- `jscene3d-game`: optional, genre-independent application lifecycle, Fixed
-  Updates, semantic input actions, and interpolated Physics Bindings.
+- `jscene3d-game`: optional, genre-independent host lifecycle, World timing,
+  semantic input actions, and coordination of runtime module interfaces.
 - `jscene3d-audio`: optional OpenAL-backed clips, playback sources, positional
   attenuation, listener control, and volume categories.
 - `jscene3d-example-framework`: unpublished reusable native hosting, browsing,
@@ -669,3 +663,6 @@ license notices, and exact selected filenames are recorded beside the assets in
 
 See `THREEJS_JAVA_ARCHITECTURE_BLUEPRINT.md`, `CODING_STANDARDS.md`, and
 `CONTEXT.md` for the accepted version 0.1 design and terminology.
+
+The accepted project-facing authoring and runtime direction is documented in
+[`entity-component-world-architecture.md`](docs/design/entity-component-world-architecture.md).

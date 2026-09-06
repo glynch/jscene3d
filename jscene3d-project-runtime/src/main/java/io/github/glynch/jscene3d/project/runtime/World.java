@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.runtime;
 
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -65,6 +66,34 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
      * @return {@code true} after closing
      */
     boolean isClosed();
+
+    /**
+     * Advances one fixed simulation step through the before-physics and after-physics component phases.
+     *
+     * <p>The world owns the zero-based tick and accumulated simulation time supplied to callbacks. Components
+     * participate only when their exact descriptor declares the corresponding phase and their owning entity is
+     * enabled. This method may be called only on an active world and is not reentrant.
+     *
+     * @param step positive fixed-step duration
+     * @throws IllegalArgumentException if {@code step} is not positive
+     * @throws IllegalStateException if the world is not active or another update is executing
+     * @throws WorldUpdateException if a scheduled component callback fails
+     */
+    void advanceFixed(Duration step);
+
+    /**
+     * Advances presentation behavior once for a rendered frame.
+     *
+     * <p>The current completed simulation time and supplied interpolation fraction are exposed through an immutable
+     * callback context. This method may be called only on an active world and is not reentrant.
+     *
+     * @param elapsed non-negative real time accepted for the frame
+     * @param interpolation finite fixed-step interpolation fraction in the inclusive unit interval
+     * @throws IllegalArgumentException if {@code elapsed} is negative or {@code interpolation} is invalid
+     * @throws IllegalStateException if the world is not active or another update is executing
+     * @throws WorldUpdateException if a scheduled component callback fails
+     */
+    void advanceFrame(Duration elapsed, float interpolation);
 
     /**
      * Deactivates and destroys lifecycle participants, then releases component values in reverse order.

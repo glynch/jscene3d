@@ -25,6 +25,7 @@ final class InternalEntity implements Entity {
     private final AssetId authoredAsset;
     private final EntityId authoredId;
     private final Optional<String> name;
+    private final String scheduleIdentity;
     private final boolean locallyEnabled;
     private final boolean enabled;
     private final @Nullable InternalEntity parent;
@@ -46,6 +47,7 @@ final class InternalEntity implements Entity {
         this.authoredAsset = Objects.requireNonNull(authoredAsset, "authoredAsset");
         this.authoredId = Objects.requireNonNull(authoredId, "authoredId");
         this.name = Objects.requireNonNull(name, "name");
+        this.scheduleIdentity = scheduleIdentity(parent, authoredAsset, authoredId);
         this.locallyEnabled = locallyEnabled;
         this.enabled = locallyEnabled && (parent == null || parent.isEnabled());
         this.parent = parent;
@@ -129,6 +131,18 @@ final class InternalEntity implements Entity {
     void complete() {
         requireIncomplete();
         complete = true;
+    }
+
+    /** Returns an authored identity path used only as a stable scheduling tie-breaker. */
+    String scheduleIdentity() {
+        return scheduleIdentity;
+    }
+
+    /** Builds an identity path independent of serialized sibling and component ordering. */
+    private static String scheduleIdentity(
+            @Nullable InternalEntity parent, AssetId authoredAsset, EntityId authoredId) {
+        String local = authoredAsset + ":" + authoredId;
+        return parent == null ? local : parent.scheduleIdentity + '/' + local;
     }
 
     /** Prevents mutation after graph completion. */

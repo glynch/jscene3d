@@ -16,6 +16,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBind
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -55,6 +56,7 @@ final class RuntimeComponentConstructor {
                 }
                 created.add(value);
                 requireLifecycleSupport(plan, descriptor, value);
+                requireUpdateSupport(plan, descriptor, value);
                 boolean bindsReferences = declaresTargetProperties(descriptor);
                 requireReferenceSupport(plan, bindsReferences, value);
                 boolean bindsEndpoints = declaresEndpoints(descriptor);
@@ -68,8 +70,13 @@ final class RuntimeComponentConstructor {
                 if (bindsEndpoints && value instanceof ComponentEndpointBinder binder) {
                     endpointBindings.add(new ComponentEndpointBindingEntry(plan, descriptor, binder));
                 }
-                entries.add(
-                        new WorldComponentEntry(plan.owner(), plan.definition().id(), value, descriptor.lifecycle()));
+                entries.add(new WorldComponentEntry(
+                        plan.owner(),
+                        plan.definition().id(),
+                        descriptor.type(),
+                        value,
+                        descriptor.lifecycle(),
+                        descriptor.updatePhases()));
             }
             bindReferences(bindings);
             bindEndpoints(endpointBindings, allocation.world().endpointRouter());
@@ -121,6 +128,16 @@ final class RuntimeComponentConstructor {
             throw new RuntimeCompositionException(
                     RuntimeDiagnosticCode.COMPONENT_LIFECYCLE_UNSUPPORTED,
                     "component factory result does not implement ComponentLifecycleCallbacks",
+                    plan.location());
+        }
+    }
+
+    /** Requires an update implementation whenever safe metadata declares scheduling participation. */
+    private static void requireUpdateSupport(ComponentPlan plan, ComponentTypeDescriptor descriptor, Object value) {
+        if (!descriptor.updatePhases().isEmpty() && !(value instanceof ComponentUpdateCallbacks)) {
+            throw new RuntimeCompositionException(
+                    RuntimeDiagnosticCode.COMPONENT_UPDATE_UNSUPPORTED,
+                    "component factory result does not implement ComponentUpdateCallbacks",
                     plan.location());
         }
     }

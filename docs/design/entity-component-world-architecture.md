@@ -358,11 +358,12 @@ arbitrary implementation failure rolls back the whole composition. The composer
 then resolves internal connections and definition-contract exports to the exact
 live component endpoints in each definition-instance scope.
 
-The implemented boundary includes initial lifecycle activation but deliberately
-does not schedule updates or support runtime structural mutation. Runtime signal
-dispatch is enabled only after successful world activation and disabled before
-world cleanup. Scheduling, module accessors, and mutation are subsequent slices
-on top of the same composed entity graph.
+The implemented boundary includes initial lifecycle activation and
+descriptor-compiled fixed and frame schedules, but deliberately does not yet
+support runtime structural mutation. Runtime signal dispatch and scheduled
+callbacks are enabled only after successful world activation and stop before
+world cleanup. Module accessors and mutation are subsequent slices on top of
+the same composed entity graph.
 
 ## Definition placement and composition
 
@@ -630,6 +631,22 @@ the points required by their declared transform authority.
 
 Rendering may interpolate previous and current simulation states but must not
 alter authoritative simulation state.
+
+The implemented scheduler exposes `World.advanceFixed(step)` and
+`World.advanceFrame(elapsed, interpolation)`. The world owns the zero-based
+fixed tick and accumulated simulation time. A fixed advance runs every declared
+`before-physics` callback, reserves the engine-owned physics seam, and then runs
+every declared `after-physics` callback. A frame advance runs declared
+`frame-update` callbacks using the completed simulation time.
+
+Any component descriptor declaring an update phase requires its runtime value
+to implement `ComponentUpdateCallbacks`; implementing that Java interface does
+not itself place a component in a schedule. Phase schedules are compiled once
+at composition and ordered by exact component type, stable authored entity
+address, and component identity rather than serialized component, sibling, or
+runtime-extension registration order. Effectively disabled entities are skipped.
+Update callbacks are synchronous, non-reentrant, and report implementation
+failure with the precise phase, live entity, and authored component identity.
 
 ## Signals and actions
 

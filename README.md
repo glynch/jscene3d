@@ -209,7 +209,9 @@ world placements. Trusted component runtime extensions bind exact, descriptor-
 declared component types to Java factories; serialized data never names an
 implementation class. World composition allocates the complete entity graph,
 constructs components, binds stable references and endpoints, and publishes an
-inactive `World` only when the whole operation succeeds.
+inactive `World` only when the whole operation succeeds. After activation, the
+world executes fixed and frame callbacks only for phases selected by each exact
+component descriptor.
 
 Run the headless world-composition example with:
 

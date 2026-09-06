@@ -26,8 +26,9 @@ game-independent interface and a demonstrated reuse case.
 
 ## Existing reusable capabilities
 
-The current codebase already contains substantial implementation that can be
-adapted behind the new interfaces rather than discarded automatically.
+The lower-level libraries already contain capabilities that new entity
+components may call through deliberately designed interfaces. Legacy project
+runtime objects and participation interfaces are not retained or adapted.
 
 ### Rendering
 

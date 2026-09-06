@@ -11,6 +11,7 @@ import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
+import io.github.glynch.jscene3d.project.component.ComponentUpdatePhase;
 import io.github.glynch.jscene3d.project.component.EndpointId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
@@ -21,6 +22,8 @@ import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.Entity;
+import io.github.glynch.jscene3d.project.runtime.FixedUpdateContext;
+import io.github.glynch.jscene3d.project.runtime.FrameUpdateContext;
 import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
@@ -34,10 +37,12 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCal
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -92,12 +97,13 @@ public final class WorldCompositionExample {
         try (World world = result.world()
                 .orElseThrow(() -> new IllegalStateException("world composition failed: " + result.diagnostics()))) {
             world.activate();
+            world.advanceFixed(Duration.ofMillis(16L));
+            world.advanceFrame(Duration.ofMillis(16L), 0.0F);
             for (Entity root : world.roots()) {
                 LabelComponent label =
                         root.component(LABEL_COMPONENT, LabelComponent.class).orElseThrow();
                 LabelLinkComponent link = root.component(LABEL_LINK_COMPONENT, LabelLinkComponent.class)
                         .orElseThrow();
-                link.updateLabel(label.value() + " signalled");
                 LOGGER.info(() -> root.id() + " " + root.name().orElse("unnamed") + " = " + label.value()
                         + ", bound label = " + link.label().value());
             }
@@ -123,6 +129,7 @@ public final class WorldCompositionExample {
                         ComponentLifecycle.ACTIVATED,
                         ComponentLifecycle.DEACTIVATED,
                         ComponentLifecycle.DESTROYED))
+                .updatePhases(Set.of(ComponentUpdatePhase.FRAME_UPDATE))
                 .build();
         PropertyDescriptor target = PropertyDescriptor.required(
                 LABEL_TARGET.value(),
@@ -137,6 +144,7 @@ public final class WorldCompositionExample {
                         LABEL_UPDATE_SIGNAL.value(),
                         LABEL_UPDATE_TYPE,
                         DescriptorPresentation.named("Label update requested"))))
+                .updatePhases(Set.of(ComponentUpdatePhase.AFTER_PHYSICS))
                 .build();
         return new ExtensionDescriptor(
                 EXTENSION_ID,
@@ -165,7 +173,8 @@ public final class WorldCompositionExample {
     }
 
     /** Mutable label independently created for each placed entity and changed through its declared action. */
-    private static final class LabelComponent implements ComponentLifecycleCallbacks, ComponentEndpointBinder {
+    private static final class LabelComponent
+            implements ComponentLifecycleCallbacks, ComponentEndpointBinder, ComponentUpdateCallbacks {
         private String value;
 
         /** Stores the initial effective authored label. */
@@ -202,10 +211,16 @@ public final class WorldCompositionExample {
         public void onDestroyed() {
             LOGGER.info(() -> "Destroyed " + value());
         }
+
+        @Override
+        public void onFrameUpdate(FrameUpdateContext update) {
+            LOGGER.info(() -> "Presented " + value() + " at simulation time " + update.simulationTime());
+        }
     }
 
     /** Component proving that stable authored targets bind independently inside repeated definition placements. */
-    private static final class LabelLinkComponent implements ComponentReferenceBinder, ComponentEndpointBinder {
+    private static final class LabelLinkComponent
+            implements ComponentReferenceBinder, ComponentEndpointBinder, ComponentUpdateCallbacks {
         private Optional<LabelComponent> label = Optional.empty();
         private Optional<RuntimeSignal> updateLabel = Optional.empty();
 
@@ -230,6 +245,11 @@ public final class WorldCompositionExample {
         /** Returns the direct component reference established before world activation. */
         private LabelComponent label() {
             return label.orElseThrow(() -> new IllegalStateException("label reference is not bound"));
+        }
+
+        @Override
+        public void onAfterPhysics(FixedUpdateContext update) {
+            updateLabel(label().value() + " signalled");
         }
     }
 }

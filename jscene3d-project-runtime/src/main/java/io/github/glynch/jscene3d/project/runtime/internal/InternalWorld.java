@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +26,7 @@ final class InternalWorld implements World {
     private final Map<RuntimeEntityId, Entity> entities = new LinkedHashMap<>();
     private final WorldLifecycle lifecycle = new WorldLifecycle();
     private final EndpointRouter endpointRouter = new EndpointRouter();
+    private WorldSchedule schedule = WorldSchedule.empty();
     private boolean complete;
 
     /** Creates an empty world shell visible to factories while its complete graph is constructed. */
@@ -65,6 +67,18 @@ final class InternalWorld implements World {
     }
 
     @Override
+    public void advanceFixed(Duration step) {
+        requireActive();
+        schedule.advanceFixed(step);
+    }
+
+    @Override
+    public void advanceFrame(Duration elapsed, float interpolation) {
+        requireActive();
+        schedule.advanceFrame(elapsed, interpolation);
+    }
+
+    @Override
     public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
         if (lifecycle.isClosed()) {
             throw new IllegalStateException("world is closed");
@@ -74,6 +88,9 @@ final class InternalWorld implements World {
 
     @Override
     public void close() {
+        if (schedule.isExecuting()) {
+            throw new IllegalStateException("world update is in progress");
+        }
         endpointRouter.deactivate();
         lifecycle.close();
     }
@@ -97,6 +114,7 @@ final class InternalWorld implements World {
         requireBuilding();
         entities.values().stream().map(InternalEntity.class::cast).forEach(InternalEntity::complete);
         lifecycle.complete(values);
+        schedule = new WorldSchedule(values);
         complete = true;
     }
 
@@ -116,6 +134,16 @@ final class InternalWorld implements World {
     private void requireBuilding() {
         if (complete || lifecycle.isClosed()) {
             throw new IllegalStateException("world composition is not open");
+        }
+    }
+
+    /** Requires successful activation before component updates can execute. */
+    private void requireActive() {
+        if (lifecycle.isClosed()) {
+            throw new IllegalStateException("world is closed");
+        }
+        if (!lifecycle.isActive()) {
+            throw new IllegalStateException("world is not active");
         }
     }
 }

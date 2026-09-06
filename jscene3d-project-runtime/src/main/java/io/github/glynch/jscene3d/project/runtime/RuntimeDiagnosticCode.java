@@ -51,7 +51,11 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
     COMPONENT_REFERENCE_TYPE_INVALID(
             "runtime.component.reference.type", "An authored component reference has an incompatible runtime type"),
     /** A registered runtime type is missing. */
-    TYPE_MISSING("runtime.type.missing", "A registered runtime type is missing");
+    TYPE_MISSING("runtime.type.missing", "A registered runtime type is missing"),
+    /** A required host-supplied world module is missing. */
+    WORLD_MODULE_MISSING("runtime.world-module.missing", "A required world module is missing"),
+    /** A world-module interface or adapter is bound more than once. */
+    WORLD_MODULE_DUPLICATE("runtime.world-module.duplicate", "A world module binding is duplicated");
 
     private final String value;
     private final String message;

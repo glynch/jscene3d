@@ -358,12 +358,13 @@ arbitrary implementation failure rolls back the whole composition. The composer
 then resolves internal connections and definition-contract exports to the exact
 live component endpoints in each definition-instance scope.
 
-The implemented boundary includes initial lifecycle activation and
-descriptor-compiled fixed and frame schedules, but deliberately does not yet
-support runtime structural mutation. Runtime signal dispatch and scheduled
-callbacks are enabled only after successful world activation and stop before
-world cleanup. Module accessors and mutation are subsequent slices on top of
-the same composed entity graph.
+The implemented boundary includes initial lifecycle activation,
+descriptor-compiled fixed and frame schedules, synchronous runtime signal
+dispatch, safe enablement and destruction commits, and exact host-supplied
+world-module lookup. Scheduled callbacks and signal dispatch are enabled only
+after successful world activation and stop before world cleanup. Resource
+leases, spawning, and concrete rendering, physics, audio, and input adapters
+remain subsequent slices on top of the same composed entity graph.
 
 ## Definition placement and composition
 
@@ -539,10 +540,26 @@ It is not an entity. It is also not a JVM-global singleton: a game world,
 editor preview, thumbnail renderer, and test world may coexist.
 
 The owning world is explicitly available to runtime components through their
-construction or lifecycle context. Public accessors such as `world.physics()`
-and `world.audio()` expose stable module interfaces, not backend implementations.
-Those interfaces allow useful commands and queries without exposing simulation
-stepping, internal collections, backend replacement, or unrestricted mutation.
+construction or lifecycle context. A host binds each world-scoped facility to
+an exact stable Java interface extending `WorldModule`; concrete adapter classes
+are never lookup identities. `world.findModule(interfaceType)` represents an
+optional dependency and `world.requireModule(interfaceType)` represents a
+required dependency. A required lookup made by a component factory fails as a
+structured composition diagnostic at that component's authored location when
+the host omitted the binding. Lookup neither searches parent interfaces nor
+falls back to static or process-global state.
+
+Passing a binding into composition does not itself transfer ownership. When
+composition succeeds, the published world owns every bound adapter and closes
+them in reverse binding order after releasing all entity component values. When
+composition fails, no world is published and the host retains ownership of all
+supplied adapters. Module lookup is unavailable after world closure. Separate
+worlds have separate bindings, allowing a game world, editor preview, thumbnail
+renderer, and tests to coexist without shared mutable world state.
+
+Stable module interfaces allow useful commands and queries without exposing
+simulation stepping, internal collections, backend replacement, or
+unrestricted entity mutation.
 
 The modules are designed as deep modules: callers do not coordinate parsing,
 dependency loading, lifecycle ordering, schedule mutation, backend handles, or

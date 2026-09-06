@@ -42,6 +42,32 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
     Optional<Entity> find(RuntimeEntityId id);
 
     /**
+     * Finds a host-supplied world module by its exact stable interface.
+     *
+     * <p>Lookup does not search implementation classes, parent interfaces, or global state. It is available during
+     * component construction and throughout the world's open lifetime.
+     *
+     * @param type exact interface used by the host binding
+     * @param <T> stable world-module interface
+     * @return bound module when supplied
+     * @throws IllegalStateException if this world is closed
+     */
+    <T extends WorldModule> Optional<T> findModule(Class<T> type);
+
+    /**
+     * Returns a required host-supplied world module by its exact stable interface.
+     *
+     * <p>A component factory may use this operation to declare an executable dependency. Absence during construction
+     * becomes a structured composition diagnostic at that component's authored location.
+     *
+     * @param type exact interface used by the host binding
+     * @param <T> stable world-module interface
+     * @return bound module
+     * @throws IllegalStateException if this world is closed or the interface is not bound
+     */
+    <T extends WorldModule> T requireModule(Class<T> type);
+
+    /**
      * Transactionally enters semantic lifecycle management and activates every initially enabled entity.
      *
      * <p>Creation and activation run owner before owned descendants. A callback failure compensates completed work in
@@ -141,9 +167,11 @@ public interface World extends RuntimeResourceLookup, AutoCloseable {
     void destroy(Entity entity);
 
     /**
-     * Deactivates and destroys lifecycle participants, then releases component values in reverse order.
+     * Deactivates and destroys lifecycle participants, releases component values, then closes owned world modules in
+     * reverse binding order. Cleanup continues after individual failures and retains first-failure precedence.
      *
      * @throws WorldLifecycleException if a declared cleanup callback fails after all cleanup has been attempted
+     * @throws WorldModuleCloseException if module cleanup is the first failure
      */
     @Override
     void close();

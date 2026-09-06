@@ -212,7 +212,10 @@ constructs components, binds stable references and endpoints, and publishes an
 inactive `World` only when the whole operation succeeds. After activation, the
 world executes fixed and frame callbacks only for phases selected by each exact
 component descriptor. Live enable, disable, and subtree-destruction commands go
-through the owning world and commit safely between update phases.
+through the owning world and commit safely between update phases. The host also
+binds world-scoped facilities through exact `WorldModule` interfaces; component
+factories can require those interfaces without discovering backend adapters or
+static global state, and successful worlds own their deterministic cleanup.
 
 Run the headless world-composition example with:
 

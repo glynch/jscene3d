@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLookup;
 import io.github.glynch.jscene3d.project.runtime.World;
+import io.github.glynch.jscene3d.project.runtime.WorldModule;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.time.Duration;
@@ -24,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 /** Composition-time world implementation which owns all constructed component values. */
 final class InternalWorld implements World {
     private final WorldDefinition definition;
+    private final WorldModules modules;
     private final RuntimeResourceLookup resources;
     private final List<Entity> roots = new ArrayList<>();
     private final Map<RuntimeEntityId, Entity> entities = new LinkedHashMap<>();
@@ -36,8 +38,9 @@ final class InternalWorld implements World {
     private boolean committingMutation;
 
     /** Creates an empty world shell visible to factories while its complete graph is constructed. */
-    InternalWorld(WorldDefinition definition, RuntimeResourceLookup resources) {
+    InternalWorld(WorldDefinition definition, WorldModules modules, RuntimeResourceLookup resources) {
         this.definition = Objects.requireNonNull(definition, "definition");
+        this.modules = Objects.requireNonNull(modules, "modules");
         this.resources = Objects.requireNonNull(resources, "resources");
         endpointRouter = new EndpointRouter(this::commitWhenIdle);
     }
@@ -58,9 +61,24 @@ final class InternalWorld implements World {
     }
 
     @Override
+    public <T extends WorldModule> Optional<T> findModule(Class<T> type) {
+        return modules.find(type);
+    }
+
+    @Override
+    public <T extends WorldModule> T requireModule(Class<T> type) {
+        return modules.require(type);
+    }
+
+    @Override
     public void activate() {
-        lifecycle.activate();
-        endpointRouter.activate();
+        try {
+            lifecycle.activate();
+            endpointRouter.activate();
+        } catch (RuntimeException failure) {
+            closeModules(failure);
+            throw failure;
+        }
     }
 
     @Override
@@ -133,7 +151,16 @@ final class InternalWorld implements World {
             throw new IllegalStateException("world structural mutation is in progress");
         }
         endpointRouter.deactivate();
-        lifecycle.close();
+        @Nullable RuntimeException failure = null;
+        try {
+            lifecycle.close();
+        } catch (RuntimeException lifecycleFailure) {
+            failure = lifecycleFailure;
+        }
+        failure = closeModules(failure);
+        if (failure != null) {
+            throw failure;
+        }
     }
 
     /** Adds one allocated entity to the world lookup. */
@@ -291,6 +318,21 @@ final class InternalWorld implements World {
             lifecycle.close();
         } catch (RuntimeException cleanupFailure) {
             failure.addSuppressed(cleanupFailure);
+        }
+        closeModules(failure);
+    }
+
+    /** Closes owned world modules and retains any earlier component or lifecycle failure. */
+    private @Nullable RuntimeException closeModules(@Nullable RuntimeException existing) {
+        try {
+            modules.close();
+            return existing;
+        } catch (RuntimeException moduleFailure) {
+            if (existing == null) {
+                return moduleFailure;
+            }
+            existing.addSuppressed(moduleFailure);
+            return existing;
         }
     }
 

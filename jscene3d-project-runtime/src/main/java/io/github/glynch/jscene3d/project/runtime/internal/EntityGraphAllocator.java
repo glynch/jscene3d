@@ -44,10 +44,11 @@ final class EntityGraphAllocator {
             AssetCatalog assets,
             RegisteredTypeCatalog types,
             WorldDefinition definition,
+            WorldModules modules,
             RuntimeResourceLookup resources) {
         this.assets = assets;
         this.types = types;
-        world = new InternalWorld(definition, resources);
+        world = new InternalWorld(definition, modules, resources);
     }
 
     /** Expands every root and returns a complete graph with deferred component plans. */

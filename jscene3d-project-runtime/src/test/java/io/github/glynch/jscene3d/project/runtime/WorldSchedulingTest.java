@@ -289,7 +289,7 @@ final class WorldSchedulingTest {
                 List.of(),
                 descriptors)));
         return WorldComposer.compose(
-                assets, AssetRef.to(definition.id()), types, List.of(extension(factories)), NO_RESOURCES);
+                assets, AssetRef.to(definition.id()), types, List.of(extension(factories)), List.of(), NO_RESOURCES);
     }
 
     /** Creates the fixture runtime extension using the supplied deterministic registration order. */

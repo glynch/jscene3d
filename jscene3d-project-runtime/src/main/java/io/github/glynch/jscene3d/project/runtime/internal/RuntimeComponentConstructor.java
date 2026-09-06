@@ -106,6 +106,12 @@ final class RuntimeComponentConstructor {
             return Objects.requireNonNull(factory.create(context), "component factory result");
         } catch (RuntimeDiagnosticsException exception) {
             throw exception;
+        } catch (MissingWorldModuleException exception) {
+            throw new RuntimeCompositionException(
+                    RuntimeDiagnosticCode.WORLD_MODULE_MISSING,
+                    "factory for " + type + " requires absent world module "
+                            + exception.moduleType().getName(),
+                    plan.location());
         } catch (RuntimeException exception) {
             throw factoryFailure(type, plan, exception);
         }

@@ -305,7 +305,7 @@ final class WorldEndpointBindingTest {
         DefinitionWriter.write(temporaryDirectory.resolve("endpoints.world.json"), world);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(descriptor()));
-        return WorldComposer.compose(assets, AssetRef.to(WORLD_ID), types, List.of(extension), NO_RESOURCES);
+        return WorldComposer.compose(assets, AssetRef.to(WORLD_ID), types, List.of(extension), List.of(), NO_RESOURCES);
     }
 
     /** Creates the reusable definition with optional internal routing and exported endpoints. */

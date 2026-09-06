@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -296,6 +297,156 @@ final class WorldComposerTest {
         assertThat(world.resolveResource(reference, String.class)).isEqualTo("resource-value");
     }
 
+    /** Exposes exact host bindings to factories and callers, then closes them after component values. */
+    @Test
+    void exposesAndOwnsWorldModulesAfterSuccessfulComposition() throws IOException {
+        List<String> events = new ArrayList<>();
+        RecordingWorldModule module = new RecordingWorldModule("garden", events, false);
+        List<ExampleWorldModule> observed = new ArrayList<>();
+        ComponentFactory<ClosingComponent> factory = context -> {
+            observed.add(context.world().requireModule(ExampleWorldModule.class));
+            return new ClosingComponent("component", events);
+        };
+        WorldModuleBinding<ExampleWorldModule> binding = WorldModuleBinding.of(ExampleWorldModule.class, module);
+
+        World world = composeWithModules(
+                        worldWithComponent(), descriptor(), List.of(extension(factory)), List.of(binding))
+                .world()
+                .orElseThrow();
+
+        assertThat(observed).containsExactly(module);
+        assertThat(world.findModule(ExampleWorldModule.class)).containsSame(module);
+        assertThat(world.requireModule(ExampleWorldModule.class)).isSameAs(module);
+        assertThat(world.findModule(SecondaryWorldModule.class)).isEmpty();
+
+        world.close();
+
+        assertThat(events).containsExactly("close:component", "close-module:garden");
+        assertThatThrownBy(() -> world.findModule(ExampleWorldModule.class))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("closed");
+    }
+
+    /** Reports a factory's absent required module at that component's authored location. */
+    @Test
+    void reportsMissingRequiredWorldModule() throws IOException {
+        ComponentFactory<Object> factory = context -> context.world().requireModule(ExampleWorldModule.class);
+
+        WorldCompositionResult result = compose(worldWithComponent(), descriptor(), factory);
+
+        assertThat(result.world()).isEmpty();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code()).isEqualTo(RuntimeDiagnosticCode.WORLD_MODULE_MISSING);
+            assertThat(diagnostic.location()).isEqualTo("/roots/0/components/0");
+            assertThat(diagnostic.details().get("technicalDetail"))
+                    .asString()
+                    .contains(ExampleWorldModule.class.getName());
+        });
+    }
+
+    /** Rejects ambiguous exact-interface bindings through a structured composition diagnostic. */
+    @Test
+    void rejectsDuplicateWorldModuleInterfaces() throws IOException {
+        List<String> events = new ArrayList<>();
+        WorldModuleBinding<ExampleWorldModule> first =
+                WorldModuleBinding.of(ExampleWorldModule.class, new RecordingWorldModule("first", events, false));
+        WorldModuleBinding<ExampleWorldModule> second =
+                WorldModuleBinding.of(ExampleWorldModule.class, new RecordingWorldModule("second", events, false));
+
+        WorldCompositionResult result = composeWithModules(
+                emptyWorld(), descriptor(), List.of(extension(new RecordingFactory())), List.of(first, second));
+
+        assertThat(result.world()).isEmpty();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code()).isEqualTo(RuntimeDiagnosticCode.WORLD_MODULE_DUPLICATE);
+            assertThat(diagnostic.location()).isEqualTo("/worldModules/1");
+        });
+        assertThat(events).isEmpty();
+    }
+
+    /** Gives independently composed worlds their own exact module adapters. */
+    @Test
+    void isolatesWorldModuleBindingsBetweenWorlds() throws IOException {
+        List<String> firstEvents = new ArrayList<>();
+        List<String> secondEvents = new ArrayList<>();
+        RecordingWorldModule firstModule = new RecordingWorldModule("first", firstEvents, false);
+        RecordingWorldModule secondModule = new RecordingWorldModule("second", secondEvents, false);
+
+        World first = composeWithModules(
+                        emptyWorld(),
+                        descriptor(),
+                        List.of(extension(new RecordingFactory())),
+                        List.of(WorldModuleBinding.of(ExampleWorldModule.class, firstModule)))
+                .world()
+                .orElseThrow();
+        World second = composeWithModules(
+                        emptyWorld(),
+                        descriptor(),
+                        List.of(extension(new RecordingFactory())),
+                        List.of(WorldModuleBinding.of(ExampleWorldModule.class, secondModule)))
+                .world()
+                .orElseThrow();
+
+        assertThat(first.requireModule(ExampleWorldModule.class)).isSameAs(firstModule);
+        assertThat(second.requireModule(ExampleWorldModule.class)).isSameAs(secondModule);
+
+        first.close();
+
+        assertThat(firstEvents).containsExactly("close-module:first");
+        assertThat(secondEvents).isEmpty();
+        assertThat(second.requireModule(ExampleWorldModule.class)).isSameAs(secondModule);
+        second.close();
+    }
+
+    /** Continues reverse binding-order module cleanup and retains the first adapter failure. */
+    @Test
+    void closesAllWorldModulesAfterAdapterFailure() throws IOException {
+        List<String> events = new ArrayList<>();
+        RecordingWorldModule first = new RecordingWorldModule("first", events, false);
+        RecordingSecondaryWorldModule second = new RecordingSecondaryWorldModule("second", events, true);
+        List<WorldModuleBinding<?>> modules = List.of(
+                WorldModuleBinding.of(ExampleWorldModule.class, first),
+                WorldModuleBinding.of(SecondaryWorldModule.class, second));
+        World world = composeWithModules(
+                        emptyWorld(), descriptor(), List.of(extension(new RecordingFactory())), modules)
+                .world()
+                .orElseThrow();
+
+        WorldModuleCloseException failure = catchThrowableOfType(WorldModuleCloseException.class, world::close);
+
+        assertThat(failure.moduleType()).isEqualTo(SecondaryWorldModule.class);
+        assertThat(events).containsExactly("close-module:second", "close-module:first");
+        assertThat(world.isClosed()).isTrue();
+    }
+
+    /** Leaves supplied adapters caller-owned when composition does not publish a world. */
+    @Test
+    void retainsHostOwnershipAfterFailedComposition() throws IOException {
+        List<String> events = new ArrayList<>();
+        RecordingWorldModule module = new RecordingWorldModule("retained", events, false);
+        WorldModuleBinding<ExampleWorldModule> binding = WorldModuleBinding.of(ExampleWorldModule.class, module);
+
+        WorldCompositionResult result =
+                composeWithModules(worldWithComponent(), descriptor(), List.of(), List.of(binding));
+
+        assertThat(result.world()).isEmpty();
+        assertThat(events).isEmpty();
+
+        module.close();
+
+        assertThat(events).containsExactly("close-module:retained");
+    }
+
+    /** Requires bindings to publish stable interfaces rather than adapter implementation classes. */
+    @Test
+    void rejectsConcreteWorldModuleLookupTypes() {
+        RecordingWorldModule module = new RecordingWorldModule("invalid", new ArrayList<>(), false);
+
+        assertThatThrownBy(() -> WorldModuleBinding.of(RecordingWorldModule.class, module))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("interface");
+    }
+
     /** Writes a world with no reusable definitions and composes it through the catalog. */
     private WorldCompositionResult compose(
             WorldDefinition world, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory) throws IOException {
@@ -312,6 +463,17 @@ final class WorldComposerTest {
             throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
         return composeCatalog(world, descriptor, extensions, resources);
+    }
+
+    /** Writes one world and composes it with explicit host world modules. */
+    private WorldCompositionResult composeWithModules(
+            WorldDefinition world,
+            ComponentTypeDescriptor descriptor,
+            List<ComponentRuntimeExtension> extensions,
+            List<WorldModuleBinding<?>> modules)
+            throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
+        return composeCatalog(world, descriptor, extensions, modules, NO_RESOURCES);
     }
 
     /** Writes the fixture assets and composes through the supported catalog interface. */
@@ -338,6 +500,16 @@ final class WorldComposerTest {
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
             RuntimeResourceLookup resources) {
+        return composeCatalog(world, descriptor, extensions, List.of(), resources);
+    }
+
+    /** Scans fixtures and invokes the public world composer with explicit world modules. */
+    private WorldCompositionResult composeCatalog(
+            WorldDefinition world,
+            ComponentTypeDescriptor descriptor,
+            List<ComponentRuntimeExtension> extensions,
+            List<WorldModuleBinding<?>> modules,
+            RuntimeResourceLookup resources) {
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
                 EXTENSION_ID,
@@ -346,7 +518,7 @@ final class WorldComposerTest {
                 DescriptorPresentation.named("Example Game"),
                 List.of(),
                 List.of(descriptor))));
-        return WorldComposer.compose(assets, AssetRef.to(world.id()), types, extensions, resources);
+        return WorldComposer.compose(assets, AssetRef.to(world.id()), types, extensions, modules, resources);
     }
 
     /** Creates the executable contribution for the test component type. */
@@ -396,6 +568,12 @@ final class WorldComposerTest {
     private static WorldDefinition emptyWorld() {
         LocalEntity root = new LocalEntity(LOCAL_ROOT, "Empty", true, List.of(), List.of());
         return new WorldDefinition(WORLD_ASSET, "Empty world", List.of(root));
+    }
+
+    /** Creates one root containing the fixture value component. */
+    private static WorldDefinition worldWithComponent() {
+        LocalEntity root = new LocalEntity(LOCAL_ROOT, "Value", true, List.of(component("1")), List.of());
+        return new WorldDefinition(WORLD_ASSET, "Value world", List.of(root));
     }
 
     /** Creates a single-instance value component descriptor. */
@@ -480,6 +658,56 @@ final class WorldComposerTest {
         @Override
         public void close() {
             events.add("close:" + value);
+        }
+    }
+
+    /** Stable example interface used as an exact host binding. */
+    private interface ExampleWorldModule extends WorldModule {}
+
+    /** Second stable interface used to prove ordered ownership. */
+    private interface SecondaryWorldModule extends WorldModule {}
+
+    /** World-scoped fake recording cleanup and optional adapter failure. */
+    private static final class RecordingWorldModule implements ExampleWorldModule {
+        private final String name;
+        private final List<String> events;
+        private final boolean fails;
+
+        /** Stores caller-owned observations. */
+        private RecordingWorldModule(String name, List<String> events, boolean fails) {
+            this.name = name;
+            this.events = events;
+            this.fails = fails;
+        }
+
+        @Override
+        public void close() {
+            events.add("close-module:" + name);
+            if (fails) {
+                throw new IllegalStateException("deliberate module failure");
+            }
+        }
+    }
+
+    /** Distinct second-interface fake used to prove reverse binding order. */
+    private static final class RecordingSecondaryWorldModule implements SecondaryWorldModule {
+        private final String name;
+        private final List<String> events;
+        private final boolean fails;
+
+        /** Stores caller-owned observations. */
+        private RecordingSecondaryWorldModule(String name, List<String> events, boolean fails) {
+            this.name = name;
+            this.events = events;
+            this.fails = fails;
+        }
+
+        @Override
+        public void close() {
+            events.add("close-module:" + name);
+            if (fails) {
+                throw new IllegalStateException("deliberate module failure");
+            }
         }
     }
 }

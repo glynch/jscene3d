@@ -30,6 +30,8 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
+import io.github.glynch.jscene3d.project.runtime.WorldModule;
+import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
@@ -88,14 +90,18 @@ public final class WorldCompositionExample {
         Path assetDirectory = Path.of(arguments[0]).toAbsolutePath().normalize();
         AssetCatalog assets = AssetCatalog.scan(assetDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(descriptor()));
+        LoggingPresentationModule presentation = new LoggingPresentationModule();
         WorldCompositionResult result = WorldComposer.compose(
                 assets,
                 AssetRef.<WorldDefinition>to(WORLD_ID),
                 types,
                 List.of(new LabelRuntimeExtension()),
+                List.of(WorldModuleBinding.of(PresentationModule.class, presentation)),
                 NO_RESOURCES);
         try (World world = result.world()
                 .orElseThrow(() -> new IllegalStateException("world composition failed: " + result.diagnostics()))) {
+            LOGGER.info(() -> "Presentation module available = "
+                    + (world.requireModule(PresentationModule.class) == presentation));
             world.activate();
             world.advanceFixed(Duration.ofMillis(16L));
             world.advanceFrame(Duration.ofMillis(16L), 0.0F);
@@ -115,6 +121,7 @@ public final class WorldCompositionExample {
             LOGGER.info(() -> mutableRoot.name().orElse("unnamed") + " destroyed = " + mutableRoot.isDestroyed()
                     + ", remaining roots = " + world.roots().size());
         }
+        LOGGER.info(() -> "Presentation module closed = " + presentation.isClosed());
     }
 
     /** Creates the safe descriptor catalog entry used to validate the authored component. */
@@ -173,7 +180,8 @@ public final class WorldCompositionExample {
         public void register(ComponentFactoryRegistry registry) {
             registry.register(LABEL_TYPE, context -> {
                 ProjectValue value = Objects.requireNonNull(context.properties().get(LABEL), "label");
-                return new LabelComponent(((ProjectValue.TextValue) value).value());
+                PresentationModule presentation = context.world().requireModule(PresentationModule.class);
+                return new LabelComponent(((ProjectValue.TextValue) value).value(), presentation);
             });
             registry.register(LABEL_LINK_TYPE, context -> new LabelLinkComponent());
         }
@@ -183,10 +191,12 @@ public final class WorldCompositionExample {
     private static final class LabelComponent
             implements ComponentLifecycleCallbacks, ComponentEndpointBinder, ComponentUpdateCallbacks {
         private String value;
+        private final PresentationModule presentation;
 
         /** Stores the initial effective authored label. */
-        private LabelComponent(String value) {
+        private LabelComponent(String value, PresentationModule presentation) {
             this.value = Objects.requireNonNull(value, "value");
+            this.presentation = Objects.requireNonNull(presentation, "presentation");
         }
 
         @Override
@@ -221,7 +231,7 @@ public final class WorldCompositionExample {
 
         @Override
         public void onFrameUpdate(FrameUpdateContext update) {
-            LOGGER.info(() -> "Presented " + value() + " at simulation time " + update.simulationTime());
+            presentation.present(value(), update.simulationTime());
         }
     }
 
@@ -257,6 +267,35 @@ public final class WorldCompositionExample {
         @Override
         public void onAfterPhysics(FixedUpdateContext update) {
             updateLabel(label().value() + " signalled");
+        }
+    }
+
+    /** Stable host-facing interface used by presentation components in this world. */
+    private interface PresentationModule extends WorldModule {
+        /** Presents one label using the completed simulation time. */
+        void present(String label, Duration simulationTime);
+    }
+
+    /** Example world-scoped adapter standing in for a future rendering implementation. */
+    private static final class LoggingPresentationModule implements PresentationModule {
+        private boolean closed;
+
+        @Override
+        public void present(String label, Duration simulationTime) {
+            if (closed) {
+                throw new IllegalStateException("presentation module is closed");
+            }
+            LOGGER.info(() -> "Presented " + label + " at simulation time " + simulationTime);
+        }
+
+        /** Returns whether world closure released this adapter. */
+        private boolean isClosed() {
+            return closed;
+        }
+
+        @Override
+        public void close() {
+            closed = true;
         }
     }
 }

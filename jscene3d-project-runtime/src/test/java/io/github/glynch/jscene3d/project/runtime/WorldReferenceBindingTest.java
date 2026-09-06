@@ -202,7 +202,7 @@ final class WorldReferenceBindingTest {
         DefinitionWriter.write(temporaryDirectory.resolve("reference.world.json"), world);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(descriptor()));
-        return WorldComposer.compose(assets, AssetRef.to(WORLD_ID), types, List.of(extension), NO_RESOURCES);
+        return WorldComposer.compose(assets, AssetRef.to(WORLD_ID), types, List.of(extension), List.of(), NO_RESOURCES);
     }
 
     /** Creates the reusable definition whose child targets its root component by stable identity. */

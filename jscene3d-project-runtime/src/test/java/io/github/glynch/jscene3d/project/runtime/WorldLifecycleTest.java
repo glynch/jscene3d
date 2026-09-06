@@ -378,7 +378,7 @@ final class WorldLifecycleTest {
                 List.of(),
                 List.of(descriptor))));
         return WorldComposer.compose(
-                assets, AssetRef.to(definition.id()), types, List.of(extension(factory)), NO_RESOURCES);
+                assets, AssetRef.to(definition.id()), types, List.of(extension(factory)), List.of(), NO_RESOURCES);
     }
 
     /** Creates the fixture runtime extension for one supplied factory. */

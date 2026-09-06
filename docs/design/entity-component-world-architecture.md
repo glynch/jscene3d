@@ -864,6 +864,37 @@ model hierarchy should be introduced only if measured performance and real
 authoring cases demonstrate that the normal entity/component model is
 insufficient.
 
+## Project hosting and exported games
+
+Editor play and exported games enter the engine through the same `ProjectHost`
+contract. The host, rather than application source code, loads `project.json`,
+discovers the runtime extensions present in the application, scans authored
+assets, resolves the manifest's startup world, composes that world, and returns
+a `HostedProject`. Applications therefore do not generate or maintain a
+project-specific world loader.
+
+An application supplies behavior through a `ComponentRuntimeExtension`
+provider. A provider which also implements `ApplicationRuntimeExtension` may
+perform application-level preparation after composition. Discovery only makes
+a provider available; the application extension named by the project manifest
+controls which provider participates as the application entry point. Component
+participation remains controlled by authored component type declarations.
+
+The host executable selects a `ProjectRuntimeEnvironment`. The environment
+supplies the engine capabilities included in that build: built-in component
+descriptors and factories, fresh world subsystem adapters, and runtime resource
+loading. Editor preview can provide a preview environment while a desktop
+export can provide rendering, input, audio, and physics adapters without
+changing application code or authored data.
+
+An exported game will package the generic launcher and host, its selected
+runtime environment and engine modules, application runtime-extension
+providers, and the project assets. Its generated launcher identifies the
+packaged project root and invokes `ProjectHost`; it does not generate a Java
+class which knows the structure of the startup world. Packaging and platform
+launcher generation are derived build concerns and do not introduce another
+authoring format.
+
 ## Serialization and schema evolution
 
 The canonical authoring format is deterministic UTF-8 JSON.

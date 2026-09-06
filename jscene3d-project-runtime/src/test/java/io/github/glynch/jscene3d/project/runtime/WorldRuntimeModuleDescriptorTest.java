@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import java.lang.module.ModuleDescriptor;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,6 +32,6 @@ final class WorldRuntimeModuleDescriptorTest {
                 .containsExactlyInAnyOrder(
                         "io.github.glynch.jscene3d.project.runtime",
                         "io.github.glynch.jscene3d.project.runtime.extension");
-        assertThat(descriptor.uses()).isEmpty();
+        assertThat(descriptor.uses()).containsExactly(ComponentRuntimeExtension.class.getName());
     }
 }

@@ -9,4 +9,6 @@ module io.github.glynch.jscene3d.project.runtime {
 
     exports io.github.glynch.jscene3d.project.runtime;
     exports io.github.glynch.jscene3d.project.runtime.extension;
+
+    uses io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 }

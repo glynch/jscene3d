@@ -106,7 +106,8 @@ public final class CacheIndexCodec {
         ImportArtifactKind kind = ImportArtifactKind.valueOf(artifact.kind());
         ImportArtifactDescriptor descriptor =
                 switch (kind) {
-                    case SCENE -> ImportArtifactDescriptor.scene(artifact.identity(), artifact.references());
+                    case ENTITY_DEFINITION ->
+                        ImportArtifactDescriptor.entityDefinition(artifact.identity(), artifact.references());
                     case RESOURCE -> resourceDescriptor(artifact);
                     case PAYLOAD -> ImportArtifactDescriptor.payload(artifact.identity(), artifact.mediaType());
                 };

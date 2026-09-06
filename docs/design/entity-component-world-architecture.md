@@ -386,6 +386,11 @@ through `Spatial3dWorldModule`. Its internal `Scene`, `Object3D`, camera, light,
 and mesh objects remain adapter details. Spawning, physics, audio, and input
 adapters remain subsequent slices on top of the same composed entity graph.
 
+Project import artifacts distinguish generated `EntityDefinition` documents
+from typed runtime-resource documents and opaque payloads. Generated definitions
+use the same canonical serializer as authored definitions and can be written
+directly into importer-owned staging output without exposing cache paths.
+
 ## Definition placement and composition
 
 Loading or importing an `EntityDefinition` does not create live entities. The

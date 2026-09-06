@@ -94,8 +94,8 @@ reproduction do not block this import path.
 1. Prove the canonical definitions, component descriptors, world composition,
    lifecycle, spawning, and collision signal path in Beacon Garden.
 2. Retain the existing validated WAD archive and Doom map decoding modules.
-3. Adapt import publication to stable assets, generated entity definitions,
-   immutable runtime resources, and the new asset catalog.
+3. Replace the current import publication with stable assets, generated entity
+   definitions, immutable runtime resources, and the new asset catalog.
 4. Build a Doomed Corridors `WorldDefinition` that places generated `MAP01`
    content through the same composer used by Beacon Garden.
 5. Migrate the player and one complete combat loop to entities and components.

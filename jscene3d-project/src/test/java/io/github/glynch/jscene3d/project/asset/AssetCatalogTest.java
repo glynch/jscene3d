@@ -27,6 +27,7 @@ import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -112,6 +113,25 @@ final class AssetCatalogTest {
                         "\"attachments\"",
                         "\"resourceBindings\"");
         assertThat(catalog.loadEntity(AssetRef.to(BEACON_ASSET)).definition()).contains(definition);
+    }
+
+    /** Writes generated definitions without taking ownership of the importing subsystem's stream. */
+    @Test
+    void writesGeneratedDefinitionsToCallerOwnedStreams() throws IOException {
+        ByteArrayOutputStream entityOutput = new ByteArrayOutputStream();
+        ByteArrayOutputStream worldOutput = new ByteArrayOutputStream();
+
+        DefinitionWriter.write(entityOutput, beaconDefinition());
+        DefinitionWriter.write(worldOutput, gardenWorld("entities/beacon.entity.json"));
+        entityOutput.write('!');
+        worldOutput.write('!');
+
+        assertThat(entityOutput.toString(StandardCharsets.UTF_8))
+                .contains("\"assetType\" : \"entity-definition\"")
+                .endsWith("\n!");
+        assertThat(worldOutput.toString(StandardCharsets.UTF_8))
+                .contains("\"assetType\" : \"world-definition\"")
+                .endsWith("\n!");
     }
 
     /** Rejects duplicate identities across otherwise independently valid asset files. */

@@ -23,6 +23,7 @@ import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -57,6 +58,22 @@ public final class DefinitionWriter {
     }
 
     /**
+     * Writes one reusable entity definition to caller-owned output.
+     *
+     * <p>This method consumes but does not close {@code output}. It is intended for generated definitions whose
+     * physical storage is owned by another subsystem, such as the project import cache.
+     *
+     * @param output destination owned by the caller
+     * @param definition generated entity definition
+     * @throws IOException when the output cannot be serialized or written
+     */
+    public static void write(OutputStream output, EntityDefinition definition) throws IOException {
+        OutputStream validOutput = Objects.requireNonNull(output, "output");
+        EntityDefinition validDefinition = Objects.requireNonNull(definition, "definition");
+        validOutput.write(serializeEntity(validDefinition));
+    }
+
+    /**
      * Writes one world definition, replacing the target only after serialization succeeds.
      *
      * @param target output file
@@ -67,6 +84,21 @@ public final class DefinitionWriter {
         Path validTarget = Objects.requireNonNull(target, "target");
         WorldDefinition validDefinition = Objects.requireNonNull(definition, "definition");
         writeBytes(validTarget, serializeWorld(validDefinition));
+    }
+
+    /**
+     * Writes one world definition to caller-owned output.
+     *
+     * <p>This method consumes but does not close {@code output}.
+     *
+     * @param output destination owned by the caller
+     * @param definition generated world definition
+     * @throws IOException when the output cannot be serialized or written
+     */
+    public static void write(OutputStream output, WorldDefinition definition) throws IOException {
+        OutputStream validOutput = Objects.requireNonNull(output, "output");
+        WorldDefinition validDefinition = Objects.requireNonNull(definition, "definition");
+        validOutput.write(serializeWorld(validDefinition));
     }
 
     /** Serializes one entity definition into a complete in-memory document. */

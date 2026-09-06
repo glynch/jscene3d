@@ -34,15 +34,19 @@ public final class ImportArtifactDescriptor {
     }
 
     /**
-     * Describes a serialized scene.
+     * Describes a serialized generated entity definition.
      *
      * @param identity deterministic importer-local output identity
-     * @param references other outputs referenced by the scene
-     * @return scene artifact descriptor
+     * @param references other outputs referenced by the definition
+     * @return entity-definition artifact descriptor
      */
-    public static ImportArtifactDescriptor scene(String identity, List<String> references) {
+    public static ImportArtifactDescriptor entityDefinition(String identity, List<String> references) {
         return new ImportArtifactDescriptor(
-                identity, ImportArtifactKind.SCENE, Optional.empty(), Optional.of("application/json"), references);
+                identity,
+                ImportArtifactKind.ENTITY_DEFINITION,
+                Optional.empty(),
+                Optional.of("application/json"),
+                references);
     }
 
     /**

@@ -5,6 +5,11 @@
 package io.github.glynch.jscene3d.project.importing;
 
 import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
+import io.github.glynch.jscene3d.project.entity.EntityDefinition;
+import io.github.glynch.jscene3d.project.entity.EntityId;
+import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.importing.extension.ImportInspectionContext;
 import io.github.glynch.jscene3d.project.importing.extension.ImportPreparationContext;
@@ -17,11 +22,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /** Synthetic importer exercising the public extension seam. */
 final class TestImportExtension implements ProjectImportExtension {
     private static final RegisteredType IMPORTER =
             new RegisteredType("io.github.glynch.import-test/source-importer", 1);
+    private static final AssetId DEFINITION_ID = new AssetId(UUID.fromString("4e230064-13e5-4ad2-bba8-8fc7dbf4ab32"));
+    private static final EntityId ROOT_ID = new EntityId(UUID.fromString("cb40d4a7-ef36-4bd4-9598-fe7180d78a24"));
 
     @Override
     public String id() {
@@ -75,6 +83,13 @@ final class TestImportExtension implements ProjectImportExtension {
                 throw new IOException("synthetic import failure");
             }
             String content = source + ":" + Files.readString(dependency, StandardCharsets.UTF_8);
+            EntityDefinition definition = new EntityDefinition(
+                    DEFINITION_ID,
+                    "Imported text",
+                    new LocalEntity(ROOT_ID, "Imported text", true, List.of(), List.of()));
+            context.artifact(
+                    ImportArtifactDescriptor.entityDefinition("definitions/main", List.of("output/main")),
+                    output -> DefinitionWriter.write(output, definition));
             context.artifact(
                     ImportArtifactDescriptor.payload("output/main", "text/plain"),
                     output -> output.write(content.getBytes(StandardCharsets.UTF_8)));

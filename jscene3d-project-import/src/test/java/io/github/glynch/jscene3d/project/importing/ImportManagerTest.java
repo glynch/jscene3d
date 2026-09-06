@@ -120,12 +120,16 @@ final class ImportManagerTest {
             assertThat(prepared.preview().isValid()).isTrue();
             assertThat(prepared.preview().artifacts())
                     .extracting(ImportedArtifactMetadata::identity)
-                    .containsExactly("output/main");
+                    .containsExactly("definitions/main", "output/main");
+            assertThat(prepared.preview().artifacts().getFirst().descriptor().kind())
+                    .isEqualTo(ImportArtifactKind.ENTITY_DEFINITION);
             prepared.commit();
             assertThat(prepared.isCommitted()).isTrue();
         }
 
         assertThat(manager.status(definition).state()).isEqualTo(ImportState.CURRENT);
+        assertThat(read(manager, definition, "definitions/main"))
+                .contains("\"assetType\" : \"entity-definition\"", "\"name\" : \"Imported text\"");
         assertThat(read(manager, definition, "output/main")).isEqualTo("source-v1:dependency-v1");
         assertThat(phases).contains(ImportPhase.INSPECTING, ImportPhase.PREPARING, ImportPhase.COMMITTING);
     }

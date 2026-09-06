@@ -27,7 +27,8 @@ final class ImportModelTest {
     /** Preserves all artifact descriptor metadata and value semantics. */
     @Test
     void describesArtifacts() {
-        ImportArtifactDescriptor scene = ImportArtifactDescriptor.scene("scenes/main", List.of("resources/world"));
+        ImportArtifactDescriptor definition =
+                ImportArtifactDescriptor.entityDefinition("definitions/main", List.of("resources/world"));
         ImportArtifactDescriptor resource =
                 ImportArtifactDescriptor.resource("resources/world", RESOURCE_TYPE, List.of("payloads/world"));
         ImportArtifactDescriptor payload =
@@ -35,14 +36,14 @@ final class ImportModelTest {
         ImportArtifactDescriptor equivalent =
                 ImportArtifactDescriptor.resource("resources/world", RESOURCE_TYPE, List.of("payloads/world"));
 
-        assertThat(scene.kind()).isEqualTo(ImportArtifactKind.SCENE);
-        assertThat(scene.mediaType()).contains("application/json");
+        assertThat(definition.kind()).isEqualTo(ImportArtifactKind.ENTITY_DEFINITION);
+        assertThat(definition.mediaType()).contains("application/json");
         assertThat(resource.resourceType()).contains(RESOURCE_TYPE);
         assertThat(resource.references()).containsExactly("payloads/world");
         assertThat(payload.kind()).isEqualTo(ImportArtifactKind.PAYLOAD);
         assertThat(payload.resourceType()).isEmpty();
         assertThat(resource).isEqualTo(equivalent).hasSameHashCodeAs(equivalent);
-        assertThat(resource).isNotEqualTo(scene).isNotEqualTo(null);
+        assertThat(resource).isNotEqualTo(definition).isNotNull();
         assertThat(resource.toString()).contains("resources/world", "RESOURCE");
     }
 
@@ -59,7 +60,7 @@ final class ImportModelTest {
                 .isThrownBy(() -> ImportArtifactDescriptor.payload("output/", "text/plain"));
         assertThatIllegalArgumentException().isThrownBy(() -> ImportArtifactDescriptor.payload("output", " "));
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> ImportArtifactDescriptor.scene("scene", List.of("same", "same")));
+                .isThrownBy(() -> ImportArtifactDescriptor.entityDefinition("definition", List.of("same", "same")));
     }
 
     /** Preserves inspected source metadata, relationships, and stable value semantics. */

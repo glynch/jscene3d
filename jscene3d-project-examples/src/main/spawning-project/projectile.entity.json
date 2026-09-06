@@ -1,0 +1,40 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/entity-definition-1.json",
+  "assetId" : "b78d0f03-2cdb-4142-8d41-14245cfc7453",
+  "assetType" : "entity-definition",
+  "formatVersion" : 1,
+  "name" : "Projectile",
+  "contract" : {
+    "parameters" : [ {
+      "id" : "speed",
+      "valueKind" : "number",
+      "required" : true,
+      "target" : {
+        "entityId" : "32a3b985-9a49-4ef2-98a8-086f947e37e8",
+        "componentId" : "6810ad02-0002-421a-8fd0-b856876795e8",
+        "propertyId" : "speed"
+      }
+    } ],
+    "signals" : [ ],
+    "actions" : [ ],
+    "capabilities" : [ ],
+    "attachments" : [ ],
+    "resourceBindings" : [ ]
+  },
+  "connections" : [ ],
+  "root" : {
+    "entryType" : "local",
+    "entityId" : "32a3b985-9a49-4ef2-98a8-086f947e37e8",
+    "name" : "Projectile",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "6810ad02-0002-421a-8fd0-b856876795e8",
+      "type" : "io.github.glynch.jscene3d.spawning-example/projectile",
+      "typeVersion" : 1,
+      "properties" : {
+        "speed" : 1
+      }
+    } ],
+    "children" : [ ]
+  }
+}

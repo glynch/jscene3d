@@ -229,6 +229,12 @@ Run the headless authored-collision example with:
 ./mvnw -pl jscene3d-project-examples -am -Prun-collision-3d-example compile
 ```
 
+Run the headless prepared-definition spawning example with:
+
+```shell
+./mvnw -pl jscene3d-project-examples -am -Prun-runtime-spawning-example compile
+```
+
 ## WAD archives
 
 The optional `jscene3d-wad` artifact validates IWAD and PWAD containers without

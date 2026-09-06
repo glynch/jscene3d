@@ -19,13 +19,13 @@ import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
-import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
@@ -35,20 +35,17 @@ final class EntityGraphAllocator {
     private final RegisteredTypeCatalog types;
     private final InternalWorld world;
     private final Map<AssetId, EntityDefinition> definitions = new LinkedHashMap<>();
+    private final List<InternalEntity> entities = new ArrayList<>();
     private final List<ComponentPlan> components = new ArrayList<>();
     private final List<RuntimeConnectionPlan> connections = new ArrayList<>();
-    private long nextEntityId = 1L;
+    private boolean preparedOnly;
+    private boolean publish = true;
 
-    /** Stores immutable composition dependencies and creates the empty world shell. */
-    EntityGraphAllocator(
-            DefinitionResolver definitionResolver,
-            RegisteredTypeCatalog types,
-            WorldDefinition definition,
-            WorldModules modules,
-            RuntimeResourceProvider resources) {
-        this.definitionResolver = definitionResolver;
-        this.types = types;
-        world = new InternalWorld(definition, modules, resources);
+    /** Stores the world and its immutable composition dependencies. */
+    EntityGraphAllocator(InternalWorld world) {
+        this.world = world;
+        definitionResolver = world.definitionResolver();
+        types = world.types();
     }
 
     /** Expands every root and returns a complete graph with deferred component plans. */
@@ -61,6 +58,45 @@ final class EntityGraphAllocator {
         }
         planConnections(scope, definition.connections(), "/connections");
         return new AllocatedWorld(world, components, connections);
+    }
+
+    /** Allocates one complete reusable-definition instance without publishing it into the live world. */
+    AllocatedInstance allocateSpawn(
+            InternalPreparedEntityDefinition prepared,
+            InternalEntity parent,
+            Map<PropertyId, ProjectValue> parameters) {
+        preparedOnly = true;
+        publish = false;
+        definitions.putAll(prepared.definitions());
+        EntityDefinition definition = prepared.definition();
+        validateParameters(definition.contract(), parameters);
+        EntityInstanceScope argumentScope = new EntityInstanceScope(definition.id(), InstanceOverrides.empty());
+        Map<PropertyId, ScopedProjectValue> arguments = scoped(prepared.resourceBindings(), argumentScope);
+        arguments.putAll(scoped(parameters, argumentScope));
+        EntityInstanceScope scope =
+                new EntityInstanceScope(definition.id(), InstanceOverrides.resolve(definition.contract(), arguments));
+        LocalEntity authoredRoot = definition.root();
+        InternalEntity root = createDetachedRoot(definition, authoredRoot, parent);
+        scope.bind(authoredRoot.id(), root);
+        planComponents(scope, authoredRoot, root, "/definition/root");
+        allocateChildren(scope, authoredRoot.children(), root, "/definition/root");
+        planConnections(scope, definition.connections(), "/definition/connections");
+        return new AllocatedInstance(world, root, entities, components, connections);
+    }
+
+    /** Creates the unpublished root of one runtime definition instance. */
+    private InternalEntity createDetachedRoot(
+            EntityDefinition definition, LocalEntity authoredRoot, InternalEntity parent) {
+        InternalEntity root = new InternalEntity(
+                world,
+                world.allocateEntityId(),
+                definition.id(),
+                authoredRoot.id(),
+                authoredRoot.name(),
+                authoredRoot.isEnabled(),
+                parent);
+        entities.add(root);
+        return root;
     }
 
     /** Allocates a local entity or expands a reusable-definition placement. */
@@ -203,12 +239,17 @@ final class EntityGraphAllocator {
             boolean locallyEnabled,
             @Nullable InternalEntity parent) {
         InternalEntity entity = new InternalEntity(
-                world, new RuntimeEntityId(nextEntityId++), authoredAsset, authoredId, name, locallyEnabled, parent);
-        world.addEntity(entity);
-        if (parent == null) {
-            world.addRoot(entity);
+                world, world.allocateEntityId(), authoredAsset, authoredId, name, locallyEnabled, parent);
+        entities.add(entity);
+        if (publish) {
+            world.addEntity(entity);
+            if (parent == null) {
+                world.addRoot(entity);
+            } else {
+                parent.addChild(entity);
+            }
         } else {
-            parent.addChild(entity);
+            Objects.requireNonNull(parent, "detached child parent").addChild(entity);
         }
         return entity;
     }
@@ -219,6 +260,12 @@ final class EntityGraphAllocator {
         EntityDefinition existing = definitions.get(id);
         if (existing != null) {
             return existing;
+        }
+        if (preparedOnly) {
+            throw new RuntimeCompositionException(
+                    RuntimeDiagnosticCode.ENTITY_PREPARATION_FAILED,
+                    "prepared definition graph omits nested definition " + id,
+                    "");
         }
         DefinitionLoadResult<EntityDefinition> result = definitionResolver.loadEntity(placement.definition(), types);
         if (!result.isValid()) {
@@ -238,5 +285,37 @@ final class EntityGraphAllocator {
                 .forEach((property, value) -> result.put(property, new ScopedProjectValue(value, containingScope)));
         result.putAll(containingScope.overrides().placement(placement.id()));
         return result;
+    }
+
+    /** Associates portable argument values with their caller's definition-instance scope. */
+    private static Map<PropertyId, ScopedProjectValue> scoped(
+            Map<PropertyId, ProjectValue> values, EntityInstanceScope scope) {
+        Map<PropertyId, ScopedProjectValue> result = new LinkedHashMap<>();
+        values.forEach((property, value) -> result.put(property, new ScopedProjectValue(value, scope)));
+        return result;
+    }
+
+    /** Requires instance arguments to be declared compatible ordinary parameters. */
+    private static void validateParameters(EntityContract contract, Map<PropertyId, ProjectValue> parameters) {
+        for (Map.Entry<PropertyId, ProjectValue> argument : parameters.entrySet()) {
+            EntityContract.Parameter parameter = contract.parameters().get(argument.getKey());
+            if (parameter == null || !parameter.accepts(argument.getValue())) {
+                throw new RuntimeCompositionException(
+                        RuntimeDiagnosticCode.SPAWN_ARGUMENT_INVALID,
+                        "unknown or incompatible spawn parameter " + argument.getKey(),
+                        "/arguments");
+            }
+        }
+        contract.parameters().values().stream()
+                .filter(EntityContract.Parameter::isRequired)
+                .map(EntityContract.Parameter::id)
+                .filter(id -> !parameters.containsKey(id))
+                .findFirst()
+                .ifPresent(id -> {
+                    throw new RuntimeCompositionException(
+                            RuntimeDiagnosticCode.SPAWN_ARGUMENT_INVALID,
+                            "required spawn parameter is absent: " + id,
+                            "/arguments");
+                });
     }
 }

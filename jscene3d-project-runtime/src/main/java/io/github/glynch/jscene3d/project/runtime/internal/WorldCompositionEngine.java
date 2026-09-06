@@ -43,8 +43,10 @@ public final class WorldCompositionEngine {
             RuntimeResourceProvider resources) {
         FactoryBindings factories = WorldRuntimeExtensions.register(source, types, extensions);
         WorldModules worldModules = new WorldModules(modules);
-        AllocatedWorld allocation =
-                new EntityGraphAllocator(definitions, types, definition, worldModules, resources).allocate();
+        WorldCompositionServices services =
+                new WorldCompositionServices(source, definitions, types, factories, worldModules, resources);
+        InternalWorld world = new InternalWorld(definition, services);
+        AllocatedWorld allocation = new EntityGraphAllocator(world).allocate();
         return RuntimeComponentConstructor.construct(allocation, types, factories);
     }
 }

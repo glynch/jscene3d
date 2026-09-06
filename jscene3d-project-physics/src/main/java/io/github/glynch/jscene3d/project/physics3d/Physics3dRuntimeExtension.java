@@ -4,7 +4,10 @@
  */
 package io.github.glynch.jscene3d.project.physics3d;
 
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import java.util.Objects;
@@ -24,18 +27,7 @@ public final class Physics3dRuntimeExtension implements ComponentRuntimeExtensio
     @Override
     public void register(ComponentFactoryRegistry registry) {
         ComponentFactoryRegistry validRegistry = Objects.requireNonNull(registry, "registry");
-        validRegistry.register(Physics3dDescriptors.collisionShapeType(), context -> {
-            AuthoredCollision3d.Shape authored = AuthoredCollision3d.shape(context.properties());
-            CollisionShape3dResource resource =
-                    context.resolveResource(authored.resource(), CollisionShape3dResource.class);
-            return new CollisionShape3d(
-                    context.owner(),
-                    context.definition().id(),
-                    resource,
-                    authored.localPosition(),
-                    authored.localOrientation(),
-                    authored.filter());
-        });
+        validRegistry.register(Physics3dDescriptors.collisionShapeType(), collisionShapeFactory());
         validRegistry.register(
                 Physics3dDescriptors.staticBodyType(),
                 context -> new InternalStaticBody3d(
@@ -50,5 +42,30 @@ public final class Physics3dRuntimeExtension implements ComponentRuntimeExtensio
                         context.definition().id(),
                         context.world().requireModule(Spatial3dWorldModule.class),
                         context.world().requireModule(Physics3dWorldModule.class)));
+    }
+
+    /** Creates the resource-aware collision-shape preparation and construction adapter. */
+    private static ComponentFactory<CollisionShape3d> collisionShapeFactory() {
+        return new ComponentFactory<>() {
+            @Override
+            public void prepare(ComponentPreparationContext context) {
+                AuthoredCollision3d.Shape authored = AuthoredCollision3d.shape(context.properties());
+                context.resolveResource(authored.resource(), CollisionShape3dResource.class);
+            }
+
+            @Override
+            public CollisionShape3d create(ComponentFactoryContext context) {
+                AuthoredCollision3d.Shape authored = AuthoredCollision3d.shape(context.properties());
+                CollisionShape3dResource resource =
+                        context.resolveResource(authored.resource(), CollisionShape3dResource.class);
+                return new CollisionShape3d(
+                        context.owner(),
+                        context.definition().id(),
+                        resource,
+                        authored.localPosition(),
+                        authored.localOrientation(),
+                        authored.filter());
+            }
+        };
     }
 }

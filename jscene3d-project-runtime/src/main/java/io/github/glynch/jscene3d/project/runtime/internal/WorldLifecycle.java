@@ -68,6 +68,32 @@ final class WorldLifecycle {
         activateNewlyEnabledComponents();
     }
 
+    /** Creates and activates one newly composed component set before taking ownership of it. */
+    void add(List<WorldComponentEntry> additions) {
+        requireState(State.ACTIVE, "world is not active");
+        List<WorldComponentEntry> values = List.copyOf(Objects.requireNonNull(additions, "additions"));
+        List<WorldComponentEntry> newlyCreated = new ArrayList<>();
+        List<WorldComponentEntry> newlyActive = new ArrayList<>();
+        try {
+            for (WorldComponentEntry component : values) {
+                invoke(component, ComponentLifecycle.CREATED);
+                newlyCreated.add(component);
+            }
+            for (WorldComponentEntry component : values) {
+                if (component.owner().isEnabled()) {
+                    invoke(component, ComponentLifecycle.ACTIVATED);
+                    newlyActive.add(component);
+                }
+            }
+        } catch (RuntimeException failure) {
+            throw Objects.requireNonNull(
+                    compensateAddition(newlyCreated, newlyActive, failure), "spawn activation failure");
+        }
+        components.addAll(values);
+        created.addAll(newlyCreated);
+        active.addAll(newlyActive);
+    }
+
     /** Permanently releases every component owned by a committed destroyed subtree. */
     void destroy(Set<InternalEntity> entities) {
         requireState(State.ACTIVE, "world is not active");
@@ -199,6 +225,13 @@ final class WorldLifecycle {
             failure = invokeForCleanup(entries.get(index), event, failure);
         }
         return failure;
+    }
+
+    /** Compensates lifecycle callbacks delivered for an addition which could not become live. */
+    private static @Nullable RuntimeException compensateAddition(
+            List<WorldComponentEntry> newlyCreated, List<WorldComponentEntry> newlyActive, RuntimeException failure) {
+        RuntimeException result = invokeReverse(newlyActive, ComponentLifecycle.DEACTIVATED, failure);
+        return invokeReverse(newlyCreated, ComponentLifecycle.DESTROYED, result);
     }
 
     /** Delivers one cleanup callback while retaining earlier failure precedence. */

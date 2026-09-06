@@ -124,6 +124,16 @@ final class InternalEntity implements Entity {
         children.add(Objects.requireNonNull(child, "child"));
     }
 
+    /** Attaches one complete spawned child at a structural commit point. */
+    void attachChild(InternalEntity child) {
+        requireLive();
+        InternalEntity validChild = Objects.requireNonNull(child, "child");
+        if (validChild.parent != this) {
+            throw new IllegalArgumentException("spawned child names another ownership parent");
+        }
+        children.add(validChild);
+    }
+
     /** Adds one constructed component value before graph completion. */
     void addComponent(ComponentId component, Object value) {
         requireIncomplete();
@@ -181,6 +191,11 @@ final class InternalEntity implements Entity {
     /** Removes one direct child while committing structural destruction. */
     void removeChild(InternalEntity child) {
         children.remove(Objects.requireNonNull(child, "child"));
+    }
+
+    /** Returns component values while preparing lifecycle or rollback cleanup. */
+    List<Object> componentValues() {
+        return List.copyOf(components.values());
     }
 
     /** Marks committed destruction and releases references to live children and component values. */

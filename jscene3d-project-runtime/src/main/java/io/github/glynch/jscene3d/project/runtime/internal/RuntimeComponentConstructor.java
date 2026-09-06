@@ -18,11 +18,9 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBin
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /** Transactionally constructs component values after allocation of the complete entity graph. */
 final class RuntimeComponentConstructor {
@@ -34,55 +32,89 @@ final class RuntimeComponentConstructor {
     /** Constructs every planned component and completes the world, rolling back on any failure. */
     static World construct(AllocatedWorld allocation, RegisteredTypeCatalog catalog, FactoryBindings factories) {
         List<Object> created = new ArrayList<>();
-        List<WorldComponentEntry> entries = new ArrayList<>();
-        List<ComponentBindingEntry> bindings = new ArrayList<>();
-        List<ComponentEndpointBindingEntry> endpointBindings = new ArrayList<>();
-        Set<Object> identities = Collections.newSetFromMap(new IdentityHashMap<>());
         try {
-            for (ComponentPlan plan : allocation.components()) {
-                ComponentTypeDescriptor descriptor = descriptor(plan, catalog);
-                EffectiveComponentProperties properties = EffectiveComponentProperties.merge(
-                        descriptor, plan.definition(), plan.overrides(), plan.scope());
-                Object value = create(plan, allocation.world(), descriptor, properties, factories);
-                if (!identities.add(value)) {
-                    throw new RuntimeCompositionException(
-                            RuntimeDiagnosticCode.FACTORY_CREATE_FAILED,
-                            "a component factory returned the same object for more than one component",
-                            plan.location());
-                }
-                created.add(value);
-                requireLifecycleSupport(plan, descriptor, value);
-                requireUpdateSupport(plan, descriptor, value);
-                boolean bindsReferences = declaresTargetProperties(descriptor, properties);
-                requireReferenceSupport(plan, bindsReferences, value);
-                boolean bindsEndpoints = declaresEndpoints(descriptor);
-                requireEndpointSupport(plan, bindsEndpoints, value);
-                plan.owner().addComponent(plan.definition().id(), value);
-                plan.scope()
-                        .bindComponent(plan.authoredEntity(), plan.definition().id(), value);
-                if (bindsReferences && value instanceof ComponentReferenceBinder binder) {
-                    bindings.add(new ComponentBindingEntry(plan, binder, properties));
-                }
-                if (bindsEndpoints && value instanceof ComponentEndpointBinder binder) {
-                    endpointBindings.add(new ComponentEndpointBindingEntry(plan, descriptor, binder));
-                }
-                entries.add(new WorldComponentEntry(
-                        plan.owner(),
-                        plan.definition().id(),
-                        descriptor.type(),
-                        value,
-                        descriptor.lifecycle(),
-                        descriptor.updatePhases()));
-            }
-            bindReferences(bindings);
-            bindEndpoints(endpointBindings, allocation.world().endpointRouter());
-            allocation.world().endpointRouter().connect(allocation.connections());
+            List<WorldComponentEntry> entries = construct(
+                    allocation.world(),
+                    allocation.components(),
+                    allocation.connections(),
+                    catalog,
+                    factories,
+                    ComponentCreationContext.ResourceAccess.ACQUIRE,
+                    created);
             allocation.world().complete(entries);
             return allocation.world();
         } catch (RuntimeException failure) {
-            rollback(allocation.world(), created, failure);
+            rollbackWorld(allocation.world(), created, failure);
             throw failure;
         }
+    }
+
+    /** Constructs one detached prepared instance without publishing or invoking lifecycle callbacks. */
+    static List<WorldComponentEntry> construct(
+            AllocatedInstance allocation, RegisteredTypeCatalog catalog, FactoryBindings factories) {
+        List<Object> created = new ArrayList<>();
+        try {
+            List<WorldComponentEntry> entries = construct(
+                    allocation.world(),
+                    allocation.components(),
+                    allocation.connections(),
+                    catalog,
+                    factories,
+                    ComponentCreationContext.ResourceAccess.PREPARED_ONLY,
+                    created);
+            allocation.entities().forEach(InternalEntity::complete);
+            return entries;
+        } catch (RuntimeException failure) {
+            allocation.world().rollbackSpawn(allocation.entities(), created, failure);
+            throw failure;
+        }
+    }
+
+    /** Constructs and binds one allocated component set through the canonical instance pipeline. */
+    private static List<WorldComponentEntry> construct(
+            InternalWorld world,
+            List<ComponentPlan> plans,
+            List<RuntimeConnectionPlan> connections,
+            RegisteredTypeCatalog catalog,
+            FactoryBindings factories,
+            ComponentCreationContext.ResourceAccess resourceAccess,
+            List<Object> created) {
+        List<WorldComponentEntry> entries = new ArrayList<>();
+        List<ComponentBindingEntry> bindings = new ArrayList<>();
+        List<ComponentEndpointBindingEntry> endpointBindings = new ArrayList<>();
+        for (ComponentPlan plan : plans) {
+            ComponentTypeDescriptor descriptor = descriptor(plan, catalog);
+            EffectiveComponentProperties properties =
+                    EffectiveComponentProperties.merge(descriptor, plan.definition(), plan.overrides(), plan.scope());
+            Object value = create(plan, world, descriptor, properties, factories, resourceAccess);
+            world.claimComponent(value, plan.location());
+            created.add(value);
+            requireLifecycleSupport(plan, descriptor, value);
+            requireUpdateSupport(plan, descriptor, value);
+            boolean bindsReferences = declaresTargetProperties(descriptor, properties);
+            requireReferenceSupport(plan, bindsReferences, value);
+            boolean bindsEndpoints = declaresEndpoints(descriptor);
+            requireEndpointSupport(plan, bindsEndpoints, value);
+            plan.owner().addComponent(plan.definition().id(), value);
+            plan.scope().bindComponent(plan.authoredEntity(), plan.definition().id(), value);
+            if (bindsReferences && value instanceof ComponentReferenceBinder binder) {
+                bindings.add(new ComponentBindingEntry(plan, binder, properties));
+            }
+            if (bindsEndpoints && value instanceof ComponentEndpointBinder binder) {
+                endpointBindings.add(new ComponentEndpointBindingEntry(plan, descriptor, binder));
+            }
+            entries.add(new WorldComponentEntry(
+                    plan.owner(),
+                    plan.definition().id(),
+                    descriptor.type(),
+                    value,
+                    descriptor.lifecycle(),
+                    descriptor.updatePhases()));
+        }
+        bindReferences(bindings);
+        bindEndpoints(endpointBindings, world.endpointRouter());
+        world.endpointRouter().connect(connections);
+        return entries;
     }
 
     /** Creates one component through its exact descriptor-backed factory. */
@@ -91,12 +123,13 @@ final class RuntimeComponentConstructor {
             InternalWorld world,
             ComponentTypeDescriptor descriptor,
             EffectiveComponentProperties properties,
-            FactoryBindings factories) {
+            FactoryBindings factories,
+            ComponentCreationContext.ResourceAccess resourceAccess) {
         ComponentDefinition definition = plan.definition();
         ComponentType type = new ComponentType(definition.type(), definition.typeVersion());
         ComponentFactory<?> factory = factories.requireComponent(type, plan.location());
-        ComponentCreationContext context =
-                new ComponentCreationContext(plan.owner(), world, definition, descriptor, properties, plan.location());
+        ComponentCreationContext context = new ComponentCreationContext(
+                plan.owner(), world, definition, descriptor, properties, plan.location(), resourceAccess);
         try {
             return Objects.requireNonNull(factory.create(context), "component factory result");
         } catch (RuntimeDiagnosticsException | RuntimeCompositionException exception) {
@@ -176,10 +209,10 @@ final class RuntimeComponentConstructor {
         return switch (value) {
             case ProjectValue.EntityTargetValue ignored -> true;
             case ProjectValue.ComponentTargetValue ignored -> true;
-            case ProjectValue.ArrayValue array ->
-                array.values().stream().anyMatch(RuntimeComponentConstructor::containsTarget);
-            case ProjectValue.ObjectValue object ->
-                object.values().values().stream().anyMatch(RuntimeComponentConstructor::containsTarget);
+            case ProjectValue.ArrayValue(List<ProjectValue> values) ->
+                values.stream().anyMatch(RuntimeComponentConstructor::containsTarget);
+            case ProjectValue.ObjectValue(Map<String, ProjectValue> values) ->
+                values.values().stream().anyMatch(RuntimeComponentConstructor::containsTarget);
             default -> false;
         };
     }
@@ -263,7 +296,8 @@ final class RuntimeComponentConstructor {
     }
 
     /** Closes created component values in reverse order and marks the partial world unusable. */
-    private static void rollback(InternalWorld world, List<Object> created, RuntimeException failure) {
+    private static void rollbackWorld(InternalWorld world, List<Object> created, RuntimeException failure) {
+        world.releaseComponentClaims(created);
         for (int index = created.size() - 1; index >= 0; index--) {
             Object value = created.get(index);
             if (value instanceof AutoCloseable closeable) {

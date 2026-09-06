@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
+import io.github.glynch.jscene3d.project.runtime.SpawnTarget;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
@@ -37,6 +38,13 @@ public interface ComponentFactoryContext {
      * @return owning world
      */
     World world();
+
+    /**
+     * Returns a retained spawn capability restricted to direct children of this component's owner.
+     *
+     * @return owner-scoped spawn target
+     */
+    SpawnTarget spawnTarget();
 
     /**
      * Returns the authored component definition being constructed.

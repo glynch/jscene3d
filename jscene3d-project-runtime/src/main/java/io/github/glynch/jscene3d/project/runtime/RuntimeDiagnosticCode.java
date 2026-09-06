@@ -54,6 +54,14 @@ public enum RuntimeDiagnosticCode implements DiagnosticCode {
     TYPE_MISSING("runtime.type.missing", "A registered runtime type is missing"),
     /** A runtime resource could not be acquired with its required type. */
     RESOURCE_ACQUISITION_FAILED("runtime.resource.acquisition", "A runtime resource could not be acquired"),
+    /** A runtime resource required by immediate spawning was not prepared. */
+    RESOURCE_NOT_PREPARED("runtime.resource.not-prepared", "A runtime resource was not prepared before spawning"),
+    /** A reusable entity definition could not be prepared. */
+    ENTITY_PREPARATION_FAILED("runtime.entity.preparation", "An entity definition could not be prepared"),
+    /** Exported spawn arguments are missing, unknown, or structurally incompatible. */
+    SPAWN_ARGUMENT_INVALID("runtime.spawn.argument", "A spawn argument is invalid"),
+    /** Transactional construction or activation of a spawned instance failed. */
+    SPAWN_FAILED("runtime.spawn", "A prepared entity definition could not be spawned"),
     /** A required host-supplied world module is missing. */
     WORLD_MODULE_MISSING("runtime.world-module.missing", "A required world module is missing"),
     /** A world-module interface or adapter is bound more than once. */

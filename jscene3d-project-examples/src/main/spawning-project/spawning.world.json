@@ -1,0 +1,21 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/world-definition-1.json",
+  "assetId" : "592c525f-c8e1-4e9e-8546-12e44598527d",
+  "assetType" : "world-definition",
+  "formatVersion" : 1,
+  "name" : "Spawning example",
+  "connections" : [ ],
+  "roots" : [ {
+    "entryType" : "local",
+    "entityId" : "46e76cd4-f864-4a24-bea8-129e93068877",
+    "name" : "Projectile emitter",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "676966fc-549a-4174-a2dc-df420268808f",
+      "type" : "io.github.glynch.jscene3d.spawning-example/emitter",
+      "typeVersion" : 1,
+      "properties" : { }
+    } ],
+    "children" : [ ]
+  } ]
+}

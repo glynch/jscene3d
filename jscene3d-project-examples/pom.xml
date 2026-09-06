@@ -159,6 +159,32 @@
             </build>
         </profile>
         <profile>
+            <id>run-runtime-spawning-example</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-runtime-spawning-example</id>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>io.github.glynch.jscene3d.project.examples.RuntimeSpawningExample</mainClass>
+                                    <arguments>
+                                        <argument>${project.basedir}/src/main/spawning-project</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>run-presentation-3d-example</id>
             <build>
                 <plugins>

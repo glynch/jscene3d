@@ -30,6 +30,12 @@ final class WorldResources {
         this.provider = Objects.requireNonNull(provider, "provider");
     }
 
+    /** Begins one isolated preparation retention transaction. */
+    Preparation beginPreparation() {
+        requireOpen();
+        return new Preparation();
+    }
+
     /** Resolves one resource and attributes its retention to the constructing entity. */
     <T> T resolve(InternalEntity owner, ResourceReference reference, Class<T> valueType, String componentLocation) {
         requireOpen();
@@ -37,10 +43,31 @@ final class WorldResources {
         ResourceReference validReference = Objects.requireNonNull(reference, "reference");
         Class<T> validValueType = Objects.requireNonNull(valueType, "valueType");
         String validLocation = Objects.requireNonNull(componentLocation, "componentLocation");
+        RetainedResource resource =
+                retained.computeIfAbsent(validReference, key -> acquire(key, validValueType, validLocation));
+        T value = cast(resource.value(), validValueType, validReference, validLocation);
+        Set<ResourceReference> references =
+                entityReferences.computeIfAbsent(validOwner, ignored -> new LinkedHashSet<>());
+        if (references.add(validReference)) {
+            resource.retainOwner();
+        }
+        return value;
+    }
+
+    /** Resolves one already prepared resource and attributes it to a newly constructed entity. */
+    <T> T resolvePrepared(
+            InternalEntity owner, ResourceReference reference, Class<T> valueType, String componentLocation) {
+        requireOpen();
+        InternalEntity validOwner = Objects.requireNonNull(owner, "owner");
+        ResourceReference validReference = Objects.requireNonNull(reference, "reference");
+        Class<T> validValueType = Objects.requireNonNull(valueType, "valueType");
+        String validLocation = Objects.requireNonNull(componentLocation, "componentLocation");
         RetainedResource resource = retained.get(validReference);
-        if (resource == null) {
-            resource = acquire(validReference, validValueType, validLocation);
-            retained.put(validReference, resource);
+        if (resource == null || !resource.isPrepared()) {
+            throw new RuntimeCompositionException(
+                    RuntimeDiagnosticCode.RESOURCE_NOT_PREPARED,
+                    "runtime resource was not prepared before immediate spawning: " + validReference,
+                    validLocation + "/resources/" + escape(validReference.toString()));
         }
         T value = cast(resource.value(), validValueType, validReference, validLocation);
         Set<ResourceReference> references =
@@ -180,6 +207,7 @@ final class WorldResources {
         private final Object value;
         private final RuntimeResourceLease<?> lease;
         private int ownerCount;
+        private boolean prepared;
 
         /** Stores one validated open lease. */
         private RetainedResource(Object value, RuntimeResourceLease<?> lease) {
@@ -210,9 +238,73 @@ final class WorldResources {
             ownerCount--;
         }
 
+        /** Adds world-owned prepared-content retention. */
+        private void retainPreparation() {
+            prepared = true;
+        }
+
+        /** Removes preparation retention rolled back before publication. */
+        private void releasePreparation() {
+            prepared = false;
+        }
+
+        /** Returns whether preparation has made this value available to immediate spawning. */
+        private boolean isPrepared() {
+            return prepared;
+        }
+
         /** Returns whether any live entity still owns this lease. */
         private boolean isRetained() {
-            return ownerCount > 0;
+            return prepared || ownerCount > 0;
+        }
+    }
+
+    /** Isolated resource-retention transaction used while preparing one reusable definition. */
+    final class Preparation {
+        private final Set<ResourceReference> newlyPrepared = new LinkedHashSet<>();
+        private boolean complete;
+
+        /** Resolves and marks one resource as safe for later immediate spawning. */
+        <T> T resolve(ResourceReference reference, Class<T> valueType, String componentLocation) {
+            if (complete) {
+                throw new IllegalStateException("runtime resource preparation is complete");
+            }
+            ResourceReference validReference = Objects.requireNonNull(reference, "reference");
+            Class<T> validValueType = Objects.requireNonNull(valueType, "valueType");
+            String validLocation = Objects.requireNonNull(componentLocation, "componentLocation");
+            RetainedResource resource =
+                    retained.computeIfAbsent(validReference, key -> acquire(key, validValueType, validLocation));
+            T value = cast(resource.value(), validValueType, validReference, validLocation);
+            if (!resource.isPrepared()) {
+                resource.retainPreparation();
+                newlyPrepared.add(validReference);
+            }
+            return value;
+        }
+
+        /** Commits every preparation retention acquired by this transaction. */
+        void commit() {
+            if (complete) {
+                throw new IllegalStateException("runtime resource preparation is complete");
+            }
+            complete = true;
+            newlyPrepared.clear();
+        }
+
+        /** Removes only preparation retentions introduced by this transaction. */
+        void rollback(RuntimeException failure) {
+            if (complete) {
+                return;
+            }
+            complete = true;
+            newlyPrepared.forEach(reference -> Objects.requireNonNull(retained.get(reference), "retained resource")
+                    .releasePreparation());
+            newlyPrepared.clear();
+            try {
+                closeUnreferenced();
+            } catch (RuntimeException closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
         }
     }
 }

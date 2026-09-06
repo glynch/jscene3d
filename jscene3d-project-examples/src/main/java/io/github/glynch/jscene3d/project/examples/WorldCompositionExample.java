@@ -35,8 +35,11 @@ import io.github.glynch.jscene3d.project.runtime.WorldModule;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
@@ -177,13 +180,27 @@ public final class WorldCompositionExample {
 
         @Override
         public void register(ComponentFactoryRegistry registry) {
-            registry.register(LABEL_TYPE, context -> {
-                ProjectValue value = Objects.requireNonNull(context.properties().get(LABEL), "label");
-                PresentationModule presentation = context.world().requireModule(PresentationModule.class);
-                LabelFormatter formatter = context.resolveResource(LABEL_FORMATTER, LabelFormatter.class);
-                return new LabelComponent(formatter.format(((ProjectValue.TextValue) value).value()), presentation);
-            });
+            registry.register(LABEL_TYPE, labelFactory());
             registry.register(LABEL_LINK_TYPE, context -> new LabelLinkComponent());
+        }
+
+        /** Creates the label's explicit resource preparation and instance construction adapter. */
+        private static ComponentFactory<LabelComponent> labelFactory() {
+            return new ComponentFactory<>() {
+                @Override
+                public void prepare(ComponentPreparationContext context) {
+                    context.resolveResource(LABEL_FORMATTER, LabelFormatter.class);
+                }
+
+                @Override
+                public LabelComponent create(ComponentFactoryContext context) {
+                    ProjectValue value =
+                            Objects.requireNonNull(context.properties().get(LABEL), "label");
+                    PresentationModule presentation = context.world().requireModule(PresentationModule.class);
+                    LabelFormatter formatter = context.resolveResource(LABEL_FORMATTER, LabelFormatter.class);
+                    return new LabelComponent(formatter.format(((ProjectValue.TextValue) value).value()), presentation);
+                }
+            };
         }
     }
 

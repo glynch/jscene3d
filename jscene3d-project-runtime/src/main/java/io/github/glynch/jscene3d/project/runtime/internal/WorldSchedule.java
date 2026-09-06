@@ -95,6 +95,17 @@ final class WorldSchedule {
         return executing;
     }
 
+    /** Adds newly activated component values to every declared future phase in stable order. */
+    void addComponents(List<WorldComponentEntry> components) {
+        List<WorldComponentEntry> additions = List.copyOf(Objects.requireNonNull(components, "components"));
+        beforePhysics.addAll(select(additions, ComponentUpdatePhase.BEFORE_PHYSICS));
+        afterPhysics.addAll(select(additions, ComponentUpdatePhase.AFTER_PHYSICS));
+        frameUpdates.addAll(select(additions, ComponentUpdatePhase.FRAME_UPDATE));
+        beforePhysics.sort(ENTRY_ORDER);
+        afterPhysics.sort(ENTRY_ORDER);
+        frameUpdates.sort(ENTRY_ORDER);
+    }
+
     /** Removes destroyed component values from every future phase schedule. */
     void removeEntities(Set<InternalEntity> entities) {
         Set<InternalEntity> targets = Set.copyOf(Objects.requireNonNull(entities, "entities"));

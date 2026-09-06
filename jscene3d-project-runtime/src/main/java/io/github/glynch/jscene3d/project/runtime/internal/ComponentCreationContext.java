@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
+import io.github.glynch.jscene3d.project.runtime.SpawnTarget;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -23,6 +24,7 @@ final class ComponentCreationContext implements ComponentFactoryContext {
     private final ComponentTypeDescriptor descriptor;
     private final Map<PropertyId, ProjectValue> properties;
     private final String location;
+    private final ResourceAccess resourceAccess;
     private boolean active = true;
 
     /** Stores validated component construction values. */
@@ -32,13 +34,15 @@ final class ComponentCreationContext implements ComponentFactoryContext {
             ComponentDefinition definition,
             ComponentTypeDescriptor descriptor,
             EffectiveComponentProperties properties,
-            String location) {
+            String location,
+            ResourceAccess resourceAccess) {
         this.owner = Objects.requireNonNull(owner, "owner");
         this.world = Objects.requireNonNull(world, "world");
         this.definition = Objects.requireNonNull(definition, "definition");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
         this.properties = properties.values();
         this.location = Objects.requireNonNull(location, "location");
+        this.resourceAccess = Objects.requireNonNull(resourceAccess, "resourceAccess");
     }
 
     @Override
@@ -49,6 +53,12 @@ final class ComponentCreationContext implements ComponentFactoryContext {
     @Override
     public World world() {
         return world;
+    }
+
+    @Override
+    public SpawnTarget spawnTarget() {
+        requireActive();
+        return world.spawnTarget(owner);
     }
 
     @Override
@@ -68,14 +78,29 @@ final class ComponentCreationContext implements ComponentFactoryContext {
 
     @Override
     public <T> T resolveResource(ResourceReference reference, Class<T> valueType) {
-        if (!active) {
-            throw new IllegalStateException("component factory context has expired");
-        }
-        return world.resolveResource((InternalEntity) owner, reference, valueType, location);
+        requireActive();
+        return resourceAccess == ResourceAccess.PREPARED_ONLY
+                ? world.resolvePreparedResource((InternalEntity) owner, reference, valueType, location)
+                : world.resolveResource((InternalEntity) owner, reference, valueType, location);
     }
 
     /** Expires construction-only resource resolution after the factory returns. */
     void expire() {
         active = false;
+    }
+
+    /** Requires factory-only operations to remain inside the factory invocation. */
+    private void requireActive() {
+        if (!active) {
+            throw new IllegalStateException("component factory context has expired");
+        }
+    }
+
+    /** Closed resource-acquisition policies for initial and prepared construction. */
+    enum ResourceAccess {
+        /** Initial composition may acquire resources synchronously. */
+        ACQUIRE,
+        /** Runtime spawning may use only resources retained during preparation. */
+        PREPARED_ONLY
     }
 }

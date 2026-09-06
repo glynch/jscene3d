@@ -16,6 +16,19 @@ package io.github.glynch.jscene3d.project.runtime.extension;
 @FunctionalInterface
 public interface ComponentFactory<T> {
     /**
+     * Resolves reusable resources required before instances of this component may be created during simulation.
+     *
+     * <p>The default is appropriate for components whose creation requires no runtime resources. A factory which calls
+     * {@link ComponentFactoryContext#resolveResource} must prepare every resource it may request; an immediate spawn
+     * fails rather than acquiring an undeclared resource on the simulation thread.
+     *
+     * @param context validated bounded preparation context
+     */
+    default void prepare(ComponentPreparationContext context) {
+        // Resource-free component types require no preparation work.
+    }
+
+    /**
      * Creates one runtime component.
      *
      * @param context validated bounded construction context

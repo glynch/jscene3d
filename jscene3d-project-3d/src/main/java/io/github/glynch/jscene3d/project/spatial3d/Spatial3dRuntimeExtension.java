@@ -4,7 +4,10 @@
  */
 package io.github.glynch.jscene3d.project.spatial3d;
 
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import java.util.Objects;
 
@@ -45,12 +48,29 @@ public final class Spatial3dRuntimeExtension implements ComponentRuntimeExtensio
             return spatial.createDirectionalLight(
                     context.owner(), authored.color(), authored.intensity(), authored.target());
         });
-        validRegistry.register(Spatial3dDescriptors.meshRendererType(), context -> {
-            AuthoredPresentation3d.MeshRenderer authored = AuthoredPresentation3d.meshRenderer(context.properties());
-            Mesh3dResource mesh = context.resolveResource(authored.mesh(), Mesh3dResource.class);
-            Material3dResource material = context.resolveResource(authored.material(), Material3dResource.class);
-            Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
-            return spatial.createMeshRenderer(context.owner(), mesh, material, authored.visible());
-        });
+        validRegistry.register(Spatial3dDescriptors.meshRendererType(), meshRendererFactory());
+    }
+
+    /** Creates the resource-aware mesh-renderer preparation and construction adapter. */
+    private static ComponentFactory<MeshRenderer3d> meshRendererFactory() {
+        return new ComponentFactory<>() {
+            @Override
+            public void prepare(ComponentPreparationContext context) {
+                AuthoredPresentation3d.MeshRenderer authored =
+                        AuthoredPresentation3d.meshRenderer(context.properties());
+                context.resolveResource(authored.mesh(), Mesh3dResource.class);
+                context.resolveResource(authored.material(), Material3dResource.class);
+            }
+
+            @Override
+            public MeshRenderer3d create(ComponentFactoryContext context) {
+                AuthoredPresentation3d.MeshRenderer authored =
+                        AuthoredPresentation3d.meshRenderer(context.properties());
+                Mesh3dResource mesh = context.resolveResource(authored.mesh(), Mesh3dResource.class);
+                Material3dResource material = context.resolveResource(authored.material(), Material3dResource.class);
+                Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
+                return spatial.createMeshRenderer(context.owner(), mesh, material, authored.visible());
+            }
+        };
     }
 }

@@ -4,9 +4,14 @@
  */
 package io.github.glynch.jscene3d.project.runtime;
 
+import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.entity.EntityDefinition;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -66,6 +71,49 @@ public interface World extends AutoCloseable {
      * @throws IllegalStateException if this world is closed or the interface is not bound
      */
     <T extends WorldModule> T requireModule(Class<T> type);
+
+    /**
+     * Prepares one reusable definition for later in-memory spawning.
+     *
+     * <p>Preparation resolves and validates the complete transitive definition graph, invokes each component factory's
+     * preparation hook, and retains every runtime resource requested by those hooks. Resource bindings are fixed for
+     * the lifetime of the returned world-bound preparation; ordinary exported parameters remain instance-specific and
+     * are supplied when spawning. The initial implementation deliberately permits preparation only while the composed
+     * world is inactive, keeping blocking definition and resource loading away from simulation callbacks.
+     *
+     * @param definition reusable definition reference
+     * @param resourceBindings exported resource-binding values
+     * @return prepared world-bound definition
+     * @throws EntityPreparationException if loading, validation, or resource preparation fails
+     * @throws IllegalStateException if this world is active or closed
+     */
+    PreparedEntityDefinition prepare(
+            AssetRef<EntityDefinition> definition, Map<PropertyId, ProjectValue> resourceBindings);
+
+    /**
+     * Prepares a reusable definition with no exported resource bindings.
+     *
+     * @param definition reusable definition reference
+     * @return prepared world-bound definition
+     * @throws EntityPreparationException if loading, validation, or resource preparation fails
+     * @throws IllegalStateException if this world is active or closed
+     */
+    default PreparedEntityDefinition prepare(AssetRef<EntityDefinition> definition) {
+        return prepare(definition, Map.of());
+    }
+
+    /**
+     * Creates an explicit structural capability restricted to one live owner.
+     *
+     * <p>The returned target may add only direct children of {@code owner}. It does not permit world-root insertion or
+     * arbitrary hierarchy mutation.
+     *
+     * @param owner entity which will own every spawned root
+     * @return owner-scoped spawn target
+     * @throws IllegalArgumentException if {@code owner} belongs to another world
+     * @throws IllegalStateException if this world is closed or the owner is pending or completely destroyed
+     */
+    SpawnTarget spawnTarget(Entity owner);
 
     /**
      * Transactionally enters semantic lifecycle management and activates every initially enabled entity.

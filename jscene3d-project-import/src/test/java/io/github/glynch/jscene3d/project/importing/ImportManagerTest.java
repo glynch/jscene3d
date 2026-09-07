@@ -9,6 +9,9 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
+import io.github.glynch.jscene3d.project.asset.AssetCatalog;
+import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.importing.extension.ProjectImportExtension;
@@ -16,6 +19,7 @@ import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
+import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.io.InputStream;
@@ -137,6 +141,33 @@ final class ImportManagerTest {
                 .contains("\"assetType\" : \"entity-definition\"", "\"name\" : \"Imported text\"");
         assertThat(read(manager, definition, "output/main")).isEqualTo("source-v1:dependency-v1");
         assertThat(phases).contains(ImportPhase.INSPECTING, ImportPhase.PREPARING, ImportPhase.COMMITTING);
+    }
+
+    /** Loads published definitions without retaining or executing the source importer at runtime. */
+    @Test
+    void loadsPublishedProjectContent() {
+        publish(manager());
+
+        ProjectContent content = PublishedProjectContent.load(
+                project, catalog, AssetCatalog.scan(project.root()).catalog().orElseThrow(), cacheDirectory, List.of());
+
+        EntityDefinition generated = content.definitions()
+                .loadEntity(AssetRef.to(TestImportExtension.DEFINITION_ID), RegisteredTypeCatalog.of(List.of()))
+                .definition()
+                .orElseThrow();
+        assertThat(generated.name()).isEqualTo("Imported text");
+    }
+
+    /** Preserves structured loading detail when a manifest-declared import document is invalid. */
+    @Test
+    void rejectsInvalidDeclaredImportWhileLoadingPublishedContent() throws IOException {
+        write("imports/source.import.json", "{}");
+        AssetCatalog authored = AssetCatalog.scan(project.root()).catalog().orElseThrow();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> PublishedProjectContent.load(project, catalog, authored, cacheDirectory, List.of()))
+                .withMessageContaining("declared project imports are invalid")
+                .withMessageContaining("import.json");
     }
 
     /** Detects dependency changes and preserves the last publication after a failed reimport. */

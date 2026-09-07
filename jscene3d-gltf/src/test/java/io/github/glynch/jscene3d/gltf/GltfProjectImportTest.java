@@ -116,6 +116,7 @@ final class GltfProjectImportTest {
                 .load(project, getClass().getClassLoader());
         assertThat(extensions.diagnostics()).isEmpty();
         importTypes = extensions.catalog();
+        assertThat(importTypes.extensions()).containsExactly(GltfProjectImportExtension.descriptor());
         definition = new ImportLoader()
                 .load(project, Path.of("imports/model.import.json"))
                 .definition()

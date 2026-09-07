@@ -854,6 +854,12 @@ attachment points, and explicitly supported material bindings. Gameplay,
 collision, audio, additional children, and behavior belong in an authored
 wrapper definition.
 
+Source inspection and import publication are editor or project-build
+operations. Normal `ProjectHost` startup consumes only complete published
+generations through `ProjectContent`; it neither executes an importer nor reads
+the original source asset. Export packaging includes the selected published
+definitions and resources, not the source-import workflow that produced them.
+
 Reimport prefers explicit source identifiers. Otherwise it uses stored source
 evidence and deterministic locators conservatively. It does not silently fuzzy
 match an uncertain target. Unresolved required targets prevent play/export and

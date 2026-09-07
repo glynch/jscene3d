@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,10 +41,10 @@ final class MacOsDiskImageExporterTest {
         outputDirectory = temporaryDirectory.resolve("distribution");
     }
 
-    /** Derives identity from the application image and delegates one structured invocation to jpackage. */
+    /** Derives identity and stages complete non-interactive disk-image content. */
     @Test
     void exportsMacOsDiskImage() throws IOException {
-        RecordingJpackageTool tool = new RecordingJpackageTool();
+        RecordingDiskImageTool tool = new RecordingDiskImageTool();
         MacOsDiskImageRequest request = request();
 
         MacOsDiskImage diskImage = new MacOsDiskImageExporter(tool, "Mac OS X").export(request);
@@ -52,33 +53,32 @@ final class MacOsDiskImageExporterTest {
                 .isEqualTo(outputDirectory.resolve("Sample Game-1.2.3.dmg"))
                 .isRegularFile()
                 .hasContent("disk image");
-        assertThat(tool.arguments())
-                .containsExactly(
-                        "--type",
-                        "dmg",
-                        "--name",
-                        "Sample Game",
-                        "--app-version",
-                        "1.2.3",
-                        "--app-image",
-                        applicationImage.toRealPath().toString(),
-                        "--dest",
-                        tool.option("--dest"));
+        assertThat(tool.volumeName()).isEqualTo("Sample Game");
+        assertThat(tool.destination().getFileName()).hasToString("Sample Game-1.2.3.dmg");
+        assertThat(tool.stagedPaths())
+                .contains(
+                        "Applications",
+                        "Sample Game.app/Contents/MacOS/Sample Game",
+                        "Sample Game.app/Contents/app/application-image.properties",
+                        "Sample Game.app/Contents/runtime/Contents/Home/lib/modules");
+        assertThat(tool.applicationsLinkTarget()).isEqualTo(Path.of("/Applications"));
     }
 
     /** Leaves an existing disk image untouched when the external packaging tool fails. */
     @Test
-    void preservesExistingDiskImageWhenJpackageFails() throws IOException {
+    void preservesExistingDiskImageWhenHdiutilFails() throws IOException {
         Path existing = outputDirectory.resolve("Sample Game-1.2.3.dmg");
         Files.createDirectories(existing.getParent());
         Files.writeString(existing, "existing", UTF_8);
         MacOsDiskImageRequest request = request();
-        JpackageTool failingTool = ignored -> new JpackageToolResult(1, "deliberate failure");
+        DiskImageTool failingTool = (source, volumeName, destination) -> {
+            throw new IOException("hdiutil failed with exit code 1: deliberate failure");
+        };
         MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(failingTool, "Mac OS X");
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(IOException.class)
-                .hasMessageContaining("jpackage failed with exit code 1", "deliberate failure");
+                .hasMessageContaining("hdiutil failed with exit code 1", "deliberate failure");
         assertThat(existing).content(UTF_8).isEqualTo("existing");
     }
 
@@ -86,7 +86,7 @@ final class MacOsDiskImageExporterTest {
     @Test
     void rejectsUnsupportedHost() {
         MacOsDiskImageRequest request = request();
-        RecordingJpackageTool tool = new RecordingJpackageTool();
+        RecordingDiskImageTool tool = new RecordingDiskImageTool();
         MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(tool, "Linux");
 
         assertThatThrownBy(() -> exporter.export(request))
@@ -100,7 +100,7 @@ final class MacOsDiskImageExporterTest {
     void rejectsMissingApplicationImageMetadata() throws IOException {
         Files.delete(applicationImage.resolve("Contents/app").resolve(ApplicationImageMetadata.PATH));
         MacOsDiskImageRequest request = request();
-        MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(new RecordingJpackageTool(), "Mac OS X");
+        MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(new RecordingDiskImageTool(), "Mac OS X");
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(IOException.class)
@@ -115,36 +115,56 @@ final class MacOsDiskImageExporterTest {
                 .build();
     }
 
-    /** Fake tool which records its arguments and creates the expected DMG in its private destination. */
-    private static final class RecordingJpackageTool implements JpackageTool {
-        private List<String> arguments = List.of();
+    /** Fake tool which captures prepared content and creates the expected DMG. */
+    private static final class RecordingDiskImageTool implements DiskImageTool {
+        private String volumeName = "";
+        private Path destination = Path.of("uninvoked");
+        private List<String> stagedPaths = List.of();
+        private Path applicationsLinkTarget = Path.of("uninvoked");
+        private boolean invoked;
 
         @Override
-        public JpackageToolResult execute(List<String> suppliedArguments) throws IOException {
-            arguments = List.copyOf(suppliedArguments);
-            Path diskImage =
-                    Path.of(option("--dest")).resolve(option("--name") + '-' + option("--app-version") + ".dmg");
-            Files.writeString(diskImage, "disk image", UTF_8);
-            return new JpackageToolResult(0, "");
+        public void create(Path sourceDirectory, String suppliedVolumeName, Path suppliedDestination)
+                throws IOException {
+            invoked = true;
+            volumeName = suppliedVolumeName;
+            destination = suppliedDestination;
+            try (Stream<Path> paths = Files.walk(sourceDirectory)) {
+                stagedPaths = paths.filter(path -> !path.equals(sourceDirectory))
+                        .map(sourceDirectory::relativize)
+                        .map(Path::toString)
+                        .map(path ->
+                                path.replace(sourceDirectory.getFileSystem().getSeparator(), "/"))
+                        .sorted()
+                        .toList();
+            }
+            applicationsLinkTarget = Files.readSymbolicLink(sourceDirectory.resolve("Applications"));
+            Files.writeString(destination, "disk image", UTF_8);
         }
 
         /** Returns whether this fake received an invocation. */
         boolean wasInvoked() {
-            return !arguments.isEmpty();
+            return invoked;
         }
 
-        /** Returns all recorded arguments. */
-        List<String> arguments() {
-            return arguments;
+        /** Returns the captured mounted volume name. */
+        String volumeName() {
+            return volumeName;
         }
 
-        /** Returns the value following the named option. */
-        String option(String name) {
-            int index = arguments.indexOf(name);
-            if (index < 0 || index + 1 >= arguments.size()) {
-                throw new IllegalStateException("missing recorded option: " + name);
-            }
-            return arguments.get(index + 1);
+        /** Returns the captured private output path. */
+        Path destination() {
+            return destination;
+        }
+
+        /** Returns the staged disk-image paths captured before staging cleanup. */
+        List<String> stagedPaths() {
+            return stagedPaths;
+        }
+
+        /** Returns the destination of the staged Applications link. */
+        Path applicationsLinkTarget() {
+            return applicationsLinkTarget;
         }
     }
 }

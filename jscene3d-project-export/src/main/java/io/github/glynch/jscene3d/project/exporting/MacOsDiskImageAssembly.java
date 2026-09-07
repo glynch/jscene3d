@@ -6,18 +6,22 @@ package io.github.glynch.jscene3d.project.exporting;
 
 import io.github.glynch.jscene3d.project.exporting.internal.StagedPathInstall;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 
 /** Stages, invokes, validates, and transactionally installs one macOS disk image. */
 final class MacOsDiskImageAssembly {
+    private static final Path APPLICATIONS_DIRECTORY = Path.of("/Applications");
+
     private final MacOsDiskImagePlan plan;
-    private final JpackageTool tool;
+    private final DiskImageTool tool;
 
     /** Stores the validated plan and packaging-tool adapter. */
-    MacOsDiskImageAssembly(MacOsDiskImagePlan plan, JpackageTool tool) {
+    MacOsDiskImageAssembly(MacOsDiskImagePlan plan, DiskImageTool tool) {
         this.plan = plan;
         this.tool = tool;
     }
@@ -35,8 +39,9 @@ final class MacOsDiskImageAssembly {
         Files.createDirectories(outputParent);
         Path staging = Files.createTempDirectory(outputParent, ".disk-image-staging-");
         try {
-            runJpackage(staging);
             Path generated = staging.resolve(plan.outputPath().getFileName());
+            Path content = stageContent(staging.resolve("content"));
+            tool.create(content, plan.applicationName(), generated);
             validateGeneratedDiskImage(generated);
             StagedPathInstall.replace(generated, plan.outputPath());
         } finally {
@@ -44,35 +49,43 @@ final class MacOsDiskImageAssembly {
         }
     }
 
-    /** Invokes jpackage with a structured argument vector and reports its complete failure output. */
-    private void runJpackage(Path staging) throws IOException {
-        JpackageToolResult result = tool.execute(arguments(staging));
-        if (result.exitCode() != 0) {
-            throw new IOException("jpackage failed with exit code " + result.exitCode() + ":\n" + result.output());
-        }
+    /** Stages the application image and conventional Applications link without invoking Finder. */
+    private Path stageContent(Path content) throws IOException {
+        Files.createDirectory(content);
+        copyApplicationImage(
+                plan.applicationImage(), content.resolve(plan.applicationImage().getFileName()));
+        Files.createSymbolicLink(content.resolve("Applications"), APPLICATIONS_DIRECTORY);
+        return content;
     }
 
-    /** Builds the complete macOS jpackage argument vector. */
-    private List<String> arguments(Path staging) {
-        List<String> arguments = new ArrayList<>();
-        option(arguments, "--type", "dmg");
-        option(arguments, "--name", plan.applicationName());
-        option(arguments, "--app-version", plan.applicationVersion());
-        option(arguments, "--app-image", plan.applicationImage().toString());
-        option(arguments, "--dest", staging.toString());
-        return List.copyOf(arguments);
-    }
+    /** Copies an application bundle while preserving native file attributes and symbolic links. */
+    private static void copyApplicationImage(Path source, Path destination) throws IOException {
+        Files.walkFileTree(source, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
+                    throws IOException {
+                Files.createDirectories(
+                        destination.resolve(source.relativize(directory).toString()));
+                return FileVisitResult.CONTINUE;
+            }
 
-    /** Appends one jpackage option and its indivisible value. */
-    private static void option(List<String> arguments, String name, String value) {
-        arguments.add(name);
-        arguments.add(value);
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                Path target = destination.resolve(source.relativize(file).toString());
+                if (attributes.isSymbolicLink()) {
+                    Files.createSymbolicLink(target, Files.readSymbolicLink(file));
+                } else {
+                    Files.copy(file, target, StandardCopyOption.COPY_ATTRIBUTES);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     /** Requires one non-empty regular DMG produced in the private staging directory. */
     private static void validateGeneratedDiskImage(Path diskImage) throws IOException {
         if (!Files.isRegularFile(diskImage) || Files.isSymbolicLink(diskImage) || Files.size(diskImage) == 0) {
-            throw new IOException("jpackage did not produce the expected disk image: " + diskImage);
+            throw new IOException("hdiutil did not produce the expected disk image: " + diskImage);
         }
     }
 }

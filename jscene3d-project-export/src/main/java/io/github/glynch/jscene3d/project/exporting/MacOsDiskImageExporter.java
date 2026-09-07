@@ -9,16 +9,16 @@ import java.util.Objects;
 
 /** Packages a completed macOS application image as an installable disk image. */
 public final class MacOsDiskImageExporter {
-    private final JpackageTool tool;
+    private final DiskImageTool tool;
     private final String operatingSystemName;
 
-    /** Uses the {@code jpackage} tool belonging to the current Java runtime on the current host. */
+    /** Uses the non-interactive macOS disk-image tool on the current host. */
     public MacOsDiskImageExporter() {
-        this(new SystemJpackageTool(), System.getProperty("os.name"));
+        this(new SystemDiskImageTool(), System.getProperty("os.name"));
     }
 
     /** Stores replaceable host dependencies for deterministic contract tests. */
-    MacOsDiskImageExporter(JpackageTool tool, String operatingSystemName) {
+    MacOsDiskImageExporter(DiskImageTool tool, String operatingSystemName) {
         this.tool = Objects.requireNonNull(tool, "tool");
         this.operatingSystemName = Objects.requireNonNull(operatingSystemName, "operatingSystemName");
     }

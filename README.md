@@ -666,6 +666,9 @@ license notices, and exact selected filenames are recorded beside the assets in
   collision bodies, sensors, shapes, and typed overlap delivery.
 - `jscene3d-project-desktop`: standard native window, input, frame-driving, and
   rendering host for manifest-selected project Worlds.
+- `jscene3d-project-export`: build-tool-independent assembly of relocatable
+  application images from authored project data, completed import publications,
+  and caller-resolved runtime JARs.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives

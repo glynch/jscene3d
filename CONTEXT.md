@@ -344,6 +344,13 @@ A loaded immutable value derived from an Asset and shareable by live Entity
 instances within the lifetime rules of a World.
 _Avoid_: Asset, mutable instance state
 
+**Application Image**:
+A relocatable derived directory containing runtime project data, completed
+import publications, application and engine JARs, platform-native libraries,
+and generic launchers. Build tools and editors supply resolved inputs; the
+engine-owned exporter controls its contents and layout.
+_Avoid_: authored project, source distribution, game-specific launcher
+
 **Spawn**:
 Transactional creation and activation of live Entities from a prepared Entity
 Definition at an explicit ownership and spatial target.

@@ -913,6 +913,15 @@ engine version, packaged project root, and published-content root to the generic
 structure of the startup world. Packaging and platform launcher generation are
 derived build concerns and do not introduce another authoring format.
 
+The application-image exporter accepts authored project data, completed import
+publications, caller-resolved runtime JARs, and an output directory through one
+build-tool-independent request. It owns runtime project-file selection,
+exclusion of imported raw sources and incomplete publication state,
+application-image layout, relative launcher generation, and staged replacement.
+Maven or a future editor resolves the runtime artifact set but does not
+reproduce those export rules. Native bundles and archives will wrap this same
+application image rather than assembling games independently.
+
 ## Serialization and schema evolution
 
 The canonical authoring format is deterministic UTF-8 JSON.

@@ -37,6 +37,29 @@ public interface Entity {
     EntityId authoredId();
 
     /**
+     * Returns how this live entity was instantiated.
+     *
+     * <p>Children declared inside a placed or spawned definition remain {@link EntityInstantiationKind#LOCAL_ENTITY}
+     * entries beneath the corresponding {@link EntityInstantiationKind#PLACEMENT} or
+     * {@link EntityInstantiationKind#SPAWN} root. This keeps the live hierarchy faithful to its authored structure
+     * without adding an instance wrapper.
+     *
+     * @return instantiation kind
+     */
+    EntityInstantiationKind instantiationKind();
+
+    /**
+     * Returns the entity definition instantiated by this root.
+     *
+     * <p>This is present exactly when {@link #instantiationKind()} is {@link EntityInstantiationKind#PLACEMENT} or
+     * {@link EntityInstantiationKind#SPAWN}. For a placement it identifies the referenced definition while
+     * {@link #authoredAsset()} and {@link #authoredId()} continue to identify the containing asset and placement.
+     *
+     * @return instantiated definition asset, if this entity is an instance root
+     */
+    Optional<AssetId> instantiatedDefinition();
+
+    /**
      * Returns the optional display name selected for this instance.
      *
      * @return display name

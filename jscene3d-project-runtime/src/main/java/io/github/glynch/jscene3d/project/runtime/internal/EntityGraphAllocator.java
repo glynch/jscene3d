@@ -13,7 +13,6 @@ import io.github.glynch.jscene3d.project.contract.EntityContract;
 import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
-import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.entity.SignalConnection;
@@ -90,8 +89,7 @@ final class EntityGraphAllocator {
         InternalEntity root = new InternalEntity(
                 world,
                 world.allocateEntityId(),
-                definition.id(),
-                authoredRoot.id(),
+                EntityProvenance.spawn(definition.id(), authoredRoot.id()),
                 authoredRoot.name(),
                 authoredRoot.isEnabled(),
                 parent);
@@ -111,7 +109,8 @@ final class EntityGraphAllocator {
     /** Allocates one locally authored entity and its complete owned subtree. */
     private InternalEntity allocateLocal(
             EntityInstanceScope scope, LocalEntity local, @Nullable InternalEntity parent, String location) {
-        InternalEntity entity = createEntity(scope.asset(), local.id(), local.name(), local.isEnabled(), parent);
+        InternalEntity entity = createEntity(
+                EntityProvenance.local(scope.asset(), local.id()), local.name(), local.isEnabled(), parent);
         scope.bind(local.id(), entity);
         planComponents(scope, local, entity, location);
         allocateChildren(scope, local.children(), entity, location);
@@ -130,8 +129,11 @@ final class EntityGraphAllocator {
                 new EntityInstanceScope(definition.id(), InstanceOverrides.resolve(definition.contract(), arguments));
         LocalEntity root = definition.root();
         Optional<String> name = placement.name().isPresent() ? placement.name() : root.name();
-        InternalEntity entity =
-                createEntity(containingScope.asset(), placement.id(), name, placement.isEnabled(), parent);
+        InternalEntity entity = createEntity(
+                EntityProvenance.placement(containingScope.asset(), placement.id(), definition.id()),
+                name,
+                placement.isEnabled(),
+                parent);
         containingScope.bind(placement.id(), entity);
         definitionScope.bind(root.id(), entity);
         planComponents(definitionScope, root, entity, location + "/definition/root");
@@ -233,13 +235,12 @@ final class EntityGraphAllocator {
 
     /** Creates and attaches one entity shell with a fresh world-local identity. */
     private InternalEntity createEntity(
-            AssetId authoredAsset,
-            EntityId authoredId,
+            EntityProvenance provenance,
             Optional<String> name,
             boolean locallyEnabled,
             @Nullable InternalEntity parent) {
-        InternalEntity entity = new InternalEntity(
-                world, world.allocateEntityId(), authoredAsset, authoredId, name, locallyEnabled, parent);
+        InternalEntity entity =
+                new InternalEntity(world, world.allocateEntityId(), provenance, name, locallyEnabled, parent);
         entities.add(entity);
         if (publish) {
             world.addEntity(entity);

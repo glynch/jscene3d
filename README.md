@@ -593,6 +593,11 @@ renders its primary camera, and releases all owned state. It does not introduce
 a parallel application lifecycle. Packaged applications invoke the generic
 `DesktopProjectLauncher` with the engine version, packaged project root, and
 published-content root; they do not need an application-specific Java launcher.
+The read-only live Entity hierarchy identifies local authored entities,
+authored definition placements, and runtime-spawned definition roots. Placement
+and spawn roots also expose the exact definition asset they instantiate, so an
+editor or diagnostic tool can distinguish live runtime structure without
+writing it back into authored project data.
 `CharacterMovementController` converts configurable semantic actions and a
 caller-supplied view direction into normalized camera-relative movement, jump
 requests, and fixed-step character physics without depending on a particular

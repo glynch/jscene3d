@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.assertj.core.api.Assertions.tuple;
 
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -93,12 +95,16 @@ final class WorldComposerTest {
         assertThat(result.diagnostics()).isEmpty();
         World world = result.world().orElseThrow();
         assertThat(world.definition()).isEqualTo(definition);
-        assertThat(world.roots()).hasSize(3);
+        List<Entity> roots = world.roots();
+        assertThat(roots).hasSize(3);
         assertThat(factory.entityCounts()).containsOnly(5);
-        assertThat(world.roots())
-                .extracting(Entity::authoredId)
-                .containsExactly(LOCAL_ROOT, FIRST_PLACEMENT, SECOND_PLACEMENT);
-        assertThat(world.roots()).extracting(Entity::id).doesNotHaveDuplicates();
+        assertThat(roots)
+                .extracting(Entity::authoredId, Entity::instantiationKind, Entity::instantiatedDefinition)
+                .containsExactly(
+                        tuple(LOCAL_ROOT, EntityInstantiationKind.LOCAL_ENTITY, Optional.empty()),
+                        tuple(FIRST_PLACEMENT, EntityInstantiationKind.PLACEMENT, Optional.of(DEFINITION_ASSET)),
+                        tuple(SECOND_PLACEMENT, EntityInstantiationKind.PLACEMENT, Optional.of(DEFINITION_ASSET)));
+        assertThat(roots.stream().map(Entity::id).toList()).doesNotHaveDuplicates();
     }
 
     /** Applies public arguments in the correct definition-instance scope without a placement wrapper. */

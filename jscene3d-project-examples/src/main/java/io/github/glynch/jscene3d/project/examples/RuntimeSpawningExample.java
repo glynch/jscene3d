@@ -93,6 +93,7 @@ public final class RuntimeSpawningExample {
             PreparedEntityDefinition prepared = world.prepare(AssetRef.to(PROJECTILE_ID));
             emitter.prepared(prepared);
             LOGGER.info(() -> "Prepared projectile = " + (prepared.world() == world));
+            LOGGER.info(() -> "Authored owner = " + owner.instantiationKind());
             world.activate();
             world.advanceFixed(Duration.ofMillis(16L));
             SpawnOperation boundary = emitter.operation();
@@ -102,6 +103,8 @@ public final class RuntimeSpawningExample {
             LOGGER.info(() -> "Requested status = " + emitter.statusAtRequest());
             LOGGER.info(() -> "Committed status = " + boundary.status() + ", owner children = "
                     + owner.children().size() + ", after-physics updates = " + firstProjectile.updates());
+            LOGGER.info(() -> "Spawned child = " + first.instantiationKind() + ", definition = "
+                    + first.instantiatedDefinition().orElseThrow());
             SpawnOperation immediate = world.spawnTarget(owner).spawn(prepared, Map.of(SPEED, number(20)));
             Entity second = immediate.entity().orElseThrow();
             Projectile secondProjectile =

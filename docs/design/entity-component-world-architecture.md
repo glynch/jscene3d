@@ -424,6 +424,13 @@ IDs internally while owning distinct live entities and component values. A
 placed root reports the containing asset and placement ID publicly; descendants
 report the reusable definition asset and their definition-local IDs.
 
+The live entity also reports whether it came from a local entity declaration,
+an authored definition placement, or a runtime spawn. Placement and spawn roots
+report the exact definition asset they instantiate. Children declared inside
+that definition retain local-entity provenance beneath the instance root. This
+metadata makes the existing read-only World hierarchy the live inspection
+model; the runtime does not construct a parallel diagnostic entity graph.
+
 ### No authored definition inheritance
 
 The initial model has no base definitions, derived definitions, prefab

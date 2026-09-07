@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
+import io.github.glynch.jscene3d.project.runtime.EntityInstantiationKind;
 import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
 import io.github.glynch.jscene3d.project.runtime.World;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ final class InternalEntity implements Entity {
     private final RuntimeEntityId id;
     private final AssetId authoredAsset;
     private final EntityId authoredId;
+    private final EntityInstantiationKind instantiationKind;
+    private final @Nullable AssetId instantiatedDefinition;
     private final Optional<String> name;
     private final String scheduleIdentity;
     private boolean locallyEnabled;
@@ -39,15 +42,17 @@ final class InternalEntity implements Entity {
     InternalEntity(
             InternalWorld world,
             RuntimeEntityId id,
-            AssetId authoredAsset,
-            EntityId authoredId,
+            EntityProvenance provenance,
             Optional<String> name,
             boolean locallyEnabled,
             @Nullable InternalEntity parent) {
         this.world = Objects.requireNonNull(world, "world");
         this.id = Objects.requireNonNull(id, "id");
-        this.authoredAsset = Objects.requireNonNull(authoredAsset, "authoredAsset");
-        this.authoredId = Objects.requireNonNull(authoredId, "authoredId");
+        EntityProvenance validProvenance = Objects.requireNonNull(provenance, "provenance");
+        authoredAsset = validProvenance.authoredAsset();
+        authoredId = validProvenance.authoredId();
+        instantiationKind = validProvenance.instantiationKind();
+        instantiatedDefinition = validProvenance.instantiatedDefinition();
         this.name = Objects.requireNonNull(name, "name");
         this.scheduleIdentity = scheduleIdentity(parent, authoredAsset, authoredId);
         this.locallyEnabled = locallyEnabled;
@@ -68,6 +73,16 @@ final class InternalEntity implements Entity {
     @Override
     public EntityId authoredId() {
         return authoredId;
+    }
+
+    @Override
+    public EntityInstantiationKind instantiationKind() {
+        return instantiationKind;
+    }
+
+    @Override
+    public Optional<AssetId> instantiatedDefinition() {
+        return Optional.ofNullable(instantiatedDefinition);
     }
 
     @Override

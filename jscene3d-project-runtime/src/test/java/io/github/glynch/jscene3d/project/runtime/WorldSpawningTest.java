@@ -96,11 +96,14 @@ final class WorldSpawningTest {
                         "after:7:0");
         assertThat(operation.status()).isEqualTo(SpawnStatus.ACTIVE);
         assertThat(operation.diagnostics()).isEmpty();
+        assertThat(spawned.instantiationKind()).isEqualTo(EntityInstantiationKind.SPAWN);
+        assertThat(spawned.instantiatedDefinition()).contains(PROJECTILE_ID);
         assertThat(spawned.parent()).containsSame(fixture.owner());
-        assertThat(spawned.children())
-                .singleElement()
-                .extracting(Entity::authoredId)
-                .isEqualTo(PROJECTILE_CHILD);
+        assertThat(spawned.children()).singleElement().satisfies(child -> {
+            assertThat(child.authoredId()).isEqualTo(PROJECTILE_CHILD);
+            assertThat(child.instantiationKind()).isEqualTo(EntityInstantiationKind.LOCAL_ENTITY);
+            assertThat(child.instantiatedDefinition()).isEmpty();
+        });
         assertThat(fixture.world().find(spawned.id())).containsSame(spawned);
         fixture.world().close();
         assertThat(events).endsWith("release:asset:projectile-resource");

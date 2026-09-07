@@ -304,6 +304,12 @@ exactly one World. Spatial, rendering, physics, audio, and game behavior are
 provided by Components rather than Entity subclasses.
 _Avoid_: Node, GameObject, Object3D
 
+**Entity Instantiation Kind**:
+Read-only live provenance identifying whether an Entity came from a local
+entity declaration, an authored Placement, or a runtime Spawn. Placement and
+Spawn roots additionally identify the Entity Definition they instantiate.
+_Avoid_: Entity type, Java class, hierarchy inference
+
 **Component**:
 A typed capability and its instance state owned by one Entity. A Component may
 contain behavior but does not own world traversal or global scheduling.

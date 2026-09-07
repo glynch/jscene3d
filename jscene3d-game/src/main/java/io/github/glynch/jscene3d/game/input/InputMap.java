@@ -4,64 +4,107 @@
  */
 package io.github.glynch.jscene3d.game.input;
 
+import io.github.glynch.jscene3d.platform.GamepadAxis;
+import io.github.glynch.jscene3d.platform.GamepadButton;
+import io.github.glynch.jscene3d.platform.GamepadState;
 import io.github.glynch.jscene3d.platform.InputState;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.MouseButton;
+import io.github.glynch.jscene3d.project.input.InputActionDefinition;
+import io.github.glynch.jscene3d.project.input.InputBinding;
+import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
-/** Immutable mapping from keyboard and mouse controls to semantic game actions. */
+/** Compiled mapping from portable physical controls to typed semantic actions. */
 public final class InputMap {
-    private final Map<InputAction, List<Binding>> bindings;
+    private final Map<InputAction, List<ButtonBinding>> buttons;
+    private final Map<InputAction, List<Axis1dBinding>> axes1d;
+    private final Map<InputAction, List<Axis2dBinding>> axes2d;
 
-    /** Copies completed builder state. */
-    private InputMap(Map<InputAction, List<Binding>> bindings) {
-        Map<InputAction, List<Binding>> copied = new LinkedHashMap<>();
-        bindings.forEach((action, actionBindings) -> copied.put(action, List.copyOf(actionBindings)));
-        this.bindings = Map.copyOf(copied);
+    /** Copies one completed compiled map. */
+    private InputMap(
+            Map<InputAction, List<ButtonBinding>> buttons,
+            Map<InputAction, List<Axis1dBinding>> axes1d,
+            Map<InputAction, List<Axis2dBinding>> axes2d) {
+        this.buttons = copy(buttons);
+        this.axes1d = copy(axes1d);
+        this.axes2d = copy(axes2d);
     }
 
-    /**
-     * Returns a new mapping builder.
+    /** Compiles one validated authored input definition.
      *
-     * @return empty builder
+     * @param definition validated project input map
+     * @return compiled runtime input map
+     */
+    public static InputMap compile(InputMapDefinition definition) {
+        Objects.requireNonNull(definition, "definition");
+        Map<InputAction, List<ButtonBinding>> buttons = new LinkedHashMap<>();
+        Map<InputAction, List<Axis1dBinding>> axes1d = new LinkedHashMap<>();
+        Map<InputAction, List<Axis2dBinding>> axes2d = new LinkedHashMap<>();
+        definition
+                .actions()
+                .forEach((name, action) -> compileAction(new InputAction(name), action, buttons, axes1d, axes2d));
+        return new InputMap(buttons, axes1d, axes2d);
+    }
+
+    /** Returns the programmatic button-map builder retained for non-project callers.
+     *
+     * @return empty button-map builder
      */
     public static Builder builder() {
         return new Builder();
     }
 
-    /**
-     * Samples a native window input view into semantic action state.
+    /** Samples keyboard and mouse input when no gamepad has been assigned.
      *
      * @param input current window input
-     * @param capture host-interface ownership for this frame
+     * @param capture host-interface ownership for this update
      * @return immutable semantic snapshot
      */
     public ActionSnapshot sample(InputState input, InputCapture capture) {
-        InputState validInput = Objects.requireNonNull(input, "input");
-        return sample(new WindowInput(validInput), capture);
+        return sample(input, null, capture);
     }
 
-    /** Resolves semantic state through the internal deterministic input seam. */
+    /** Samples keyboard, mouse, and one runtime-assigned standard gamepad.
+     *
+     * @param input current window input
+     * @param gamepad assigned gamepad state, or {@code null}
+     * @param capture host-interface ownership for this update
+     * @return immutable semantic snapshot
+     */
+    public ActionSnapshot sample(InputState input, @Nullable GamepadState gamepad, InputCapture capture) {
+        return sample(new WindowInput(Objects.requireNonNull(input, "input"), gamepad), capture);
+    }
+
+    /** Resolves semantic state through the deterministic physical-input seam. */
     ActionSnapshot sample(PhysicalInput input, InputCapture capture) {
         PhysicalInput validInput = Objects.requireNonNull(input, "input");
         InputCapture validCapture = Objects.requireNonNull(capture, "capture");
         ActionSnapshot.Builder snapshot = ActionSnapshot.builder();
-        bindings.forEach(
-                (action, actionBindings) -> sampleAction(action, actionBindings, validInput, validCapture, snapshot));
+        buttons.forEach((action, bindings) -> sampleButton(action, bindings, validInput, validCapture, snapshot));
+        axes1d.forEach((action, bindings) -> snapshot.axis1d(
+                action,
+                clamp(bindings.stream()
+                        .mapToDouble(binding -> binding.value(validInput))
+                        .sum())));
+        axes2d.forEach((action, bindings) -> sampleAxis2d(action, bindings, validInput, validCapture, snapshot));
         if (!validCapture.pointer()) {
             snapshot.pointerDelta(validInput.pointerDeltaX(), validInput.pointerDeltaY());
         }
         return snapshot.build();
     }
 
-    /** Aggregates every physical binding assigned to one semantic action. */
-    private static void sampleAction(
+    /** Aggregates every digital binding assigned to one semantic action. */
+    private static void sampleButton(
             InputAction action,
-            List<Binding> bindings,
+            List<ButtonBinding> bindings,
             PhysicalInput input,
             InputCapture capture,
             ActionSnapshot.Builder snapshot) {
@@ -78,8 +121,141 @@ public final class InputMap {
         }
     }
 
-    /** One keyboard or mouse binding hidden behind a common sampling contract. */
-    private sealed interface Binding permits KeyBinding, MouseBinding {
+    /** Adds and bounds all two-dimensional bindings for one semantic action. */
+    private static void sampleAxis2d(
+            InputAction action,
+            List<Axis2dBinding> bindings,
+            PhysicalInput input,
+            InputCapture capture,
+            ActionSnapshot.Builder snapshot) {
+        float x = 0.0F;
+        float y = 0.0F;
+        for (Axis2dBinding binding : bindings) {
+            InputVector2 value = binding.value(input, capture);
+            x += value.x();
+            y += value.y();
+        }
+        snapshot.axis2d(action, clamp(x), clamp(y));
+    }
+
+    /** Compiles every binding of one structurally validated action. */
+    private static void compileAction(
+            InputAction action,
+            InputActionDefinition definition,
+            Map<InputAction, List<ButtonBinding>> buttons,
+            Map<InputAction, List<Axis1dBinding>> axes1d,
+            Map<InputAction, List<Axis2dBinding>> axes2d) {
+        switch (definition.valueType()) {
+            case BUTTON ->
+                buttons.put(
+                        action,
+                        definition.bindings().stream()
+                                .map(InputMap::compileButton)
+                                .toList());
+            case AXIS_1D ->
+                axes1d.put(
+                        action,
+                        definition.bindings().stream()
+                                .map(InputMap::compileAxis1d)
+                                .toList());
+            case AXIS_2D ->
+                axes2d.put(
+                        action,
+                        definition.bindings().stream()
+                                .map(InputMap::compileAxis2d)
+                                .toList());
+        }
+    }
+
+    /** Compiles one digital binding. */
+    private static ButtonBinding compileButton(InputBinding binding) {
+        return switch (binding) {
+            case InputBinding.KeyboardKey(String control) -> new KeyBinding(key(control));
+            case InputBinding.MouseButton(String control) -> new MouseBinding(mouseButton(control));
+            case InputBinding.GamepadButton(String control) -> new GamepadButtonBinding(gamepadButton(control));
+            default -> throw new IllegalArgumentException("not a button binding: " + binding);
+        };
+    }
+
+    /** Compiles one scalar binding. */
+    private static Axis1dBinding compileAxis1d(InputBinding binding) {
+        return switch (binding) {
+            case InputBinding.GamepadAxis(String control, float deadZone, float scale) ->
+                new GamepadAxisBinding(gamepadAxis(control), deadZone, scale);
+            default -> throw new IllegalArgumentException("not an axis-1d binding: " + binding);
+        };
+    }
+
+    /** Compiles one vector binding. */
+    private static Axis2dBinding compileAxis2d(InputBinding binding) {
+        return switch (binding) {
+            case InputBinding.DirectionalKeys(String up, String down, String left, String right) ->
+                new DirectionalKeysBinding(key(up), key(down), key(left), key(right));
+            case InputBinding.MouseDelta(float scaleX, float scaleY) -> new MouseDeltaBinding(scaleX, scaleY);
+            case InputBinding.GamepadStick(String control, float deadZone, boolean invertY) ->
+                new GamepadStickBinding(stickAxes(control), deadZone, invertY);
+            default -> throw new IllegalArgumentException("not an axis-2d binding: " + binding);
+        };
+    }
+
+    /** Resolves a portable enum control name. */
+    private static Key key(String control) {
+        return enumValue(Key.class, control, "keyboard");
+    }
+
+    /** Resolves a portable enum control name. */
+    private static MouseButton mouseButton(String control) {
+        return enumValue(MouseButton.class, control, "mouse");
+    }
+
+    /** Resolves a portable enum control name. */
+    private static GamepadButton gamepadButton(String control) {
+        return enumValue(GamepadButton.class, control, "gamepad button");
+    }
+
+    /** Resolves a portable enum control name. */
+    private static GamepadAxis gamepadAxis(String control) {
+        return enumValue(GamepadAxis.class, control, "gamepad axis");
+    }
+
+    /** Resolves a standard stick to its two physical axes. */
+    private static StickAxes stickAxes(String control) {
+        return switch (control) {
+            case "left-stick" -> new StickAxes(GamepadAxis.LEFT_STICK_X, GamepadAxis.LEFT_STICK_Y);
+            case "right-stick" -> new StickAxes(GamepadAxis.RIGHT_STICK_X, GamepadAxis.RIGHT_STICK_Y);
+            default -> throw new IllegalArgumentException("unsupported gamepad stick control: " + control);
+        };
+    }
+
+    /** Converts lowercase-hyphen authoring names to platform enum constants. */
+    private static <E extends Enum<E>> E enumValue(Class<E> type, String control, String device) {
+        try {
+            return Enum.valueOf(type, control.replace('-', '_').toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalArgumentException("unsupported " + device + " control: " + control, failure);
+        }
+    }
+
+    /** Clamps one aggregate to the semantic axis range. */
+    private static float clamp(double value) {
+        return (float) Math.clamp(value, -1.0, 1.0);
+    }
+
+    /** Applies a symmetric dead zone and rescales the remaining range. */
+    private static float deadZone(float value, float threshold) {
+        float magnitude = Math.abs(value);
+        return magnitude <= threshold ? 0.0F : Math.copySign((magnitude - threshold) / (1.0F - threshold), value);
+    }
+
+    /** Immutably copies ordered binding groups. */
+    private static <T> Map<InputAction, List<T>> copy(Map<InputAction, List<T>> source) {
+        Map<InputAction, List<T>> result = new LinkedHashMap<>();
+        source.forEach((action, bindings) -> result.put(action, List.copyOf(bindings)));
+        return Collections.unmodifiableMap(result);
+    }
+
+    /** A sampled digital binding. */
+    private sealed interface ButtonBinding permits KeyBinding, MouseBinding, GamepadButtonBinding {
         boolean isDown(PhysicalInput input, InputCapture capture);
 
         boolean wasPressed(PhysicalInput input, InputCapture capture);
@@ -87,8 +263,18 @@ public final class InputMap {
         boolean wasReleased(PhysicalInput input, InputCapture capture);
     }
 
-    /** Keyboard implementation of one physical binding. */
-    private record KeyBinding(Key key) implements Binding {
+    /** A sampled one-dimensional binding. */
+    private interface Axis1dBinding {
+        float value(PhysicalInput input);
+    }
+
+    /** A sampled two-dimensional binding. */
+    private interface Axis2dBinding {
+        InputVector2 value(PhysicalInput input, InputCapture capture);
+    }
+
+    /** Keyboard implementation of one digital binding. */
+    private record KeyBinding(Key key) implements ButtonBinding {
         @Override
         public boolean isDown(PhysicalInput input, InputCapture capture) {
             return !capture.keyboard() && input.isKeyDown(key);
@@ -105,8 +291,8 @@ public final class InputMap {
         }
     }
 
-    /** Mouse implementation of one physical binding. */
-    private record MouseBinding(MouseButton button) implements Binding {
+    /** Mouse implementation of one digital binding. */
+    private record MouseBinding(MouseButton button) implements ButtonBinding {
         @Override
         public boolean isDown(PhysicalInput input, InputCapture capture) {
             return !capture.pointer() && input.isMouseButtonDown(button);
@@ -123,8 +309,79 @@ public final class InputMap {
         }
     }
 
-    /** Native-window adapter for the internal physical-input seam. */
-    private record WindowInput(InputState input) implements PhysicalInput {
+    /** Standard-gamepad implementation of one digital binding. */
+    private record GamepadButtonBinding(GamepadButton button) implements ButtonBinding {
+        @Override
+        public boolean isDown(PhysicalInput input, InputCapture capture) {
+            return input.isGamepadButtonDown(button);
+        }
+
+        @Override
+        public boolean wasPressed(PhysicalInput input, InputCapture capture) {
+            return input.wasGamepadButtonPressed(button);
+        }
+
+        @Override
+        public boolean wasReleased(PhysicalInput input, InputCapture capture) {
+            return input.wasGamepadButtonReleased(button);
+        }
+    }
+
+    /** Standard-gamepad implementation of one scalar binding. */
+    private record GamepadAxisBinding(GamepadAxis axis, float deadZone, float scale) implements Axis1dBinding {
+        @Override
+        public float value(PhysicalInput input) {
+            float raw = input.gamepadAxis(axis);
+            float normalized =
+                    axis == GamepadAxis.LEFT_TRIGGER || axis == GamepadAxis.RIGHT_TRIGGER ? (raw + 1.0F) * 0.5F : raw;
+            return clamp(InputMap.deadZone(normalized, deadZone) * scale);
+        }
+    }
+
+    /** Four keyboard keys combined into one vector binding. */
+    private record DirectionalKeysBinding(Key up, Key down, Key left, Key right) implements Axis2dBinding {
+        @Override
+        public InputVector2 value(PhysicalInput input, InputCapture capture) {
+            if (capture.keyboard()) {
+                return InputVector2.ZERO;
+            }
+            float x = (input.isKeyDown(right) ? 1.0F : 0.0F) - (input.isKeyDown(left) ? 1.0F : 0.0F);
+            float y = (input.isKeyDown(up) ? 1.0F : 0.0F) - (input.isKeyDown(down) ? 1.0F : 0.0F);
+            return new InputVector2(x, y);
+        }
+    }
+
+    /** Relative mouse movement converted into one vector binding. */
+    private record MouseDeltaBinding(float scaleX, float scaleY) implements Axis2dBinding {
+        @Override
+        public InputVector2 value(PhysicalInput input, InputCapture capture) {
+            return capture.pointer()
+                    ? InputVector2.ZERO
+                    : new InputVector2(clamp(input.pointerDeltaX() * scaleX), clamp(input.pointerDeltaY() * scaleY));
+        }
+    }
+
+    /** Two standard-gamepad axes converted with one radial dead zone. */
+    private record GamepadStickBinding(StickAxes axes, float deadZone, boolean invertY) implements Axis2dBinding {
+        @Override
+        public InputVector2 value(PhysicalInput input, InputCapture capture) {
+            float x = input.gamepadAxis(axes.x());
+            float y = input.gamepadAxis(axes.y()) * (invertY ? -1.0F : 1.0F);
+            float magnitude = Math.min(1.0F, (float) Math.sqrt(x * x + y * y));
+            if (magnitude <= deadZone) {
+                return InputVector2.ZERO;
+            }
+            float outputMagnitude = (magnitude - deadZone) / (1.0F - deadZone);
+            float scale = outputMagnitude / magnitude;
+            return new InputVector2(clamp(x * scale), clamp(y * scale));
+        }
+    }
+
+    /** Physical axes underlying one standard gamepad stick. */
+    private record StickAxes(GamepadAxis x, GamepadAxis y) {}
+
+    /** Window and optional gamepad adapter for the internal physical-input seam. */
+    private record WindowInput(InputState input, @Nullable GamepadState gamepad) implements PhysicalInput {
         @Override
         public boolean isKeyDown(Key key) {
             return input.isKeyDown(key);
@@ -156,6 +413,26 @@ public final class InputMap {
         }
 
         @Override
+        public boolean isGamepadButtonDown(GamepadButton button) {
+            return gamepad != null && gamepad.isButtonDown(button);
+        }
+
+        @Override
+        public boolean wasGamepadButtonPressed(GamepadButton button) {
+            return gamepad != null && gamepad.wasButtonPressed(button);
+        }
+
+        @Override
+        public boolean wasGamepadButtonReleased(GamepadButton button) {
+            return gamepad != null && gamepad.wasButtonReleased(button);
+        }
+
+        @Override
+        public float gamepadAxis(GamepadAxis axis) {
+            return gamepad == null ? 0.0F : gamepad.axis(axis);
+        }
+
+        @Override
         public double pointerDeltaX() {
             return input.pointerDeltaX();
         }
@@ -166,26 +443,23 @@ public final class InputMap {
         }
     }
 
-    /** Builds an immutable action map while preserving declaration order. */
+    /** Builds an immutable button map for non-project clients. */
     public static final class Builder {
-        private final Map<InputAction, List<Binding>> bindings = new LinkedHashMap<>();
+        private final Map<InputAction, List<ButtonBinding>> bindings = new LinkedHashMap<>();
 
-        /** Creates an empty builder. */
         private Builder() {}
 
-        /**
-         * Binds a keyboard key to an action.
+        /** Binds a keyboard key to an action.
          *
          * @param action semantic action
-         * @param key physical key
+         * @param key physical keyboard key
          * @return this builder
          */
         public Builder bind(InputAction action, Key key) {
             return add(action, new KeyBinding(Objects.requireNonNull(key, "key")));
         }
 
-        /**
-         * Binds a mouse button to an action.
+        /** Binds a mouse button to an action.
          *
          * @param action semantic action
          * @param button physical mouse button
@@ -195,23 +469,21 @@ public final class InputMap {
             return add(action, new MouseBinding(Objects.requireNonNull(button, "button")));
         }
 
-        /**
-         * Builds the immutable mapping.
+        /** Builds a map containing at least one binding.
          *
-         * @return mapping containing at least one action binding
-         * @throws IllegalStateException if no bindings were added
+         * @return immutable input map
          */
         public InputMap build() {
             if (bindings.isEmpty()) {
                 throw new IllegalStateException("An input map requires at least one binding");
             }
-            return new InputMap(bindings);
+            return new InputMap(bindings, Map.of(), Map.of());
         }
 
         /** Adds one unique physical binding to an action. */
-        private Builder add(InputAction action, Binding binding) {
-            InputAction validAction = Objects.requireNonNull(action, "action");
-            List<Binding> actionBindings = bindings.computeIfAbsent(validAction, ignored -> new ArrayList<>());
+        private Builder add(InputAction action, ButtonBinding binding) {
+            List<ButtonBinding> actionBindings =
+                    bindings.computeIfAbsent(Objects.requireNonNull(action, "action"), ignored -> new ArrayList<>());
             if (!actionBindings.contains(binding)) {
                 actionBindings.add(binding);
             }

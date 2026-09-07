@@ -26,6 +26,8 @@ public enum InputMapDiagnosticCode implements DiagnosticCode {
     ACTIONS_EMPTY("input-map.actions.empty", "The input map requires at least one action"),
     /** An action identifier is invalid. */
     ACTION_ID_INVALID("input-map.action.id", "An input action identifier is invalid"),
+    /** An action value type is unsupported. */
+    VALUE_TYPE_UNSUPPORTED("input-map.action.value-type", "The input action value type is unsupported"),
     /** An action has no bindings. */
     BINDINGS_EMPTY("input-map.bindings.empty", "An input action requires at least one binding"),
     /** A binding entry is missing. */
@@ -34,8 +36,10 @@ public enum InputMapDiagnosticCode implements DiagnosticCode {
     DEVICE_UNSUPPORTED("input-map.binding.device", "The input binding device is unsupported"),
     /** A binding control is missing. */
     CONTROL_REQUIRED("input-map.binding.control", "The input binding requires a physical control"),
-    /** A binding contains a property for the wrong device. */
-    CONTROL_CONFLICT("input-map.binding.conflict", "The input binding contains conflicting control properties"),
+    /** A binding does not produce its action's value type. */
+    VALUE_TYPE_MISMATCH("input-map.binding.value-type", "The input binding does not match its action value type"),
+    /** A numeric binding option is invalid. */
+    CONFIGURATION_INVALID("input-map.binding.configuration", "The input binding configuration is invalid"),
     /** A physical binding is duplicated for one action. */
     BINDING_DUPLICATE("input-map.binding.duplicate", "The input action contains a duplicate physical binding");
 

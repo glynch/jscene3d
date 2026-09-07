@@ -7,9 +7,11 @@ package io.github.glynch.jscene3d.project.runtime;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import java.util.List;
+import java.util.Optional;
 
 /** Host-selected engine facilities used to compose each project world. */
 public interface ProjectRuntimeEnvironment {
@@ -32,9 +34,10 @@ public interface ProjectRuntimeEnvironment {
      *
      * <p>A successfully composed world takes ownership. The host closes adapters after failed composition.
      *
+     * @param inputMap validated authored input map when declared by the project
      * @return bindings in ownership and reverse-cleanup order
      */
-    List<WorldModuleBinding<?>> createWorldModules();
+    List<WorldModuleBinding<?>> createWorldModules(Optional<InputMapDefinition> inputMap);
 
     /**
      * Loads the definition resolver and immutable-resource provider for one validated project.

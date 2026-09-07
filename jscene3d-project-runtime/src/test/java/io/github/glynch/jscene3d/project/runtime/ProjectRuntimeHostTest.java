@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.extension.ApplicationRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
@@ -26,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -171,7 +173,7 @@ final class ProjectRuntimeHostTest {
             }
 
             @Override
-            public List<WorldModuleBinding<?>> createWorldModules() {
+            public List<WorldModuleBinding<?>> createWorldModules(Optional<InputMapDefinition> inputMap) {
                 return module == null ? List.of() : List.of(WorldModuleBinding.of(TestWorldModule.class, module));
             }
 

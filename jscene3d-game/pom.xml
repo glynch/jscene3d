@@ -31,6 +31,10 @@
             <artifactId>jscene3d-lwjgl</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-runtime</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.joml</groupId>
             <artifactId>joml</artifactId>
         </dependency>

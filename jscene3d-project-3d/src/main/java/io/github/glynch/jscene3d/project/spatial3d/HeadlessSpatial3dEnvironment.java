@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.spatial3d;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeEnvironment;
@@ -16,6 +17,7 @@ import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.List;
+import java.util.Optional;
 
 /** Standard headless-capable three-dimensional environment for project play and tests. */
 public final class HeadlessSpatial3dEnvironment implements ProjectRuntimeEnvironment {
@@ -42,7 +44,7 @@ public final class HeadlessSpatial3dEnvironment implements ProjectRuntimeEnviron
     }
 
     @Override
-    public List<WorldModuleBinding<?>> createWorldModules() {
+    public List<WorldModuleBinding<?>> createWorldModules(Optional<InputMapDefinition> inputMap) {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         return List.of(WorldModuleBinding.of(Spatial3dWorldModule.class, spatial));
     }

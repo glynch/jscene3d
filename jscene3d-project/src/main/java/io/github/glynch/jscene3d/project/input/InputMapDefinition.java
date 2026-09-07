@@ -10,14 +10,13 @@ import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireNor
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 /** Immutable, structurally validated mapping from semantic actions to physical controls. */
 public final class InputMapDefinition {
     private final Path source;
-    private final Map<String, List<InputBinding>> actions;
+    private final Map<String, InputActionDefinition> actions;
 
     /**
      * Creates one validated input-map definition.
@@ -25,7 +24,7 @@ public final class InputMapDefinition {
      * @param source normalized absolute definition-document path
      * @param actions non-empty action bindings in authored order
      */
-    public InputMapDefinition(Path source, Map<String, List<InputBinding>> actions) {
+    public InputMapDefinition(Path source, Map<String, InputActionDefinition> actions) {
         this.source = requireNormalizedAbsolute(source, "source");
         this.actions = copyActions(actions);
     }
@@ -44,7 +43,7 @@ public final class InputMapDefinition {
      *
      * @return immutable actions in authored order
      */
-    public Map<String, List<InputBinding>> actions() {
+    public Map<String, InputActionDefinition> actions() {
         return actions;
     }
 
@@ -70,19 +69,15 @@ public final class InputMapDefinition {
     }
 
     /** Copies actions while retaining authored order and enforcing public-model invariants. */
-    private static Map<String, List<InputBinding>> copyActions(Map<String, List<InputBinding>> actions) {
+    private static Map<String, InputActionDefinition> copyActions(Map<String, InputActionDefinition> actions) {
         Objects.requireNonNull(actions, "actions");
         if (actions.isEmpty()) {
             throw new IllegalArgumentException("actions must not be empty");
         }
-        Map<String, List<InputBinding>> copied = new LinkedHashMap<>();
-        actions.forEach((action, bindings) -> {
+        Map<String, InputActionDefinition> copied = new LinkedHashMap<>();
+        actions.forEach((action, definition) -> {
             String validAction = requireLocalId(action, "action");
-            List<InputBinding> validBindings = List.copyOf(Objects.requireNonNull(bindings, "bindings"));
-            if (validBindings.isEmpty()) {
-                throw new IllegalArgumentException("bindings must not be empty: " + validAction);
-            }
-            copied.put(validAction, validBindings);
+            copied.put(validAction, Objects.requireNonNull(definition, "definition"));
         });
         return Collections.unmodifiableMap(copied);
     }

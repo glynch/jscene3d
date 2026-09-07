@@ -5,9 +5,11 @@
 package io.github.glynch.jscene3d.project.input.internal;
 
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.input.InputActionDefinition;
 import io.github.glynch.jscene3d.project.input.InputBinding;
 import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import io.github.glynch.jscene3d.project.input.InputMapDiagnosticCode;
+import io.github.glynch.jscene3d.project.input.InputValueType;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.internal.JsonPointers;
 import io.github.glynch.jscene3d.project.internal.ProjectIdentifiers;
@@ -27,6 +29,7 @@ public final class InputMapValidator {
     private static final int SCHEMA_VERSION = 1;
     private static final String SCHEMA_URI = "https://jscene3d.org/schemas/input-map-1.json";
     private static final String LOCAL_SCHEMA_REFERENCE = "schema/input-map-1.schema.json";
+    private static final float DEFAULT_DEAD_ZONE = 0.15F;
 
     private final GameProject project;
     private final Path source;
@@ -39,8 +42,7 @@ public final class InputMapValidator {
         diagnostics = new DiagnosticCollector(source);
     }
 
-    /**
-     * Validates one raw input-map definition.
+    /** Validates one raw input-map definition.
      *
      * @param raw nullable deserialization model
      * @param project containing validated project
@@ -56,11 +58,8 @@ public final class InputMapValidator {
     /** Validates fields in deterministic document order. */
     private Optional<InputMapDefinition> validate(RawInputMap raw) {
         validateSchema(raw.schema(), raw.schemaVersion());
-        Map<String, List<InputBinding>> actions = validateActions(raw.actions());
-        if (diagnostics.hasErrors()) {
-            return Optional.empty();
-        }
-        return Optional.of(new InputMapDefinition(source, actions));
+        Map<String, InputActionDefinition> actions = validateActions(raw.actions());
+        return diagnostics.hasErrors() ? Optional.empty() : Optional.of(new InputMapDefinition(source, actions));
     }
 
     /** Validates the authoritative version and optional schema reference. */
@@ -82,8 +81,8 @@ public final class InputMapValidator {
     }
 
     /** Validates the non-empty semantic action index. */
-    private Map<String, List<InputBinding>> validateActions(
-            @Nullable Map<String, @Nullable List<RawInputMap.@Nullable Binding>> rawActions) {
+    private Map<String, InputActionDefinition> validateActions(
+            @Nullable Map<String, RawInputMap.@Nullable Action> rawActions) {
         if (rawActions == null) {
             diagnostics.error(InputMapDiagnosticCode.ACTIONS_REQUIRED, "actions must be an object", "/actions");
             return Map.of();
@@ -92,16 +91,14 @@ public final class InputMapValidator {
             diagnostics.error(InputMapDiagnosticCode.ACTIONS_EMPTY, "actions must not be empty", "/actions");
             return Map.of();
         }
-        Map<String, List<InputBinding>> actions = new LinkedHashMap<>();
-        rawActions.forEach((action, bindings) -> validateAction(action, bindings, actions));
+        Map<String, InputActionDefinition> actions = new LinkedHashMap<>();
+        rawActions.forEach((action, raw) -> validateAction(action, raw, actions));
         return actions;
     }
 
-    /** Validates one semantic action and its ordered physical bindings. */
+    /** Validates one typed semantic action and its ordered physical bindings. */
     private void validateAction(
-            String action,
-            @Nullable List<RawInputMap.@Nullable Binding> rawBindings,
-            Map<String, List<InputBinding>> actions) {
+            String action, RawInputMap.@Nullable Action raw, Map<String, InputActionDefinition> actions) {
         String location = "/actions/" + JsonPointers.escapeSegment(action);
         boolean validAction = ProjectIdentifiers.isLocalId(action);
         if (!validAction) {
@@ -110,33 +107,75 @@ public final class InputMapValidator {
                     "action identifiers must be portable lowercase identifiers",
                     location);
         }
+        if (raw == null) {
+            diagnostics.error(InputMapDiagnosticCode.BINDING_REQUIRED, "action must be an object", location);
+            return;
+        }
+        Optional<InputValueType> valueType = valueType(raw.valueType(), location + "/valueType");
+        List<InputBinding> bindings = validateBindings(raw.bindings(), valueType, location + "/bindings");
+        if (validAction && valueType.isPresent() && !bindings.isEmpty()) {
+            actions.put(action, new InputActionDefinition(valueType.orElseThrow(), bindings));
+        }
+    }
+
+    /** Converts one portable value-type name. */
+    private Optional<InputValueType> valueType(@Nullable String raw, String location) {
+        InputValueType value =
+                switch (raw == null ? "" : raw) {
+                    case "button" -> InputValueType.BUTTON;
+                    case "axis-1d" -> InputValueType.AXIS_1D;
+                    case "axis-2d" -> InputValueType.AXIS_2D;
+                    default -> null;
+                };
+        if (value == null) {
+            diagnostics.error(
+                    InputMapDiagnosticCode.VALUE_TYPE_UNSUPPORTED,
+                    "valueType must be button, axis-1d, or axis-2d: " + raw,
+                    location);
+        }
+        return Optional.ofNullable(value);
+    }
+
+    /** Validates a non-empty unique binding list. */
+    private List<InputBinding> validateBindings(
+            @Nullable List<RawInputMap.@Nullable Binding> rawBindings,
+            Optional<InputValueType> valueType,
+            String location) {
         if (rawBindings == null || rawBindings.isEmpty()) {
             diagnostics.error(
                     InputMapDiagnosticCode.BINDINGS_EMPTY,
                     "an action requires at least one physical binding",
                     location);
-            return;
+            return List.of();
         }
         List<InputBinding> bindings = new ArrayList<>();
         LinkedHashSet<InputBinding> unique = new LinkedHashSet<>();
         for (int index = 0; index < rawBindings.size(); index++) {
             String bindingLocation = location + '/' + index;
-            Optional<InputBinding> candidate = validateBinding(rawBindings.get(index), bindingLocation);
-            if (candidate.isPresent()) {
-                InputBinding binding = candidate.orElseThrow();
-                if (unique.add(binding)) {
+            validateBinding(rawBindings.get(index), bindingLocation).ifPresent(binding -> {
+                if (validateValueType(valueType, binding, bindingLocation) && unique.add(binding)) {
                     bindings.add(binding);
-                } else {
+                } else if (valueType.orElse(null) == binding.valueType()) {
                     diagnostics.error(
                             InputMapDiagnosticCode.BINDING_DUPLICATE,
-                            "physical binding is duplicated: " + binding.control(),
+                            "physical binding is duplicated: " + binding,
                             bindingLocation);
                 }
-            }
+            });
         }
-        if (validAction && !bindings.isEmpty()) {
-            actions.put(action, List.copyOf(bindings));
+        return bindings;
+    }
+
+    /** Reports bindings whose output shape differs from their action. */
+    private boolean validateValueType(Optional<InputValueType> valueType, InputBinding binding, String location) {
+        if (valueType.isPresent() && valueType.orElseThrow() != binding.valueType()) {
+            diagnostics.error(
+                    InputMapDiagnosticCode.VALUE_TYPE_MISMATCH,
+                    "binding produces " + binding.valueType() + " but action requires " + valueType.orElseThrow(),
+                    location);
+            return false;
         }
+        return true;
     }
 
     /** Validates one device-specific physical binding. */
@@ -145,54 +184,76 @@ public final class InputMapValidator {
             diagnostics.error(InputMapDiagnosticCode.BINDING_REQUIRED, "binding must be an object", location);
             return Optional.empty();
         }
-        if (raw.device() == null || raw.device().isBlank()) {
-            diagnostics.error(
-                    InputMapDiagnosticCode.DEVICE_UNSUPPORTED,
-                    "binding.device must be keyboard or mouse",
-                    location + "/device");
+        try {
+            return switch (raw.device() == null ? "" : raw.device()) {
+                case "keyboard" -> keyboardBinding(raw, location);
+                case "mouse" -> mouseBinding(raw, location);
+                case "gamepad" -> gamepadBinding(raw, location);
+                default -> unsupportedDevice(raw.device(), location);
+            };
+        } catch (IllegalArgumentException failure) {
+            diagnostics.error(InputMapDiagnosticCode.CONFIGURATION_INVALID, failure.getMessage(), location);
             return Optional.empty();
         }
-        return switch (raw.device()) {
-            case "keyboard" -> keyboardBinding(raw, location);
-            case "mouse" -> mouseBinding(raw, location);
-            default -> {
-                diagnostics.error(
-                        InputMapDiagnosticCode.DEVICE_UNSUPPORTED,
-                        "unsupported input device: " + raw.device(),
-                        location + "/device");
-                yield Optional.empty();
-            }
-        };
     }
 
-    /** Validates one keyboard-key binding. */
+    /** Creates one keyboard key or four-key directional composite. */
     private Optional<InputBinding> keyboardBinding(RawInputMap.Binding raw, String location) {
-        if (raw.button() != null) {
-            diagnostics.error(
-                    InputMapDiagnosticCode.CONTROL_CONFLICT,
-                    "a keyboard binding cannot declare button",
-                    location + "/button");
+        if ("directional".equals(raw.control())) {
+            return Optional.of(new InputBinding.DirectionalKeys(
+                    required(raw.up(), location + "/up"),
+                    required(raw.down(), location + "/down"),
+                    required(raw.left(), location + "/left"),
+                    required(raw.right(), location + "/right")));
         }
-        return control(raw.key(), InputBinding.Device.KEYBOARD, location + "/key");
+        return Optional.of(new InputBinding.KeyboardKey(required(raw.control(), location + "/control")));
     }
 
-    /** Validates one mouse-button binding. */
+    /** Creates one mouse button or relative pointer-delta binding. */
     private Optional<InputBinding> mouseBinding(RawInputMap.Binding raw, String location) {
-        if (raw.key() != null) {
-            diagnostics.error(
-                    InputMapDiagnosticCode.CONTROL_CONFLICT, "a mouse binding cannot declare key", location + "/key");
-        }
-        return control(raw.button(), InputBinding.Device.MOUSE_BUTTON, location + "/button");
+        String control = required(raw.control(), location + "/control");
+        return Optional.of(
+                "delta".equals(control)
+                        ? new InputBinding.MouseDelta(orDefault(raw.scaleX(), 1.0F), orDefault(raw.scaleY(), 1.0F))
+                        : new InputBinding.MouseButton(control));
     }
 
-    /** Creates a binding when its device-specific control name is present. */
-    private Optional<InputBinding> control(@Nullable String control, InputBinding.Device device, String location) {
+    /** Creates one standard gamepad button, axis, or stick binding. */
+    private Optional<InputBinding> gamepadBinding(RawInputMap.Binding raw, String location) {
+        String control = required(raw.control(), location + "/control");
+        if (control.endsWith("-stick")) {
+            return Optional.of(new InputBinding.GamepadStick(
+                    control, orDefault(raw.deadZone(), DEFAULT_DEAD_ZONE), Boolean.TRUE.equals(raw.invertY())));
+        }
+        if (control.endsWith("-x") || control.endsWith("-y") || control.endsWith("-trigger")) {
+            return Optional.of(new InputBinding.GamepadAxis(
+                    control, orDefault(raw.deadZone(), DEFAULT_DEAD_ZONE), orDefault(raw.scale(), 1.0F)));
+        }
+        return Optional.of(new InputBinding.GamepadButton(control));
+    }
+
+    /** Reports one unsupported device. */
+    private Optional<InputBinding> unsupportedDevice(@Nullable String device, String location) {
+        diagnostics.error(
+                InputMapDiagnosticCode.DEVICE_UNSUPPORTED,
+                "binding.device must be keyboard, mouse, or gamepad: " + device,
+                location + "/device");
+        return Optional.empty();
+    }
+
+    /** Requires one non-blank physical control name. */
+    private String required(@Nullable String control, String location) {
         if (control == null || control.isBlank()) {
             diagnostics.error(
                     InputMapDiagnosticCode.CONTROL_REQUIRED, "the physical control name must not be blank", location);
-            return Optional.empty();
+            throw new IllegalArgumentException("the physical control name must not be blank");
         }
-        return Optional.of(new InputBinding(device, control));
+        return control;
+    }
+
+    /** Uses an authored option or its format default. */
+    private static float orDefault(@Nullable Float value, float defaultValue) {
+        return value == null ? defaultValue : value;
     }
 
     /** Validated input map and ordered diagnostics returned to the public loader.

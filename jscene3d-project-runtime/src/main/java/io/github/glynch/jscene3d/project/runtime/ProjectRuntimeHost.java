@@ -13,6 +13,9 @@ import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.input.InputMapDefinition;
+import io.github.glynch.jscene3d.project.input.InputMapLoadResult;
+import io.github.glynch.jscene3d.project.input.InputMapLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
@@ -23,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 
@@ -51,9 +55,10 @@ public final class ProjectRuntimeHost implements ProjectHost {
         RegisteredTypeCatalog types = loadTypes(project);
         AssetCatalog assets = loadAssets(project);
         AssetMetadata startup = startupAsset(project, assets);
+        Optional<InputMapDefinition> inputMap = loadInputMap(project);
         List<ComponentRuntimeExtension> extensions = runtimeExtensions();
         ProjectContent content = loadContent(project, types, assets);
-        List<WorldModuleBinding<?>> modules = List.copyOf(environment.createWorldModules());
+        List<WorldModuleBinding<?>> modules = List.copyOf(environment.createWorldModules(inputMap));
         WorldCompositionResult composition = WorldComposer.compose(
                 content.definitions(),
                 AssetRef.<WorldDefinition>to(startup.id()),
@@ -71,6 +76,16 @@ public final class ProjectRuntimeHost implements ProjectHost {
                 new HostedProject(project, assets, composition.world().orElseThrow());
         prepareApplication(hosted, extensions);
         return hosted;
+    }
+
+    /** Loads the optional authored input map before constructing runtime modules. */
+    private static Optional<InputMapDefinition> loadInputMap(GameProject project) {
+        return project.runtime().inputMap().map(path -> {
+            InputMapLoadResult result = new InputMapLoader().load(project, path);
+            return result.definition()
+                    .orElseThrow(
+                            () -> new ProjectHostException("project input-map loading failed", result.diagnostics()));
+        });
     }
 
     /** Loads project-scoped authored and generated content through the host-selected environment. */

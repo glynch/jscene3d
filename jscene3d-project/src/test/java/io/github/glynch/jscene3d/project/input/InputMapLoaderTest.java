@@ -31,11 +31,21 @@ class InputMapLoaderTest {
                   "$schema": "../schema/input-map-1.schema.json",
                   "schemaVersion": 1,
                   "actions": {
-                    "move-forward": [
-                      {"device": "keyboard", "key": "W"},
-                      {"device": "keyboard", "key": "UP"}
-                    ],
-                    "fire": [{"device": "mouse", "button": "LEFT"}]
+                    "move": {
+                      "valueType": "axis-2d",
+                      "bindings": [
+                        {"device": "keyboard", "control": "directional",
+                         "up": "W", "down": "S", "left": "A", "right": "D"},
+                        {"device": "gamepad", "control": "left-stick", "deadZone": 0.2}
+                      ]
+                    },
+                    "fire": {
+                      "valueType": "button",
+                      "bindings": [
+                        {"device": "mouse", "control": "LEFT"},
+                        {"device": "gamepad", "control": "button-south"}
+                      ]
+                    }
                   }
                 }
                 """);
@@ -46,13 +56,14 @@ class InputMapLoaderTest {
         assertThat(result.diagnostics()).isEmpty();
         InputMapDefinition definition = result.definition().orElseThrow();
         assertThat(definition.source()).isEqualTo(inputMap.toRealPath());
-        assertThat(definition.actions()).containsOnlyKeys("move-forward", "fire");
-        assertThat(definition.actions().get("move-forward"))
+        assertThat(definition.actions()).containsOnlyKeys("move", "fire");
+        assertThat(definition.actions().get("move").valueType()).isEqualTo(InputValueType.AXIS_2D);
+        assertThat(definition.actions().get("move").bindings())
                 .containsExactly(
-                        new InputBinding(InputBinding.Device.KEYBOARD, "W"),
-                        new InputBinding(InputBinding.Device.KEYBOARD, "UP"));
-        assertThat(definition.actions().get("fire"))
-                .containsExactly(new InputBinding(InputBinding.Device.MOUSE_BUTTON, "LEFT"));
+                        new InputBinding.DirectionalKeys("W", "S", "A", "D"),
+                        new InputBinding.GamepadStick("left-stick", 0.2F, false));
+        assertThat(definition.actions().get("fire").bindings())
+                .containsExactly(new InputBinding.MouseButton("LEFT"), new InputBinding.GamepadButton("button-south"));
     }
 
     @Test
@@ -62,14 +73,17 @@ class InputMapLoaderTest {
                 {
                   "schemaVersion": 2,
                   "actions": {
-                    "Bad Action": [],
-                    "fire": [
-                      null,
-                      {"device": "controller", "key": "A"},
-                      {"device": "keyboard", "key": "W", "button": "LEFT"},
-                      {"device": "keyboard", "key": "W"},
-                      {"device": "keyboard", "key": "W"}
-                    ]
+                    "Bad Action": {"valueType": "vector", "bindings": []},
+                    "fire": {
+                      "valueType": "button",
+                      "bindings": [
+                        null,
+                        {"device": "controller", "control": "button-south"},
+                        {"device": "keyboard", "control": "W"},
+                        {"device": "keyboard", "control": "W"},
+                        {"device": "gamepad", "control": "left-stick"}
+                      ]
+                    }
                   }
                 }
                 """);
@@ -82,10 +96,11 @@ class InputMapLoaderTest {
                 .contains(
                         InputMapDiagnosticCode.SCHEMA_UNSUPPORTED,
                         InputMapDiagnosticCode.ACTION_ID_INVALID,
+                        InputMapDiagnosticCode.VALUE_TYPE_UNSUPPORTED,
                         InputMapDiagnosticCode.BINDINGS_EMPTY,
                         InputMapDiagnosticCode.BINDING_REQUIRED,
                         InputMapDiagnosticCode.DEVICE_UNSUPPORTED,
-                        InputMapDiagnosticCode.CONTROL_CONFLICT,
+                        InputMapDiagnosticCode.VALUE_TYPE_MISMATCH,
                         InputMapDiagnosticCode.BINDING_DUPLICATE);
     }
 
@@ -110,7 +125,11 @@ class InputMapLoaderTest {
     void exposesValueSemantics() throws IOException {
         Path source = temporaryDirectory.toRealPath().resolve("input-map.json");
         InputMapDefinition first = new InputMapDefinition(
-                source, Map.of("fire", List.of(new InputBinding(InputBinding.Device.MOUSE_BUTTON, "LEFT"))));
+                source,
+                Map.of(
+                        "fire",
+                        new InputActionDefinition(
+                                InputValueType.BUTTON, List.of(new InputBinding.MouseButton("LEFT")))));
         InputMapDefinition second = new InputMapDefinition(source, first.actions());
 
         assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);

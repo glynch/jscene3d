@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.game.input;
 
+import io.github.glynch.jscene3d.platform.GamepadAxis;
+import io.github.glynch.jscene3d.platform.GamepadButton;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.MouseButton;
 
@@ -20,6 +22,22 @@ interface PhysicalInput {
     boolean wasMouseButtonPressed(MouseButton button);
 
     boolean wasMouseButtonReleased(MouseButton button);
+
+    default boolean isGamepadButtonDown(GamepadButton button) {
+        return false;
+    }
+
+    default boolean wasGamepadButtonPressed(GamepadButton button) {
+        return false;
+    }
+
+    default boolean wasGamepadButtonReleased(GamepadButton button) {
+        return false;
+    }
+
+    default float gamepadAxis(GamepadAxis axis) {
+        return 0.0F;
+    }
 
     double pointerDeltaX();
 

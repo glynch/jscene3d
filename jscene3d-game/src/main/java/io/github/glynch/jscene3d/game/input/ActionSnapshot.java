@@ -4,17 +4,22 @@
  */
 package io.github.glynch.jscene3d.game.input;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 /** Immutable semantic action and relative-pointer state for one update. */
 public final class ActionSnapshot {
-    private static final ActionSnapshot EMPTY = new ActionSnapshot(Set.of(), Set.of(), Set.of(), 0.0, 0.0);
+    private static final ActionSnapshot EMPTY =
+            new ActionSnapshot(Set.of(), Set.of(), Set.of(), Map.of(), Map.of(), 0.0, 0.0);
 
     private final Set<InputAction> down;
     private final Set<InputAction> pressed;
     private final Set<InputAction> released;
+    private final Map<InputAction, Float> axes1d;
+    private final Map<InputAction, InputVector2> axes2d;
     private final double pointerDeltaX;
     private final double pointerDeltaY;
 
@@ -23,11 +28,15 @@ public final class ActionSnapshot {
             Set<InputAction> down,
             Set<InputAction> pressed,
             Set<InputAction> released,
+            Map<InputAction, Float> axes1d,
+            Map<InputAction, InputVector2> axes2d,
             double pointerDeltaX,
             double pointerDeltaY) {
         this.down = Set.copyOf(down);
         this.pressed = Set.copyOf(pressed);
         this.released = Set.copyOf(released);
+        this.axes1d = Map.copyOf(axes1d);
+        this.axes2d = Map.copyOf(axes2d);
         this.pointerDeltaX = requireFinite(pointerDeltaX, "pointerDeltaX");
         this.pointerDeltaY = requireFinite(pointerDeltaY, "pointerDeltaY");
     }
@@ -93,6 +102,24 @@ public final class ActionSnapshot {
         return positiveValue - negativeValue;
     }
 
+    /** Returns one authored one-dimensional action value.
+     *
+     * @param action action to query
+     * @return current scalar value
+     */
+    public float axis1d(InputAction action) {
+        return axes1d.getOrDefault(Objects.requireNonNull(action, "action"), 0.0F);
+    }
+
+    /** Returns one authored two-dimensional action value.
+     *
+     * @param action action to query
+     * @return current vector value
+     */
+    public InputVector2 axis2d(InputAction action) {
+        return axes2d.getOrDefault(Objects.requireNonNull(action, "action"), InputVector2.ZERO);
+    }
+
     /**
      * Returns horizontal relative-pointer movement.
      *
@@ -125,6 +152,8 @@ public final class ActionSnapshot {
                 validNewer.down,
                 mergedPressed,
                 mergedReleased,
+                validNewer.axes1d,
+                validNewer.axes2d,
                 pointerDeltaX + validNewer.pointerDeltaX,
                 pointerDeltaY + validNewer.pointerDeltaY);
     }
@@ -135,7 +164,9 @@ public final class ActionSnapshot {
      * @return held-only snapshot
      */
     public ActionSnapshot heldOnly() {
-        return down.isEmpty() ? EMPTY : new ActionSnapshot(down, Set.of(), Set.of(), 0.0, 0.0);
+        return down.isEmpty() && axes1d.isEmpty() && axes2d.isEmpty()
+                ? EMPTY
+                : new ActionSnapshot(down, Set.of(), Set.of(), axes1d, axes2d, 0.0, 0.0);
     }
 
     @Override
@@ -149,19 +180,22 @@ public final class ActionSnapshot {
         return down.equals(snapshot.down)
                 && pressed.equals(snapshot.pressed)
                 && released.equals(snapshot.released)
+                && axes1d.equals(snapshot.axes1d)
+                && axes2d.equals(snapshot.axes2d)
                 && Double.compare(pointerDeltaX, snapshot.pointerDeltaX) == 0
                 && Double.compare(pointerDeltaY, snapshot.pointerDeltaY) == 0;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(down, pressed, released, pointerDeltaX, pointerDeltaY);
+        return Objects.hash(down, pressed, released, axes1d, axes2d, pointerDeltaX, pointerDeltaY);
     }
 
     @Override
     public String toString() {
-        return "ActionSnapshot{down=" + down + ", pressed=" + pressed + ", released=" + released + ", pointerDeltaX="
-                + pointerDeltaX + ", pointerDeltaY=" + pointerDeltaY + '}';
+        return "ActionSnapshot{down=" + down + ", pressed=" + pressed + ", released=" + released + ", axes1d="
+                + axes1d + ", axes2d=" + axes2d + ", pointerDeltaX=" + pointerDeltaX + ", pointerDeltaY="
+                + pointerDeltaY + '}';
     }
 
     /** Returns the set union without exposing mutable storage. */
@@ -184,6 +218,8 @@ public final class ActionSnapshot {
         private final Set<InputAction> down = new HashSet<>();
         private final Set<InputAction> pressed = new HashSet<>();
         private final Set<InputAction> released = new HashSet<>();
+        private final Map<InputAction, Float> axes1d = new HashMap<>();
+        private final Map<InputAction, InputVector2> axes2d = new HashMap<>();
         private double pointerDeltaX;
         private double pointerDeltaY;
 
@@ -225,6 +261,41 @@ public final class ActionSnapshot {
             return this;
         }
 
+        /** Sets one authored one-dimensional action value.
+         *
+         * @param action action to set
+         * @param value finite scalar value, clamped to the unit range
+         * @return this builder
+         */
+        public Builder axis1d(InputAction action, float value) {
+            InputAction validAction = Objects.requireNonNull(action, "action");
+            float bounded = clamp(value);
+            if (bounded == 0.0F) {
+                axes1d.remove(validAction);
+            } else {
+                axes1d.put(validAction, bounded);
+            }
+            return this;
+        }
+
+        /** Sets one authored two-dimensional action value.
+         *
+         * @param action action to set
+         * @param x finite horizontal value, clamped to the unit range
+         * @param y finite vertical value, clamped to the unit range
+         * @return this builder
+         */
+        public Builder axis2d(InputAction action, float x, float y) {
+            InputAction validAction = Objects.requireNonNull(action, "action");
+            InputVector2 value = new InputVector2(clamp(x), clamp(y));
+            if (value.equals(InputVector2.ZERO)) {
+                axes2d.remove(validAction);
+            } else {
+                axes2d.put(validAction, value);
+            }
+            return this;
+        }
+
         /**
          * Sets relative-pointer movement.
          *
@@ -244,7 +315,15 @@ public final class ActionSnapshot {
          * @return immutable action snapshot
          */
         public ActionSnapshot build() {
-            return new ActionSnapshot(down, pressed, released, pointerDeltaX, pointerDeltaY);
+            return new ActionSnapshot(down, pressed, released, axes1d, axes2d, pointerDeltaX, pointerDeltaY);
+        }
+
+        /** Clamps a finite aggregate to the authored axis range. */
+        private static float clamp(float value) {
+            if (!Float.isFinite(value)) {
+                throw new IllegalArgumentException("axis value must be finite: " + value);
+            }
+            return Math.clamp(value, -1.0F, 1.0F);
         }
     }
 }

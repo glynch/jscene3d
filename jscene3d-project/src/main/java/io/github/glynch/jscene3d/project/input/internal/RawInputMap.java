@@ -18,15 +18,39 @@ import org.jspecify.annotations.Nullable;
 public record RawInputMap(
         @JsonProperty("$schema") @Nullable String schema,
         int schemaVersion,
-        @Nullable Map<String, @Nullable List<RawInputMap.@Nullable Binding>> actions) {
+        @Nullable Map<String, RawInputMap.@Nullable Action> actions) {
+    /** Nullable semantic action fields.
+     *
+     * @param valueType nullable semantic value type
+     * @param bindings nullable ordered physical bindings
+     */
+    public record Action(
+            @Nullable String valueType, @Nullable List<RawInputMap.@Nullable Binding> bindings) {}
+
     /** Nullable physical binding fields.
      *
      * @param device nullable device name
-     * @param key nullable keyboard key
-     * @param button nullable mouse button
+     * @param control nullable device control or composite name
+     * @param up nullable positive vertical keyboard control
+     * @param down nullable negative vertical keyboard control
+     * @param left nullable negative horizontal keyboard control
+     * @param right nullable positive horizontal keyboard control
+     * @param deadZone nullable gamepad dead-zone magnitude
+     * @param scale nullable one-dimensional output multiplier
+     * @param scaleX nullable horizontal output multiplier
+     * @param scaleY nullable vertical output multiplier
+     * @param invertY nullable gamepad-stick vertical inversion
      */
     public record Binding(
             @Nullable String device,
-            @Nullable String key,
-            @Nullable String button) {}
+            @Nullable String control,
+            @Nullable String up,
+            @Nullable String down,
+            @Nullable String left,
+            @Nullable String right,
+            @Nullable Float deadZone,
+            @Nullable Float scale,
+            @Nullable Float scaleX,
+            @Nullable Float scaleY,
+            @Nullable Boolean invertY) {}
 }

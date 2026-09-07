@@ -67,4 +67,39 @@ final class ActionSnapshotTest {
         ActionSnapshot.Builder builder = ActionSnapshot.builder();
         assertThatThrownBy(() -> builder.pointerDelta(Double.NaN, 0.0)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void retainsTypedAxesWhileConsumingTransitions() {
+        ActionSnapshot older = ActionSnapshot.builder()
+                .axis1d(LEFT, -0.5F)
+                .axis2d(RIGHT, 0.25F, -0.75F)
+                .build();
+        ActionSnapshot newer = ActionSnapshot.builder()
+                .axis1d(LEFT, 2.0F)
+                .axis2d(RIGHT, -0.5F, 0.5F)
+                .build();
+
+        ActionSnapshot merged = older.merge(newer);
+        ActionSnapshot held = merged.heldOnly();
+
+        assertThat(merged.axis1d(LEFT)).isEqualTo(1.0F);
+        assertThat(merged.axis2d(RIGHT)).isEqualTo(new InputVector2(-0.5F, 0.5F));
+        assertThat(held.axis1d(LEFT)).isEqualTo(1.0F);
+        assertThat(held.axis2d(RIGHT)).isEqualTo(new InputVector2(-0.5F, 0.5F));
+        assertThat(ActionSnapshot.builder()
+                        .axis1d(LEFT, 0.0F)
+                        .axis2d(RIGHT, 0.0F, 0.0F)
+                        .build())
+                .isEqualTo(ActionSnapshot.empty());
+    }
+
+    @Test
+    void rejectsNonFiniteOrOutOfRangeAxisValues() {
+        ActionSnapshot.Builder builder = ActionSnapshot.builder();
+
+        assertThatThrownBy(() -> builder.axis1d(LEFT, Float.NaN)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new InputVector2(Float.POSITIVE_INFINITY, 0.0F))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new InputVector2(0.0F, -2.0F)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

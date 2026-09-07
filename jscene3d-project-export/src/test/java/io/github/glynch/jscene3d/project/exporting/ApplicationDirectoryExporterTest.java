@@ -21,7 +21,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Verifies complete application directorys through the public export interface. */
+/** Verifies complete application directories through the public export interface. */
 final class ApplicationDirectoryExporterTest {
     private static final String ENGINE_VERSION = "0.1.0-SNAPSHOT";
 
@@ -65,6 +65,7 @@ final class ApplicationDirectoryExporterTest {
                 .containsExactly("engine.jar", "sample-game.jar");
         assertThat(relativeFiles(applicationDirectory.root()))
                 .containsExactly(
+                        "application-directory.properties",
                         "bin/sample-game",
                         "bin/sample-game.cmd",
                         "content/imports/model/active-generation",

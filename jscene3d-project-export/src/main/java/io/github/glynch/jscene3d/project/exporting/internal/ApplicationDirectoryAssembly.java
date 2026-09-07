@@ -6,7 +6,6 @@ package io.github.glynch.jscene3d.project.exporting.internal;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,9 +44,9 @@ public final class ApplicationDirectoryAssembly {
                 Files.createTempDirectory(parent, '.' + output.getFileName().toString() + "-staging-");
         try {
             populate(validPlan, staging);
-            install(staging, output);
+            StagedDirectoryInstall.replace(staging, output);
         } finally {
-            deleteIfPresent(staging);
+            StagedDirectoryInstall.deleteIfPresent(staging);
         }
     }
 
@@ -57,6 +56,7 @@ public final class ApplicationDirectoryAssembly {
         copyPublishedContent(plan.publishedContentRoot(), staging.resolve("content"));
         copyArtifacts(plan, staging.resolve("lib"));
         writeLaunchers(plan, staging.resolve("bin"));
+        new ApplicationDirectoryMetadata(plan.engineVersion(), plan.launcherName(), plan.jvmArguments()).write(staging);
     }
 
     /** Copies the planned authored project documents. */
@@ -191,72 +191,5 @@ public final class ApplicationDirectoryAssembly {
         } catch (UnsupportedOperationException ignored) {
             // Windows and other non-POSIX filesystems use the generated command launcher.
         }
-    }
-
-    /** Installs staging, restoring an existing directory if the final move fails. */
-    private static void install(Path staging, Path output) throws IOException {
-        if (Files.notExists(output)) {
-            move(staging, output);
-            return;
-        }
-        Path backup = Files.createTempDirectory(
-                output.getParent(), '.' + output.getFileName().toString() + "-backup-");
-        Files.delete(backup);
-        move(output, backup);
-        try {
-            move(staging, output);
-        } catch (IOException exception) {
-            restoreBackup(output, backup, exception);
-            throw exception;
-        }
-        deleteTree(backup);
-    }
-
-    /** Restores the previous directory and retains both failures if restoration itself fails. */
-    private static void restoreBackup(Path output, Path backup, IOException installFailure) {
-        try {
-            if (Files.exists(output)) {
-                deleteTree(output);
-            }
-            move(backup, output);
-        } catch (IOException restorationFailure) {
-            installFailure.addSuppressed(restorationFailure);
-        }
-    }
-
-    /** Moves one directory atomically where supported and portably otherwise. */
-    private static void move(Path source, Path destination) throws IOException {
-        try {
-            Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException ignored) {
-            Files.move(source, destination);
-        }
-    }
-
-    /** Deletes one remaining staging or backup tree when present. */
-    private static void deleteIfPresent(Path root) throws IOException {
-        if (Files.exists(root)) {
-            deleteTree(root);
-        }
-    }
-
-    /** Deletes a known application-directory staging, backup, or replaced-output tree child first. */
-    private static void deleteTree(Path root) throws IOException {
-        Files.walkFileTree(root, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path directory, IOException exception) throws IOException {
-                if (exception != null) {
-                    throw exception;
-                }
-                Files.delete(directory);
-                return FileVisitResult.CONTINUE;
-            }
-        });
     }
 }

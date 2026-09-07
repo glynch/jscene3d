@@ -590,7 +590,9 @@ renderer-independent collision objects and scene objects.
 loads the manifest-selected World, discovers the application runtime extension,
 constructs input, 3D, and physics modules, polls native input, drives the World,
 renders its primary camera, and releases all owned state. It does not introduce
-a parallel application lifecycle.
+a parallel application lifecycle. Packaged applications invoke the generic
+`DesktopProjectLauncher` with the engine version, packaged project root, and
+published-content root; they do not need an application-specific Java launcher.
 `CharacterMovementController` converts configurable semantic actions and a
 caller-supplied view direction into normalized camera-relative movement, jump
 requests, and fixed-step character physics without depending on a particular

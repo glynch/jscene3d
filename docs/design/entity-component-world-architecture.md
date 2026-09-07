@@ -900,11 +900,11 @@ or authored data.
 
 An exported game will package the generic launcher and host, its selected
 runtime environment and engine modules, application runtime-extension
-providers, and the project assets. Its generated launcher identifies the
-packaged project root and invokes `ProjectHost`; it does not generate a Java
-class which knows the structure of the startup world. Packaging and platform
-launcher generation are derived build concerns and do not introduce another
-authoring format.
+providers, and the project assets. Its generated platform launcher supplies the
+engine version, packaged project root, and published-content root to the generic
+`DesktopProjectLauncher`; it does not generate a Java class which knows the
+structure of the startup world. Packaging and platform launcher generation are
+derived build concerns and do not introduce another authoring format.
 
 ## Serialization and schema evolution
 

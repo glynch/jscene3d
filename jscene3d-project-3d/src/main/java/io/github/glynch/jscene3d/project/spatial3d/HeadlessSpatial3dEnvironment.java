@@ -4,7 +4,11 @@
  */
 package io.github.glynch.jscene3d.project.spatial3d;
 
+import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeEnvironment;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
@@ -44,7 +48,7 @@ public final class HeadlessSpatial3dEnvironment implements ProjectRuntimeEnviron
     }
 
     @Override
-    public RuntimeResourceProvider resources() {
-        return NO_RESOURCES;
+    public ProjectContent loadContent(GameProject project, RegisteredTypeCatalog types, AssetCatalog authored) {
+        return new ProjectContent(authored, NO_RESOURCES);
     }
 }

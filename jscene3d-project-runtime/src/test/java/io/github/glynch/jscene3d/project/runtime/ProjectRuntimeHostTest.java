@@ -8,9 +8,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.extension.ApplicationRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
@@ -173,13 +176,14 @@ final class ProjectRuntimeHostTest {
             }
 
             @Override
-            public RuntimeResourceProvider resources() {
-                return new RuntimeResourceProvider() {
+            public ProjectContent loadContent(GameProject project, RegisteredTypeCatalog types, AssetCatalog authored) {
+                RuntimeResourceProvider resources = new RuntimeResourceProvider() {
                     @Override
                     public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
                         throw new IllegalStateException("test project declares no runtime resources");
                     }
                 };
+                return new ProjectContent(authored, resources);
             }
         };
     }

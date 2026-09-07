@@ -882,10 +882,15 @@ participation remains controlled by authored component type declarations.
 
 The host executable selects a `ProjectRuntimeEnvironment`. The environment
 supplies the engine capabilities included in that build: built-in component
-descriptors and factories, fresh world subsystem adapters, and runtime resource
-loading. Editor preview can provide a preview environment while a desktop
-export can provide rendering, input, audio, and physics adapters without
-changing application code or authored data.
+descriptors and factories, fresh world subsystem adapters, and project-scoped
+content loading. After the manifest, safe type catalog, and authored asset
+catalog are available, it returns one `ProjectContent` containing the definition
+resolver and immutable-resource provider used by composition. That resolver may
+combine authored definitions with generated import publications without making
+the generic host depend on a particular importer. Editor preview can provide a
+preview environment while a desktop export can provide rendering, input,
+audio, physics, and imported-content adapters without changing application code
+or authored data.
 
 An exported game will package the generic launcher and host, its selected
 runtime environment and engine modules, application runtime-extension

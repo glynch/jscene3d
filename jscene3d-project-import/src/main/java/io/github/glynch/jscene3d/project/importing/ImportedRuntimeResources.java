@@ -33,9 +33,34 @@ import java.util.Optional;
 
 /** Creates runtime-resource providers over validated project files and published import artifacts. */
 public final class ImportedRuntimeResources {
+    private static final ImportedArtifactLookup NO_IMPORTED_ARTIFACTS = new ImportedArtifactLookup() {
+        @Override
+        public List<ImportedArtifactMetadata> artifacts(ImportDefinition definition) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<ImportedArtifact> openArtifact(ImportDefinition definition, String identity) {
+            return Optional.empty();
+        }
+    };
+
     /** Prevents construction of this stateless integration entry point. */
     private ImportedRuntimeResources() {
         throw new AssertionError("ImportedRuntimeResources cannot be instantiated");
+    }
+
+    /**
+     * Creates a provider for authored project and asset resources when no imported publications participate.
+     *
+     * @param project containing validated project
+     * @param catalog resolved safe type metadata
+     * @param loaders runtime loaders for supported resource types
+     * @return synchronous runtime-resource provider
+     */
+    public static RuntimeResourceProvider create(
+            GameProject project, RegisteredTypeCatalog catalog, Collection<RuntimeResourceLoader<?>> loaders) {
+        return create(project, catalog, List.of(), NO_IMPORTED_ARTIFACTS, loaders);
     }
 
     /**

@@ -52,14 +52,15 @@ public final class ProjectRuntimeHost implements ProjectHost {
         AssetCatalog assets = loadAssets(project);
         AssetMetadata startup = startupAsset(project, assets);
         List<ComponentRuntimeExtension> extensions = runtimeExtensions();
+        ProjectContent content = loadContent(project, types, assets);
         List<WorldModuleBinding<?>> modules = List.copyOf(environment.createWorldModules());
         WorldCompositionResult composition = WorldComposer.compose(
-                assets,
+                content.definitions(),
                 AssetRef.<WorldDefinition>to(startup.id()),
                 types,
                 extensions,
                 modules,
-                environment.resources());
+                content.resources());
         if (!composition.isComposed()) {
             ProjectHostException failure =
                     new ProjectHostException("startup world composition failed", composition.diagnostics());
@@ -70,6 +71,16 @@ public final class ProjectRuntimeHost implements ProjectHost {
                 new HostedProject(project, assets, composition.world().orElseThrow());
         prepareApplication(hosted, extensions);
         return hosted;
+    }
+
+    /** Loads project-scoped authored and generated content through the host-selected environment. */
+    private ProjectContent loadContent(GameProject project, RegisteredTypeCatalog types, AssetCatalog assets) {
+        try {
+            return Objects.requireNonNull(
+                    environment.loadContent(project, types, assets), "runtime environment project content");
+        } catch (RuntimeException failure) {
+            throw new ProjectHostException("project runtime content loading failed", failure);
+        }
     }
 
     /** Loads and validates the project manifest. */

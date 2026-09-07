@@ -4,7 +4,10 @@
  */
 package io.github.glynch.jscene3d.project.runtime;
 
+import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
+import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import java.util.List;
 
@@ -34,9 +37,16 @@ public interface ProjectRuntimeEnvironment {
     List<WorldModuleBinding<?>> createWorldModules();
 
     /**
-     * Returns the host-owned provider used to resolve immutable runtime resources.
+     * Loads the definition resolver and immutable-resource provider for one validated project.
      *
-     * @return runtime resource provider
+     * <p>The returned resolver may combine the authored catalog with generated import publications. The returned
+     * resource provider may use the project manifest and registered resource descriptors. Neither facility owns the
+     * supplied project, type catalog, or authored catalog.
+     *
+     * @param project validated project manifest
+     * @param types resolved safe descriptor catalog including this environment's built-ins
+     * @param authored authored definition catalog
+     * @return project-scoped composition content
      */
-    RuntimeResourceProvider resources();
+    ProjectContent loadContent(GameProject project, RegisteredTypeCatalog types, AssetCatalog authored);
 }

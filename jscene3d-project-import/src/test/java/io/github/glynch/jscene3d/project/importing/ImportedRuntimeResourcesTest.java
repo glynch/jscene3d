@@ -123,6 +123,15 @@ final class ImportedRuntimeResourcesTest {
         assertResource(provider, ResourceReference.imported("model-import/resource"), "import payload");
     }
 
+    /** Resolves authored resources without requiring callers to construct unused import infrastructure. */
+    @Test
+    void createsAuthoredOnlyProvider() {
+        RuntimeResourceProvider provider =
+                ImportedRuntimeResources.create(project, catalog(), List.of(new TestLoader()));
+
+        assertResource(provider, ResourceReference.asset("resource-doc"), "project payload");
+    }
+
     /** Rejects requested Java types and publication metadata that disagree with serialized content. */
     @Test
     void rejectsTypeMismatchesAndClosesRejectedValues() throws IOException {

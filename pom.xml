@@ -58,6 +58,7 @@
         <module>jscene3d-project-examples</module>
         <module>jscene3d-audio-examples</module>
         <module>jscene3d-wad-examples</module>
+        <module>prototypes/javafx-opengl-viewport</module>
     </modules>
 
     <properties>
@@ -82,7 +83,10 @@
         <drako.version>1.4.2</drako.version>
         <jspecify.version>1.0.1</jspecify.version>
         <junit.version>6.1.3</junit.version>
+        <kotlin.version>2.1.0</kotlin.version>
         <lwjgl.version>3.4.3</lwjgl.version>
+        <javafx.version>21.0.12</javafx.version>
+        <openglfx.version>4.2.3</openglfx.version>
         <nullaway.version>0.14.0</nullaway.version>
         <node.version>v24.18.0</node.version>
         <npm.version>11.16.0</npm.version>
@@ -165,6 +169,21 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-controls</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.huskerdev</groupId>
+                <artifactId>openglfx-lwjgl</artifactId>
+                <version>${openglfx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib-jdk8</artifactId>
+                <version>${kotlin.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.glynch</groupId>

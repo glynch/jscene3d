@@ -62,7 +62,6 @@ import io.github.glynch.jscene3d.fogs.Fog;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
 import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
-import io.github.glynch.jscene3d.lwjgl.internal.WindowContextRegistry;
 import io.github.glynch.jscene3d.materials.AlphaMode;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
@@ -135,7 +134,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector2f;
 import org.jspecify.annotations.Nullable;
 
-/** Owns rendering and all OpenGL state for one JScene3D window context. */
+/** Owns rendering and all OpenGL state for one presentation context. */
 public final class Renderer implements AutoCloseable {
     /** Maximum number of visible point lights supported by one rendered scene in version 0.1. */
     public static final int MAX_POINT_LIGHTS = 8;
@@ -162,8 +161,7 @@ public final class Renderer implements AutoCloseable {
      */
     public static final int MAX_SKIN_JOINTS = 56;
 
-    private final Window window;
-    private final WindowContextRegistry.Access context;
+    private final RendererContext context;
     private final boolean automaticClear;
     private final RendererInfo info;
     private final RenderStatistics statistics;
@@ -217,9 +215,8 @@ public final class Renderer implements AutoCloseable {
     private boolean standardTextureUnitsPrimed;
     private boolean closed;
 
-    /** Initializes context-local renderer state after the window context is exclusively claimed. */
-    private Renderer(Window window, WindowContextRegistry.Access context, RendererOptions options) {
-        this.window = window;
+    /** Initializes context-local renderer state after the presentation context is exclusively claimed. */
+    private Renderer(RendererContext context, RendererOptions options) {
         this.context = context;
         automaticClear = options.automaticClear();
         clearColor = options.clearColor();
@@ -276,15 +273,22 @@ public final class Renderer implements AutoCloseable {
     public static Renderer create(Window window, RendererOptions options) {
         Window validWindow = Objects.requireNonNull(window, "window");
         RendererOptions validOptions = Objects.requireNonNull(options, "options");
-        WindowContextRegistry.Access context = WindowContextRegistry.claim(validWindow);
+        RendererContext context = WindowRendererContext.claim(validWindow);
         try {
-            context.makeCurrent();
-            glEnable(GL_FRAMEBUFFER_SRGB);
-            return new Renderer(validWindow, context, validOptions);
+            return create(context, validOptions);
         } catch (RuntimeException exception) {
-            WindowContextRegistry.release(validWindow, context);
+            context.release();
             throw exception;
         }
+    }
+
+    /** Creates a renderer over a current externally owned context for the viewport prototype. */
+    static Renderer create(RendererContext context, RendererOptions options) {
+        RendererContext validContext = Objects.requireNonNull(context, "context");
+        RendererOptions validOptions = Objects.requireNonNull(options, "options");
+        validContext.makeCurrent();
+        glEnable(GL_FRAMEBUFFER_SRGB);
+        return new Renderer(validContext, validOptions);
     }
 
     /**
@@ -300,6 +304,7 @@ public final class Renderer implements AutoCloseable {
         Scene validScene = Objects.requireNonNull(scene, "scene");
         Camera validCamera = Objects.requireNonNull(camera, "camera");
         context.makeCurrent();
+        context.bindPresentationFramebuffer();
         releaseClosedGeometryResources();
         releaseClosedTextureResources();
         releaseClosedEnvironmentResources();
@@ -325,6 +330,7 @@ public final class Renderer implements AutoCloseable {
                         geometryResources, instanceResources, activeInstancedMeshes, morphResources);
                 activeShadowFrame = shadowRenderer.render(
                         validScene, validCamera, renderList.lights(), viewMatrix, shadowResources);
+                context.bindPresentationFramebuffer();
                 recordShadowWork(activeShadowFrame);
                 updateProgramCount();
                 updateShadowResourceCount();
@@ -393,14 +399,15 @@ public final class Renderer implements AutoCloseable {
     public void render(Overlay overlay) {
         requireOpen();
         Overlay validOverlay = Objects.requireNonNull(overlay, "overlay");
-        int logicalWidth = window.width();
-        int logicalHeight = window.height();
+        int logicalWidth = context.logicalWidth();
+        int logicalHeight = context.logicalHeight();
         overlayCanvas.clear();
         validOverlay.paint(overlayCanvas, logicalWidth, logicalHeight);
         if (overlayCanvas.vertexCount() == 0) {
             return;
         }
         context.makeCurrent();
+        context.bindPresentationFramebuffer();
         overlayRenderer()
                 .render(
                         overlayCanvas,
@@ -414,6 +421,7 @@ public final class Renderer implements AutoCloseable {
     public void clear() {
         requireOpen();
         context.makeCurrent();
+        context.bindPresentationFramebuffer();
         applyViewport(context.framebufferWidth(), context.framebufferHeight());
         clearBuffers(clearColor);
     }
@@ -566,7 +574,7 @@ public final class Renderer implements AutoCloseable {
         return closed;
     }
 
-    /** Releases all context-local GPU resources and the exclusive window claim. */
+    /** Releases all context-local GPU resources and the exclusive context claim. */
     @Override
     public void close() {
         if (closed) {
@@ -589,7 +597,7 @@ public final class Renderer implements AutoCloseable {
             resources.setProgramCount(0);
             closed = true;
         } finally {
-            WindowContextRegistry.release(window, context);
+            context.release();
         }
     }
 

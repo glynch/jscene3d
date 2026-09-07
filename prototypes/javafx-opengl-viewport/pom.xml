@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.glynch</groupId>
+        <artifactId>jscene3d-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../..</relativePath>
+    </parent>
+
+    <artifactId>jscene3d-javafx-opengl-viewport-prototype</artifactId>
+    <name>JScene3D JavaFX OpenGL Viewport Prototype</name>
+    <description>Throwaway feasibility prototype for embedding the JScene3D renderer in JavaFX.</description>
+
+    <properties>
+        <jacoco.skip>true</jacoco.skip>
+        <jscene3d.prototype.autoCloseSeconds>0</jscene3d.prototype.autoCloseSeconds>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-lwjgl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.huskerdev</groupId>
+            <artifactId>openglfx-lwjgl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <classifier>${lwjgl.natives}</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-opengl</artifactId>
+            <classifier>${lwjgl.natives}</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <profiles>
+        <profile>
+            <id>run-javafx-opengl-prototype</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-javafx-opengl-prototype</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <arguments>
+                                        <argument>-Dprism.vsync=false</argument>
+                                        <argument>-Djscene3d.prototype.autoCloseSeconds=${jscene3d.prototype.autoCloseSeconds}</argument>
+                                        <argument>-classpath</argument>
+                                        <classpath />
+                                        <argument>io.github.glynch.jscene3d.render.PrototypeLauncher</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

@@ -922,6 +922,29 @@ Maven or a future editor resolves the runtime artifact set but does not
 reproduce those export rules. Native bundles and archives will wrap this same
 application image rather than assembling games independently.
 
+The application directory is the canonical assembled export and the first
+supported output format. It contains relative launchers, application and engine
+JARs, target-platform native dependencies, authored runtime project data, and
+published imported content. The initial directory uses a compatible installed
+Java runtime; it is relocatable on its target platform but is not claimed to be
+a single-file or cross-platform executable.
+
+Platform packaging consumes that assembled directory and adds only the runtime,
+native launcher, metadata, signing, and distribution container required by the
+target. The implementation order is the application directory on the current
+host, a macOS application bundle over that directory, and then a DMG containing
+the application bundle. Windows and Linux bundles and installers follow the
+same composition rule on their respective build hosts. Mobile targets require
+their own platform hosts and build pipelines; they do not reuse a desktop
+launcher unchanged.
+
+A conventional executable JAR is not an export target because the game needs
+target-specific native libraries and reliable native-library discovery before
+the application starts. The exporter will not create a self-extracting JAR or
+restart Java through an application bootstrapper. A ZIP or similar archive may
+distribute the assembled application directory without changing its runtime
+model.
+
 ## Serialization and schema evolution
 
 The canonical authoring format is deterministic UTF-8 JSON.
@@ -1037,6 +1060,27 @@ by JSON, Java builders, validation, and runtime composition.
 Java builders and annotations may provide additional authoring front ends, but
 they must produce the same canonical immutable definitions. Arbitrary Java
 construction is not a second runtime composition model.
+
+## Visual editor host
+
+The visual editor is a native JavaFX application. JavaFX owns the editor shell,
+including its menus, hierarchy, inspectors, asset browser, diagnostics, tabs,
+and layout. Its central viewport uses the actual JScene3D OpenGL renderer through
+a tested JavaFX/OpenGL bridge. The editor will not maintain a parallel WebGL,
+WebGPU, or Three.js renderer merely to display project content.
+
+The bridge implementation is selected only after a focused prototype proves
+representative JScene3D rendering, resizing, high-DPI behavior, input and focus,
+resource disposal, and packaged execution on the supported desktop platforms.
+That prototype also determines the smallest change needed to stop the renderer
+from assuming that every render target is a JScene3D-created GLFW window.
+
+The initial editor and preview runtime share one JVM and communicate through
+ordinary Java contracts. HTTP, JSON RPC, or gRPC is not introduced between
+them. A separately hosted preview process and an IPC protocol may be added later
+if crash isolation or hot restart provides enough value to justify that extra
+boundary. JavaFX and the OpenGL bridge are editor dependencies and are never
+included in exported games unless a game explicitly uses them itself.
 
 ## Initial module seams
 

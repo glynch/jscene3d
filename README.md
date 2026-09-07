@@ -593,6 +593,14 @@ renders its primary camera, and releases all owned state. It does not introduce
 a parallel application lifecycle. Packaged applications invoke the generic
 `DesktopProjectLauncher` with the engine version, packaged project root, and
 published-content root; they do not need an application-specific Java launcher.
+
+`jscene3d-project-export` first assembles a relocatable target-platform
+application directory containing relative launchers, runtime JARs, native
+dependencies, project data, and published content. Native application bundles
+and installers consume that directory rather than reproducing its content
+selection rules. A conventional executable or self-extracting JAR is not a
+supported game export format.
+
 The read-only live Entity hierarchy identifies local authored entities,
 authored definition placements, and runtime-spawned definition roots. Placement
 and spawn roots also expose the exact definition asset they instantiate, so an

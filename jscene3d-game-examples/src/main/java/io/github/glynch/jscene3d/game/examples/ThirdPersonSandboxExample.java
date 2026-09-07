@@ -12,11 +12,7 @@ import io.github.glynch.jscene3d.examples.framework.ExampleContext;
 import io.github.glynch.jscene3d.examples.framework.ExampleFrame;
 import io.github.glynch.jscene3d.examples.framework.ExampleLauncher;
 import io.github.glynch.jscene3d.examples.framework.HostedExample;
-import io.github.glynch.jscene3d.game.FixedUpdate;
-import io.github.glynch.jscene3d.game.FrameUpdate;
-import io.github.glynch.jscene3d.game.GameApplication;
 import io.github.glynch.jscene3d.game.GameLoopSettings;
-import io.github.glynch.jscene3d.game.GameRuntime;
 import io.github.glynch.jscene3d.game.input.ActionSnapshot;
 import io.github.glynch.jscene3d.game.input.InputAction;
 import io.github.glynch.jscene3d.game.input.InputCapture;
@@ -92,19 +88,18 @@ public final class ThirdPersonSandboxExample {
         return panel;
     }
 
-    /** Adapts the shared example host lifecycle to the reusable game runtime. */
+    /** Adapts the shared example host lifecycle to this lower-level movement demonstration. */
     private static final class HostedGameExample implements HostedExample {
         private final ExampleContext context;
         private final SandboxApplication application;
         private final ControlPanel panel;
-        private final GameRuntime runtime;
+        private final ExampleFixedStepClock clock = new ExampleFixedStepClock();
 
         private HostedGameExample(ExampleContext context, SandboxApplication application, ControlPanel panel) {
             this.context = context;
             this.application = application;
             this.panel = panel;
-            runtime = new GameRuntime(application);
-            runtime.start();
+            application.start();
         }
 
         @Override
@@ -119,23 +114,24 @@ public final class ThirdPersonSandboxExample {
             application.updateCamera(frame.elapsedSeconds(), pointerCaptured);
             InputCapture capture = new InputCapture(frame.keyboardCaptured(), pointerCaptured);
             ActionSnapshot input = application.inputMap.sample(context.window().input(), capture);
-            runtime.advance(elapsed(frame.elapsedSeconds()), input);
+            int fixedUpdates = clock.advance(elapsed(frame.elapsedSeconds()), input, application::fixedUpdate);
+            application.frameUpdate(input, clock.simulationTime(), fixedUpdates, clock.interpolation());
         }
 
         @Override
         public void render() {
-            runtime.render();
+            application.render(clock.interpolation());
             context.renderer().render(panel);
         }
 
         @Override
         public void renderThumbnail() {
-            runtime.render();
+            application.render(clock.interpolation());
         }
 
         @Override
         public void close() {
-            runtime.close();
+            application.close();
         }
 
         /** Converts the example host's finite seconds to nanosecond game-loop time. */
@@ -145,7 +141,7 @@ public final class ThirdPersonSandboxExample {
     }
 
     /** Owns the example's third-person world, rules, presentation, and resources. */
-    private static final class SandboxApplication implements GameApplication {
+    private static final class SandboxApplication {
         private static final InputAction MOVE_FORWARD = new InputAction("move-forward");
         private static final InputAction MOVE_BACKWARD = new InputAction("move-backward");
         private static final InputAction MOVE_LEFT = new InputAction("move-left");
@@ -210,38 +206,34 @@ public final class ThirdPersonSandboxExample {
             movement = characterController.move(new Vector3f(), 1.0F / 120.0F);
         }
 
-        @Override
-        public void start() {
+        private void start() {
             playerBinding.snap();
             resetCamera();
         }
 
-        @Override
-        public void fixedUpdate(FixedUpdate update) {
-            input = update.input();
+        private void fixedUpdate(Duration step, ActionSnapshot fixedInput) {
+            input = fixedInput;
             Vector3f viewForward = new Vector3f(0.0F, 0.0F, -1.0F).rotate(camera.quaternion());
-            movement = movementController.move(input, viewForward, update.step());
+            movement = movementController.move(input, viewForward, step);
             faceMovement(movementController.desiredVelocity(new Vector3f()));
             playerBinding.capture();
         }
 
-        @Override
-        public void update(FrameUpdate update) {
-            input = update.input();
-            simulationNanos = update.simulationTime().toNanos();
-            fixedUpdateCount = update.fixedUpdateCount();
-            interpolation = update.interpolation();
+        private void frameUpdate(
+                ActionSnapshot frameInput, Duration simulationTime, int fixedUpdates, float frameInterpolation) {
+            input = frameInput;
+            simulationNanos = simulationTime.toNanos();
+            fixedUpdateCount = fixedUpdates;
+            interpolation = frameInterpolation;
         }
 
-        @Override
-        public void render(FrameUpdate update) {
-            playerBinding.apply(update.interpolation());
+        private void render(float frameInterpolation) {
+            playerBinding.apply(frameInterpolation);
             followPlayer();
             context.renderer().render(scene, camera);
         }
 
-        @Override
-        public void close() {
+        private void close() {
             if (closed) {
                 return;
             }

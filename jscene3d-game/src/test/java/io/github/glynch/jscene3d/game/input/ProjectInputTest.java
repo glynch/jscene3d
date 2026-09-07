@@ -35,6 +35,13 @@ final class ProjectInputTest {
     }
 
     @Test
+    void providesAnEmptyModuleForProjectsWithoutAnInputMap() {
+        try (ProjectInput input = ProjectInput.empty()) {
+            assertThat(input.snapshot()).isEqualTo(ActionSnapshot.empty());
+        }
+    }
+
+    @Test
     @SuppressWarnings("NullAway") // Deliberate nulls verify public boundary validation.
     void rejectsMissingConstructionAndPublicationState() {
         InputMapDefinition definition = definition();

@@ -577,21 +577,28 @@ sensor, and live debug geometry.
 
 ## Game runtime
 
-`GameRuntime` coordinates a caller-owned `GameApplication` without creating a
-window, render thread, or physics world. It separates deterministic Fixed
-Updates from rendered frame updates, clamps long frames, bounds catch-up work,
-buffers action transitions until simulation consumes them, and reports an
-interpolation factor for smooth presentation. `InputMap` translates physical
-keyboard and mouse controls into named `InputAction` values while respecting
-input captured by a host interface. `PhysicsBinding` is the explicit game-layer
-adapter between renderer-independent collision objects and scene objects.
+`WorldFrameDriver` advances one composed `World` directly. It separates fixed
+simulation updates from frame presentation, clamps long frames, bounds catch-up
+work, buffers action transitions until simulation consumes them, and supplies
+the interpolation fraction to the World's declared frame-update participants.
+`InputMap` translates authored keyboard, mouse, and standard gamepad bindings
+into typed semantic actions while respecting input captured by a host
+interface. `PhysicsBinding` remains the explicit lower-level adapter between
+renderer-independent collision objects and scene objects.
+
+`jscene3d-project-desktop` provides the standard graphical project host. It
+loads the manifest-selected World, discovers the application runtime extension,
+constructs input, 3D, and physics modules, polls native input, drives the World,
+renders its primary camera, and releases all owned state. It does not introduce
+a parallel application lifecycle.
 `CharacterMovementController` converts configurable semantic actions and a
 caller-supplied view direction into normalized camera-relative movement, jump
 requests, and fixed-step character physics without depending on a particular
 camera implementation.
 
-The separate `jscene3d-game-examples` artifact demonstrates these seams with
-first- and third-person sandboxes. The first-person example uses W/S or Up/Down
+The separate `jscene3d-game-examples` artifact demonstrates the reusable input,
+movement, and lower-level physics/presentation utilities with first- and
+third-person sandboxes. The first-person example uses W/S or Up/Down
 to move, A/D to strafe, Left/Right or captured mouse movement to turn, and Space
 to jump. The third-person example uses W A S D or the arrow keys for
 camera-relative movement, mouse dragging to orbit, scrolling to zoom, and Space
@@ -648,14 +655,18 @@ license notices, and exact selected filenames are recorded beside the assets in
 - `jscene3d-project-3d`: descriptor-backed `Transform3d` components and the
   world-scoped adapter that maps entity ownership to an internal `Object3D`
   hierarchy.
+- `jscene3d-project-physics`: independently authored descriptor-backed 3D
+  collision bodies, sensors, shapes, and typed overlap delivery.
+- `jscene3d-project-desktop`: standard native window, input, frame-driving, and
+  rendering host for manifest-selected project Worlds.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives
   and opaque lumps as selectable source items and cached artifacts.
 - `jscene3d-doom`: optional classic Doom map discovery, decoding, validation,
   and project import over the generic WAD capability.
-- `jscene3d-game`: optional, genre-independent host lifecycle, World timing,
-  semantic input actions, and coordination of runtime module interfaces.
+- `jscene3d-game`: optional, genre-independent World timing, semantic input
+  actions, and reusable game/physics coordination.
 - `jscene3d-audio`: optional OpenAL-backed clips, playback sources, positional
   attenuation, listener control, and volume categories.
 - `jscene3d-example-framework`: unpublished reusable native hosting, browsing,

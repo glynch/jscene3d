@@ -62,6 +62,11 @@ public final class InputMap {
         return new Builder();
     }
 
+    /** Creates the no-action map used when a project omits input authoring. */
+    static InputMap empty() {
+        return new InputMap(Map.of(), Map.of(), Map.of());
+    }
+
     /** Samples keyboard and mouse input when no gamepad has been assigned.
      *
      * @param input current window input

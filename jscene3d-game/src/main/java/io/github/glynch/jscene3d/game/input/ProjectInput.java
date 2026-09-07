@@ -24,6 +24,22 @@ public final class ProjectInput implements InputWorldModule {
         inputMap = InputMap.compile(Objects.requireNonNull(definition, "definition"));
     }
 
+    /** Creates an input module with no authored actions.
+     *
+     * <p>This is used by standard hosts for projects which do not declare an input map. The module
+     * still provides a stable empty snapshot to components.
+     *
+     * @return new open empty input module
+     */
+    public static ProjectInput empty() {
+        return new ProjectInput(InputMap.empty());
+    }
+
+    /** Stores one already compiled map. */
+    private ProjectInput(InputMap inputMap) {
+        this.inputMap = Objects.requireNonNull(inputMap, "inputMap");
+    }
+
     /** Samples keyboard and mouse state for the current update.
      *
      * @param input current window input

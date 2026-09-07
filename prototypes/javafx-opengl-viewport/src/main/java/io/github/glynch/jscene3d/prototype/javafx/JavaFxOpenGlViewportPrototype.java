@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.render;
+package io.github.glynch.jscene3d.prototype.javafx;
 
 import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
@@ -204,7 +204,10 @@ public final class JavaFxOpenGlViewportPrototype extends Application {
 
     /** Optionally closes automated smoke runs while leaving ordinary launches interactive. */
     private void scheduleAutomaticClose() {
-        int seconds = Integer.getInteger("jscene3d.prototype.autoCloseSeconds", 0);
+        String commandLineSeconds = getParameters().getNamed().get("auto-close-seconds");
+        int seconds = commandLineSeconds == null
+                ? Integer.getInteger("jscene3d.prototype.autoCloseSeconds", 0)
+                : Integer.parseInt(commandLineSeconds);
         if (seconds <= 0) {
             return;
         }

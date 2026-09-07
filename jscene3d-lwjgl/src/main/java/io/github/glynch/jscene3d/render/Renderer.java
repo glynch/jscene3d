@@ -282,8 +282,18 @@ public final class Renderer implements AutoCloseable {
         }
     }
 
-    /** Creates a renderer over a current externally owned context for the viewport prototype. */
-    static Renderer create(RendererContext context, RendererOptions options) {
+    /**
+     * Creates a renderer over a current externally owned context for the viewport prototype.
+     *
+     * <p>This overload is public only so the throwaway JavaFX/OpenGLFX prototype can test a named
+     * module boundary. It is not an accepted renderer-host API and must not be merged from the
+     * prototype branch in its current form.
+     *
+     * @param context externally owned context and presentation surface
+     * @param options immutable renderer configuration
+     * @return renderer using, but not destroying, the external presentation surface
+     */
+    public static Renderer create(RendererContext context, RendererOptions options) {
         RendererContext validContext = Objects.requireNonNull(context, "context");
         RendererOptions validOptions = Objects.requireNonNull(options, "options");
         validContext.makeCurrent();

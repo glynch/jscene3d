@@ -41,13 +41,11 @@
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl</artifactId>
             <classifier>${lwjgl.natives}</classifier>
-            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-opengl</artifactId>
             <classifier>${lwjgl.natives}</classifier>
-            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.jspecify</groupId>
@@ -73,13 +71,93 @@
                                 </goals>
                                 <configuration>
                                     <executable>${java.home}/bin/java</executable>
+                                    <longModulepath>false</longModulepath>
                                     <arguments>
                                         <argument>-Dprism.vsync=false</argument>
                                         <argument>-Djscene3d.prototype.autoCloseSeconds=${jscene3d.prototype.autoCloseSeconds}</argument>
-                                        <argument>-classpath</argument>
+                                        <argument>--module-path</argument>
                                         <classpath />
-                                        <argument>io.github.glynch.jscene3d.render.PrototypeLauncher</argument>
+                                        <argument>--add-exports=javafx.graphics/com.sun.prism=openglfx</argument>
+                                        <argument>--add-exports=javafx.graphics/com.sun.javafx.scene.layout=openglfx</argument>
+                                        <argument>--add-exports=javafx.graphics/com.sun.javafx.scene=openglfx</argument>
+                                        <argument>--add-exports=javafx.graphics/com.sun.javafx.sg.prism=openglfx</argument>
+                                        <argument>--add-exports=javafx.graphics/com.sun.scenario=openglfx</argument>
+                                        <argument>--add-exports=javafx.graphics/com.sun.javafx.tk=openglfx</argument>
+                                        <argument>--add-exports=javafx.graphics/com.sun.glass.ui=openglfx</argument>
+                                        <argument>--module</argument>
+                                        <argument>io.github.glynch.jscene3d.prototype.javafx/io.github.glynch.jscene3d.prototype.javafx.PrototypeLauncher</argument>
                                     </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>package-javafx-opengl-prototype</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>collect-prototype-modules</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <outputDirectory>${project.build.directory}/prototype-module-path</outputDirectory>
+                                    <overWriteSnapshots>true</overWriteSnapshots>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>package-javafx-opengl-prototype</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                                <configuration>
+                                    <type>APP_IMAGE</type>
+                                    <name>JScene3D JavaFX OpenGL Prototype</name>
+                                    <appVersion>1.0.0</appVersion>
+                                    <vendor>JScene3D</vendor>
+                                    <description>Throwaway JavaFX and OpenGLFX viewport feasibility prototype.</description>
+                                    <copyright>Copyright 2026 Graham Lynch</copyright>
+                                    <module>io.github.glynch.jscene3d.prototype.javafx/io.github.glynch.jscene3d.prototype.javafx.PrototypeLauncher</module>
+                                    <modulePaths>
+                                        <path>${project.build.directory}/${project.build.finalName}.jar</path>
+                                        <path>${project.build.directory}/prototype-module-path</path>
+                                    </modulePaths>
+                                    <destination>${project.build.directory}/prototype-app-image</destination>
+                                    <removeDestination>true</removeDestination>
+                                    <javaOptions>
+                                        <option>-Dprism.vsync=false</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.prism=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.scene.layout=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.scene=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.sg.prism=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.scenario=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.tk=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.glass.ui=openglfx</option>
+                                    </javaOptions>
+                                    <jLink>
+                                        <noHeaderFiles>true</noHeaderFiles>
+                                        <noManPages>true</noManPages>
+                                        <stripDebug>true</stripDebug>
+                                    </jLink>
+                                    <macAppCategory>developer-tools</macAppCategory>
+                                    <macPackageIdentifier>io.github.glynch.jscene3d.prototype.javafx</macPackageIdentifier>
+                                    <macPackageName>JScene3D Proto</macPackageName>
                                 </configuration>
                             </execution>
                         </executions>

@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.render;
+package io.github.glynch.jscene3d.prototype.javafx;
 
 import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
 
@@ -14,6 +14,9 @@ import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Group;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.RotationOrder;
+import io.github.glynch.jscene3d.render.Renderer;
+import io.github.glynch.jscene3d.render.RendererContext;
+import io.github.glynch.jscene3d.render.RendererOptions;
 import io.github.glynch.jscene3d.scenes.Scene;
 
 /** Owns the actual JScene3D scene, renderer, and GPU resources displayed by the prototype. */

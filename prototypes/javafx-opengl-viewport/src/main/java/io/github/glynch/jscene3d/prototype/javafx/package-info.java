@@ -4,6 +4,6 @@
  */
 /** Throwaway JavaFX/OpenGL viewport feasibility prototype. */
 @NullMarked
-package io.github.glynch.jscene3d.render;
+package io.github.glynch.jscene3d.prototype.javafx;
 
 import org.jspecify.annotations.NullMarked;

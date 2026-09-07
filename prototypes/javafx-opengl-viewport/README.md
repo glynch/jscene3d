@@ -13,6 +13,17 @@ Run the prototype from the repository root:
 ./mvnw -pl :jscene3d-javafx-opengl-viewport-prototype -am -Prun-javafx-opengl-prototype package
 ```
 
+Build the self-contained macOS application image:
+
+```shell
+./mvnw -pl :jscene3d-javafx-opengl-viewport-prototype -am -Ppackage-javafx-opengl-prototype clean verify
+```
+
+The application is written to
+`target/prototype-app-image/JScene3D JavaFX OpenGL Prototype.app` beneath this
+prototype module. It contains a linked Java runtime and launches the prototype
+as a named JPMS module; no separately installed JDK or Maven process is used.
+
 The interface deliberately uses ordinary JavaFX controls around the viewport.
 Inside the viewport, the JScene3D renderer draws three boxes. Verify that:
 

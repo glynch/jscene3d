@@ -1,8 +1,12 @@
-package io.github.glynch.jscene3d.render;
+/*
+ * Copyright 2026 Graham Lynch
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.glynch.jscene3d.prototype.javafx;
 
 import javafx.application.Application;
 
-/** Classpath launcher which delegates to the JavaFX application. */
+/** Named-module launcher which delegates to the JavaFX application. */
 public final class PrototypeLauncher {
 
     private PrototypeLauncher() {}

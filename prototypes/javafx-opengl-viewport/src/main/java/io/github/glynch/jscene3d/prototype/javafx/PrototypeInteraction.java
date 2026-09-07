@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.render;
+package io.github.glynch.jscene3d.prototype.javafx;
 
 /** Shares the small amount of mutable JavaFX input state consumed by rendered frames. */
 final class PrototypeInteraction {

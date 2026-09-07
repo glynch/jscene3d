@@ -2,13 +2,14 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.render;
+package io.github.glynch.jscene3d.prototype.javafx;
 
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30.glBindFramebuffer;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.canvas.events.GLRenderEvent;
+import io.github.glynch.jscene3d.render.RendererContext;
 
 /** Adapts OpenGLFX's current callback context and swap-chain framebuffer to JScene3D. */
 final class OpenGlFxRendererContext implements RendererContext {

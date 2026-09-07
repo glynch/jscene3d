@@ -5,7 +5,8 @@
 package io.github.glynch.jscene3d.project.exporting;
 
 import io.github.glynch.jscene3d.project.desktop.DesktopProjectLauncher;
-import io.github.glynch.jscene3d.project.exporting.internal.StagedDirectoryInstall;
+import io.github.glynch.jscene3d.project.exporting.internal.ApplicationImageMetadata;
+import io.github.glynch.jscene3d.project.exporting.internal.StagedPathInstall;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -48,9 +49,9 @@ final class MacOsApplicationImageAssembly {
             runJpackage(input, packageOutput);
             Path generatedImage = packageOutput.resolve(plan.applicationName() + ".app");
             validateGeneratedImage(generatedImage);
-            StagedDirectoryInstall.replace(generatedImage, plan.outputRoot());
+            StagedPathInstall.replace(generatedImage, plan.outputRoot());
         } finally {
-            StagedDirectoryInstall.deleteIfPresent(staging);
+            StagedPathInstall.deleteIfPresent(staging);
         }
     }
 
@@ -61,6 +62,7 @@ final class MacOsApplicationImageAssembly {
         }
         copyTree(plan.applicationDirectory().resolve("project"), input.resolve("project"));
         copyTree(plan.applicationDirectory().resolve("content"), input.resolve("content"));
+        new ApplicationImageMetadata(plan.applicationName(), plan.applicationVersion()).write(input);
     }
 
     /** Invokes jpackage with a structured argument vector and reports its complete failure output. */

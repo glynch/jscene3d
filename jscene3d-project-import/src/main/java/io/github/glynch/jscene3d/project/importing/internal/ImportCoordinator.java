@@ -25,7 +25,6 @@ import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.imports.ImportDefinitionDiagnosticCode;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -47,6 +46,7 @@ public final class ImportCoordinator {
     private final CacheStore cache;
     private final ImporterBindings bindings;
     private final CacheIndexCodec codec;
+    private final CachedArtifactLookup artifactLookup;
 
     /**
      * Creates one project-scoped coordinator.
@@ -60,6 +60,7 @@ public final class ImportCoordinator {
         this.cache = Objects.requireNonNull(cache, "cache");
         this.bindings = Objects.requireNonNull(bindings, "bindings");
         codec = cache.codec();
+        artifactLookup = new CachedArtifactLookup(cache);
     }
 
     /**
@@ -166,14 +167,7 @@ public final class ImportCoordinator {
      */
     public List<ImportedArtifactMetadata> artifacts(ImportDefinition definition) {
         ImportDefinition validDefinition = requireDefinition(definition);
-        try {
-            return cache.active(validDefinition.id()).stream()
-                    .flatMap(generation -> generation.index().artifacts().stream())
-                    .map(codec::metadata)
-                    .toList();
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to list imported artifacts for " + validDefinition.id(), exception);
-        }
+        return artifactLookup.artifacts(validDefinition);
     }
 
     /**
@@ -185,25 +179,7 @@ public final class ImportCoordinator {
      */
     public Optional<ImportedArtifact> openArtifact(ImportDefinition definition, String identity) {
         ImportDefinition validDefinition = requireDefinition(definition);
-        String validIdentity = Preconditions.requirePortableIdentity(identity, "identity");
-        try {
-            Optional<CacheStore.ActiveGeneration> active = cache.active(validDefinition.id());
-            if (active.isEmpty()) {
-                return Optional.empty();
-            }
-            CacheStore.ActiveGeneration generation = active.orElseThrow();
-            Optional<CachedArtifact> artifact = generation.index().artifacts().stream()
-                    .filter(candidate -> candidate.identity().equals(validIdentity))
-                    .findFirst();
-            if (artifact.isEmpty()) {
-                return Optional.empty();
-            }
-            CachedArtifact cachedArtifact = artifact.orElseThrow();
-            return Optional.of(new InternalImportedArtifact(
-                    codec.metadata(cachedArtifact), cache.artifactPath(generation, cachedArtifact)));
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to open imported artifact " + validIdentity, exception);
-        }
+        return artifactLookup.openArtifact(validDefinition, identity);
     }
 
     /** Invokes adapter inspection and converts operational failures to diagnostics. */

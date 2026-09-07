@@ -8,6 +8,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.project.exporting.internal.ApplicationImageMetadata;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -83,10 +84,13 @@ final class ApplicationImageExporterTest {
                         "-Djscene3d.launch.content.directory=$APPDIR/content");
         assertThat(tool.inputPaths())
                 .containsExactly(
+                        "application-image.properties",
                         "jscene3d-project-desktop.jar",
                         "project/project.json",
                         "project/worlds/start.world.json",
                         "sample-game.jar");
+        assertThat(ApplicationImageMetadata.read(image.root().resolve("Contents/app")))
+                .isEqualTo(new ApplicationImageMetadata("Sample Game", "1.0.0"));
     }
 
     /** Leaves an existing image untouched when the external packaging tool fails. */
@@ -199,10 +203,15 @@ final class ApplicationImageExporterTest {
             Path input = Path.of(option("--input"));
             inputPaths = relativeFiles(input);
             Path image = Path.of(option("--dest")).resolve(option("--name") + ".app");
+            Path applicationContent = image.resolve("Contents/app");
             Path launcher = image.resolve("Contents/MacOS").resolve(option("--name"));
             Path runtimeModules = image.resolve("Contents/runtime/Contents/Home/lib/modules");
+            Files.createDirectories(applicationContent);
             Files.createDirectories(launcher.getParent());
             Files.createDirectories(runtimeModules.getParent());
+            Files.copy(
+                    input.resolve(ApplicationImageMetadata.PATH),
+                    applicationContent.resolve(ApplicationImageMetadata.PATH));
             Files.writeString(launcher, "launcher", UTF_8);
             Files.writeString(runtimeModules, "runtime", UTF_8);
             return new JpackageToolResult(0, "");

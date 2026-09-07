@@ -145,8 +145,9 @@ final class ImportManagerTest {
 
     /** Loads published definitions without retaining or executing the source importer at runtime. */
     @Test
-    void loadsPublishedProjectContent() {
+    void loadsPublishedProjectContent() throws IOException {
         publish(manager());
+        Files.delete(cacheDirectory.resolve("staging"));
 
         ProjectContent content = PublishedProjectContent.load(
                 project, catalog, AssetCatalog.scan(project.root()).catalog().orElseThrow(), cacheDirectory, List.of());
@@ -156,6 +157,7 @@ final class ImportManagerTest {
                 .definition()
                 .orElseThrow();
         assertThat(generated.name()).isEqualTo("Imported text");
+        assertThat(cacheDirectory.resolve("staging")).doesNotExist();
     }
 
     /** Preserves structured loading detail when a manifest-declared import document is invalid. */

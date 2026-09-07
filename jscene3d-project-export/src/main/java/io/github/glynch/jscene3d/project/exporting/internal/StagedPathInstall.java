@@ -13,18 +13,18 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 
-/** Transactional replacement and cleanup for privately staged export directories. */
-public final class StagedDirectoryInstall {
+/** Transactional replacement and cleanup for privately staged export paths. */
+public final class StagedPathInstall {
     /** Prevents construction. */
-    private StagedDirectoryInstall() {
-        throw new AssertionError("StagedDirectoryInstall cannot be instantiated");
+    private StagedPathInstall() {
+        throw new AssertionError("StagedPathInstall cannot be instantiated");
     }
 
     /**
-     * Replaces one output directory with a complete staging directory.
+     * Replaces one output path with a complete staging path.
      *
-     * @param staging complete private staging directory
-     * @param output final output directory
+     * @param staging complete private staging path
+     * @param output final output path
      * @throws IOException when installation or restoration fails
      */
     public static void replace(Path staging, Path output) throws IOException {
@@ -47,9 +47,9 @@ public final class StagedDirectoryInstall {
     }
 
     /**
-     * Deletes one staging or backup tree if it still exists.
+     * Deletes one staging or backup path if it still exists.
      *
-     * @param root known private export directory
+     * @param root known private export path
      * @throws IOException when the tree cannot be deleted
      */
     public static void deleteIfPresent(Path root) throws IOException {

@@ -44,9 +44,9 @@ public final class ApplicationDirectoryAssembly {
                 Files.createTempDirectory(parent, '.' + output.getFileName().toString() + "-staging-");
         try {
             populate(validPlan, staging);
-            StagedDirectoryInstall.replace(staging, output);
+            StagedPathInstall.replace(staging, output);
         } finally {
-            StagedDirectoryInstall.deleteIfPresent(staging);
+            StagedPathInstall.deleteIfPresent(staging);
         }
     }
 

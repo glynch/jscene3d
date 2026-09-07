@@ -30,6 +30,7 @@ public final class CacheStore {
     private final Path cacheRoot;
     private final Path importsRoot;
     private final Path stagingRoot;
+    private final boolean writable;
     private final CacheIndexCodec codec = new CacheIndexCodec();
 
     /**
@@ -46,8 +47,44 @@ public final class CacheStore {
             cacheRoot = normalized.toRealPath();
             importsRoot = Files.createDirectories(cacheRoot.resolve("imports")).toRealPath();
             stagingRoot = Files.createDirectories(cacheRoot.resolve("staging")).toRealPath();
+            writable = true;
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to initialize import cache: " + suppliedRoot, exception);
+        }
+    }
+
+    /** Stores a validated read-only view without creating cache paths. */
+    private CacheStore(Path cacheRoot, Path importsRoot) {
+        this.cacheRoot = cacheRoot;
+        this.importsRoot = importsRoot;
+        stagingRoot = cacheRoot.resolve("staging");
+        writable = false;
+    }
+
+    /**
+     * Opens published content without creating cache or staging directories.
+     *
+     * @param suppliedRoot existing published-content root
+     * @return read-only published cache view
+     */
+    public static CacheStore openPublished(Path suppliedRoot) {
+        try {
+            Path normalized = Objects.requireNonNull(suppliedRoot, "suppliedRoot")
+                    .toAbsolutePath()
+                    .normalize();
+            if (Files.exists(normalized) && !Files.isDirectory(normalized)) {
+                throw new IllegalArgumentException("Published import cache is not a directory: " + normalized);
+            }
+            Path root = Files.isDirectory(normalized) ? normalized.toRealPath() : normalized;
+            Path imports = root.resolve("imports");
+            if (Files.isDirectory(imports)) {
+                imports = imports.toRealPath();
+            } else if (Files.exists(imports)) {
+                throw new IllegalArgumentException("Published imports path is not a directory: " + imports);
+            }
+            return new CacheStore(root, imports);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to open published import cache: " + suppliedRoot, exception);
         }
     }
 
@@ -58,6 +95,9 @@ public final class CacheStore {
      * @return owned secure staging workspace
      */
     public TemporaryWorkspace createStagingWorkspace(String importId) {
+        if (!writable) {
+            throw new IllegalStateException("Published import cache is read-only: " + cacheRoot);
+        }
         return TemporaryWorkspace.create(stagingRoot, importId + '-');
     }
 

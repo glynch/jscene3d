@@ -17,12 +17,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.jar.JarFile;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /** Complete validated macOS application-image plan prepared without changing output. */
 final class MacOsApplicationImagePlan {
-    private static final Pattern MACOS_APPLICATION_VERSION = Pattern.compile("[1-9]\\d*(?:\\.\\d+){0,2}");
     private static final String LAUNCHER_ENTRY =
             DesktopProjectLauncher.class.getName().replace('.', '/') + ".class";
 
@@ -60,12 +58,12 @@ final class MacOsApplicationImagePlan {
     static MacOsApplicationImagePlan prepare(ApplicationImageRequest request, String operatingSystemName)
             throws IOException {
         ApplicationImageRequest validRequest = Objects.requireNonNull(request, "request");
-        requireMacOs(operatingSystemName);
-        requireMacOsVersion(validRequest.applicationVersion());
+        MacOsPackageValues.requireHost(operatingSystemName);
+        MacOsPackageValues.requireApplicationVersion(validRequest.applicationVersion());
         Path root = requireApplicationDirectory(validRequest.applicationDirectory());
         ApplicationDirectoryMetadata metadata = ApplicationDirectoryMetadata.read(root);
         GameProject project = loadProject(root.resolve("project"), metadata.engineVersion());
-        requireApplicationName(project.identity().name());
+        MacOsPackageValues.requireApplicationName(project.identity().name());
         List<Path> artifacts = runtimeArtifacts(root.resolve("lib"));
         Path launcherArtifact = findLauncherArtifact(artifacts);
         validateOutput(validRequest.outputDirectory(), root, project.identity().name());
@@ -127,22 +125,6 @@ final class MacOsApplicationImagePlan {
         return outputRoot().resolve("Contents/MacOS").resolve(applicationName());
     }
 
-    /** Rejects hosts for which this first native-image implementation has no contract. */
-    private static void requireMacOs(String operatingSystemName) {
-        String validName = Objects.requireNonNull(operatingSystemName, "operatingSystemName");
-        if (!validName.startsWith("Mac")) {
-            throw new UnsupportedOperationException("native application-image export currently supports macOS only");
-        }
-    }
-
-    /** Requires the restricted numeric version accepted by macOS jpackage images. */
-    private static void requireMacOsVersion(String version) {
-        if (!MACOS_APPLICATION_VERSION.matcher(version).matches()) {
-            throw new IllegalArgumentException(
-                    "applicationVersion must contain one to three numeric components and start above zero: " + version);
-        }
-    }
-
     /** Resolves and checks the required application-directory layout. */
     private static Path requireApplicationDirectory(Path requestedRoot) throws IOException {
         if (!Files.isDirectory(requestedRoot)) {
@@ -171,13 +153,6 @@ final class MacOsApplicationImagePlan {
     /** Converts project-loader diagnostics into one export-input failure. */
     private static IllegalArgumentException invalidProject(List<ProjectDiagnostic> diagnostics) {
         return new IllegalArgumentException("packaged project is invalid: " + diagnostics);
-    }
-
-    /** Requires a name that is also one safe application-bundle filename. */
-    private static void requireApplicationName(String name) {
-        if (name.equals(".") || name.equals("..") || name.indexOf('/') >= 0 || name.indexOf(':') >= 0) {
-            throw new IllegalArgumentException("project name is not a valid macOS application name: " + name);
-        }
     }
 
     /** Lists regular JAR artifacts and rejects links or unrelated library entries. */

@@ -8,6 +8,8 @@ import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.importing.internal.CacheStore;
+import io.github.glynch.jscene3d.project.importing.internal.CachedArtifactLookup;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.imports.ImportLoadResult;
 import io.github.glynch.jscene3d.project.imports.ImportLoader;
@@ -57,7 +59,7 @@ public final class PublishedProjectContent {
         Path validCacheRoot = Objects.requireNonNull(cacheRoot, "cacheRoot");
         List<RuntimeResourceLoader<?>> validResourceLoaders = List.copyOf(resourceLoaders);
         List<ImportDefinition> imports = loadDeclaredImports(validProject);
-        ImportManager publications = ImportManager.create(validProject, validCatalog, validCacheRoot, List.of());
+        ImportedArtifactLookup publications = new CachedArtifactLookup(CacheStore.openPublished(validCacheRoot));
         DefinitionResolver definitions;
         try {
             definitions = ImportedDefinitionResolver.create(validAuthored, imports, publications);

@@ -86,6 +86,7 @@ final class MacOsApplicationImageAssembly {
         option(arguments, "--dest", packageOutput.toString());
         option(arguments, "--mac-package-identifier", plan.packageIdentifier());
         option(arguments, "--mac-app-category", "games");
+        plan.applicationIcon().ifPresent(icon -> option(arguments, "--icon", icon.toString()));
         for (String argument : plan.jvmArguments()) {
             option(arguments, "--java-options", argument);
         }

@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
 
@@ -64,6 +65,7 @@ final class MacOsApplicationImagePlan {
         ApplicationDirectoryMetadata metadata = ApplicationDirectoryMetadata.read(root);
         GameProject project = loadProject(root.resolve("project"), metadata.engineVersion());
         MacOsPackageValues.requireApplicationName(project.identity().name());
+        project.identity().icon().ifPresent(MacOsApplicationImagePlan::requireMacOsIcon);
         List<Path> artifacts = runtimeArtifacts(root.resolve("lib"));
         Path launcherArtifact = findLauncherArtifact(artifacts);
         validateOutput(validRequest.outputDirectory(), root, project.identity().name());
@@ -88,6 +90,11 @@ final class MacOsApplicationImagePlan {
     /** Returns the package description. */
     String description() {
         return project.identity().description().orElse(applicationName());
+    }
+
+    /** Returns the optional project-supplied macOS application icon. */
+    Optional<Path> applicationIcon() {
+        return project.identity().icon();
     }
 
     /** Returns the requested platform-native version. */
@@ -141,6 +148,13 @@ final class MacOsApplicationImagePlan {
     private static void requireDirectory(Path directory, String description) {
         if (!Files.isDirectory(directory)) {
             throw new IllegalArgumentException(description + " directory is absent: " + directory);
+        }
+    }
+
+    /** Requires the native icon format accepted by macOS application packaging. */
+    private static void requireMacOsIcon(Path icon) {
+        if (!icon.getFileName().toString().endsWith(".icns")) {
+            throw new IllegalArgumentException("macOS application icon must be an .icns file: " + icon);
         }
     }
 

@@ -40,6 +40,8 @@ final class ApplicationImageExporterTest {
         Path artifacts = Files.createDirectory(temporaryDirectory.resolve("artifacts"));
         Path gameJar = jar(artifacts.resolve("sample-game.jar"), "sample/Game.class");
         Path desktopJar = jar(artifacts.resolve("jscene3d-project-desktop.jar"), LAUNCHER_CLASS);
+        Files.createDirectories(projectRoot.resolve("branding"));
+        Files.write(projectRoot.resolve("branding/sample-game.icns"), new byte[] {0, 1, 2, 3});
         Files.writeString(projectRoot.resolve("project.json"), manifest(), UTF_8);
         Files.createDirectories(projectRoot.resolve("worlds"));
         Files.writeString(projectRoot.resolve("worlds/start.world.json"), worldDefinition(), UTF_8);
@@ -76,6 +78,11 @@ final class ApplicationImageExporterTest {
         assertThat(tool.option("--main-class"))
                 .isEqualTo("io.github.glynch.jscene3d.project.desktop.DesktopProjectLauncher");
         assertThat(tool.option("--mac-package-identifier")).isEqualTo("io.github.glynch.sample-game");
+        assertThat(tool.option("--icon"))
+                .isEqualTo(applicationDirectory
+                        .toRealPath()
+                        .resolve("project/branding/sample-game.icns")
+                        .toString());
         assertThat(tool.javaOptions())
                 .containsExactly(
                         "-XstartOnFirstThread",
@@ -86,6 +93,7 @@ final class ApplicationImageExporterTest {
                 .containsExactly(
                         "application-image.properties",
                         "jscene3d-project-desktop.jar",
+                        "project/branding/sample-game.icns",
                         "project/project.json",
                         "project/worlds/start.world.json",
                         "sample-game.jar");
@@ -134,6 +142,32 @@ final class ApplicationImageExporterTest {
                 .hasMessageContaining("do not contain the generic desktop launcher");
     }
 
+    /** Omits jpackage icon configuration when the project does not declare one. */
+    @Test
+    void exportsWithoutOptionalApplicationIcon() throws IOException {
+        Files.writeString(applicationDirectory.resolve("project/project.json"), manifestWithoutIcon(), UTF_8);
+        RecordingJpackageTool tool = new RecordingJpackageTool();
+
+        new ApplicationImageExporter(tool, "Mac OS X").export(request());
+
+        assertThat(tool.hasOption("--icon")).isFalse();
+    }
+
+    /** Rejects project icons which do not use the native macOS application-icon format. */
+    @Test
+    void rejectsNonIcnsApplicationIcon() throws IOException {
+        Path projectRoot = applicationDirectory.resolve("project");
+        Files.write(projectRoot.resolve("branding/sample-game.png"), new byte[] {0, 1, 2, 3});
+        Files.writeString(
+                projectRoot.resolve("project.json"), manifest().replace("sample-game.icns", "sample-game.png"), UTF_8);
+        ApplicationImageExporter exporter = new ApplicationImageExporter(new RecordingJpackageTool(), "Mac OS X");
+        ApplicationImageRequest request = request();
+
+        assertThatThrownBy(() -> exporter.export(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("macOS application icon must be an .icns file");
+    }
+
     /** Builds the standard native-image request. */
     private ApplicationImageRequest request() {
         return ApplicationImageRequest.builder()
@@ -162,7 +196,8 @@ final class ApplicationImageExporterTest {
                     "id": "io.github.glynch.sample-game",
                     "name": "Sample Game",
                     "version": "0.1.0",
-                    "description": "A native packaging fixture"
+                    "description": "A native packaging fixture",
+                    "icon": "branding/sample-game.icns"
                   },
                   "engine": {
                     "requires": ">=0.1.0-SNAPSHOT <0.2.0"
@@ -179,6 +214,11 @@ final class ApplicationImageExporterTest {
                   ]
                 }
                 """;
+    }
+
+    /** Returns the fixture manifest without its optional icon declaration. */
+    private static String manifestWithoutIcon() {
+        return manifest().replace(",\n    \"icon\": \"branding/sample-game.icns\"", "");
     }
 
     /** Returns one discoverable world-definition header. */
@@ -220,6 +260,11 @@ final class ApplicationImageExporterTest {
         /** Returns whether this fake received an invocation. */
         boolean wasInvoked() {
             return !arguments.isEmpty();
+        }
+
+        /** Returns whether this fake received the named option. */
+        boolean hasOption(String name) {
+            return arguments.contains(name);
         }
 
         /** Returns the value following the first named option. */

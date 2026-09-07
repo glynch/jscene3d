@@ -8,21 +8,21 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable description of one successfully assembled relocatable application image. */
-public final class ApplicationImage {
+/** Immutable description of one successfully assembled relocatable application directory. */
+public final class ApplicationDirectory {
     private final Path root;
     private final String launcherName;
     private final List<Path> runtimeArtifacts;
 
     /** Stores output paths produced by the exporter. */
-    ApplicationImage(Path root, String launcherName, List<Path> runtimeArtifacts) {
+    ApplicationDirectory(Path root, String launcherName, List<Path> runtimeArtifacts) {
         this.root = Objects.requireNonNull(root, "root");
         this.launcherName = Objects.requireNonNull(launcherName, "launcherName");
         this.runtimeArtifacts = List.copyOf(runtimeArtifacts);
     }
 
     /**
-     * Returns the application-image root.
+     * Returns the application-directory root.
      *
      * @return normalized absolute output root
      */
@@ -33,7 +33,7 @@ public final class ApplicationImage {
     /**
      * Returns the packaged authored project directory.
      *
-     * @return project directory below the image root
+     * @return project directory below the application root
      */
     public Path projectDirectory() {
         return root.resolve("project");
@@ -42,7 +42,7 @@ public final class ApplicationImage {
     /**
      * Returns the packaged published-content directory.
      *
-     * @return content directory below the image root
+     * @return content directory below the application root
      */
     public Path publishedContentDirectory() {
         return root.resolve("content");
@@ -60,7 +60,7 @@ public final class ApplicationImage {
     /**
      * Returns the generated POSIX launcher.
      *
-     * @return launcher path below the image root
+     * @return launcher path below the application root
      */
     public Path posixLauncher() {
         return root.resolve("bin").resolve(launcherName);
@@ -69,7 +69,7 @@ public final class ApplicationImage {
     /**
      * Returns the generated Windows launcher.
      *
-     * @return command-file path below the image root
+     * @return command-file path below the application root
      */
     public Path windowsLauncher() {
         return root.resolve("bin").resolve(launcherName + ".cmd");

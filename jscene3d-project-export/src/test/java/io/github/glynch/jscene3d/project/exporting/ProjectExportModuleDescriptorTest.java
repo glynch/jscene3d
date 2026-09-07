@@ -21,7 +21,7 @@ final class ProjectExportModuleDescriptorTest {
 
     /** Keeps implementation and command adaptation inaccessible to module-path callers. */
     @Test
-    void exportsOnlyTheApplicationImageInterface() {
+    void exportsOnlyTheApplicationDirectoryInterface() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
         Set<String> exports = descriptor.exports().stream()
                 .map(ModuleDescriptor.Exports::source)

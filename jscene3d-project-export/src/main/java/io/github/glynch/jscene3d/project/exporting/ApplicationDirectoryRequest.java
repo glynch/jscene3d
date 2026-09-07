@@ -16,12 +16,12 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Immutable description of one relocatable desktop application-image export.
+ * Immutable description of one relocatable desktop application-directory export.
  *
  * <p>The request identifies already-resolved runtime JARs rather than a Maven, Gradle, or editor dependency model.
  * The exporter owns the output layout, project-file selection, published-content filtering, and launcher generation.
  */
-public final class ApplicationImageRequest {
+public final class ApplicationDirectoryRequest {
     private final String engineVersion;
     private final String launcherName;
     private final Path projectRoot;
@@ -31,7 +31,7 @@ public final class ApplicationImageRequest {
     private final List<String> jvmArguments;
 
     /** Builds one validated request from caller-supplied values. */
-    private ApplicationImageRequest(Builder builder) {
+    private ApplicationDirectoryRequest(Builder builder) {
         engineVersion =
                 requireNonBlank(Objects.requireNonNull(builder.engineVersion, "engineVersion"), "engineVersion");
         launcherName = requireLauncherName(Objects.requireNonNull(builder.launcherName, "launcherName"));
@@ -48,7 +48,7 @@ public final class ApplicationImageRequest {
     }
 
     /**
-     * Starts an application-image request.
+     * Starts an application-directory request.
      *
      * @return empty request builder
      */
@@ -102,7 +102,7 @@ public final class ApplicationImageRequest {
     }
 
     /**
-     * Returns the application-image directory to replace after successful staging.
+     * Returns the application directory to replace after successful staging.
      *
      * @return normalized absolute output directory
      */
@@ -129,7 +129,7 @@ public final class ApplicationImageRequest {
         private @Nullable Path outputDirectory;
         private List<String> jvmArguments = List.of();
 
-        /** Prevents construction outside {@link ApplicationImageRequest#builder()}. */
+        /** Prevents construction outside {@link ApplicationDirectoryRequest#builder()}. */
         private Builder() {}
 
         /**
@@ -188,7 +188,7 @@ public final class ApplicationImageRequest {
         }
 
         /**
-         * Sets the application-image directory replaced after successful staging.
+         * Sets the application directory replaced after successful staging.
          *
          * @param value output directory
          * @return this builder
@@ -212,10 +212,10 @@ public final class ApplicationImageRequest {
         /**
          * Creates the validated immutable request.
          *
-         * @return application-image request
+         * @return application-directory request
          */
-        public ApplicationImageRequest build() {
-            return new ApplicationImageRequest(this);
+        public ApplicationDirectoryRequest build() {
+            return new ApplicationDirectoryRequest(this);
         }
     }
 }

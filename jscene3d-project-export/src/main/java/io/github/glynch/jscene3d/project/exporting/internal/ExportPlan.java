@@ -8,7 +8,7 @@ import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetCatalogLoadResult;
 import io.github.glynch.jscene3d.project.asset.AssetMetadata;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
-import io.github.glynch.jscene3d.project.exporting.ApplicationImageRequest;
+import io.github.glynch.jscene3d.project.exporting.ApplicationDirectoryRequest;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.imports.ImportLoadResult;
 import io.github.glynch.jscene3d.project.imports.ImportLoader;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 /** Complete validated source plan consumed by filesystem assembly. */
 public final class ExportPlan {
-    private final ApplicationImageRequest request;
+    private final ApplicationDirectoryRequest request;
     private final Path projectRoot;
     private final Path publishedContentRoot;
     private final List<ExportFile> projectFiles;
@@ -38,7 +38,7 @@ public final class ExportPlan {
 
     /** Stores a complete plan after all input validation succeeds. */
     private ExportPlan(
-            ApplicationImageRequest request,
+            ApplicationDirectoryRequest request,
             Path projectRoot,
             Path publishedContentRoot,
             List<ExportFile> projectFiles,
@@ -57,8 +57,8 @@ public final class ExportPlan {
      * @return validated deterministic export plan
      * @throws IOException when project inputs cannot be read
      */
-    public static ExportPlan prepare(ApplicationImageRequest request) throws IOException {
-        ApplicationImageRequest validRequest = Objects.requireNonNull(request, "request");
+    public static ExportPlan prepare(ApplicationDirectoryRequest request) throws IOException {
+        ApplicationDirectoryRequest validRequest = Objects.requireNonNull(request, "request");
         GameProject project = loadProject(validRequest);
         Path contentRoot = requireDirectory(validRequest.publishedContentRoot(), "publishedContentRoot");
         List<Path> artifacts = validateArtifacts(validRequest.runtimeArtifacts());
@@ -126,7 +126,7 @@ public final class ExportPlan {
     }
 
     /**
-     * Returns the final application-image directory.
+     * Returns the final application directory.
      *
      * @return normalized output directory
      */
@@ -140,7 +140,7 @@ public final class ExportPlan {
     }
 
     /** Loads a valid project using the exact requested engine compatibility version. */
-    private static GameProject loadProject(ApplicationImageRequest request) {
+    private static GameProject loadProject(ApplicationDirectoryRequest request) {
         ProjectLoadResult result = new ProjectLoader(request.engineVersion()).load(request.projectRoot());
         return result.project().orElseThrow(() -> invalidDefinition("project", result.diagnostics()));
     }

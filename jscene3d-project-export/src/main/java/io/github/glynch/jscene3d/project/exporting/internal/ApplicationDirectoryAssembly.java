@@ -18,17 +18,17 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 
-/** Filesystem implementation of one validated application-image export plan. */
-public final class ApplicationImageAssembly {
+/** Filesystem implementation of one validated application-directory export plan. */
+public final class ApplicationDirectoryAssembly {
     private static final String DESKTOP_LAUNCHER = "io.github.glynch.jscene3d.project.desktop.DesktopProjectLauncher";
 
     /** Prevents construction. */
-    private ApplicationImageAssembly() {
-        throw new AssertionError("ApplicationImageAssembly cannot be instantiated");
+    private ApplicationDirectoryAssembly() {
+        throw new AssertionError("ApplicationDirectoryAssembly cannot be instantiated");
     }
 
     /**
-     * Stages and installs one complete application image.
+     * Stages and installs one complete application directory.
      *
      * @param plan validated source and destination plan
      * @throws IOException when staging, installation, or cleanup fails
@@ -51,7 +51,7 @@ public final class ApplicationImageAssembly {
         }
     }
 
-    /** Writes every application-image section into a private staging directory. */
+    /** Writes every application-directory section into a private staging directory. */
     private static void populate(ExportPlan plan, Path staging) throws IOException {
         copyProject(plan, staging.resolve("project"));
         copyPublishedContent(plan.publishedContentRoot(), staging.resolve("content"));
@@ -101,7 +101,7 @@ public final class ApplicationImageAssembly {
         }
     }
 
-    /** Writes portable launchers which depend only on application-image-relative paths. */
+    /** Writes portable launchers which depend only on application-directory-relative paths. */
     private static void writeLaunchers(ExportPlan plan, Path destinationRoot) throws IOException {
         Files.createDirectories(destinationRoot);
         Path posix = destinationRoot.resolve(plan.launcherName());
@@ -135,7 +135,7 @@ public final class ApplicationImageAssembly {
                 + " \\\n    \"$application_home/project\" \\\n    \"$application_home/content\"\n";
     }
 
-    /** Renders the Windows command launcher with application-image-relative paths. */
+    /** Renders the Windows command launcher with application-directory-relative paths. */
     private static String windowsLauncher(ExportPlan plan) {
         StringBuilder javaArguments = new StringBuilder();
         for (String argument : plan.jvmArguments()) {
@@ -193,7 +193,7 @@ public final class ApplicationImageAssembly {
         }
     }
 
-    /** Installs staging, restoring an existing image if the final move fails. */
+    /** Installs staging, restoring an existing directory if the final move fails. */
     private static void install(Path staging, Path output) throws IOException {
         if (Files.notExists(output)) {
             move(staging, output);
@@ -212,7 +212,7 @@ public final class ApplicationImageAssembly {
         deleteTree(backup);
     }
 
-    /** Restores the previous image and retains both failures if restoration itself fails. */
+    /** Restores the previous directory and retains both failures if restoration itself fails. */
     private static void restoreBackup(Path output, Path backup, IOException installFailure) {
         try {
             if (Files.exists(output)) {
@@ -240,7 +240,7 @@ public final class ApplicationImageAssembly {
         }
     }
 
-    /** Deletes a known application-image staging, backup, or replaced-output tree child first. */
+    /** Deletes a known application-directory staging, backup, or replaced-output tree child first. */
     private static void deleteTree(Path root) throws IOException {
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override

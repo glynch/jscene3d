@@ -4,8 +4,8 @@
  */
 package io.github.glynch.jscene3d.project.exporting.internal;
 
-import io.github.glynch.jscene3d.project.exporting.ApplicationImageExporter;
-import io.github.glynch.jscene3d.project.exporting.ApplicationImageRequest;
+import io.github.glynch.jscene3d.project.exporting.ApplicationDirectoryExporter;
+import io.github.glynch.jscene3d.project.exporting.ApplicationDirectoryRequest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,17 +15,17 @@ import java.util.Comparator;
 import java.util.List;
 
 /** Process adapter used by build tools which have already resolved a runtime dependency directory. */
-public final class ApplicationImageExportCommand {
+public final class ApplicationDirectoryExportCommand {
     private static final int REQUIRED_ARGUMENT_COUNT = 7;
 
     /** Prevents construction of this command-line adapter. */
-    private ApplicationImageExportCommand() {
-        throw new AssertionError("ApplicationImageExportCommand cannot be instantiated");
+    private ApplicationDirectoryExportCommand() {
+        throw new AssertionError("ApplicationDirectoryExportCommand cannot be instantiated");
     }
 
     /**
-     * Exports one image from engine version, launcher name, project, content, dependency directory, application JAR,
-     * output directory, and optional trailing JVM arguments.
+     * Exports one application directory from engine version, launcher name, project, content, dependency directory,
+     * application JAR, output directory, and optional trailing JVM arguments.
      *
      * @param arguments ordered export inputs followed by zero or more JVM arguments
      * @throws IOException when dependency discovery or export fails
@@ -41,7 +41,7 @@ public final class ApplicationImageExportCommand {
         runtimeArtifacts.add(Path.of(arguments[5]));
         List<String> jvmArguments =
                 List.copyOf(Arrays.asList(arguments).subList(REQUIRED_ARGUMENT_COUNT, arguments.length));
-        ApplicationImageRequest request = ApplicationImageRequest.builder()
+        ApplicationDirectoryRequest request = ApplicationDirectoryRequest.builder()
                 .engineVersion(arguments[0])
                 .launcherName(arguments[1])
                 .projectRoot(Path.of(arguments[2]))
@@ -50,7 +50,7 @@ public final class ApplicationImageExportCommand {
                 .outputDirectory(Path.of(arguments[6]))
                 .jvmArguments(jvmArguments)
                 .build();
-        new ApplicationImageExporter().export(request);
+        new ApplicationDirectoryExporter().export(request);
     }
 
     /** Discovers only regular JARs in one non-recursive dependency directory. */

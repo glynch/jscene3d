@@ -21,8 +21,8 @@ import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Verifies complete application images through the public export interface. */
-final class ApplicationImageExporterTest {
+/** Verifies complete application directorys through the public export interface. */
+final class ApplicationDirectoryExporterTest {
     private static final String ENGINE_VERSION = "0.1.0-SNAPSHOT";
 
     @TempDir
@@ -53,16 +53,17 @@ final class ApplicationImageExporterTest {
 
     /** Exports only runtime project data, committed publications, JARs, and generated launchers. */
     @Test
-    void assemblesRelocatableApplicationImage() throws IOException {
-        ApplicationImageRequest request = request(List.of(applicationArtifact, engineArtifact));
+    void assemblesRelocatableApplicationDirectory() throws IOException {
+        ApplicationDirectoryRequest request = request(List.of(applicationArtifact, engineArtifact));
 
-        ApplicationImage image = new ApplicationImageExporter().export(request);
+        ApplicationDirectory applicationDirectory = new ApplicationDirectoryExporter().export(request);
 
-        assertThat(image.root()).isEqualTo(output.toAbsolutePath().normalize());
-        assertThat(image.runtimeArtifacts())
+        assertThat(applicationDirectory.root())
+                .isEqualTo(output.toAbsolutePath().normalize());
+        assertThat(applicationDirectory.runtimeArtifacts())
                 .extracting(path -> path.getFileName().toString())
                 .containsExactly("engine.jar", "sample-game.jar");
-        assertThat(relativeFiles(image.root()))
+        assertThat(relativeFiles(applicationDirectory.root()))
                 .containsExactly(
                         "bin/sample-game",
                         "bin/sample-game.cmd",
@@ -83,14 +84,15 @@ final class ApplicationImageExporterTest {
     /** Generates launchers containing no source-checkout paths or game-specific Java entry point. */
     @Test
     void generatesGenericRelativeLaunchers() throws IOException {
-        ApplicationImage image = new ApplicationImageExporter().export(request(List.of(applicationArtifact)));
+        ApplicationDirectory applicationDirectory =
+                new ApplicationDirectoryExporter().export(request(List.of(applicationArtifact)));
 
-        assertThat(image.posixLauncher())
+        assertThat(applicationDirectory.posixLauncher())
                 .content(StandardCharsets.UTF_8)
                 .contains("DesktopProjectLauncher", "\"$application_home/project\"")
                 .contains("'-XstartOnFirstThread'", "'0.1.0-SNAPSHOT'")
                 .doesNotContain(projectRoot.toString(), "SampleGameApplication");
-        assertThat(image.windowsLauncher())
+        assertThat(applicationDirectory.windowsLauncher())
                 .content(StandardCharsets.UTF_8)
                 .contains("DesktopProjectLauncher", "%APPLICATION_HOME%\\project", "\"-XstartOnFirstThread\"")
                 .doesNotContain(projectRoot.toString(), "SampleGameApplication");
@@ -100,7 +102,8 @@ final class ApplicationImageExporterTest {
     @Test
     @EnabledOnOs({OS.LINUX, OS.MAC})
     void posixLauncherPassesOnlyIntendedArguments() throws IOException, InterruptedException {
-        ApplicationImage image = new ApplicationImageExporter().export(request(List.of(applicationArtifact)));
+        ApplicationDirectory applicationDirectory =
+                new ApplicationDirectoryExporter().export(request(List.of(applicationArtifact)));
         Path fakeJavaHome = temporaryDirectory.resolve("fake-java-home");
         Path fakeJava = write(fakeJavaHome.resolve("bin/java"), "#!/bin/sh\nprintf '%s\\n' \"$@\"\n");
         Files.setPosixFilePermissions(
@@ -110,7 +113,8 @@ final class ApplicationImageExporterTest {
                         PosixFilePermission.OWNER_WRITE,
                         PosixFilePermission.OWNER_EXECUTE));
 
-        ProcessBuilder builder = new ProcessBuilder(image.posixLauncher().toString())
+        ProcessBuilder builder = new ProcessBuilder(
+                        applicationDirectory.posixLauncher().toString())
                 .directory(temporaryDirectory.toFile())
                 .redirectErrorStream(true);
         builder.environment().put("JAVA_HOME", fakeJavaHome.toString());
@@ -126,18 +130,18 @@ final class ApplicationImageExporterTest {
                 .containsExactly(
                         "-XstartOnFirstThread",
                         "-classpath",
-                        image.root().resolve("lib/*").toString(),
+                        applicationDirectory.root().resolve("lib/*").toString(),
                         "io.github.glynch.jscene3d.project.desktop.DesktopProjectLauncher",
                         ENGINE_VERSION,
-                        image.projectDirectory().toString(),
-                        image.publishedContentDirectory().toString());
+                        applicationDirectory.projectDirectory().toString(),
+                        applicationDirectory.publishedContentDirectory().toString());
     }
 
-    /** Replaces a previous image only after a complete new staging image exists. */
+    /** Replaces a previous directory only after a complete new staging directory exists. */
     @Test
-    void replacesPreviousApplicationImage() throws IOException {
-        ApplicationImageExporter exporter = new ApplicationImageExporter();
-        ApplicationImageRequest request = request(List.of(applicationArtifact));
+    void replacesPreviousApplicationDirectory() throws IOException {
+        ApplicationDirectoryExporter exporter = new ApplicationDirectoryExporter();
+        ApplicationDirectoryRequest request = request(List.of(applicationArtifact));
         exporter.export(request);
         write(output.resolve("obsolete.txt"), "obsolete");
 
@@ -149,11 +153,11 @@ final class ApplicationImageExporterTest {
 
     /** Leaves an existing output untouched when validation rejects an incomplete runtime class path. */
     @Test
-    void preservesPreviousImageWhenValidationFails() throws IOException {
+    void preservesPreviousDirectoryWhenValidationFails() throws IOException {
         Path marker = write(output.resolve("existing.txt"), "existing");
         Path missingArtifact = temporaryDirectory.resolve("missing.jar");
-        ApplicationImageRequest invalidRequest = request(List.of(missingArtifact));
-        ApplicationImageExporter exporter = new ApplicationImageExporter();
+        ApplicationDirectoryRequest invalidRequest = request(List.of(missingArtifact));
+        ApplicationDirectoryExporter exporter = new ApplicationDirectoryExporter();
 
         assertThatThrownBy(() -> exporter.export(invalidRequest))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -166,8 +170,8 @@ final class ApplicationImageExporterTest {
     void rejectsArtifactFilenameCollisions() throws IOException {
         Path otherDirectory = Files.createDirectory(temporaryDirectory.resolve("other-artifacts"));
         Path duplicate = write(otherDirectory.resolve("engine.jar"), "other engine");
-        ApplicationImageRequest invalidRequest = request(List.of(engineArtifact, duplicate));
-        ApplicationImageExporter exporter = new ApplicationImageExporter();
+        ApplicationDirectoryRequest invalidRequest = request(List.of(engineArtifact, duplicate));
+        ApplicationDirectoryExporter exporter = new ApplicationDirectoryExporter();
 
         assertThatThrownBy(() -> exporter.export(invalidRequest))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -175,8 +179,8 @@ final class ApplicationImageExporterTest {
     }
 
     /** Builds the standard request used by each export behavior test. */
-    private ApplicationImageRequest request(List<Path> artifacts) {
-        return ApplicationImageRequest.builder()
+    private ApplicationDirectoryRequest request(List<Path> artifacts) {
+        return ApplicationDirectoryRequest.builder()
                 .engineVersion(ENGINE_VERSION)
                 .launcherName("sample-game")
                 .projectRoot(projectRoot)
@@ -285,7 +289,7 @@ final class ApplicationImageExporterTest {
         return Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
-    /** Returns regular-file paths relative to one image in portable sorted order. */
+    /** Returns regular-file paths relative to one application directory in portable sorted order. */
     private static List<String> relativeFiles(Path root) throws IOException {
         try (var paths = Files.walk(root)) {
             return paths.filter(Files::isRegularFile)

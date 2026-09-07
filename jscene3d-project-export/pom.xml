@@ -10,7 +10,7 @@
 
     <artifactId>jscene3d-project-export</artifactId>
     <name>JScene3D Project Export</name>
-    <description>Generic application-image export for JScene3D game projects.</description>
+    <description>Generic application-directory export for JScene3D game projects.</description>
 
     <dependencies>
         <dependency>

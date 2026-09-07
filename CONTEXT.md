@@ -344,7 +344,7 @@ A loaded immutable value derived from an Asset and shareable by live Entity
 instances within the lifetime rules of a World.
 _Avoid_: Asset, mutable instance state
 
-**Application Image**:
+**Application Directory**:
 A relocatable derived directory containing runtime project data, completed
 import publications, application and engine JARs, platform-native libraries,
 and generic launchers. Build tools and editors supply resolved inputs; the

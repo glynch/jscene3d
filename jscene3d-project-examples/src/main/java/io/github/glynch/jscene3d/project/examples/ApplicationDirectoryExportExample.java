@@ -4,23 +4,23 @@
  */
 package io.github.glynch.jscene3d.project.examples;
 
-import io.github.glynch.jscene3d.project.exporting.ApplicationImage;
-import io.github.glynch.jscene3d.project.exporting.ApplicationImageExporter;
-import io.github.glynch.jscene3d.project.exporting.ApplicationImageRequest;
+import io.github.glynch.jscene3d.project.exporting.ApplicationDirectory;
+import io.github.glynch.jscene3d.project.exporting.ApplicationDirectoryExporter;
+import io.github.glynch.jscene3d.project.exporting.ApplicationDirectoryRequest;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
-/** Exports caller-resolved game and engine JARs as one relocatable application image. */
-public final class ApplicationImageExportExample {
+/** Exports caller-resolved game and engine JARs as one relocatable application directory. */
+public final class ApplicationDirectoryExportExample {
     private static final int REQUIRED_ARGUMENT_COUNT = 6;
-    private static final Logger LOGGER = Logger.getLogger(ApplicationImageExportExample.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ApplicationDirectoryExportExample.class.getName());
 
     /** Prevents construction of this application entry point. */
-    private ApplicationImageExportExample() {
-        throw new AssertionError("ApplicationImageExportExample cannot be instantiated");
+    private ApplicationDirectoryExportExample() {
+        throw new AssertionError("ApplicationDirectoryExportExample cannot be instantiated");
     }
 
     /**
@@ -38,7 +38,7 @@ public final class ApplicationImageExportExample {
         List<Path> artifacts = Arrays.asList(arguments).subList(5, arguments.length).stream()
                 .map(Path::of)
                 .toList();
-        ApplicationImageRequest request = ApplicationImageRequest.builder()
+        ApplicationDirectoryRequest request = ApplicationDirectoryRequest.builder()
                 .engineVersion(arguments[0])
                 .launcherName(arguments[1])
                 .projectRoot(Path.of(arguments[2]))
@@ -46,8 +46,8 @@ public final class ApplicationImageExportExample {
                 .outputDirectory(Path.of(arguments[4]))
                 .runtimeArtifacts(artifacts)
                 .build();
-        ApplicationImage image = new ApplicationImageExporter().export(request);
-        LOGGER.info(() -> "Application image = " + image.root() + ", runtime artifacts = "
-                + image.runtimeArtifacts().size());
+        ApplicationDirectory applicationDirectory = new ApplicationDirectoryExporter().export(request);
+        LOGGER.info(() -> "Application directory = " + applicationDirectory.root() + ", runtime artifacts = "
+                + applicationDirectory.runtimeArtifacts().size());
     }
 }

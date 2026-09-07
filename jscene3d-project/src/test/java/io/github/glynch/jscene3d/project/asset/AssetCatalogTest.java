@@ -25,6 +25,7 @@ import io.github.glynch.jscene3d.project.entity.SpatialTarget;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -247,6 +248,23 @@ final class AssetCatalogTest {
                 .singleElement()
                 .extracting(diagnostic -> diagnostic.code().code())
                 .isEqualTo("asset.root");
+    }
+
+    /** Stops recursive discovery at a nested project instead of merging its independently owned assets. */
+    @Test
+    void excludesNestedProjectAssets() throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("beacon.entity.json"), beaconDefinition());
+        Path nestedProject = temporaryDirectory.resolve("target/export/application/project");
+        Files.createDirectories(nestedProject);
+        Files.writeString(nestedProject.resolve(ProjectLoader.MANIFEST_NAME), "{}\n", StandardCharsets.UTF_8);
+        DefinitionWriter.write(nestedProject.resolve("duplicate.entity.json"), beaconDefinition());
+
+        AssetCatalog catalog = scanValidCatalog();
+
+        assertThat(catalog.assets())
+                .singleElement()
+                .extracting(AssetMetadata::path)
+                .isEqualTo(temporaryDirectory.resolve("beacon.entity.json").toRealPath());
     }
 
     /** Diagnoses unresolved and wrong-kind typed references without consulting their path hints. */

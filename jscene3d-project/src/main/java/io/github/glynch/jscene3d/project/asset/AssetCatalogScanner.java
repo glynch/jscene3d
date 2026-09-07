@@ -9,10 +9,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
+import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -60,11 +64,10 @@ final class AssetCatalogScanner {
 
     /** Discovers supported definition filenames in portable relative-path order. */
     private void scanFiles(Path root) {
-        try (var paths = Files.walk(root)) {
-            paths.filter(Files::isRegularFile)
-                    .filter(AssetCatalogScanner::isDefinitionFile)
-                    .sorted(Comparator.comparing(path -> portablePath(root.relativize(path))))
-                    .forEach(path -> scanFile(root, path));
+        try {
+            List<Path> paths = discoverDefinitionFiles(root);
+            paths.sort(Comparator.comparing(path -> portablePath(root.relativize(path))));
+            paths.forEach(path -> scanFile(root, path));
         } catch (IOException exception) {
             DiagnosticCollector collector = new DiagnosticCollector(root);
             collector.error(
@@ -73,6 +76,29 @@ final class AssetCatalogScanner {
                     "");
             diagnostics.addAll(collector.diagnostics());
         }
+    }
+
+    /** Collects definition files without crossing into independently manifested nested projects. */
+    private static List<Path> discoverDefinitionFiles(Path root) throws IOException {
+        List<Path> definitions = new ArrayList<>();
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                if (!directory.equals(root) && Files.isRegularFile(directory.resolve(ProjectLoader.MANIFEST_NAME))) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                if (attributes.isRegularFile() && isDefinitionFile(file)) {
+                    definitions.add(file);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return definitions;
     }
 
     /** Reads and indexes one asset envelope. */

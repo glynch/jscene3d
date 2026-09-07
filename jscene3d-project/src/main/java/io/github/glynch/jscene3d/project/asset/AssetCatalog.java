@@ -43,7 +43,8 @@ public final class AssetCatalog implements DefinitionResolver {
      * Scans supported authored definition files below one project root.
      *
      * <p>Discovery is recursive and deterministic. Only {@code .entity.json} and {@code .world.json} files are
-     * considered. Complete definitions remain unloaded until requested through the resulting catalog.
+     * considered. A nested directory containing its own {@code project.json} is a separate project and its subtree is
+     * not scanned. Complete definitions remain unloaded until requested through the resulting catalog.
      *
      * @param projectRoot project directory
      * @return catalog or ordered structured diagnostics

@@ -62,7 +62,6 @@ import io.github.glynch.jscene3d.fogs.Fog;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
 import io.github.glynch.jscene3d.lwjgl.internal.Preconditions;
-import io.github.glynch.jscene3d.lwjgl.internal.WindowContextRegistry;
 import io.github.glynch.jscene3d.materials.AlphaMode;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
@@ -135,7 +134,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector2f;
 import org.jspecify.annotations.Nullable;
 
-/** Owns rendering and all OpenGL state for one JScene3D window context. */
+/** Owns rendering and all OpenGL state for one render surface. */
 public final class Renderer implements AutoCloseable {
     /** Maximum number of visible point lights supported by one rendered scene in version 0.1. */
     public static final int MAX_POINT_LIGHTS = 8;
@@ -162,8 +161,7 @@ public final class Renderer implements AutoCloseable {
      */
     public static final int MAX_SKIN_JOINTS = 56;
 
-    private final Window window;
-    private final WindowContextRegistry.Access context;
+    private final RenderSurface surface;
     private final boolean automaticClear;
     private final RendererInfo info;
     private final RenderStatistics statistics;
@@ -217,10 +215,9 @@ public final class Renderer implements AutoCloseable {
     private boolean standardTextureUnitsPrimed;
     private boolean closed;
 
-    /** Initializes context-local renderer state after the window context is exclusively claimed. */
-    private Renderer(Window window, WindowContextRegistry.Access context, RendererOptions options) {
-        this.window = window;
-        this.context = context;
+    /** Initializes context-local renderer state after exclusive surface access is transferred. */
+    private Renderer(RenderSurface surface, RendererOptions options) {
+        this.surface = surface;
         automaticClear = options.automaticClear();
         clearColor = options.clearColor();
         clearAlpha = options.clearAlpha();
@@ -276,14 +273,56 @@ public final class Renderer implements AutoCloseable {
     public static Renderer create(Window window, RendererOptions options) {
         Window validWindow = Objects.requireNonNull(window, "window");
         RendererOptions validOptions = Objects.requireNonNull(options, "options");
-        WindowContextRegistry.Access context = WindowContextRegistry.claim(validWindow);
+        return create(WindowRenderSurface.claim(validWindow), validOptions);
+    }
+
+    /**
+     * Creates a renderer with default options over host-supplied exclusive surface access.
+     *
+     * @param surface access to a host-owned context and presentation framebuffer
+     * @return renderer owning the supplied access until it closes
+     * @throws NullPointerException if {@code surface} is {@code null}
+     * @throws IllegalStateException if the surface cannot be activated on the calling thread
+     */
+    public static Renderer create(RenderSurface surface) {
+        return create(surface, RendererOptions.defaults());
+    }
+
+    /**
+     * Creates a renderer over host-supplied exclusive surface access.
+     *
+     * <p>Ownership of the access object transfers to this operation. The renderer releases that
+     * access if construction fails or when it closes, without taking ownership of the underlying
+     * host surface, context, or frame-presentation lifecycle.
+     *
+     * @param surface access to a host-owned context and presentation framebuffer
+     * @param options immutable renderer configuration
+     * @return renderer owning the supplied access until it closes
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalStateException if the surface cannot be activated on the calling thread
+     */
+    public static Renderer create(RenderSurface surface, RendererOptions options) {
+        RenderSurface validSurface = Objects.requireNonNull(surface, "surface");
+        RendererOptions validOptions = Objects.requireNonNull(options, "options");
         try {
-            context.makeCurrent();
+            validSurface.activate();
             glEnable(GL_FRAMEBUFFER_SRGB);
-            return new Renderer(validWindow, context, validOptions);
-        } catch (RuntimeException exception) {
-            WindowContextRegistry.release(validWindow, context);
-            throw exception;
+            return new Renderer(validSurface, validOptions);
+        } catch (RuntimeException failure) {
+            releaseAfterFailure(validSurface, failure);
+            throw failure;
+        }
+    }
+
+    /** Releases transferred surface access while preserving an earlier failure, when present. */
+    private static void releaseAfterFailure(RenderSurface surface, @Nullable Throwable failure) {
+        try {
+            surface.release();
+        } catch (RuntimeException releaseFailure) {
+            if (failure == null) {
+                throw releaseFailure;
+            }
+            failure.addSuppressed(releaseFailure);
         }
     }
 
@@ -299,7 +338,7 @@ public final class Renderer implements AutoCloseable {
         requireOpen();
         Scene validScene = Objects.requireNonNull(scene, "scene");
         Camera validCamera = Objects.requireNonNull(camera, "camera");
-        context.makeCurrent();
+        surface.activate();
         releaseClosedGeometryResources();
         releaseClosedTextureResources();
         releaseClosedEnvironmentResources();
@@ -309,8 +348,9 @@ public final class Renderer implements AutoCloseable {
         activeFog = validScene.fog();
         statistics.beginFrame();
 
-        int framebufferWidth = context.framebufferWidth();
-        int framebufferHeight = context.framebufferHeight();
+        RenderSurfaceSize surfaceSize = surface.size();
+        int framebufferWidth = surfaceSize.framebufferWidth();
+        int framebufferHeight = surfaceSize.framebufferHeight();
         boolean usesToneMapping = toneMapping != ToneMapping.NONE && framebufferWidth > 0 && framebufferHeight > 0;
         boolean mainTargetStarted = false;
         boolean rendered = false;
@@ -325,6 +365,7 @@ public final class Renderer implements AutoCloseable {
                         geometryResources, instanceResources, activeInstancedMeshes, morphResources);
                 activeShadowFrame = shadowRenderer.render(
                         validScene, validCamera, renderList.lights(), viewMatrix, shadowResources);
+                surface.activate();
                 recordShadowWork(activeShadowFrame);
                 updateProgramCount();
                 updateShadowResourceCount();
@@ -372,9 +413,11 @@ public final class Renderer implements AutoCloseable {
             return;
         }
         if (rendered) {
+            toneMappingTarget().resolve();
+            surface.activate();
             toneMappingTarget().present(toneMappingProgram(), exposure);
         } else {
-            toneMappingTarget().cancel();
+            surface.activate();
         }
     }
 
@@ -393,28 +436,30 @@ public final class Renderer implements AutoCloseable {
     public void render(Overlay overlay) {
         requireOpen();
         Overlay validOverlay = Objects.requireNonNull(overlay, "overlay");
-        int logicalWidth = window.width();
-        int logicalHeight = window.height();
+        RenderSurfaceSize surfaceSize = surface.size();
+        int logicalWidth = surfaceSize.logicalWidth();
+        int logicalHeight = surfaceSize.logicalHeight();
         overlayCanvas.clear();
         validOverlay.paint(overlayCanvas, logicalWidth, logicalHeight);
         if (overlayCanvas.vertexCount() == 0) {
             return;
         }
-        context.makeCurrent();
+        surface.activate();
         overlayRenderer()
                 .render(
                         overlayCanvas,
                         logicalWidth,
                         logicalHeight,
-                        context.framebufferWidth(),
-                        context.framebufferHeight());
+                        surfaceSize.framebufferWidth(),
+                        surfaceSize.framebufferHeight());
     }
 
     /** Clears the current color and depth buffers using the renderer clear color. */
     public void clear() {
         requireOpen();
-        context.makeCurrent();
-        applyViewport(context.framebufferWidth(), context.framebufferHeight());
+        surface.activate();
+        RenderSurfaceSize surfaceSize = surface.size();
+        applyViewport(surfaceSize.framebufferWidth(), surfaceSize.framebufferHeight());
         clearBuffers(clearColor);
     }
 
@@ -430,7 +475,7 @@ public final class Renderer implements AutoCloseable {
      */
     public void setViewport(int x, int y, int width, int height) {
         requireOpen();
-        context.makeCurrent();
+        surface.activate();
         int validX = Preconditions.requireNonNegative(x, "x");
         int validY = Preconditions.requireNonNegative(y, "y");
         int validWidth = Preconditions.requirePositive(width, "width");
@@ -445,7 +490,7 @@ public final class Renderer implements AutoCloseable {
     /** Restores automatic use of the complete current framebuffer. */
     public void resetViewport() {
         requireOpen();
-        context.makeCurrent();
+        surface.activate();
         customViewport = false;
     }
 
@@ -460,11 +505,12 @@ public final class Renderer implements AutoCloseable {
      */
     public OverlayImage captureViewport() {
         requireOpen();
-        context.makeCurrent();
+        surface.activate();
+        RenderSurfaceSize surfaceSize = surface.size();
         int x = customViewport ? viewportX : 0;
         int y = customViewport ? viewportY : 0;
-        int width = customViewport ? viewportWidth : context.framebufferWidth();
-        int height = customViewport ? viewportHeight : context.framebufferHeight();
+        int width = customViewport ? viewportWidth : surfaceSize.framebufferWidth();
+        int height = customViewport ? viewportHeight : surfaceSize.framebufferHeight();
         long byteCount = (long) width * height * 4L;
         if (byteCount > Integer.MAX_VALUE) {
             throw new IllegalStateException(
@@ -492,7 +538,7 @@ public final class Renderer implements AutoCloseable {
      */
     public void setClearColor(Color color, float alpha) {
         requireOpen();
-        context.makeCurrent();
+        surface.activate();
         Color validColor = Objects.requireNonNull(color, "color");
         float validAlpha = Preconditions.requireUnitInterval(alpha, "alpha");
         clearColor = validColor;
@@ -553,7 +599,7 @@ public final class Renderer implements AutoCloseable {
      */
     public RendererInfo info() {
         requireOpen();
-        context.makeCurrent();
+        surface.activate();
         return info;
     }
 
@@ -566,14 +612,15 @@ public final class Renderer implements AutoCloseable {
         return closed;
     }
 
-    /** Releases all context-local GPU resources and the exclusive window claim. */
+    /** Releases all context-local GPU resources and the exclusive surface access. */
     @Override
     public void close() {
         if (closed) {
             return;
         }
-        context.makeCurrent();
+        @Nullable Throwable failure = null;
         try {
+            surface.activate();
             closeCachedResources();
             closeBuiltInPrograms();
             closeRenderTargets();
@@ -587,9 +634,12 @@ public final class Renderer implements AutoCloseable {
             resources.setActiveMorphResources(0);
             resources.setActiveShadowMaps(0);
             resources.setProgramCount(0);
-            closed = true;
+        } catch (RuntimeException exception) {
+            failure = exception;
+            throw exception;
         } finally {
-            WindowContextRegistry.release(window, context);
+            closed = true;
+            releaseAfterFailure(surface, failure);
         }
     }
 
@@ -1195,11 +1245,8 @@ public final class Renderer implements AutoCloseable {
 
     /** Binds current morph data and uploads it to the basic program. */
     private void uploadMorphing(BasicProgram program, RenderItem item) {
-        if (!(item.object() instanceof Mesh)) {
-            program.uploadMorphing(false, 0, 0, false);
-            return;
-        }
-        MorphResources.Binding binding = bindMorphResources(item);
+        MorphResources.Binding binding =
+                item.object() instanceof Mesh ? bindMorphResources(item) : morphResources.bindDisabled();
         program.uploadMorphing(
                 binding.enabled(), binding.targetCount(), binding.vertexCount(), binding.instanceWeights());
     }

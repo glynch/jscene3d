@@ -11,7 +11,11 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.joml.Math.toRadians;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL11.glReadPixels;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL31.GL_TEXTURE_BINDING_BUFFER;
 
 import io.github.glynch.jscene3d.cameras.OrthographicCamera;
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
@@ -64,6 +68,7 @@ import io.github.glynch.jscene3d.objects.SkinnedMesh;
 import io.github.glynch.jscene3d.platform.VerticalSync;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.platform.WindowOptions;
+import io.github.glynch.jscene3d.render.internal.resources.MorphResources;
 import io.github.glynch.jscene3d.scenes.Scene;
 import io.github.glynch.jscene3d.textures.EnvironmentMap;
 import io.github.glynch.jscene3d.textures.Texture;
@@ -378,6 +383,8 @@ final class RendererIT {
 
             renderer.render(scene, camera);
             assertCenterPixelIsRed(window);
+            assertThat(textureBufferBinding(MorphResources.TARGET_TEXTURE_UNIT)).isNotZero();
+            assertThat(textureBufferBinding(MorphResources.WEIGHT_TEXTURE_UNIT)).isNotZero();
 
             billboard.setAlignment(BillboardAlignment.CYLINDRICAL);
             renderer.render(scene, camera);
@@ -2103,6 +2110,14 @@ final class RendererIT {
 
     private static void assertCenterPixelIsRed(Window window) {
         assertPixelIsRed(window.framebufferWidth() / 2, window.framebufferHeight() / 2);
+    }
+
+    /** Returns the texture-buffer object bound to one combined texture unit. */
+    private static int textureBufferBinding(int textureUnit) {
+        glActiveTexture(GL_TEXTURE0 + textureUnit);
+        int binding = glGetInteger(GL_TEXTURE_BINDING_BUFFER);
+        glActiveTexture(GL_TEXTURE0);
+        return binding;
     }
 
     private static void assertCenterPixelIsNormalizedRed(Window window) {

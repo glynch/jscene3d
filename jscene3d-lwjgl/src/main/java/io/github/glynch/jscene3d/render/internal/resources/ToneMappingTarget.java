@@ -89,18 +89,23 @@ public final class ToneMappingTarget implements AutoCloseable {
     }
 
     /**
-     * Resolves multisampling when needed and presents the ACES-mapped image.
-     *
-     * @param program tone-mapping presentation program
-     * @param exposure positive linear exposure multiplier
+     * Resolves multisampling into the texture sampled by the presentation pass.
      */
-    public void present(ToneMappingProgram program, float exposure) {
+    public void resolve() {
         if (sampleCount > 1) {
             glBindFramebuffer(GL_READ_FRAMEBUFFER, sceneFramebuffer);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolvedFramebuffer);
             glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    /**
+     * Presents the ACES-mapped image into the framebuffer already bound by the host surface.
+     *
+     * @param program tone-mapping presentation program
+     * @param exposure positive linear exposure multiplier
+     */
+    public void present(ToneMappingProgram program, float exposure) {
         glViewport(0, 0, width, height);
         glDisable(GL_BLEND);
         glDisable(GL_CULL_FACE);
@@ -113,11 +118,6 @@ public final class ToneMappingTarget implements AutoCloseable {
         glBindVertexArray(vertexArray);
         glDrawArrays(PrimitiveTopology.TRIANGLES.openGlMode(), 0, 3);
         glBindVertexArray(0);
-    }
-
-    /** Restores the default framebuffer when scene rendering aborts before presentation. */
-    public void cancel() {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     /** Deletes all framebuffer, renderbuffer, texture, and vertex-array names. */

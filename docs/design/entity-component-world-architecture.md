@@ -1066,20 +1066,28 @@ construction is not a second runtime composition model.
 The visual editor is a native JavaFX application. JavaFX owns the editor shell,
 including its menus, hierarchy, inspectors, asset browser, diagnostics, tabs,
 and layout. Its central viewport uses the actual JScene3D OpenGL renderer through
-a tested JavaFX/OpenGL bridge. The editor will not maintain a parallel WebGL,
-WebGPU, or Three.js renderer merely to display project content.
+OpenGLFX. The editor will not maintain a parallel WebGL, WebGPU, or Three.js
+renderer merely to display project content.
 
-The bridge implementation is selected only after a focused prototype proves
-representative JScene3D rendering, resizing, high-DPI behavior, input and focus,
-resource disposal, and packaged execution on the supported desktop platforms.
-That prototype also determines the smallest change needed to stop the renderer
-from assuming that every render target is a JScene3D-created GLFW window.
+The focused JavaFX/OpenGLFX prototype proved actual JScene3D rendering,
+physical and logical resizing, JavaFX-managed input and focus, ordered resource
+disposal, named-module execution, and a relocatable packaged macOS application.
+Other desktop platforms remain subject to equivalent qualification.
+
+`jscene3d-lwjgl` exposes `RenderSurface` as the renderer-host seam. Its adapter
+activates the host-owned context and correct presentation framebuffer, returns
+one consistent `RenderSurfaceSize`, and releases the renderer's exclusive access
+without destroying the surface or context. JScene3D's GLFW integration and the
+editor's OpenGLFX integration use separate adapters at that seam. The renderer
+owns GPU realizations; the host owns the window or control, context lifetime,
+frame scheduling, and final presentation. This contract also prevents renderer
+internals from assuming that presentation always targets framebuffer zero.
 
 The initial editor and preview runtime share one JVM and communicate through
 ordinary Java contracts. HTTP, JSON RPC, or gRPC is not introduced between
 them. A separately hosted preview process and an IPC protocol may be added later
 if crash isolation or hot restart provides enough value to justify that extra
-boundary. JavaFX and the OpenGL bridge are editor dependencies and are never
+boundary. JavaFX and OpenGLFX are editor dependencies and are never
 included in exported games unless a game explicitly uses them itself.
 
 ## Initial module seams

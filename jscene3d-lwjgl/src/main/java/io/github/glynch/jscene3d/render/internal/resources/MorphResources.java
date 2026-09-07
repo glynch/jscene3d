@@ -50,8 +50,7 @@ public final class MorphResources implements AutoCloseable {
      */
     public Binding bind(Mesh mesh) {
         if (mesh.morphTargetCount() == 0) {
-            defaults.bind();
-            return Binding.DISABLED;
+            return bindDisabled();
         }
         BufferGeometry geometry = mesh.geometry();
         MorphTargetResource targetResource = targets.computeIfAbsent(geometry, ignored -> new MorphTargetResource());
@@ -70,6 +69,16 @@ public final class MorphResources implements AutoCloseable {
                 instanceWeights,
                 targetUpload.count() + weightUpload.count(),
                 targetUpload.byteCount() + weightUpload.byteCount());
+    }
+
+    /**
+     * Binds complete fallback buffers for a draw that does not apply morph deformation.
+     *
+     * @return disabled morph layout
+     */
+    public Binding bindDisabled() {
+        defaults.bind();
+        return Binding.DISABLED;
     }
 
     /** Releases resources that were not used by either render pass this frame. */

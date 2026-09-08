@@ -54,6 +54,20 @@ final class InputMapTest {
     }
 
     @Test
+    void preservesACompleteButtonClickWithinOneInputPoll() {
+        InputMap map = InputMap.builder().bind(FIRE, MouseButton.LEFT).build();
+        FakeInput input = new FakeInput();
+        input.buttonsPressed.add(MouseButton.LEFT);
+        input.buttonsReleased.add(MouseButton.LEFT);
+
+        ActionSnapshot snapshot = map.sample(input, InputCapture.NONE);
+
+        assertThat(snapshot.isDown(FIRE)).isFalse();
+        assertThat(snapshot.wasPressed(FIRE)).isTrue();
+        assertThat(snapshot.wasReleased(FIRE)).isTrue();
+    }
+
+    @Test
     void suppressesOnlyInputOwnedByTheHostInterface() {
         InputMap map = InputMap.builder()
                 .bind(MOVE, Key.W)

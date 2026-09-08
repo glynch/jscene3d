@@ -114,7 +114,7 @@ public final class InputMap {
             InputCapture capture,
             ActionSnapshot.Builder snapshot) {
         boolean down = bindings.stream().anyMatch(binding -> binding.isDown(input, capture));
-        boolean pressed = down && bindings.stream().anyMatch(binding -> binding.wasPressed(input, capture));
+        boolean pressed = bindings.stream().anyMatch(binding -> binding.wasPressed(input, capture));
         boolean released = !down && bindings.stream().anyMatch(binding -> binding.wasReleased(input, capture));
         if (pressed) {
             snapshot.pressed(action);

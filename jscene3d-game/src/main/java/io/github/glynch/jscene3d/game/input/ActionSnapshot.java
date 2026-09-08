@@ -251,13 +251,15 @@ public final class ActionSnapshot {
         }
 
         /**
-         * Marks an action as newly released.
+         * Marks an action as newly released and no longer held.
          *
          * @param action released action
          * @return this builder
          */
         public Builder released(InputAction action) {
-            released.add(Objects.requireNonNull(action, "action"));
+            InputAction validAction = Objects.requireNonNull(action, "action");
+            released.add(validAction);
+            down.remove(validAction);
             return this;
         }
 

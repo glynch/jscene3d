@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.examples;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
 import io.github.glynch.jscene3d.project.component.ComponentType;
@@ -60,10 +61,10 @@ import java.util.logging.Logger;
 public final class WorldCompositionExample {
     private static final String EXTENSION_ID = "io.github.glynch.jscene3d.world-example";
     private static final AssetId WORLD_ID = AssetId.from("0fbb5faf-b309-4684-a24c-8dd2295bb483");
-    private static final ComponentId LABEL_COMPONENT = ComponentId.from("14b0558a-1f72-4773-a03c-af7001323f92");
     private static final ComponentId LABEL_LINK_COMPONENT = ComponentId.from("34d922c8-dd18-4d4c-8fd4-2a0daaa1cd08");
     private static final ComponentType LABEL_TYPE = ComponentType.of(EXTENSION_ID + "/label", 1);
     private static final ComponentType LABEL_LINK_TYPE = ComponentType.of(EXTENSION_ID + "/label-link", 1);
+    private static final CapabilityId LABEL_CAPABILITY = new CapabilityId(EXTENSION_ID + "/label-access");
     private static final RegisteredType LABEL_UPDATE_TYPE = new RegisteredType(EXTENSION_ID + "/label-update", 1);
     private static final PropertyId LABEL = new PropertyId("label");
     private static final PropertyId LABEL_TARGET = new PropertyId("label-target");
@@ -107,7 +108,7 @@ public final class WorldCompositionExample {
             world.advanceFrame(Duration.ofMillis(16L), 0.0F);
             for (Entity root : world.roots()) {
                 LabelComponent label =
-                        root.component(LABEL_COMPONENT, LabelComponent.class).orElseThrow();
+                        root.capability(LABEL_CAPABILITY, LabelComponent.class).orElseThrow();
                 LabelLinkComponent link = root.component(LABEL_LINK_COMPONENT, LabelLinkComponent.class)
                         .orElseThrow();
                 LOGGER.info(() -> root.id() + " " + root.name().orElse("unnamed") + " = " + label.value()
@@ -140,6 +141,7 @@ public final class WorldCompositionExample {
                 .properties(List.of(label))
                 .actions(List.of(EndpointDescriptor.withPayload(
                         LABEL_UPDATE_ACTION.value(), LABEL_UPDATE_TYPE, DescriptorPresentation.named("Update label"))))
+                .providedCapabilities(Set.of(LABEL_CAPABILITY))
                 .lifecycle(Set.of(
                         ComponentLifecycle.CREATED,
                         ComponentLifecycle.ACTIVATED,

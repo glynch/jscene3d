@@ -284,6 +284,13 @@ identity. General `getComponent(Class<?>)` lookup and nearest-ancestor searches
 are not the dependency model. A missing, conflicting, or ambiguous required
 dependency is a validation failure before activation.
 
+Runtime behavior may also query a capability on one exact live entity, for
+example when a collision identifies the entity whose player-resource capability
+should receive a pickup. The component descriptor remains the authority for
+which component provides that capability; the query never searches ancestors,
+descendants, or the wider world. Authored relationships which already know a
+specific participant continue to use stable entity or component identity.
+
 Required external contract values must be supplied. Optional values are valid
 only when the descriptor explicitly defines meaningful behavior for absence;
 the runtime never searches the hierarchy or world for a plausible replacement.

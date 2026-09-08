@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.runtime;
 
 import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import java.util.List;
@@ -127,6 +128,22 @@ public interface Entity {
      * @throws ClassCastException if the identified value has another Java type
      */
     <T> Optional<T> component(ComponentId component, Class<T> valueType);
+
+    /**
+     * Finds the component on this exact entity which declares one provided capability.
+     *
+     * <p>The safe component descriptor selects providers; {@code valueType} only verifies the caller's expected Java
+     * representation. This method never searches parents, children, or other world entities. Destroyed entities expose
+     * no capabilities.
+     *
+     * @param <T> expected runtime provider type
+     * @param capability stable semantic capability identity
+     * @param valueType expected Java representation
+     * @return provider value when exactly one component on this entity declares the capability
+     * @throws IllegalStateException if multiple components on this entity provide the capability
+     * @throws ClassCastException if the provider has another Java type
+     */
+    <T> Optional<T> capability(CapabilityId capability, Class<T> valueType);
 
     /**
      * Returns the world which exclusively owns this entity.

@@ -5,7 +5,9 @@
 package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentId;
+import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.EntityInstantiationKind;
@@ -34,6 +36,7 @@ final class InternalEntity implements Entity {
     private final @Nullable InternalEntity parent;
     private final List<Entity> children = new ArrayList<>();
     private final Map<ComponentId, Object> components = new LinkedHashMap<>();
+    private final Map<CapabilityId, List<Object>> capabilities = new LinkedHashMap<>();
     private boolean complete;
     private boolean pendingDestruction;
     private boolean destroyed;
@@ -129,6 +132,19 @@ final class InternalEntity implements Entity {
     }
 
     @Override
+    public <T> Optional<T> capability(CapabilityId capability, Class<T> valueType) {
+        CapabilityId validCapability = Objects.requireNonNull(capability, "capability");
+        List<Object> providers = capabilities.get(validCapability);
+        if (providers == null) {
+            return Optional.empty();
+        }
+        if (providers.size() != 1) {
+            throw new IllegalStateException("runtime capability is ambiguous on entity " + id + ": " + validCapability);
+        }
+        return Optional.of(Objects.requireNonNull(valueType, "valueType").cast(providers.getFirst()));
+    }
+
+    @Override
     public World world() {
         return world;
     }
@@ -150,12 +166,18 @@ final class InternalEntity implements Entity {
     }
 
     /** Adds one constructed component value before graph completion. */
-    void addComponent(ComponentId component, Object value) {
+    void addComponent(ComponentId component, ComponentTypeDescriptor descriptor, Object value) {
         requireIncomplete();
-        if (components.putIfAbsent(
-                        Objects.requireNonNull(component, "component"), Objects.requireNonNull(value, "value"))
-                != null) {
+        ComponentId validComponent = Objects.requireNonNull(component, "component");
+        ComponentTypeDescriptor validDescriptor = Objects.requireNonNull(descriptor, "descriptor");
+        Object validValue = Objects.requireNonNull(value, "value");
+        if (components.putIfAbsent(validComponent, validValue) != null) {
             throw new IllegalStateException("runtime component identity is duplicated: " + component);
+        }
+        for (CapabilityId capability : validDescriptor.providedCapabilities()) {
+            capabilities
+                    .computeIfAbsent(capability, ignored -> new ArrayList<>())
+                    .add(validValue);
         }
     }
 
@@ -220,6 +242,7 @@ final class InternalEntity implements Entity {
         enabled = false;
         children.clear();
         components.clear();
+        capabilities.clear();
     }
 
     /** Returns an authored identity path used only as a stable scheduling tie-breaker. */

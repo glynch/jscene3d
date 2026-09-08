@@ -95,7 +95,7 @@ final class RuntimeComponentConstructor {
             requireReferenceSupport(plan, bindsReferences, value);
             boolean bindsEndpoints = declaresEndpoints(descriptor);
             requireEndpointSupport(plan, bindsEndpoints, value);
-            plan.owner().addComponent(plan.definition().id(), value);
+            plan.owner().addComponent(plan.definition().id(), descriptor, value);
             plan.scope().bindComponent(plan.authoredEntity(), plan.definition().id(), value);
             if (bindsReferences && value instanceof ComponentReferenceBinder binder) {
                 bindings.add(new ComponentBindingEntry(plan, binder, properties));

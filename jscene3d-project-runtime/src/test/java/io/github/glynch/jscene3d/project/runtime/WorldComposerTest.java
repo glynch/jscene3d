@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
+import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentMultiplicity;
@@ -61,6 +62,8 @@ final class WorldComposerTest {
     private static final EntityId SECOND_PLACEMENT = EntityId.from("45ac2b84-af14-4c37-9881-4cc377ba36bd");
     private static final ComponentId VALUE_COMPONENT = ComponentId.from("f00d1dcf-a908-45a0-855c-21e55dfef9fc");
     private static final ComponentType VALUE_TYPE = ComponentType.of("example.game/value", 1);
+    private static final CapabilityId VALUE_CAPABILITY = new CapabilityId("example.game/value-access");
+    private static final CapabilityId MISSING_CAPABILITY = new CapabilityId("example.game/missing");
     private static final PropertyId VALUE = new PropertyId("value");
 
     private static final RuntimeResourceProvider NO_RESOURCES = new RuntimeResourceProvider() {
@@ -156,6 +159,65 @@ final class WorldComposerTest {
         assertThat(runtimeChild.isEnabled()).isFalse();
         assertThat(world.find(runtimeChild.id())).containsSame(runtimeChild);
         assertThat(runtimeChild.component(VALUE_COMPONENT, Object.class)).isEmpty();
+    }
+
+    /** Resolves one runtime provider from safe descriptor metadata on the exact entity only. */
+    @Test
+    void resolvesDescriptorDeclaredCapabilityOnExactEntity() throws IOException {
+        LocalEntity child = new LocalEntity(DEFINITION_CHILD, true, List.of(), List.of());
+        LocalEntity root = new LocalEntity(LOCAL_ROOT, true, List.of(component("1")), List.of(child));
+        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Capability world", List.of(root));
+        World world = compose(definition, capableDescriptor(ComponentMultiplicity.SINGLE), new RecordingFactory())
+                .world()
+                .orElseThrow();
+        Entity runtimeRoot = world.roots().getFirst();
+        Entity runtimeChild = runtimeRoot.children().getFirst();
+        RecordedComponent component =
+                runtimeRoot.component(VALUE_COMPONENT, RecordedComponent.class).orElseThrow();
+
+        assertThat(runtimeRoot.capability(VALUE_CAPABILITY, RecordedComponent.class))
+                .containsSame(component);
+        assertThat(runtimeRoot.capability(MISSING_CAPABILITY, RecordedComponent.class))
+                .isEmpty();
+        assertThat(runtimeChild.capability(VALUE_CAPABILITY, RecordedComponent.class))
+                .isEmpty();
+    }
+
+    /** Rejects runtime capability lookup when safe descriptors name multiple providers on one entity. */
+    @Test
+    void rejectsAmbiguousRuntimeCapability() throws IOException {
+        LocalEntity root = new LocalEntity(
+                LOCAL_ROOT,
+                true,
+                List.of(
+                        component("81411df2-a65c-449b-9611-1ec68dc5a722", "1"),
+                        component("0d6d3e6e-a2ab-49c5-9b04-bcb261341f39", "2")),
+                List.of());
+        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Ambiguous capability world", List.of(root));
+        World world = compose(definition, capableDescriptor(ComponentMultiplicity.MULTIPLE), new RecordingFactory())
+                .world()
+                .orElseThrow();
+        Entity runtimeRoot = world.roots().getFirst();
+
+        assertThatThrownBy(() -> runtimeRoot.capability(VALUE_CAPABILITY, RecordedComponent.class))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ambiguous", VALUE_CAPABILITY.toString());
+    }
+
+    /** Removes descriptor-declared capability providers when their entity is destroyed. */
+    @Test
+    void removesRuntimeCapabilitiesOnDestruction() throws IOException {
+        World world = compose(
+                        worldWithComponent(), capableDescriptor(ComponentMultiplicity.SINGLE), new RecordingFactory())
+                .world()
+                .orElseThrow();
+        Entity root = world.roots().getFirst();
+        world.activate();
+
+        world.destroy(root);
+
+        assertThat(root.isDestroyed()).isTrue();
+        assertThat(root.capability(VALUE_CAPABILITY, RecordedComponent.class)).isEmpty();
     }
 
     /** Closes successful worlds once and releases component values in reverse construction order. */
@@ -817,6 +879,17 @@ final class WorldComposerTest {
 
     /** Creates a value component descriptor with configurable per-entity multiplicity. */
     private static ComponentTypeDescriptor descriptor(ComponentMultiplicity multiplicity) {
+        return descriptor(multiplicity, Set.of());
+    }
+
+    /** Creates a value component descriptor providing the fixture's semantic capability. */
+    private static ComponentTypeDescriptor capableDescriptor(ComponentMultiplicity multiplicity) {
+        return descriptor(multiplicity, Set.of(VALUE_CAPABILITY));
+    }
+
+    /** Creates a value descriptor with configurable multiplicity and provided capabilities. */
+    private static ComponentTypeDescriptor descriptor(
+            ComponentMultiplicity multiplicity, Set<CapabilityId> providedCapabilities) {
         PropertyDescriptor property = PropertyDescriptor.optionalWithDefault(
                 VALUE.value(),
                 ProjectValueKind.NUMBER,
@@ -826,6 +899,7 @@ final class WorldComposerTest {
                 Set.of());
         return ComponentTypeDescriptor.builder(VALUE_TYPE, DescriptorPresentation.named("Value"))
                 .properties(List.of(property))
+                .providedCapabilities(providedCapabilities)
                 .multiplicity(multiplicity)
                 .build();
     }

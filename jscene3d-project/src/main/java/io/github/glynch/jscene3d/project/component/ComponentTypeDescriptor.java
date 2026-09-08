@@ -121,7 +121,7 @@ public final class ComponentTypeDescriptor {
     }
 
     /**
-     * Returns capabilities supplied to sibling components.
+     * Returns semantic capabilities supplied by component instances.
      *
      * @return immutable provided-capability set
      */

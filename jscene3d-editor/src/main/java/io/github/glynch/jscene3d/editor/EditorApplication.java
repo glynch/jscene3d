@@ -7,6 +7,9 @@ package io.github.glynch.jscene3d.editor;
 import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
+import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import java.io.File;
+import java.nio.file.Path;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -16,7 +19,11 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Slider;
 import javafx.scene.control.SplitPane;
@@ -28,6 +35,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.jspecify.annotations.Nullable;
@@ -35,6 +43,10 @@ import org.jspecify.annotations.Nullable;
 /** Production JavaFX shell for the JScene3D visual editor. */
 public final class EditorApplication extends Application {
     private final ViewportInteraction interaction;
+    private final EditorProjectLoader projectLoader;
+    private final TreeView<EditorHierarchyNode> hierarchy;
+    private final ListView<EditorAssetItem> assets;
+    private final ListView<ProjectDiagnostic> diagnostics;
 
     private @Nullable GLCanvas canvas;
     private double previousPointerX;
@@ -44,6 +56,11 @@ public final class EditorApplication extends Application {
     /** Creates an application instance whose stage is initialized later by JavaFX. */
     public EditorApplication() {
         interaction = new ViewportInteraction();
+        projectLoader =
+                new EditorProjectLoader(EditorBuildInfo.engineVersion(), EditorApplication.class.getClassLoader());
+        hierarchy = new TreeView<>();
+        assets = new ListView<>();
+        diagnostics = new ListView<>();
     }
 
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
@@ -57,11 +74,11 @@ public final class EditorApplication extends Application {
         installViewportEvents(viewportCanvas, controller);
 
         BorderPane root = new BorderPane();
-        root.setTop(createToolbar(viewportCanvas, controller));
+        root.setTop(createTopControls(stage, viewportCanvas, controller, status));
         root.setLeft(createNavigation());
         root.setCenter(createViewportPane(viewportCanvas));
         root.setRight(createInspector());
-        root.setBottom(status);
+        root.setBottom(createDiagnosticsPane(status));
         root.setStyle("-fx-base: #252a30; -fx-background-color: #1b2026;");
 
         stage.setTitle("JScene3D Editor");
@@ -73,6 +90,7 @@ public final class EditorApplication extends Application {
             disposeCanvas();
         });
         stage.show();
+        loadCommandLineProject(stage, status);
         viewportCanvas.requestFocus();
         scheduleAutomaticClose();
     }
@@ -136,8 +154,15 @@ public final class EditorApplication extends Application {
         });
     }
 
-    /** Creates ordinary JavaFX toolbar controls that drive the temporary preview. */
-    private ToolBar createToolbar(GLCanvas viewportCanvas, ViewportController controller) {
+    /** Creates the application menu and ordinary JavaFX viewport controls. */
+    private VBox createTopControls(Stage stage, GLCanvas viewportCanvas, ViewportController controller, Label status) {
+        MenuItem openProject = new MenuItem("Open Project…");
+        openProject.setOnAction(ignored -> chooseProject(stage, status));
+        Menu file = new Menu("File");
+        file.getItems().add(openProject);
+
+        Button openButton = new Button("Open Project…");
+        openButton.setOnAction(ignored -> chooseProject(stage, status));
         Button reset = new Button("Reset orientation");
         reset.setOnAction(ignored -> {
             interaction.requestReset();
@@ -151,11 +176,13 @@ public final class EditorApplication extends Application {
         speed.valueProperty()
                 .addListener((ignored, oldValue, value) -> interaction.setRotationSpeed(value.floatValue()));
         controller.setAnimationControl(animate);
-        return new ToolBar(reset, new Separator(), animate, new Label("Rotation speed"), speed);
+        ToolBar toolbar = new ToolBar(
+                openButton, new Separator(), reset, new Separator(), animate, new Label("Rotation speed"), speed);
+        return new VBox(new MenuBar(file), toolbar);
     }
 
-    /** Creates placeholder hierarchy and asset-browser regions for later editor slices. */
-    private static SplitPane createNavigation() {
+    /** Creates hierarchy and asset-browser regions backed by the opened project session. */
+    private SplitPane createNavigation() {
         SplitPane navigation = new SplitPane(createHierarchy(), createAssetBrowser());
         navigation.setOrientation(Orientation.VERTICAL);
         navigation.setDividerPositions(0.58);
@@ -163,20 +190,14 @@ public final class EditorApplication extends Application {
         return navigation;
     }
 
-    /** Creates a hierarchy that explicitly represents only the temporary preview scene. */
-    private static VBox createHierarchy() {
-        TreeItem<String> preview = new TreeItem<>("Preview scene");
-        preview.getChildren().add(new TreeItem<>("Three-box model"));
-        preview.getChildren().add(new TreeItem<>("Perspective camera"));
-        preview.setExpanded(true);
-        TreeView<String> hierarchy = new TreeView<>(preview);
+    /** Creates the initially empty authored hierarchy view. */
+    private VBox createHierarchy() {
         VBox.setVgrow(hierarchy, Priority.ALWAYS);
         return new VBox(6.0, new Label("Hierarchy"), hierarchy);
     }
 
-    /** Creates an asset-browser placeholder without inventing an editor document model. */
-    private static VBox createAssetBrowser() {
-        ListView<String> assets = new ListView<>();
+    /** Creates the initially empty asset browser. */
+    private VBox createAssetBrowser() {
         assets.setPlaceholder(new Label("Open a project to browse its assets"));
         VBox.setVgrow(assets, Priority.ALWAYS);
         return new VBox(6.0, new Label("Assets"), assets);
@@ -204,6 +225,70 @@ public final class EditorApplication extends Application {
         inspector.setPrefWidth(250.0);
         VBox.setVgrow(inspector, Priority.ALWAYS);
         return inspector;
+    }
+
+    /** Creates a compact status and structured-diagnostics region. */
+    private VBox createDiagnosticsPane(Label status) {
+        diagnostics.setPlaceholder(new Label("No project diagnostics"));
+        diagnostics.setCellFactory(ignored -> new DiagnosticCell());
+        diagnostics.setPrefHeight(105.0);
+        diagnostics.setMinHeight(72.0);
+        VBox pane = new VBox(4.0, status, new Label("Diagnostics"), diagnostics);
+        pane.setPadding(new Insets(0.0, 8.0, 8.0, 8.0));
+        return pane;
+    }
+
+    /** Opens the directory chooser and loads the selected project without starting it. */
+    private void chooseProject(Stage stage, Label status) {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Open JScene3D Project");
+        @Nullable File directory = chooser.showDialog(stage);
+        if (directory != null) {
+            openProject(stage, status, directory.toPath());
+        }
+    }
+
+    /** Loads the optional first unnamed command-line argument as a project directory. */
+    private void loadCommandLineProject(Stage stage, Label status) {
+        if (!getParameters().getUnnamed().isEmpty()) {
+            openProject(stage, status, Path.of(getParameters().getUnnamed().getFirst()));
+        }
+    }
+
+    /** Replaces the current editor session with data loaded from one directory. */
+    private void openProject(Stage stage, Label status, Path directory) {
+        status.setText("Opening " + directory.toAbsolutePath().normalize());
+        EditorProjectLoadResult result = projectLoader.load(directory);
+        diagnostics.getItems().setAll(result.diagnostics());
+        if (result.session().isEmpty()) {
+            hierarchy.setRoot(null);
+            assets.getItems().clear();
+            status.setText("Project could not be opened — see diagnostics");
+            return;
+        }
+        EditorProjectSession session = result.session().orElseThrow();
+        TreeItem<EditorHierarchyNode> root = createTreeItem(session.hierarchy());
+        root.setExpanded(true);
+        hierarchy.setRoot(root);
+        assets.getItems().setAll(session.assets());
+        stage.setTitle(session.project().identity().name() + " — JScene3D Editor");
+        long errors = result.diagnostics().stream()
+                .filter(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR)
+                .count();
+        status.setText("Opened " + session.project().identity().name() + " — "
+                + session.hierarchy().children().size() + " root entities, "
+                + session.assets().size()
+                + " assets, " + errors + " errors");
+    }
+
+    /** Converts one immutable hierarchy projection into JavaFX tree items. */
+    private static TreeItem<EditorHierarchyNode> createTreeItem(EditorHierarchyNode node) {
+        TreeItem<EditorHierarchyNode> item = new TreeItem<>(node);
+        item.getChildren()
+                .setAll(node.children().stream()
+                        .map(EditorApplication::createTreeItem)
+                        .toList());
+        return item;
     }
 
     /** Optionally closes automated smoke runs while leaving ordinary launches interactive. */
@@ -236,5 +321,26 @@ public final class EditorApplication extends Application {
         stage.setOnCloseRequest(null);
         stage.close();
         Platform.exit();
+    }
+
+    /** Formats structured project diagnostics without discarding their stable code or source. */
+    private static final class DiagnosticCell extends ListCell<ProjectDiagnostic> {
+        @Override
+        protected void updateItem(@Nullable ProjectDiagnostic diagnostic, boolean empty) {
+            super.updateItem(diagnostic, empty);
+            if (empty || diagnostic == null) {
+                setText(null);
+                setStyle("");
+                return;
+            }
+            String location = diagnostic.location().isEmpty() ? "" : diagnostic.location();
+            String detail = diagnostic.details().getOrDefault("technicalDetail", diagnostic.message());
+            setText(diagnostic.severity() + "  " + diagnostic.code().code() + "  " + detail + "  —  "
+                    + diagnostic.source() + location);
+            setStyle(
+                    diagnostic.severity() == ProjectDiagnostic.Severity.ERROR
+                            ? "-fx-text-fill: #ff8a80;"
+                            : "-fx-text-fill: #ffd180;");
+        }
     }
 }

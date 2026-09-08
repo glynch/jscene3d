@@ -19,6 +19,18 @@
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-import</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-3d</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-physics</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-lwjgl</artifactId>
         </dependency>
         <dependency>
@@ -54,6 +66,24 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <configuration>
+                    <propertiesEncoding>UTF-8</propertiesEncoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
     <profiles>
         <profile>

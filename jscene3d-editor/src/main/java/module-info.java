@@ -5,6 +5,9 @@
 /** Native JavaFX visual editor for JScene3D projects. */
 module io.github.glynch.jscene3d.editor {
     requires io.github.glynch.jscene3d.lwjgl;
+    requires io.github.glynch.jscene3d.project.importing;
+    requires io.github.glynch.jscene3d.project.physics3d;
+    requires io.github.glynch.jscene3d.project.spatial3d;
     requires grapl.natives.core.macos;
     requires grapl.natives.gl.macos;
     requires javafx.controls;

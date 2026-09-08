@@ -12,13 +12,21 @@ import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.geometries.IndexBuffer;
 import io.github.glynch.jscene3d.materials.AlphaMode;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.MaterialSide;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
+import io.github.glynch.jscene3d.project.runtime.ResourceContent;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
+import io.github.glynch.jscene3d.textures.Texture;
+import io.github.glynch.jscene3d.textures.TextureColorSpace;
+import io.github.glynch.jscene3d.textures.TextureCoordinateOrigin;
+import io.github.glynch.jscene3d.textures.TextureFilter;
+import io.github.glynch.jscene3d.textures.TextureWrap;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -30,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 /** Exercises the complete version-one spatial resource storage boundary. */
@@ -111,6 +120,140 @@ final class Spatial3dResourceTest {
         source.close();
     }
 
+    /** Round-trips a shared texture and retains it for the lifetime of an unlit material resource. */
+    @Test
+    void roundTripsTextureBackedBasicMaterial() throws IOException {
+        byte opaque = (byte) 0xff;
+        Texture sourceTexture = Texture.baseColor(2, 1, new byte[] {opaque, 0, 0, opaque, 0, opaque, 0, opaque});
+        sourceTexture.setCoordinateOrigin(TextureCoordinateOrigin.TOP_LEFT);
+        sourceTexture.setHorizontalWrap(TextureWrap.REPEAT);
+        sourceTexture.setVerticalWrap(TextureWrap.MIRRORED_REPEAT);
+        sourceTexture.setMinificationFilter(TextureFilter.NEAREST_MIPMAP_NEAREST);
+        sourceTexture.setMagnificationFilter(TextureFilter.NEAREST);
+        ByteArrayOutputStream textureDefinitionOutput = new ByteArrayOutputStream();
+        ByteArrayOutputStream texturePayloadOutput = new ByteArrayOutputStream();
+        ResourceReference texturePayload = ResourceReference.imported("model/payloads/checker.rgba8");
+        Spatial3dResourceWriter.writeTexture(
+                textureDefinitionOutput, texturePayloadOutput, sourceTexture, texturePayload);
+
+        Texture3dResource textureResource = textureLoader()
+                .load(
+                        textureDefinition(texturePayload),
+                        reference -> new ByteArrayInputStream(texturePayloadOutput.toByteArray()));
+        BasicMaterial sourceMaterial = new BasicMaterial(Color.linear(0.25F, 0.5F, 0.75F));
+        sourceMaterial.setColorMap(sourceTexture);
+        sourceMaterial.setAlphaMode(AlphaMode.MASK);
+        ByteArrayOutputStream materialOutput = new ByteArrayOutputStream();
+        ResourceReference textureReference = ResourceReference.imported("model/resources/checker");
+        Spatial3dResourceWriter.writeBasicMaterial(materialOutput, sourceMaterial, textureReference);
+        AtomicBoolean released = new AtomicBoolean();
+
+        Material3dResource materialResource = basicMaterialLoader()
+                .load(basicMaterialDefinition(textureReference), new ResourceContentStub(textureResource, released));
+        BasicMaterial loadedMaterial = (BasicMaterial) materialResource.material();
+
+        assertThat(new String(textureDefinitionOutput.toByteArray(), StandardCharsets.UTF_8))
+                .contains("rgba8-texture-resource", "\"horizontal-wrap\" : \"repeat\"");
+        assertThat(textureResource.texture().width()).isEqualTo(2);
+        assertThat(textureResource.texture().coordinateOrigin()).isEqualTo(TextureCoordinateOrigin.TOP_LEFT);
+        assertThat(new String(materialOutput.toByteArray(), StandardCharsets.UTF_8))
+                .contains("basic-material-resource", "\"$ref\" : \"import:model/resources/checker\"");
+        assertThat(loadedMaterial.color()).isEqualTo(sourceMaterial.color());
+        assertThat(loadedMaterial.alphaMode()).isEqualTo(AlphaMode.MASK);
+        assertThat(loadedMaterial.colorMap()).containsSame(textureResource.texture());
+        materialResource.close();
+        assertThat(released).isTrue();
+        assertThat(textureResource.isClosed()).isTrue();
+        sourceMaterial.close();
+        sourceTexture.close();
+    }
+
+    /** Round-trips an unlit material which deliberately has no texture dependency. */
+    @Test
+    void roundTripsTextureFreeBasicMaterial() throws IOException {
+        BasicMaterial source = new BasicMaterial(Color.linear(0.2F, 0.4F, 0.6F));
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        Spatial3dResourceWriter.writeBasicMaterial(output, source);
+        ResourceDefinition definition = basicMaterialDefinition();
+
+        Material3dResource resource = basicMaterialLoader().load(definition, reference -> {
+            throw new AssertionError("texture-free material must not acquire content");
+        });
+        BasicMaterial loaded = (BasicMaterial) resource.material();
+
+        assertThat(new String(output.toByteArray(), StandardCharsets.UTF_8)).doesNotContain("color-map");
+        assertThat(loaded.colorMap()).isEmpty();
+        resource.close();
+        source.close();
+    }
+
+    /** Enforces texture and basic-material writer preconditions without leaking their inputs. */
+    @Test
+    void rejectsMismatchedBasicMaterialTextureReferences() {
+        Texture texture = Texture.baseColor(1, 1, new byte[] {0, 0, 0, (byte) 0xff});
+        BasicMaterial textured = new BasicMaterial();
+        textured.setColorMap(texture);
+        BasicMaterial textureFree = new BasicMaterial();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ResourceReference reference = ResourceReference.imported("model/resources/checker");
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> Spatial3dResourceWriter.writeBasicMaterial(output, textured))
+                .withMessageContaining("color-map reference is required");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> Spatial3dResourceWriter.writeBasicMaterial(output, textureFree, reference))
+                .withMessageContaining("must have a color map");
+
+        textured.close();
+        textureFree.close();
+        texture.close();
+    }
+
+    /** Reconstructs linear texture data and enforces terminal texture-resource ownership. */
+    @Test
+    void loadsLinearTextureAndEnforcesOwnership() throws IOException {
+        ResourceReference payload = ResourceReference.imported("model/payloads/data.rgba8");
+        ResourceDefinition definition = textureDefinition(payload, 1, 1, "linear");
+        byte[] pixels = new byte[] {1, 2, 3, 4};
+
+        Texture3dResource resource = textureLoader().load(definition, reference -> new ByteArrayInputStream(pixels));
+
+        Texture loaded = resource.texture();
+        assertThat(loaded.colorSpace()).isEqualTo(TextureColorSpace.LINEAR);
+        resource.close();
+        resource.close();
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> Texture3dResource.owning(loaded))
+                .withMessageContaining("must be open");
+        assertThatThrownBy(resource::texture)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("closed");
+    }
+
+    /** Rejects malformed texture documents and pixel envelopes before publishing runtime state. */
+    @Test
+    void rejectsInvalidTextureContent() {
+        ResourceReference payload = ResourceReference.imported("model/payloads/data.rgba8");
+        ResourceDefinition wrongPayload = withTextureProperty("payload", new ProjectValue.TextValue("wrong"));
+        ResourceDefinition shortPayload = textureDefinition(payload, 1, 1, "srgb");
+        ResourceDefinition longPayload = textureDefinition(payload, 1, 1, "srgb");
+        ResourceDefinition oversized = textureDefinition(payload, 30_000, 30_000, "srgb");
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> textureLoader().load(wrongPayload, reference -> InputStreamStub.EMPTY))
+                .withMessageContaining("payload must be a reference");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> textureLoader().load(shortPayload, reference -> InputStreamStub.EMPTY))
+                .withMessageContaining("length must be 4 bytes");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> textureLoader()
+                        .load(longPayload, reference -> new ByteArrayInputStream(new byte[] {1, 2, 3, 4, 5})))
+                .withMessageContaining("length must be 4 bytes");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> textureLoader().load(oversized, reference -> InputStreamStub.EMPTY))
+                .withMessageContaining("too large");
+    }
+
     /** Rejects unsupported mesh format features and corrupt payload envelopes. */
     @Test
     void rejectsUnsupportedAndInvalidMeshContent() throws IOException {
@@ -139,10 +282,18 @@ final class Spatial3dResourceTest {
     void describesSpatialResources() {
         assertThat(Spatial3dResourceLoaders.all())
                 .extracting(RuntimeResourceLoader::type)
-                .containsExactly(Spatial3dDescriptors.meshResourceType(), Spatial3dDescriptors.materialResourceType());
+                .containsExactly(
+                        Spatial3dDescriptors.meshResourceType(),
+                        Spatial3dDescriptors.materialResourceType(),
+                        Spatial3dDescriptors.textureResourceType(),
+                        Spatial3dDescriptors.basicMaterialResourceType());
         assertThat(Spatial3dDescriptors.extensionDescriptor().types())
                 .extracting(descriptor -> descriptor.type())
-                .containsExactly(Spatial3dDescriptors.meshResourceType(), Spatial3dDescriptors.materialResourceType());
+                .containsExactly(
+                        Spatial3dDescriptors.meshResourceType(),
+                        Spatial3dDescriptors.materialResourceType(),
+                        Spatial3dDescriptors.textureResourceType(),
+                        Spatial3dDescriptors.basicMaterialResourceType());
         assertThat(Spatial3dDescriptors.extensionDescriptor().types().getFirst().properties())
                 .containsOnlyKeys("payload");
     }
@@ -161,6 +312,20 @@ final class Spatial3dResourceTest {
                 Spatial3dResourceLoaders.all().get(1);
     }
 
+    /** Returns the typed texture loader from the public heterogeneous collection. */
+    @SuppressWarnings("unchecked")
+    private static RuntimeResourceLoader<Texture3dResource> textureLoader() {
+        return (RuntimeResourceLoader<Texture3dResource>)
+                Spatial3dResourceLoaders.all().get(2);
+    }
+
+    /** Returns the typed basic-material loader from the public heterogeneous collection. */
+    @SuppressWarnings("unchecked")
+    private static RuntimeResourceLoader<Material3dResource> basicMaterialLoader() {
+        return (RuntimeResourceLoader<Material3dResource>)
+                Spatial3dResourceLoaders.all().get(3);
+    }
+
     /** Builds all properties normally reconstructed from the canonical material document. */
     private static ResourceDefinition materialDefinition() {
         Map<String, ProjectValue> values = new LinkedHashMap<>();
@@ -176,6 +341,70 @@ final class Spatial3dResourceTest {
         values.put("vertex-colors", new ProjectValue.BooleanValue(true));
         return new ResourceDefinition(
                 URI.create("import:model/resources/material"), Spatial3dDescriptors.materialResourceType(), values);
+    }
+
+    /** Builds one exact texture definition matching the generated payload. */
+    private static ResourceDefinition textureDefinition(ResourceReference payload) {
+        return textureDefinition(payload, 2, 1, "srgb");
+    }
+
+    /** Builds one texture definition with caller-selected image metadata. */
+    private static ResourceDefinition textureDefinition(
+            ResourceReference payload, int width, int height, String colorSpace) {
+        Map<String, ProjectValue> values = new LinkedHashMap<>();
+        values.put("payload", new ProjectValue.ReferenceValue(payload));
+        values.put("width", number(width));
+        values.put("height", number(height));
+        values.put("color-space", new ProjectValue.TextValue(colorSpace));
+        values.put("minification-filter", new ProjectValue.TextValue("nearest-mipmap-nearest"));
+        values.put("magnification-filter", new ProjectValue.TextValue("nearest"));
+        values.put("horizontal-wrap", new ProjectValue.TextValue("repeat"));
+        values.put("vertical-wrap", new ProjectValue.TextValue("mirrored-repeat"));
+        values.put("coordinate-origin", new ProjectValue.TextValue("top-left"));
+        values.put("mipmap-mode", new ProjectValue.TextValue("generate"));
+        return new ResourceDefinition(
+                URI.create("import:model/resources/checker"), Spatial3dDescriptors.textureResourceType(), values);
+    }
+
+    /** Builds a valid texture definition with one caller-selected replacement property. */
+    private static ResourceDefinition withTextureProperty(String name, ProjectValue value) {
+        Map<String, ProjectValue> values =
+                new LinkedHashMap<>(textureDefinition(PAYLOAD).properties());
+        values.put(name, value);
+        return new ResourceDefinition(
+                URI.create("import:model/resources/checker"), Spatial3dDescriptors.textureResourceType(), values);
+    }
+
+    /** Builds one unlit material definition referencing the generated texture. */
+    private static ResourceDefinition basicMaterialDefinition(ResourceReference texture) {
+        Map<String, ProjectValue> values = basicMaterialProperties();
+        values.put("color-map", new ProjectValue.ReferenceValue(texture));
+        return basicMaterialDefinition(values);
+    }
+
+    /** Builds one texture-free unlit material definition. */
+    private static ResourceDefinition basicMaterialDefinition() {
+        return basicMaterialDefinition(basicMaterialProperties());
+    }
+
+    /** Builds the common unlit material properties. */
+    private static Map<String, ProjectValue> basicMaterialProperties() {
+        Map<String, ProjectValue> values = new LinkedHashMap<>();
+        values.put("color", numbers(0.25F, 0.5F, 0.75F));
+        values.put("opacity", number(1.0F));
+        values.put("alpha-mode", new ProjectValue.TextValue("mask"));
+        values.put("alpha-cutoff", number(0.5F));
+        values.put("side", new ProjectValue.TextValue("front"));
+        values.put("vertex-colors", new ProjectValue.BooleanValue(false));
+        return values;
+    }
+
+    /** Creates one material definition from already validated properties. */
+    private static ResourceDefinition basicMaterialDefinition(Map<String, ProjectValue> values) {
+        return new ResourceDefinition(
+                URI.create("import:model/resources/basic-material"),
+                Spatial3dDescriptors.basicMaterialResourceType(),
+                values);
     }
 
     /** Creates one portable number. */
@@ -199,6 +428,31 @@ final class Spatial3dResourceTest {
         /** Prevents construction. */
         private InputStreamStub() {
             throw new AssertionError("InputStreamStub cannot be instantiated");
+        }
+    }
+
+    /** Supplies one retained nested texture resource to the basic-material loader. */
+    private static final class ResourceContentStub implements ResourceContent {
+        private final Texture3dResource texture;
+        private final AtomicBoolean released;
+
+        /** Stores the nested resource and its observable lease-release state. */
+        private ResourceContentStub(Texture3dResource texture, AtomicBoolean released) {
+            this.texture = texture;
+            this.released = released;
+        }
+
+        @Override
+        public ByteArrayInputStream openPayload(ResourceReference reference) {
+            throw new AssertionError("basic material does not open payloads directly");
+        }
+
+        @Override
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+            return RuntimeResourceLease.of(valueType.cast(texture), () -> {
+                released.set(true);
+                texture.close();
+            });
         }
     }
 }

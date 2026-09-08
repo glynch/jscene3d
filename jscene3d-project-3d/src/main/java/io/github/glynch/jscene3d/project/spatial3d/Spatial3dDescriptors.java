@@ -35,6 +35,8 @@ public final class Spatial3dDescriptors {
     private static final ComponentType MESH_RENDERER_TYPE = type("mesh-renderer-3d");
     private static final RegisteredType MESH_RESOURCE_TYPE = resourceType("mesh-resource");
     private static final RegisteredType MATERIAL_RESOURCE_TYPE = resourceType("standard-material-resource");
+    private static final RegisteredType TEXTURE_RESOURCE_TYPE = resourceType("rgba8-texture-resource");
+    private static final RegisteredType BASIC_MATERIAL_RESOURCE_TYPE = resourceType("basic-material-resource");
 
     private static final CapabilityId SPATIAL_CAPABILITY = new CapabilityId(EXTENSION_ID + "/spatial-3d");
 
@@ -123,6 +125,24 @@ public final class Spatial3dDescriptors {
      */
     public static RegisteredType materialResourceType() {
         return MATERIAL_RESOURCE_TYPE;
+    }
+
+    /**
+     * Returns the exact version-one RGBA8 texture resource type.
+     *
+     * @return texture resource type
+     */
+    public static RegisteredType textureResourceType() {
+        return TEXTURE_RESOURCE_TYPE;
+    }
+
+    /**
+     * Returns the exact version-one unlit material resource type.
+     *
+     * @return basic-material resource type
+     */
+    public static RegisteredType basicMaterialResourceType() {
+        return BASIC_MATERIAL_RESOURCE_TYPE;
     }
 
     /**
@@ -267,7 +287,11 @@ public final class Spatial3dDescriptors {
                 "1.0.0",
                 ">=0.1.0 <0.2.0",
                 DescriptorPresentation.named("JScene3D 3D components"),
-                List.of(meshResourceDescriptor(), materialResourceDescriptor()),
+                List.of(
+                        meshResourceDescriptor(),
+                        materialResourceDescriptor(),
+                        textureResourceDescriptor(),
+                        basicMaterialResourceDescriptor()),
                 List.of(transformDescriptor(), cameraDescriptor(), lightDescriptor(), meshRendererDescriptor()));
     }
 
@@ -303,6 +327,74 @@ public final class Spatial3dDescriptors {
                         textProperty("side", "Side", "Front, back, or double", "front"),
                         booleanProperty(
                                 "vertex-colors", "Vertex colors", "Multiply by the geometry color attribute", false)));
+    }
+
+    /** Describes one raw RGBA8 image and its complete sampler state. */
+    private static RegisteredTypeDescriptor textureResourceDescriptor() {
+        return resourceDescriptor(
+                TEXTURE_RESOURCE_TYPE,
+                "RGBA8 texture resource",
+                "Immutable renderer-independent RGBA8 image and sampler",
+                List.of(
+                        PropertyDescriptor.required(
+                                PAYLOAD,
+                                ProjectValueKind.REFERENCE,
+                                DescriptorPresentation.described("Payload", "Raw RGBA8 pixel payload"),
+                                Map.of(),
+                                Set.of()),
+                        PropertyDescriptor.required(
+                                "width",
+                                ProjectValueKind.NUMBER,
+                                DescriptorPresentation.named("Width"),
+                                Map.of(),
+                                Set.of()),
+                        PropertyDescriptor.required(
+                                "height",
+                                ProjectValueKind.NUMBER,
+                                DescriptorPresentation.named("Height"),
+                                Map.of(),
+                                Set.of()),
+                        textProperty("color-space", "Color space", "sRGB or linear channel interpretation", "srgb"),
+                        textProperty(
+                                "minification-filter",
+                                "Minification filter",
+                                "Texture minification and mipmap filter",
+                                "linear-mipmap-linear"),
+                        textProperty(
+                                "magnification-filter",
+                                "Magnification filter",
+                                "Texture magnification filter",
+                                "linear"),
+                        textProperty("horizontal-wrap", "Horizontal wrap", "Horizontal address mode", "clamp-to-edge"),
+                        textProperty("vertical-wrap", "Vertical wrap", "Vertical address mode", "clamp-to-edge"),
+                        textProperty(
+                                "coordinate-origin",
+                                "Coordinate origin",
+                                "Image corner represented by texture coordinate zero",
+                                "bottom-left"),
+                        textProperty("mipmap-mode", "Mipmap mode", "Renderer mipmap generation policy", "generate")));
+    }
+
+    /** Describes one unlit material with an optional shared base-color texture. */
+    private static RegisteredTypeDescriptor basicMaterialResourceDescriptor() {
+        return resourceDescriptor(
+                BASIC_MATERIAL_RESOURCE_TYPE,
+                "Basic material resource",
+                "Immutable unlit material with an optional base-color texture",
+                List.of(
+                        arrayProperty("color", "Color", "Linear-sRGB base color", numbers(1.0F, 1.0F, 1.0F)),
+                        numberProperty("opacity", "Opacity", "Surface opacity", 1.0F),
+                        textProperty("alpha-mode", "Alpha mode", "Opaque, mask, or blend", "opaque"),
+                        numberProperty("alpha-cutoff", "Alpha cutoff", "Masked-alpha cutoff", 0.5F),
+                        textProperty("side", "Side", "Front, back, or double", "front"),
+                        booleanProperty(
+                                "vertex-colors", "Vertex colors", "Multiply by the geometry color attribute", false),
+                        PropertyDescriptor.optional(
+                                "color-map",
+                                ProjectValueKind.REFERENCE,
+                                DescriptorPresentation.described("Color map", "Shared RGBA8 texture resource"),
+                                Map.of(),
+                                Set.of())));
     }
 
     /** Creates one registered resource descriptor without executable endpoints. */

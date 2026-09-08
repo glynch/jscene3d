@@ -82,7 +82,7 @@ configuration.
 Beacon Garden establishes the generic architecture before Doomed Corridors is
 migrated. The Doomed Corridors sequence is then:
 
-1. Adapt the project manifest and asset catalog to reference the startup
+1. Replace the project manifest and asset catalog with references to the startup
    `WorldDefinition` and WAD import recipe.
 2. Publish `MAP01` through generated assets and a read-only map
    `EntityDefinition` where entity structure is appropriate.

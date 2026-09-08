@@ -19,4 +19,20 @@ public interface ResourceContent {
      * @throws IllegalArgumentException when the reference is unknown or does not identify readable content
      */
     InputStream openPayload(ResourceReference reference) throws IOException;
+
+    /**
+     * Acquires one nested runtime resource needed by the resource currently being loaded.
+     *
+     * <p>The caller owns and must close the returned lease. Resource providers which do not support nested resources
+     * retain the default failure, allowing payload-only test adapters to remain functional interfaces.
+     *
+     * @param <T> required runtime value type
+     * @param reference portable resource reference
+     * @param valueType required runtime Java type
+     * @return independently releasable lease retaining the nested resource
+     * @throws UnsupportedOperationException when this content adapter supports payloads only
+     */
+    default <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+        throw new UnsupportedOperationException("nested runtime resources are not supported");
+    }
 }

@@ -33,6 +33,7 @@ public final class Spatial3dDescriptors {
     private static final ComponentType PERSPECTIVE_CAMERA_TYPE = type("perspective-camera-3d");
     private static final ComponentType DIRECTIONAL_LIGHT_TYPE = type("directional-light-3d");
     private static final ComponentType MESH_RENDERER_TYPE = type("mesh-renderer-3d");
+    private static final ComponentType BILLBOARD_RENDERER_TYPE = type("billboard-renderer-3d");
     private static final RegisteredType MESH_RESOURCE_TYPE = resourceType("mesh-resource");
     private static final RegisteredType MATERIAL_RESOURCE_TYPE = resourceType("standard-material-resource");
     private static final RegisteredType TEXTURE_RESOURCE_TYPE = resourceType("rgba8-texture-resource");
@@ -53,6 +54,9 @@ public final class Spatial3dDescriptors {
     private static final PropertyId MESH = new PropertyId("mesh");
     private static final PropertyId MATERIAL = new PropertyId("material");
     private static final PropertyId VISIBLE = new PropertyId("visible");
+    private static final PropertyId SIZE = new PropertyId("size");
+    private static final PropertyId ANCHOR = new PropertyId("anchor");
+    private static final PropertyId ALIGNMENT = new PropertyId("alignment");
     private static final String PAYLOAD = "payload";
 
     private static final Set<ComponentLifecycle> PRESENTATION_LIFECYCLE =
@@ -107,6 +111,15 @@ public final class Spatial3dDescriptors {
      */
     public static ComponentType meshRendererType() {
         return MESH_RENDERER_TYPE;
+    }
+
+    /**
+     * Returns the exact version-one billboard-renderer component type.
+     *
+     * @return billboard-renderer component type
+     */
+    public static ComponentType billboardRendererType() {
+        return BILLBOARD_RENDERER_TYPE;
     }
 
     /**
@@ -272,6 +285,33 @@ public final class Spatial3dDescriptors {
     }
 
     /**
+     * Returns the billboard width-and-height property identity.
+     *
+     * @return billboard-size property identity
+     */
+    public static PropertyId sizeProperty() {
+        return SIZE;
+    }
+
+    /**
+     * Returns the normalized billboard-anchor property identity.
+     *
+     * @return billboard-anchor property identity
+     */
+    public static PropertyId anchorProperty() {
+        return ANCHOR;
+    }
+
+    /**
+     * Returns the billboard camera-alignment property identity.
+     *
+     * @return billboard-alignment property identity
+     */
+    public static PropertyId alignmentProperty() {
+        return ALIGNMENT;
+    }
+
+    /**
      * Returns safe immutable metadata for all built-in three-dimensional components.
      *
      * @return extension descriptor
@@ -292,7 +332,12 @@ public final class Spatial3dDescriptors {
                         materialResourceDescriptor(),
                         textureResourceDescriptor(),
                         basicMaterialResourceDescriptor()),
-                List.of(transformDescriptor(), cameraDescriptor(), lightDescriptor(), meshRendererDescriptor()));
+                List.of(
+                        transformDescriptor(),
+                        cameraDescriptor(),
+                        lightDescriptor(),
+                        meshRendererDescriptor(),
+                        billboardRendererDescriptor()));
     }
 
     /** Describes one geometry document referencing an opaque binary payload. */
@@ -460,6 +505,31 @@ public final class Spatial3dDescriptors {
                 .properties(List.of(
                         referenceProperty(MESH, "Mesh", "Immutable mesh resource"),
                         referenceProperty(MATERIAL, "Material", "Immutable material resource"),
+                        booleanProperty(VISIBLE, "Visible", "Local instance visibility", true)))
+                .multiplicity(ComponentMultiplicity.MULTIPLE)
+                .build();
+    }
+
+    /** Describes one camera-facing unlit rectangle backed by a shared material. */
+    private static ComponentTypeDescriptor billboardRendererDescriptor() {
+        return presentation(
+                        BILLBOARD_RENDERER_TYPE,
+                        "Billboard Renderer 3D",
+                        "Camera-facing rectangle with explicit world-space dimensions and anchor")
+                .properties(List.of(
+                        referenceProperty(MATERIAL, "Material", "Immutable unlit material resource"),
+                        vectorProperty(SIZE, "Size", "World-space width and height", numbers(1.0F, 1.0F), "vector2"),
+                        vectorProperty(
+                                ANCHOR,
+                                "Anchor",
+                                "Normalized point held at the entity transform",
+                                numbers(0.5F, 0.5F),
+                                "vector2"),
+                        textProperty(
+                                ALIGNMENT.value(),
+                                "Alignment",
+                                "Spherical or cylindrical camera alignment",
+                                "spherical"),
                         booleanProperty(VISIBLE, "Visible", "Local instance visibility", true)))
                 .multiplicity(ComponentMultiplicity.MULTIPLE)
                 .build();

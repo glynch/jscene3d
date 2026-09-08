@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.spatial3d;
 
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.BillboardAlignment;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.World;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.joml.Quaternionfc;
+import org.joml.Vector2fc;
 import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 
@@ -108,6 +110,22 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     }
 
     @Override
+    public BillboardRenderer3d createBillboardRenderer(
+            Entity owner,
+            Material3dResource material,
+            Vector2fc size,
+            Vector2fc anchor,
+            BillboardAlignment alignment,
+            boolean visible) {
+        Entity validOwner = requireOwner(owner);
+        Object3dBillboardRenderer renderer = new Object3dBillboardRenderer(
+                this, validOwner, Objects.requireNonNull(material, "material"), size, anchor, alignment, visible);
+        node(validOwner).add(renderer.renderable());
+        registrations.add(renderer);
+        return renderer;
+    }
+
+    @Override
     public void render(Renderer renderer, float viewportAspectRatio) {
         requireOpen();
         Renderer validRenderer = Objects.requireNonNull(renderer, "renderer");
@@ -184,6 +202,14 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
         prune(validRenderer.owner());
     }
 
+    /** Removes one terminal billboard-renderer registration and its hidden scene object. */
+    void release(Object3dBillboardRenderer renderer) {
+        Object3dBillboardRenderer validRenderer = Objects.requireNonNull(renderer, "renderer");
+        requireRegistration(validRenderer);
+        validRenderer.renderable().detach();
+        prune(validRenderer.owner());
+    }
+
     /** Returns or creates the hidden transform anchor for one entity. */
     private Object3D node(Entity owner) {
         Object3D existing = nodes.get(owner);
@@ -214,6 +240,7 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
             case Object3dPerspectiveCamera camera -> camera.owner() == owner;
             case Object3dDirectionalLight light -> light.owner() == owner;
             case Object3dMeshRenderer renderer -> renderer.owner() == owner;
+            case Object3dBillboardRenderer renderer -> renderer.owner() == owner;
             default -> false;
         };
     }

@@ -11,6 +11,7 @@ import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 /** Decodes structurally validated project values into exact 3D presentation configuration. */
@@ -47,6 +48,16 @@ final class AuthoredPresentation3d {
                 bool(properties, Spatial3dDescriptors.visibleProperty()));
     }
 
+    /** Decodes complete billboard-renderer configuration before runtime resource acquisition. */
+    static BillboardRenderer billboardRenderer(Map<PropertyId, ProjectValue> properties) {
+        return new BillboardRenderer(
+                reference(properties, Spatial3dDescriptors.materialProperty()),
+                vector2(properties, Spatial3dDescriptors.sizeProperty()),
+                vector2(properties, Spatial3dDescriptors.anchorProperty()),
+                text(properties, Spatial3dDescriptors.alignmentProperty()),
+                bool(properties, Spatial3dDescriptors.visibleProperty()));
+    }
+
     /** Requires one finite numeric property. */
     private static float number(Map<PropertyId, ProjectValue> properties, PropertyId property) {
         ProjectValue value = required(properties, property);
@@ -69,6 +80,15 @@ final class AuthoredPresentation3d {
         return bool.value();
     }
 
+    /** Requires one text property. */
+    private static String text(Map<PropertyId, ProjectValue> properties, PropertyId property) {
+        ProjectValue value = required(properties, property);
+        if (!(value instanceof ProjectValue.TextValue(String text))) {
+            throw new IllegalArgumentException(property + " must be text");
+        }
+        return text;
+    }
+
     /** Requires one resource-reference property. */
     private static ResourceReference reference(Map<PropertyId, ProjectValue> properties, PropertyId property) {
         ProjectValue value = required(properties, property);
@@ -86,6 +106,16 @@ final class AuthoredPresentation3d {
         }
         List<ProjectValue> values = array.values();
         return new Vector3f(entry(values, 0, property), entry(values, 1, property), entry(values, 2, property));
+    }
+
+    /** Requires one exact finite two-number vector. */
+    private static Vector2f vector2(Map<PropertyId, ProjectValue> properties, PropertyId property) {
+        ProjectValue value = required(properties, property);
+        if (!(value instanceof ProjectValue.ArrayValue array) || array.values().size() != 2) {
+            throw new IllegalArgumentException(property + " must contain exactly two numbers");
+        }
+        List<ProjectValue> values = array.values();
+        return new Vector2f(entry(values, 0, property), entry(values, 1, property));
     }
 
     /** Requires one finite vector entry. */
@@ -115,4 +145,8 @@ final class AuthoredPresentation3d {
 
     /** Complete mesh-renderer configuration. */
     record MeshRenderer(ResourceReference mesh, ResourceReference material, boolean visible) {}
+
+    /** Complete billboard-renderer configuration. */
+    record BillboardRenderer(
+            ResourceReference material, Vector2f size, Vector2f anchor, String alignment, boolean visible) {}
 }

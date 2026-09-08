@@ -67,13 +67,15 @@ final class Spatial3dDescriptorsTest {
                         Spatial3dDescriptors.transformType(),
                         Spatial3dDescriptors.perspectiveCameraType(),
                         Spatial3dDescriptors.directionalLightType(),
-                        Spatial3dDescriptors.meshRendererType());
-        assertThat(components.subList(1, 4)).allSatisfy(component -> {
+                        Spatial3dDescriptors.meshRendererType(),
+                        Spatial3dDescriptors.billboardRendererType());
+        assertThat(components.subList(1, 5)).allSatisfy(component -> {
             assertThat(component.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
             assertThat(component.lifecycle())
                     .containsExactlyInAnyOrder(ComponentLifecycle.ACTIVATED, ComponentLifecycle.DEACTIVATED);
         });
         assertThat(components.get(3).multiplicity()).isEqualTo(ComponentMultiplicity.MULTIPLE);
+        assertThat(components.get(4).multiplicity()).isEqualTo(ComponentMultiplicity.MULTIPLE);
     }
 
     /** Publishes required resource references and portable camera, light, and visibility defaults. */
@@ -84,6 +86,7 @@ final class Spatial3dDescriptorsTest {
         ComponentTypeDescriptor camera = components.get(1);
         ComponentTypeDescriptor light = components.get(2);
         ComponentTypeDescriptor mesh = components.get(3);
+        ComponentTypeDescriptor billboard = components.get(4);
 
         assertThat(camera.properties().keySet())
                 .containsExactly(
@@ -105,6 +108,17 @@ final class Spatial3dDescriptorsTest {
         assertThat(meshProperty.isRequired()).isTrue();
         assertThat(materialProperty.isRequired()).isTrue();
         assertThat(visibleProperty.defaultValue()).contains(new ProjectValue.BooleanValue(true));
+        assertThat(billboard.properties().keySet())
+                .containsExactly(
+                        Spatial3dDescriptors.materialProperty(),
+                        Spatial3dDescriptors.sizeProperty(),
+                        Spatial3dDescriptors.anchorProperty(),
+                        Spatial3dDescriptors.alignmentProperty(),
+                        Spatial3dDescriptors.visibleProperty());
+        assertThat(array(Objects.requireNonNull(billboard.properties().get(Spatial3dDescriptors.sizeProperty()))))
+                .containsExactly(1.0F, 1.0F);
+        assertThat(array(Objects.requireNonNull(billboard.properties().get(Spatial3dDescriptors.anchorProperty()))))
+                .containsExactly(0.5F, 0.5F);
     }
 
     /** Extracts float values from one descriptor default array. */

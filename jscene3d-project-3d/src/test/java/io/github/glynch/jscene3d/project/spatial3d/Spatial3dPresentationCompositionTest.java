@@ -7,8 +7,10 @@ package io.github.glynch.jscene3d.project.spatial3d;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
+import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.LambertMaterial;
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.BillboardAlignment;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
@@ -48,28 +50,33 @@ final class Spatial3dPresentationCompositionTest {
     private static final ComponentId CAMERA = ComponentId.from("f88c23a4-5b70-4af5-b409-e991fa1abf14");
     private static final ComponentId LIGHT = ComponentId.from("25694276-072e-4f76-91bb-a0da0d96e9e0");
     private static final ComponentId RENDERER = ComponentId.from("0dcce20a-9fe3-4583-bc7b-fca33062a3d1");
+    private static final ComponentId BILLBOARD = ComponentId.from("fb616ed9-c194-47ec-be93-09d0ec5b70f9");
     private static final ComponentId TRANSFORM = ComponentId.from("93a714ee-a89e-40e4-9801-24b48a6b6824");
     private static final ResourceReference MESH_REFERENCE = ResourceReference.asset("cube-mesh");
     private static final ResourceReference MATERIAL_REFERENCE = ResourceReference.asset("blue-material");
+    private static final ResourceReference BASIC_MATERIAL_REFERENCE = ResourceReference.asset("sprite-material");
 
     @TempDir
     private Path temporaryDirectory;
 
-    /** Composes, activates, and mutates one complete descriptor-backed presentation world. */
+    /** Composes one complete descriptor-backed presentation world with its authored values. */
     @Test
-    void composesAndMutatesPresentation() throws IOException {
+    void composesPresentationWithAuthoredValues() throws IOException {
         TestResources resources = new TestResources();
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         World world = compose(presentationWorld(), spatial, resources).world().orElseThrow();
         Entity cameraEntity = world.roots().get(0);
         Entity lightEntity = world.roots().get(1);
         Entity meshEntity = world.roots().get(2);
+        Entity billboardEntity = world.roots().get(3);
         PerspectiveCamera3d camera =
                 cameraEntity.component(CAMERA, PerspectiveCamera3d.class).orElseThrow();
         DirectionalLight3d light =
                 lightEntity.component(LIGHT, DirectionalLight3d.class).orElseThrow();
         MeshRenderer3d renderer =
                 meshEntity.component(RENDERER, MeshRenderer3d.class).orElseThrow();
+        BillboardRenderer3d billboard =
+                billboardEntity.component(BILLBOARD, BillboardRenderer3d.class).orElseThrow();
 
         assertThat(spatial.isReadyToRender()).isFalse();
         assertThat(camera.fieldOfViewDegrees()).isCloseTo(50.0F, within(0.0001F));
@@ -81,15 +88,43 @@ final class Spatial3dPresentationCompositionTest {
         assertThat(renderer.mesh()).isSameAs(resources.mesh);
         assertThat(renderer.material()).isSameAs(resources.material);
         assertThat(renderer.isVisible()).isTrue();
+        assertThat(billboard.material()).isSameAs(resources.basicMaterial);
+        assertThat(billboard.size().x()).isEqualTo(2.0F);
+        assertThat(billboard.size().y()).isEqualTo(3.0F);
+        assertThat(billboard.anchor().x()).isEqualTo(0.5F);
+        assertThat(billboard.anchor().y()).isEqualTo(0.0F);
+        assertThat(billboard.alignment()).isEqualTo(BillboardAlignment.CYLINDRICAL);
+        assertThat(billboard.isVisible()).isTrue();
 
-        world.activate();
-        assertThat(spatial.isReadyToRender()).isTrue();
+        world.close();
+    }
+
+    /** Mutates descriptor-backed camera, lighting, mesh, and billboard presentation state. */
+    @Test
+    void mutatesPresentation() throws IOException {
+        TestResources resources = new TestResources();
+        Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
+        World world = compose(presentationWorld(), spatial, resources).world().orElseThrow();
+        Entity cameraEntity = world.roots().get(0);
+        Entity lightEntity = world.roots().get(1);
+        Entity meshEntity = world.roots().get(2);
+        Entity billboardEntity = world.roots().get(3);
+        PerspectiveCamera3d camera =
+                cameraEntity.component(CAMERA, PerspectiveCamera3d.class).orElseThrow();
+        DirectionalLight3d light =
+                lightEntity.component(LIGHT, DirectionalLight3d.class).orElseThrow();
+        MeshRenderer3d renderer =
+                meshEntity.component(RENDERER, MeshRenderer3d.class).orElseThrow();
+        BillboardRenderer3d billboard =
+                billboardEntity.component(BILLBOARD, BillboardRenderer3d.class).orElseThrow();
+
         camera.setFieldOfViewDegrees(70.0F);
         camera.setClippingPlanes(0.5F, 300.0F);
         light.setColor(Color.RED);
         light.setIntensity(3.0F);
         light.setTarget(1.0F, 2.0F, 3.0F);
         renderer.setVisible(false);
+        billboard.setVisible(false);
 
         assertThat(camera.fieldOfViewDegrees()).isCloseTo(70.0F, within(0.0001F));
         assertThat(camera.near()).isEqualTo(0.5F);
@@ -98,6 +133,7 @@ final class Spatial3dPresentationCompositionTest {
         assertThat(light.intensity()).isEqualTo(3.0F);
         assertThat(coordinates(light.target())).containsExactly(1.0F, 2.0F, 3.0F);
         assertThat(renderer.isVisible()).isFalse();
+        assertThat(billboard.isVisible()).isFalse();
 
         world.close();
     }
@@ -111,12 +147,15 @@ final class Spatial3dPresentationCompositionTest {
         Entity cameraEntity = world.roots().get(0);
         Entity lightEntity = world.roots().get(1);
         Entity meshEntity = world.roots().get(2);
+        Entity billboardEntity = world.roots().get(3);
         PerspectiveCamera3d camera =
                 cameraEntity.component(CAMERA, PerspectiveCamera3d.class).orElseThrow();
         DirectionalLight3d light =
                 lightEntity.component(LIGHT, DirectionalLight3d.class).orElseThrow();
         MeshRenderer3d renderer =
                 meshEntity.component(RENDERER, MeshRenderer3d.class).orElseThrow();
+        BillboardRenderer3d billboard =
+                billboardEntity.component(BILLBOARD, BillboardRenderer3d.class).orElseThrow();
 
         assertThat(spatial.isReadyToRender()).isFalse();
         world.activate();
@@ -126,11 +165,14 @@ final class Spatial3dPresentationCompositionTest {
         world.enable(cameraEntity);
         assertThat(spatial.isReadyToRender()).isTrue();
         world.destroy(meshEntity);
+        world.destroy(billboardEntity);
 
         assertThat(renderer.isClosed()).isTrue();
+        assertThat(billboard.isClosed()).isTrue();
         renderer.close();
         assertThat(resources.mesh.isClosed()).isTrue();
         assertThat(resources.material.isClosed()).isTrue();
+        assertThat(resources.basicMaterial.isClosed()).isTrue();
         world.close();
         assertThat(camera.isClosed()).isTrue();
         assertThat(light.isClosed()).isTrue();
@@ -207,7 +249,18 @@ final class Spatial3dPresentationCompositionTest {
                         Map.of(
                                 Spatial3dDescriptors.meshProperty(), reference(MESH_REFERENCE),
                                 Spatial3dDescriptors.materialProperty(), reference(MATERIAL_REFERENCE))));
-        return new WorldDefinition(WORLD_ID, "3D presentation", List.of(camera, light, mesh));
+        LocalEntity billboard = entity(
+                "Billboard",
+                component(Spatial3dDescriptors.transformType(), Map.of()),
+                component(
+                        BILLBOARD,
+                        Spatial3dDescriptors.billboardRendererType(),
+                        Map.of(
+                                Spatial3dDescriptors.materialProperty(), reference(BASIC_MATERIAL_REFERENCE),
+                                Spatial3dDescriptors.sizeProperty(), numbers(2.0F, 3.0F),
+                                Spatial3dDescriptors.anchorProperty(), numbers(0.5F, 0.0F),
+                                Spatial3dDescriptors.alignmentProperty(), new ProjectValue.TextValue("cylindrical"))));
+        return new WorldDefinition(WORLD_ID, "3D presentation", List.of(camera, light, mesh, billboard));
     }
 
     /** Creates a world containing exactly one camera. */
@@ -241,6 +294,7 @@ final class Spatial3dPresentationCompositionTest {
                     case "Second" -> EntityId.from("921a70ea-f838-493d-903a-502f4fc63cc4");
                     case "Sun" -> EntityId.from("41219435-4728-4388-967a-f2f0f5ed6357");
                     case "Cube" -> EntityId.from("bc67eff8-31b9-4df0-8acb-283a76c544df");
+                    case "Billboard" -> EntityId.from("4f359d31-2fb1-4caf-9910-b97372702af3");
                     default -> throw new IllegalArgumentException("unknown fixture entity " + name);
                 };
         return new LocalEntity(id, name, true, List.of(components), List.of());
@@ -300,6 +354,7 @@ final class Spatial3dPresentationCompositionTest {
     private static final class TestResources implements RuntimeResourceProvider {
         private final Mesh3dResource mesh = Mesh3dResource.owning(BoxGeometry.create(1.0F, 1.0F, 1.0F));
         private final Material3dResource material = Material3dResource.owning(new LambertMaterial(Color.BLUE));
+        private final Material3dResource basicMaterial = Material3dResource.owning(new BasicMaterial(Color.WHITE));
 
         @Override
         public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
@@ -311,6 +366,9 @@ final class Spatial3dPresentationCompositionTest {
             } else if (reference.equals(MATERIAL_REFERENCE)) {
                 value = material;
                 release = material::close;
+            } else if (reference.equals(BASIC_MATERIAL_REFERENCE)) {
+                value = basicMaterial;
+                release = basicMaterial::close;
             } else {
                 throw new IllegalStateException("unknown resource " + reference);
             }

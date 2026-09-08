@@ -4,11 +4,13 @@
  */
 package io.github.glynch.jscene3d.project.spatial3d;
 
+import io.github.glynch.jscene3d.objects.BillboardAlignment;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import java.util.Locale;
 import java.util.Objects;
 
 /** Executable Transform3d factory corresponding exactly to {@link Spatial3dDescriptors}. */
@@ -52,6 +54,7 @@ public final class Spatial3dRuntimeExtension implements ComponentRuntimeExtensio
                     context.owner(), authored.color(), authored.intensity(), authored.target());
         });
         validRegistry.register(Spatial3dDescriptors.meshRendererType(), meshRendererFactory());
+        validRegistry.register(Spatial3dDescriptors.billboardRendererType(), billboardRendererFactory());
     }
 
     /** Creates the resource-aware mesh-renderer preparation and construction adapter. */
@@ -73,6 +76,30 @@ public final class Spatial3dRuntimeExtension implements ComponentRuntimeExtensio
                 Material3dResource material = context.resolveResource(authored.material(), Material3dResource.class);
                 Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
                 return spatial.createMeshRenderer(context.owner(), mesh, material, authored.visible());
+            }
+        };
+    }
+
+    /** Creates the resource-aware billboard-renderer preparation and construction adapter. */
+    private static ComponentFactory<BillboardRenderer3d> billboardRendererFactory() {
+        return new ComponentFactory<>() {
+            @Override
+            public void prepare(ComponentPreparationContext context) {
+                AuthoredPresentation3d.BillboardRenderer authored = AuthoredPresentation3d.billboardRenderer(
+                        context.properties().values());
+                context.resolveResource(authored.material(), Material3dResource.class);
+            }
+
+            @Override
+            public BillboardRenderer3d create(ComponentFactoryContext context) {
+                AuthoredPresentation3d.BillboardRenderer authored = AuthoredPresentation3d.billboardRenderer(
+                        context.properties().values());
+                Material3dResource material = context.resolveResource(authored.material(), Material3dResource.class);
+                BillboardAlignment alignment = BillboardAlignment.valueOf(
+                        authored.alignment().toUpperCase(Locale.ROOT).replace('-', '_'));
+                Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
+                return spatial.createBillboardRenderer(
+                        context.owner(), material, authored.size(), authored.anchor(), alignment, authored.visible());
             }
         };
     }

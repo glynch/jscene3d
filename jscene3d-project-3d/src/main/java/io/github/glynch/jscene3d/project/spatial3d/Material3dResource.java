@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.spatial3d;
 
+import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.Material;
 import java.util.List;
 import java.util.Objects;
@@ -90,6 +91,15 @@ public final class Material3dResource implements AutoCloseable {
     Material material() {
         requireOpen();
         return material;
+    }
+
+    /** Returns the owned material when it has the unlit profile required by billboards. */
+    BasicMaterial basicMaterial() {
+        requireOpen();
+        if (!(material instanceof BasicMaterial basicMaterial)) {
+            throw new IllegalArgumentException("billboards require a basic material resource");
+        }
+        return basicMaterial;
     }
 
     /** Rejects internal access after terminal closure. */

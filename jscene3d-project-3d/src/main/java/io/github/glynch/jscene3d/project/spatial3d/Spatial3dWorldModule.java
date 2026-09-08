@@ -5,11 +5,13 @@
 package io.github.glynch.jscene3d.project.spatial3d;
 
 import io.github.glynch.jscene3d.math.Color;
+import io.github.glynch.jscene3d.objects.BillboardAlignment;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.WorldModule;
 import io.github.glynch.jscene3d.render.Renderer;
 import java.util.Optional;
 import org.joml.Quaternionfc;
+import org.joml.Vector2fc;
 import org.joml.Vector3fc;
 
 /** World-scoped seam that realizes live three-dimensional spatial and presentation components. */
@@ -97,6 +99,27 @@ public interface Spatial3dWorldModule extends WorldModule {
      * @throws IllegalStateException if this module is closed
      */
     MeshRenderer3d createMeshRenderer(Entity owner, Mesh3dResource mesh, Material3dResource material, boolean visible);
+
+    /**
+     * Creates a camera-facing billboard attached to an entity's primary transform.
+     *
+     * @param owner live component owner
+     * @param material shared immutable unlit material resource
+     * @param size positive finite world-space width and height
+     * @param anchor finite normalized anchor coordinates
+     * @param alignment camera-facing alignment mode
+     * @param visible initial local visibility
+     * @return registered world-owned billboard-renderer component
+     * @throws IllegalArgumentException if a resource, value, or owner is invalid
+     * @throws IllegalStateException if this module is closed
+     */
+    BillboardRenderer3d createBillboardRenderer(
+            Entity owner,
+            Material3dResource material,
+            Vector2fc size,
+            Vector2fc anchor,
+            BillboardAlignment alignment,
+            boolean visible);
 
     /**
      * Renders the current presentation through the effectively active primary camera.

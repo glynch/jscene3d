@@ -133,10 +133,28 @@ final class CharacterControllerTest {
     }
 
     @Test
+    void traversesConsecutiveTriangleMeshStepsAtTheConfiguredMaximumHeight() {
+        PhysicsWorld world = new PhysicsWorld();
+        KinematicBody body = addCharacterBody(world, new Vector3f(10.0F, -0.999F, 0.0F));
+        addStaticTriangleStaircase(world);
+        CharacterController controller = new CharacterController(world, body);
+
+        for (int update = 0; update < 240; update++) {
+            controller.move(new Vector3f(-8.0F, 0.0F, 0.0F), FIXED_SECONDS);
+            if (body.position(new Vector3f()).x < -2.0F) {
+                break;
+            }
+        }
+
+        assertThat(body.position(new Vector3f()).x).isLessThan(-2.0F);
+        assertThat(body.position(new Vector3f()).y).isCloseTo(1.001F, TOLERANCE);
+    }
+
+    @Test
     void doesNotClimbATriangleMeshLedgeAboveTheMaximumStepHeight() {
         PhysicsWorld world = new PhysicsWorld();
         KinematicBody body = addCharacterBody(world, new Vector3f(-4.0F, 1.001F, 0.0F));
-        addStaticTriangleStep(world, 1.0F);
+        addStaticTriangleStep(world, 0.51F);
         CharacterController controller = new CharacterController(world, body);
 
         for (int update = 0; update < 240; update++) {
@@ -332,6 +350,30 @@ final class CharacterControllerTest {
             4.0F, 0.0F, 0.0F, 4.0F
         };
         int[] indices = {0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6, 8, 9, 10, 8, 10, 11};
+        world.addStaticBody().addCollider(new TriangleMeshShape(positions, indices));
+    }
+
+    private static void addStaticTriangleStaircase(PhysicsWorld world) {
+        float[] positions = {
+            8.0F, -2.0F, -4.0F, 12.0F, -2.0F, -4.0F, 12.0F, -2.0F, 4.0F, 8.0F, -2.0F, 4.0F, 5.0F, -1.5F, -4.0F, 8.0F,
+            -1.5F, -4.0F, 8.0F, -1.5F, 4.0F, 5.0F, -1.5F, 4.0F, 2.0F, -1.0F, -4.0F, 5.0F, -1.0F, -4.0F, 5.0F, -1.0F,
+            4.0F, 2.0F, -1.0F, 4.0F, -1.0F, -0.5F, -4.0F, 2.0F, -0.5F, -4.0F, 2.0F, -0.5F, 4.0F, -1.0F, -0.5F, 4.0F,
+            -4.0F, 0.0F, -4.0F, -1.0F, 0.0F, -4.0F, -1.0F, 0.0F, 4.0F, -4.0F, 0.0F, 4.0F, 8.0F, -2.0F, -4.0F, 8.0F,
+            -1.5F, -4.0F, 8.0F, -1.5F, 4.0F, 8.0F, -2.0F, 4.0F, 5.0F, -1.5F, -4.0F, 5.0F, -1.0F, -4.0F, 5.0F, -1.0F,
+            4.0F, 5.0F, -1.5F, 4.0F, 2.0F, -1.0F, -4.0F, 2.0F, -0.5F, -4.0F, 2.0F, -0.5F, 4.0F, 2.0F, -1.0F, 4.0F,
+            -1.0F, -0.5F, -4.0F, -1.0F, 0.0F, -4.0F, -1.0F, 0.0F, 4.0F, -1.0F, -0.5F, 4.0F
+        };
+        int[] indices = {
+            0, 2, 1, 0, 3, 2,
+            4, 6, 5, 4, 7, 6,
+            8, 10, 9, 8, 11, 10,
+            12, 14, 13, 12, 15, 14,
+            16, 18, 17, 16, 19, 18,
+            20, 21, 22, 20, 22, 23,
+            24, 25, 26, 24, 26, 27,
+            28, 29, 30, 28, 30, 31,
+            32, 33, 34, 32, 34, 35
+        };
         world.addStaticBody().addCollider(new TriangleMeshShape(positions, indices));
     }
 

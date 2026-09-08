@@ -102,11 +102,14 @@ public final class KinematicMovement {
     private static float stepLiftDistance(
             MovementState state, SweepHit blockingHit, Vector3fc up, KinematicMoveSettings settings) {
         float footHeight = lowestSupportHeight(state, state.position, up);
-        float obstacleHeight = blockingHit.point(new Vector3f()).dot(up) - footHeight;
-        if (obstacleHeight > settings.maximumStepHeight() + STEP_HEIGHT_TOLERANCE) {
+        float contactHeight = blockingHit.point(new Vector3f()).dot(up);
+        float obstacleHeight = contactHeight - footHeight;
+        // Shape support can remain one skin inside the surface supporting the body.
+        float maximumMeasuredHeight = settings.maximumStepHeight() + settings.skinWidth() + STEP_HEIGHT_TOLERANCE;
+        if (obstacleHeight > maximumMeasuredHeight) {
             return 0.0F;
         }
-        return Math.clamp(obstacleHeight + settings.skinWidth(), 0.0F, settings.maximumStepHeight());
+        return Math.max(obstacleHeight + settings.skinWidth(), 0.0F);
     }
 
     private static Vector3f stepProbeMotion(
@@ -162,7 +165,9 @@ public final class KinematicMovement {
         float travel = Math.clamp(ground.distance() - settings.skinWidth(), 0.0F, Float.POSITIVE_INFINITY);
         Vector3f landingPosition = new Vector3f(landingStart).fma(-travel, up);
         float stepHeight = new Vector3f(landingPosition).sub(state.position).dot(up);
-        if (stepHeight <= STEP_HEIGHT_TOLERANCE || stepHeight > settings.maximumStepHeight() + STEP_HEIGHT_TOLERANCE) {
+        // The body may begin one skin inside the support and must finish one skin above the landing.
+        float maximumDisplacement = settings.maximumStepHeight() + 2.0F * settings.skinWidth() + STEP_HEIGHT_TOLERANCE;
+        if (stepHeight <= STEP_HEIGHT_TOLERANCE || stepHeight > maximumDisplacement) {
             return false;
         }
         state.position.add(horizontalMotion).fma(stepHeight, up);

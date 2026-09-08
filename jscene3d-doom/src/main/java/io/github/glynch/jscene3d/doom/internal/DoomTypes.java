@@ -14,14 +14,8 @@ public final class DoomTypes {
     /** Current version of the Doom extension's registered types. */
     public static final int TYPE_VERSION = 1;
 
-    /** Portable classic-map resource type identity. */
-    public static final String MAP_RESOURCE_IDENTIFIER = EXTENSION_IDENTIFIER + "/map";
-
     /** Classic-map source importer type. */
     public static final RegisteredType MAP_IMPORTER = new RegisteredType(EXTENSION_IDENTIFIER + "/maps", TYPE_VERSION);
-
-    /** Portable classic-map resource type. */
-    public static final RegisteredType MAP_RESOURCE = new RegisteredType(MAP_RESOURCE_IDENTIFIER, TYPE_VERSION);
 
     /** Prevents construction of this type-identity namespace. */
     private DoomTypes() {

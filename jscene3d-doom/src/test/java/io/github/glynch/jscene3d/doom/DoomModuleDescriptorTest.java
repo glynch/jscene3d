@@ -22,7 +22,7 @@ final class DoomModuleDescriptorTest {
         assertThat(getClass().getModule().getName()).isEqualTo("io.github.glynch.jscene3d.doom");
     }
 
-    /** Exports only decoding interfaces, retains transitive WAD types, and provides the import seam. */
+    /** Exports reusable Doom data interfaces, retains transitive WAD types, and provides the import seam. */
     @Test
     void declaresSupportedModuleInterface() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
@@ -32,7 +32,10 @@ final class DoomModuleDescriptorTest {
 
         assertThat(exports)
                 .containsExactlyInAnyOrder(
-                        "io.github.glynch.jscene3d.doom.diagnostic", "io.github.glynch.jscene3d.doom.map");
+                        "io.github.glynch.jscene3d.doom.diagnostic",
+                        "io.github.glynch.jscene3d.doom.geometry",
+                        "io.github.glynch.jscene3d.doom.map",
+                        "io.github.glynch.jscene3d.doom.material");
         assertThat(descriptor.requires())
                 .filteredOn(requirement -> requirement.name().equals("io.github.glynch.jscene3d.wad"))
                 .singleElement()

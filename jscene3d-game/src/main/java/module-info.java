@@ -8,10 +8,12 @@ module io.github.glynch.jscene3d.game {
     requires transitive io.github.glynch.jscene3d.physics;
     requires transitive io.github.glynch.jscene3d.lwjgl;
     requires transitive io.github.glynch.jscene3d.project.runtime;
+    requires io.github.glynch.jscene3d.project.physics3d;
     requires transitive org.joml;
     requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.game;
     exports io.github.glynch.jscene3d.game.input;
     exports io.github.glynch.jscene3d.game.physics;
+    exports io.github.glynch.jscene3d.game.project3d;
 }

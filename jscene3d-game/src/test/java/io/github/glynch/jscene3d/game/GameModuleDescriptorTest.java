@@ -27,6 +27,7 @@ final class GameModuleDescriptorTest {
                 .containsExactlyInAnyOrder(
                         "io.github.glynch.jscene3d.game",
                         "io.github.glynch.jscene3d.game.input",
-                        "io.github.glynch.jscene3d.game.physics");
+                        "io.github.glynch.jscene3d.game.physics",
+                        "io.github.glynch.jscene3d.game.project3d");
     }
 }

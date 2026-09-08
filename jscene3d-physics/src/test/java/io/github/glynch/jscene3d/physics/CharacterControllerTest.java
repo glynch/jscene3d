@@ -70,6 +70,26 @@ final class CharacterControllerTest {
     }
 
     @Test
+    void continuesAlongAdjacentTriangleWallFacesWithoutSnaggingAtTheirSharedEdge() {
+        PhysicsWorld world = new PhysicsWorld();
+        CharacterControllerSettings settings = CharacterControllerSettings.DEFAULT
+                .withGravity(0.0F)
+                .withMovementSettings(KinematicMoveSettings.DEFAULT
+                        .withMaximumStepHeight(0.0F)
+                        .withGroundSnapDistance(0.0F));
+        KinematicBody body = addCharacterBody(world, new Vector3f(0.499F, 0.0F, -1.0F));
+        addStaticTriangleWall(world);
+        CharacterController controller = new CharacterController(world, body, settings);
+
+        for (int update = 0; update < 60; update++) {
+            controller.move(new Vector3f(1.0F, 0.0F, 4.0F), FIXED_SECONDS);
+        }
+
+        assertThat(body.position(new Vector3f()).x).isCloseTo(0.499F, TOLERANCE);
+        assertThat(body.position(new Vector3f()).z).isGreaterThan(0.9F);
+    }
+
+    @Test
     void traversesAReachableStepInBothDirectionsAcrossRepeatedFixedUpdates() {
         PhysicsWorld world = new PhysicsWorld();
         KinematicBody body = addCharacterBody(world, new Vector3f(-4.0F, 0.951F, 0.0F));
@@ -312,6 +332,15 @@ final class CharacterControllerTest {
             4.0F, 0.0F, 0.0F, 4.0F
         };
         int[] indices = {0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6, 8, 9, 10, 8, 10, 11};
+        world.addStaticBody().addCollider(new TriangleMeshShape(positions, indices));
+    }
+
+    private static void addStaticTriangleWall(PhysicsWorld world) {
+        float[] positions = {
+            1.0F, -2.0F, -5.0F, 1.0F, 2.0F, -5.0F, 1.0F, 2.0F, 0.0F, 1.0F, -2.0F, 0.0F, 1.0F, -2.0F, 0.0F, 1.0F, 2.0F,
+            0.0F, 1.0F, 2.0F, 5.0F, 1.0F, -2.0F, 5.0F
+        };
+        int[] indices = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
         world.addStaticBody().addCollider(new TriangleMeshShape(positions, indices));
     }
 

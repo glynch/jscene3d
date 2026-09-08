@@ -42,7 +42,6 @@ import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -154,7 +153,7 @@ public final class RuntimeSpawningExample {
 
     /** Constructs one projectile from its validated effective instance parameter. */
     private static Projectile createProjectile(ComponentFactoryContext context) {
-        ProjectValue value = Objects.requireNonNull(context.properties().get(SPEED), "speed");
+        ProjectValue value = context.properties().value(SPEED);
         return new Projectile(((ProjectValue.NumberValue) value).value());
     }
 

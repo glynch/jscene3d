@@ -6,10 +6,7 @@ package io.github.glynch.jscene3d.project.runtime.extension;
 
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
-import io.github.glynch.jscene3d.project.component.PropertyId;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import java.util.Map;
 
 /** Bounded preparation context for resolving one component's reusable runtime resources. */
 public interface ComponentPreparationContext {
@@ -32,7 +29,7 @@ public interface ComponentPreparationContext {
      *
      * @return immutable effective properties in descriptor declaration order
      */
-    Map<PropertyId, ProjectValue> properties();
+    ComponentProperties properties();
 
     /**
      * Resolves and retains one shared immutable resource before simulation.

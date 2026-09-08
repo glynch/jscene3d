@@ -6,13 +6,10 @@ package io.github.glynch.jscene3d.project.runtime.extension;
 
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
-import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.SpawnTarget;
 import io.github.glynch.jscene3d.project.runtime.World;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import java.util.Map;
 
 /**
  * Bounded construction context supplied to one registered component factory.
@@ -65,7 +62,7 @@ public interface ComponentFactoryContext {
      *
      * @return immutable effective properties in descriptor declaration order
      */
-    Map<PropertyId, ProjectValue> properties();
+    ComponentProperties properties();
 
     /**
      * Resolves one shared immutable resource and attributes its lease to the owning entity.

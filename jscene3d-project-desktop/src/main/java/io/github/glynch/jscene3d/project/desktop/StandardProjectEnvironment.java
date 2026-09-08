@@ -6,6 +6,8 @@ package io.github.glynch.jscene3d.project.desktop;
 
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
+import io.github.glynch.jscene3d.game.project3d.Game3dDescriptors;
+import io.github.glynch.jscene3d.game.project3d.Game3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
@@ -54,12 +56,15 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
 
     @Override
     public List<ExtensionDescriptor> descriptors() {
-        return List.of(Spatial3dDescriptors.extensionDescriptor(), Physics3dDescriptors.extensionDescriptor());
+        return List.of(
+                Spatial3dDescriptors.extensionDescriptor(),
+                Physics3dDescriptors.extensionDescriptor(),
+                Game3dDescriptors.extensionDescriptor());
     }
 
     @Override
     public List<ComponentRuntimeExtension> runtimeExtensions() {
-        return List.of(new Spatial3dRuntimeExtension(), new Physics3dRuntimeExtension());
+        return List.of(new Spatial3dRuntimeExtension(), new Physics3dRuntimeExtension(), new Game3dRuntimeExtension());
     }
 
     @Override

@@ -37,7 +37,13 @@ public enum DoomDiagnosticCode implements DiagnosticCode {
     MAP_BLOCKMAP_INVALID("doom.map.blockmap", "The Doom BLOCKMAP structure is invalid"),
 
     /** Map lump data could not be read or decoded safely. */
-    MAP_DATA_UNREADABLE("doom.map.data", "The classic Doom map data could not be decoded");
+    MAP_DATA_UNREADABLE("doom.map.data", "The classic Doom map data could not be decoded"),
+
+    /** Referenced wall textures or flats could not be decoded. */
+    MATERIAL_INVALID("doom.material.invalid", "The selected Doom map materials could not be imported"),
+
+    /** Renderer-independent map geometry could not be generated. */
+    GEOMETRY_INVALID("doom.geometry.invalid", "The selected Doom map geometry could not be generated");
 
     private final String value;
     private final String message;

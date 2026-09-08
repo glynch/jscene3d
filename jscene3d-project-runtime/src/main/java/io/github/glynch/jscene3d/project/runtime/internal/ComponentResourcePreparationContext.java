@@ -6,18 +6,16 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
-import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentProperties;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import java.util.Map;
 import java.util.Objects;
 
 /** One-use component preparation context backed by a world resource transaction. */
 final class ComponentResourcePreparationContext implements ComponentPreparationContext {
     private final ComponentDefinition definition;
     private final ComponentTypeDescriptor descriptor;
-    private final Map<PropertyId, ProjectValue> properties;
+    private final ComponentProperties properties;
     private final WorldResources.Preparation resources;
     private final String location;
     private boolean active = true;
@@ -31,7 +29,8 @@ final class ComponentResourcePreparationContext implements ComponentPreparationC
             String location) {
         this.definition = Objects.requireNonNull(definition, "definition");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
-        this.properties = Objects.requireNonNull(properties, "properties").values();
+        this.properties = new ComponentProperties(
+                Objects.requireNonNull(properties, "properties").values());
         this.resources = Objects.requireNonNull(resources, "resources");
         this.location = Objects.requireNonNull(location, "location");
     }
@@ -47,7 +46,7 @@ final class ComponentResourcePreparationContext implements ComponentPreparationC
     }
 
     @Override
-    public Map<PropertyId, ProjectValue> properties() {
+    public ComponentProperties properties() {
         return properties;
     }
 

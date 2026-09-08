@@ -9,7 +9,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.glynch.jscene3d.doom.diagnostic.DoomDiagnosticCode;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
-import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.importing.ImportManager;
 import io.github.glynch.jscene3d.project.importing.ImportedArtifact;
@@ -24,7 +23,6 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,7 +34,6 @@ import org.junit.jupiter.api.io.TempDir;
 /** Exercises the complete service-discovered Doom project-import integration. */
 final class DoomImportExtensionTest {
     private static final String IMPORTER_IDENTIFIER = "io.github.glynch.jscene3d.doom/maps";
-    private static final RegisteredType MAP_RESOURCE_TYPE = new RegisteredType("io.github.glynch.jscene3d.doom/map", 1);
     private static final String PROJECT_MANIFEST = """
             {
               "schemaVersion": 1,
@@ -96,7 +93,7 @@ final class DoomImportExtensionTest {
         wadPath = projectDirectory.resolve("assets/content.wad");
         List<TestDoomWadFiles.LumpContent> lumps = TestDoomWadFiles.validMap("MAP01");
         lumps.addAll(TestDoomWadFiles.validMap("E1M1"));
-        TestDoomWadFiles.write(wadPath, lumps);
+        TestDoomWadFiles.write(wadPath, TestDoomWadFiles.withMinimalMaterials(lumps));
         project = new ProjectLoader("0.1.0-SNAPSHOT")
                 .load(projectDirectory)
                 .project()
@@ -109,29 +106,21 @@ final class DoomImportExtensionTest {
         catalog = result.catalog();
     }
 
-    /** Exposes a selectable map collection and stable map identities with source metadata. */
+    /** Exposes selectable maps with stable identities and source metadata. */
     @Test
     void inspectsDiscoveredMaps() {
         SourceInspection inspection = manager().inspect("content", IMPORTER_IDENTIFIER);
 
         assertThat(inspection.isValid()).isTrue();
-        assertThat(inspection.items())
-                .extracting(SourceItem::identity)
-                .containsExactly("maps", "maps/MAP01", "maps/E1M1");
-        SourceItem collection = inspection.items().getFirst();
-        assertThat(collection.isSelectable()).isTrue();
-        assertThat(collection.relations())
-                .extracting(relation -> relation.targetIdentity())
-                .containsExactly("maps/MAP01", "maps/E1M1");
-        assertThat(collection.properties()).containsEntry("map-count", new ProjectValue.NumberValue(BigDecimal.TWO));
-        assertThat(inspection.items().get(1).properties())
-                .containsEntry("name", new ProjectValue.TextValue("MAP01"))
-                .containsEntry("marker-index", new ProjectValue.NumberValue(BigDecimal.ZERO));
+        assertThat(inspection.items()).extracting(SourceItem::identity).containsExactly("maps/MAP01", "maps/E1M1");
+        assertThat(inspection.items().getFirst().isSelectable()).isTrue();
+        assertThat(inspection.items().getFirst().properties())
+                .containsEntry("map", new ProjectValue.TextValue("MAP01"));
     }
 
-    /** Imports one selected map as a native project resource. */
+    /** Publishes one selected map as a closed graph of generic project artifacts. */
     @Test
-    void importsSelectedMapResource() throws IOException {
+    void publishesSelectedMapDefinitionAndResources() throws IOException {
         ImportManager manager = manager();
         ImportDefinition definition = definition();
 
@@ -139,22 +128,23 @@ final class DoomImportExtensionTest {
             assertThat(prepared.preview().isValid()).isTrue();
             assertThat(prepared.preview().artifacts())
                     .extracting(ImportedArtifactMetadata::identity)
-                    .containsExactly("maps/MAP01");
-            assertThat(prepared.preview().artifacts().getFirst().descriptor().resourceType())
-                    .contains(MAP_RESOURCE_TYPE);
+                    .contains(
+                            "maps/MAP01/definition",
+                            "maps/MAP01/resources/collision/static",
+                            "maps/MAP01/payloads/collision/static.mesh");
             prepared.commit();
         }
 
-        String resource = new String(read(manager, definition, "maps/MAP01"), StandardCharsets.UTF_8);
-        assertThat(resource)
-                .startsWith("{\n  \"schemaVersion\" : 1,")
+        String entityDefinition =
+                new String(read(manager, definition, "maps/MAP01/definition"), StandardCharsets.UTF_8);
+        assertThat(entityDefinition)
+                .startsWith("{\n  \"$schema\" : \"https://jscene3d.org/schemas/entity-definition-1.json\",")
                 .contains(
-                        "\"type\" : \"io.github.glynch.jscene3d.doom/map\"",
                         "\"name\" : \"MAP01\"",
-                        "\"sha256\" : ",
-                        "\"things\" : [",
-                        "\"linedefs\" : [",
-                        "\"blockmap\" : {")
+                        "io.github.glynch.jscene3d.spatial3d/transform-3d",
+                        "io.github.glynch.jscene3d.physics3d/static-body-3d",
+                        "io.github.glynch.jscene3d.physics3d/collision-shape-3d",
+                        "io.github.glynch.jscene3d.spatial3d/mesh-renderer-3d")
                 .doesNotContain(projectDirectory.toString())
                 .endsWith("}\n");
     }

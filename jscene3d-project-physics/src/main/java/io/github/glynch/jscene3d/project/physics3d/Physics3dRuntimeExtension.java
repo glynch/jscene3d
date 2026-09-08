@@ -49,7 +49,8 @@ public final class Physics3dRuntimeExtension implements ComponentRuntimeExtensio
                         context.definition().id(),
                         context.world().requireModule(Spatial3dWorldModule.class),
                         context.world().requireModule(Physics3dWorldModule.class),
-                        AuthoredCollision3d.characterSettings(context.properties())));
+                        AuthoredCollision3d.characterSettings(
+                                context.properties().values())));
     }
 
     /** Creates the resource-aware collision-shape preparation and construction adapter. */
@@ -57,13 +58,15 @@ public final class Physics3dRuntimeExtension implements ComponentRuntimeExtensio
         return new ComponentFactory<>() {
             @Override
             public void prepare(ComponentPreparationContext context) {
-                AuthoredCollision3d.Shape authored = AuthoredCollision3d.shape(context.properties());
+                AuthoredCollision3d.Shape authored =
+                        AuthoredCollision3d.shape(context.properties().values());
                 context.resolveResource(authored.resource(), CollisionShape3dResource.class);
             }
 
             @Override
             public CollisionShape3d create(ComponentFactoryContext context) {
-                AuthoredCollision3d.Shape authored = AuthoredCollision3d.shape(context.properties());
+                AuthoredCollision3d.Shape authored =
+                        AuthoredCollision3d.shape(context.properties().values());
                 CollisionShape3dResource resource =
                         context.resolveResource(authored.resource(), CollisionShape3dResource.class);
                 return new CollisionShape3d(

@@ -6,14 +6,12 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
-import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.SpawnTarget;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentProperties;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import java.util.Map;
 import java.util.Objects;
 
 /** Immutable bounded factory context for one component construction. */
@@ -22,7 +20,7 @@ final class ComponentCreationContext implements ComponentFactoryContext {
     private final InternalWorld world;
     private final ComponentDefinition definition;
     private final ComponentTypeDescriptor descriptor;
-    private final Map<PropertyId, ProjectValue> properties;
+    private final ComponentProperties properties;
     private final String location;
     private final ResourceAccess resourceAccess;
     private boolean active = true;
@@ -40,7 +38,7 @@ final class ComponentCreationContext implements ComponentFactoryContext {
         this.world = Objects.requireNonNull(world, "world");
         this.definition = Objects.requireNonNull(definition, "definition");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
-        this.properties = properties.values();
+        this.properties = new ComponentProperties(properties.values());
         this.location = Objects.requireNonNull(location, "location");
         this.resourceAccess = Objects.requireNonNull(resourceAccess, "resourceAccess");
     }
@@ -72,7 +70,7 @@ final class ComponentCreationContext implements ComponentFactoryContext {
     }
 
     @Override
-    public Map<PropertyId, ProjectValue> properties() {
+    public ComponentProperties properties() {
         return properties;
     }
 

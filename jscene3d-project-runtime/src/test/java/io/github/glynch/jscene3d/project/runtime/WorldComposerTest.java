@@ -44,7 +44,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -164,7 +163,7 @@ final class WorldComposerTest {
     void closesConstructedComponentsInReverseOrder() throws IOException {
         List<String> events = new ArrayList<>();
         ComponentFactory<ClosingComponent> factory = context -> {
-            String value = text(Objects.requireNonNull(context.properties().get(VALUE), "value"));
+            String value = text(context.properties().value(VALUE));
             events.add("create:" + value);
             return new ClosingComponent(value, events);
         };
@@ -191,7 +190,7 @@ final class WorldComposerTest {
     void rollsBackFailedComposition() throws IOException {
         List<String> events = new ArrayList<>();
         ComponentFactory<ClosingComponent> factory = context -> {
-            String value = text(Objects.requireNonNull(context.properties().get(VALUE), "value"));
+            String value = text(context.properties().value(VALUE));
             events.add("create:" + value);
             if ("99".equals(value)) {
                 throw new IllegalStateException("deliberate failure");
@@ -314,7 +313,7 @@ final class WorldComposerTest {
         RuntimeResourceProvider resources = stringResourceProvider(events);
         ComponentFactory<ClosingComponent> factory = context -> {
             context.resolveResource(ResourceReference.asset("shared"), String.class);
-            String value = text(Objects.requireNonNull(context.properties().get(VALUE), "value"));
+            String value = text(context.properties().value(VALUE));
             return new ClosingComponent(value, events);
         };
         World world = compose(twoRootWorld(), descriptor(), List.of(extension(factory)), resources)
@@ -338,7 +337,7 @@ final class WorldComposerTest {
         RuntimeResourceProvider resources = stringResourceProvider(events);
         ComponentFactory<ClosingComponent> factory = context -> {
             context.resolveResource(ResourceReference.asset("shared"), String.class);
-            String value = text(Objects.requireNonNull(context.properties().get(VALUE), "value"));
+            String value = text(context.properties().value(VALUE));
             if ("2".equals(value)) {
                 throw new IllegalStateException("deliberate resource-user failure");
             }
@@ -872,8 +871,7 @@ final class WorldComposerTest {
         @Override
         public RecordedComponent create(ComponentFactoryContext context) {
             entityCounts.add(entityCount(context.world()));
-            ProjectValue authoredValue =
-                    Objects.requireNonNull(context.properties().get(VALUE), "value");
+            ProjectValue authoredValue = context.properties().value(VALUE);
             BigDecimal value = ((ProjectValue.NumberValue) authoredValue).value();
             return new RecordedComponent(context.owner(), context.world(), value);
         }

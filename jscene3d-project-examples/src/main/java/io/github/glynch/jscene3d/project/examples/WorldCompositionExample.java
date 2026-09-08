@@ -194,8 +194,7 @@ public final class WorldCompositionExample {
 
                 @Override
                 public LabelComponent create(ComponentFactoryContext context) {
-                    ProjectValue value =
-                            Objects.requireNonNull(context.properties().get(LABEL), "label");
+                    ProjectValue value = context.properties().value(LABEL);
                     PresentationModule presentation = context.world().requireModule(PresentationModule.class);
                     LabelFormatter formatter = context.resolveResource(LABEL_FORMATTER, LabelFormatter.class);
                     return new LabelComponent(formatter.format(((ProjectValue.TextValue) value).value()), presentation);

@@ -66,8 +66,18 @@ final class StandardProjectEnvironmentTest {
 
         List<WorldModuleBinding<?>> modules = environment.createWorldModules(Optional.empty());
 
-        assertThat(environment.descriptors()).hasSize(2);
-        assertThat(environment.runtimeExtensions()).hasSize(2);
+        assertThat(environment.descriptors())
+                .extracting(descriptor -> descriptor.id())
+                .containsExactly(
+                        "io.github.glynch.jscene3d.spatial3d",
+                        "io.github.glynch.jscene3d.physics3d",
+                        "io.github.glynch.jscene3d.game3d");
+        assertThat(environment.runtimeExtensions())
+                .extracting(extension -> extension.id())
+                .containsExactly(
+                        "io.github.glynch.jscene3d.spatial3d",
+                        "io.github.glynch.jscene3d.physics3d",
+                        "io.github.glynch.jscene3d.game3d");
         assertThat(modules)
                 .extracting(binding -> binding.type().getName())
                 .containsExactly(

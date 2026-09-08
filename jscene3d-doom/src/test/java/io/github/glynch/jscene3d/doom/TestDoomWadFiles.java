@@ -47,6 +47,27 @@ final class TestDoomWadFiles {
         return lumps;
     }
 
+    /** Prepends the palette, flats, and composite wall textures required by {@link #validMap}. */
+    static List<LumpContent> withMinimalMaterials(List<LumpContent> mapLumps) {
+        byte[] palette = new byte[256 * 3];
+        palette[3] = 32;
+        palette[4] = 64;
+        palette[5] = 96;
+        byte[] flat = new byte[64 * 64];
+        Arrays.fill(flat, (byte) 1);
+        List<LumpContent> lumps = new ArrayList<>(List.of(
+                new LumpContent("PLAYPAL", palette),
+                new LumpContent("F_START", new byte[0]),
+                new LumpContent("FLOOR0_1", flat),
+                new LumpContent("CEIL1_1", flat),
+                new LumpContent("F_END", new byte[0]),
+                new LumpContent("PATCH1", patch()),
+                new LumpContent("PNAMES", patchNames()),
+                new LumpContent("TEXTURE1", textureDefinitions())));
+        lumps.addAll(mapLumps);
+        return lumps;
+    }
+
     /** Replaces one named lump in a complete minimal MAP01 sequence. */
     static List<LumpContent> validMapReplacing(String name, byte[] content) {
         List<LumpContent> lumps = validMap("MAP01");
@@ -130,6 +151,58 @@ final class TestDoomWadFiles {
         byte[] encoded = name.getBytes(StandardCharsets.US_ASCII);
         target.put(encoded);
         target.put(new byte[8 - encoded.length]);
+    }
+
+    /** Encodes the single patch name shared by both fixture wall textures. */
+    private static byte[] patchNames() {
+        ByteBuffer bytes = ByteBuffer.allocate(Integer.BYTES + 8).order(ByteOrder.LITTLE_ENDIAN);
+        bytes.putInt(1);
+        putName(bytes, "PATCH1");
+        return bytes.array();
+    }
+
+    /** Encodes the upper and middle wall textures referenced by the fixture sidedef. */
+    private static byte[] textureDefinitions() {
+        int definitionSize = 22 + 10;
+        ByteBuffer bytes = ByteBuffer.allocate(12 + definitionSize * 2).order(ByteOrder.LITTLE_ENDIAN);
+        bytes.putInt(2);
+        bytes.putInt(12);
+        bytes.putInt(12 + definitionSize);
+        putTextureDefinition(bytes, "UPPER");
+        putTextureDefinition(bytes, "MIDDLE");
+        return bytes.array();
+    }
+
+    /** Writes one 1-by-1 composite texture definition using patch zero. */
+    private static void putTextureDefinition(ByteBuffer bytes, String name) {
+        putName(bytes, name);
+        bytes.putInt(0);
+        bytes.putShort((short) 1);
+        bytes.putShort((short) 1);
+        bytes.putInt(0);
+        bytes.putShort((short) 1);
+        bytes.putShort((short) 0);
+        bytes.putShort((short) 0);
+        bytes.putShort((short) 0);
+        bytes.putShort((short) 0);
+        bytes.putShort((short) 0);
+    }
+
+    /** Encodes one opaque 1-by-1 Doom patch. */
+    private static byte[] patch() {
+        ByteBuffer bytes = ByteBuffer.allocate(18).order(ByteOrder.LITTLE_ENDIAN);
+        bytes.putShort((short) 1);
+        bytes.putShort((short) 1);
+        bytes.putShort((short) 0);
+        bytes.putShort((short) 0);
+        bytes.putInt(12);
+        bytes.put((byte) 0);
+        bytes.put((byte) 1);
+        bytes.put((byte) 0);
+        bytes.put((byte) 1);
+        bytes.put((byte) 0);
+        bytes.put((byte) 0xff);
+        return bytes.array();
     }
 
     /** Immutable test lump content with defensive byte-array ownership. */

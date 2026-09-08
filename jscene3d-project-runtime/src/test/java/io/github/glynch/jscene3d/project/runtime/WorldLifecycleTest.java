@@ -40,7 +40,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -433,7 +432,7 @@ final class WorldLifecycleTest {
 
         @Override
         public RecordingLifecycle create(ComponentFactoryContext context) {
-            ProjectValue value = Objects.requireNonNull(context.properties().get(LABEL), "label");
+            ProjectValue value = context.properties().value(LABEL);
             String label = ((ProjectValue.TextValue) value).value();
             return new RecordingLifecycle(label, events, failures.getOrDefault(label, Set.of()));
         }

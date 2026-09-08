@@ -33,6 +33,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryConte
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentProperties;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -413,15 +414,14 @@ final class WorldSpawningTest {
         public Projectile create(ComponentFactoryContext context) {
             ResourceReference reference = reference(context.properties());
             String resource = context.resolveResource(reference, String.class);
-            ProjectValue speedValue =
-                    Objects.requireNonNull(context.properties().get(SPEED), "speed");
+            ProjectValue speedValue = context.properties().value(SPEED);
             BigDecimal speed = ((ProjectValue.NumberValue) speedValue).value();
             return new Projectile(speed, resource, events);
         }
 
         /** Reads one required portable resource reference. */
-        private static ResourceReference reference(Map<PropertyId, ProjectValue> properties) {
-            ProjectValue value = Objects.requireNonNull(properties.get(RESOURCE), "resource");
+        private static ResourceReference reference(ComponentProperties properties) {
+            ProjectValue value = properties.value(RESOURCE);
             return ((ProjectValue.ReferenceValue) value).reference();
         }
     }

@@ -58,14 +58,20 @@ final class Physics3dDescriptorsTest {
                 .allSatisfy(signal -> assertThat(signal.payload()).contains(Physics3dDescriptors.overlapPayloadType()));
     }
 
-    /** Publishes immutable box and sphere resource declarations. */
+    /** Publishes every immutable collision resource declaration and its matching loader. */
     @Test
     void describesCollisionResources() {
         assertThat(Physics3dDescriptors.extensionDescriptor().types())
                 .extracting(descriptor -> descriptor.type())
-                .containsExactly(Physics3dDescriptors.boxResourceType(), Physics3dDescriptors.sphereResourceType());
+                .containsExactly(
+                        Physics3dDescriptors.boxResourceType(),
+                        Physics3dDescriptors.sphereResourceType(),
+                        Physics3dDescriptors.triangleMeshResourceType());
         assertThat(Physics3dResourceLoaders.all())
                 .extracting(loader -> loader.type())
-                .containsExactly(Physics3dDescriptors.boxResourceType(), Physics3dDescriptors.sphereResourceType());
+                .containsExactly(
+                        Physics3dDescriptors.boxResourceType(),
+                        Physics3dDescriptors.sphereResourceType(),
+                        Physics3dDescriptors.triangleMeshResourceType());
     }
 }

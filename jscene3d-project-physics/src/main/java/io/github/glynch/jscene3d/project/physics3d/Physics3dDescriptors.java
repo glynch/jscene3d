@@ -34,6 +34,7 @@ public final class Physics3dDescriptors {
     private static final ComponentType SENSOR_TYPE = type("collision-sensor-3d");
     private static final RegisteredType BOX_RESOURCE_TYPE = resourceType("box-collision-shape-3d");
     private static final RegisteredType SPHERE_RESOURCE_TYPE = resourceType("sphere-collision-shape-3d");
+    private static final RegisteredType TRIANGLE_MESH_RESOURCE_TYPE = resourceType("triangle-mesh-collision-shape-3d");
     private static final RegisteredType OVERLAP_PAYLOAD_TYPE = resourceType("collision-overlap-3d");
 
     private static final PropertyId SHAPE = new PropertyId("shape");
@@ -105,6 +106,15 @@ public final class Physics3dDescriptors {
      */
     public static RegisteredType sphereResourceType() {
         return SPHERE_RESOURCE_TYPE;
+    }
+
+    /**
+     * Returns the static triangle-mesh collision resource type.
+     *
+     * @return exact version-one triangle-mesh collision resource type
+     */
+    public static RegisteredType triangleMeshResourceType() {
+        return TRIANGLE_MESH_RESOURCE_TYPE;
     }
 
     /**
@@ -204,7 +214,7 @@ public final class Physics3dDescriptors {
                 "1.0.0",
                 ">=0.1.0 <0.2.0",
                 DescriptorPresentation.named("JScene3D 3D physics"),
-                List.of(boxResourceDescriptor(), sphereResourceDescriptor()),
+                List.of(boxResourceDescriptor(), sphereResourceDescriptor(), triangleMeshResourceDescriptor()),
                 List.of(shapeDescriptor(), staticBodyDescriptor(), sensorDescriptor()));
     }
 
@@ -223,6 +233,19 @@ public final class Physics3dDescriptors {
     private static RegisteredTypeDescriptor sphereResourceDescriptor() {
         return resourceDescriptor(
                 SPHERE_RESOURCE_TYPE, "Sphere collision shape 3D", List.of(positiveNumber("radius", "Radius")));
+    }
+
+    /** Describes one payload-backed immutable triangle collision mesh for static geometry. */
+    private static RegisteredTypeDescriptor triangleMeshResourceDescriptor() {
+        return resourceDescriptor(
+                TRIANGLE_MESH_RESOURCE_TYPE,
+                "Triangle mesh collision shape 3D",
+                List.of(PropertyDescriptor.required(
+                        "payload",
+                        ProjectValueKind.REFERENCE,
+                        DescriptorPresentation.named("Payload"),
+                        Map.of(),
+                        Set.of())));
     }
 
     /** Creates inert safe metadata for one collision resource. */

@@ -9,12 +9,15 @@ import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.runtime.ResourceContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
 /** Supplies runtime loaders corresponding exactly to {@link Physics3dDescriptors}. */
 public final class Physics3dResourceLoaders {
-    private static final List<RuntimeResourceLoader<?>> ALL = List.of(new BoxLoader(), new SphereLoader());
+    private static final List<RuntimeResourceLoader<?>> ALL =
+            List.of(new BoxLoader(), new SphereLoader(), new TriangleMeshLoader());
 
     /** Prevents construction of this stable loader collection. */
     private Physics3dResourceLoaders() {
@@ -65,6 +68,32 @@ public final class Physics3dResourceLoaders {
         @Override
         public SphereCollisionShape3dResource load(ResourceDefinition definition, ResourceContent content) {
             return new SphereCollisionShape3dResource(number(definition.properties(), "radius"));
+        }
+    }
+
+    /** Reconstructs one immutable static triangle mesh from its independently published payload. */
+    private static final class TriangleMeshLoader
+            implements RuntimeResourceLoader<TriangleMeshCollisionShape3dResource> {
+        @Override
+        public RegisteredType type() {
+            return Physics3dDescriptors.triangleMeshResourceType();
+        }
+
+        @Override
+        public Class<TriangleMeshCollisionShape3dResource> valueType() {
+            return TriangleMeshCollisionShape3dResource.class;
+        }
+
+        @Override
+        public TriangleMeshCollisionShape3dResource load(ResourceDefinition definition, ResourceContent content)
+                throws IOException {
+            ProjectValue payload = definition.properties().get("payload");
+            if (!(payload instanceof ProjectValue.ReferenceValue reference)) {
+                throw new IllegalArgumentException("triangle-mesh collision resource payload must be a reference");
+            }
+            try (InputStream input = content.openPayload(reference.reference())) {
+                return Physics3dResourceCodec.readTriangleMesh(input);
+            }
         }
     }
 

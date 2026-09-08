@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.physics3d;
 
 import io.github.glynch.jscene3d.project.resource.ResourceWriter;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
@@ -50,6 +51,62 @@ public final class Physics3dResourceWriter {
                 Objects.requireNonNull(output, "output"),
                 Physics3dDescriptors.sphereResourceType(),
                 Map.of("radius", number(CollisionPreconditions.requirePositive(radius, "radius"))));
+    }
+
+    /**
+     * Writes one triangle-mesh resource document and its distinct binary collision payload.
+     *
+     * <p>The method consumes but does not close either output and defensively validates both arrays.
+     *
+     * @param resourceOutput resource-document destination
+     * @param payloadOutput binary-payload destination
+     * @param positions consecutive finite XYZ coordinates
+     * @param indices consecutive vertex-index triples
+     * @param payloadReference reference stored in the resource document
+     * @throws IOException when either destination cannot be written
+     */
+    public static void writeTriangleMesh(
+            OutputStream resourceOutput,
+            OutputStream payloadOutput,
+            float[] positions,
+            int[] indices,
+            ResourceReference payloadReference)
+            throws IOException {
+        writeTriangleMeshPayload(payloadOutput, positions, indices);
+        writeTriangleMeshDefinition(resourceOutput, payloadReference);
+    }
+
+    /**
+     * Writes one triangle-mesh resource document for an independently published collision payload.
+     *
+     * @param output resource-document destination
+     * @param payloadReference reference stored in the resource document
+     * @throws IOException when the destination cannot be written
+     */
+    public static void writeTriangleMeshDefinition(OutputStream output, ResourceReference payloadReference)
+            throws IOException {
+        ResourceWriter.write(
+                Objects.requireNonNull(output, "output"),
+                Physics3dDescriptors.triangleMeshResourceType(),
+                Map.of(
+                        "payload",
+                        new ProjectValue.ReferenceValue(Objects.requireNonNull(payloadReference, "payloadReference"))));
+    }
+
+    /**
+     * Writes one validated binary triangle collision mesh without closing caller-owned output.
+     *
+     * @param output binary-payload destination
+     * @param positions consecutive finite XYZ coordinates
+     * @param indices consecutive vertex-index triples
+     * @throws IOException when the destination cannot be written
+     */
+    public static void writeTriangleMeshPayload(OutputStream output, float[] positions, int[] indices)
+            throws IOException {
+        Physics3dResourceCodec.writeTriangleMesh(
+                Objects.requireNonNull(output, "output"),
+                Objects.requireNonNull(positions, "positions"),
+                Objects.requireNonNull(indices, "indices"));
     }
 
     /** Creates one portable exact finite decimal. */

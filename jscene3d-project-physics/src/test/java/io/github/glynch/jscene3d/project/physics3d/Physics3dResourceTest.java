@@ -8,8 +8,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
+import io.github.glynch.jscene3d.project.runtime.ResourceContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.value.ResourceReference;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -68,6 +71,41 @@ final class Physics3dResourceTest {
         resource.close();
     }
 
+    /** Round-trips independently published triangle collision geometry through its public resource seam. */
+    @Test
+    void writesAndLoadsTriangleMesh() throws IOException {
+        float[] positions = {0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 3.0F, 0.0F};
+        int[] indices = {0, 1, 2};
+        ResourceReference payload = ResourceReference.imported("test/triangle-mesh.payload");
+        ByteArrayOutputStream resourceOutput = new ByteArrayOutputStream();
+        ByteArrayOutputStream payloadOutput = new ByteArrayOutputStream();
+        Physics3dResourceWriter.writeTriangleMesh(resourceOutput, payloadOutput, positions, indices, payload);
+        ResourceDefinition definition = new ResourceDefinition(
+                URI.create("project:/collision/triangle-mesh.resource.json"),
+                Physics3dDescriptors.triangleMeshResourceType(),
+                Map.of("payload", new ProjectValue.ReferenceValue(payload)));
+
+        TriangleMeshCollisionShape3dResource resource = triangleMeshLoader()
+                .load(definition, reference -> new ByteArrayInputStream(payloadOutput.toByteArray()));
+
+        assertThat(new String(resourceOutput.toByteArray(), StandardCharsets.UTF_8))
+                .contains("triangle-mesh-collision-shape-3d", "\"$ref\" : \"import:test/triangle-mesh.payload\"");
+        assertThat(resource.vertexCount()).isEqualTo(3);
+        assertThat(resource.triangleCount()).isOne();
+        assertThat(resource.vertex(2, new Vector3f())).isEqualTo(new Vector3f(0.0F, 3.0F, 0.0F));
+        assertThat(resource.index(1)).isOne();
+        resource.close();
+        assertThatThrownBy(resource::triangleCount).isInstanceOf(IllegalStateException.class);
+
+        byte[] malformedPayload = payloadOutput.toByteArray();
+        malformedPayload[0] = 0;
+        ResourceContent malformedContent = reference -> new ByteArrayInputStream(malformedPayload);
+        RuntimeResourceLoader<TriangleMeshCollisionShape3dResource> loader = triangleMeshLoader();
+        assertThatThrownBy(() -> loader.load(definition, malformedContent))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("invalid magic value");
+    }
+
     /** Covers non-finite geometry rejection and both asymmetric filter mismatch paths. */
     @Test
     void rejectsNonFiniteGeometryAndMismatchedFilters() {
@@ -103,6 +141,13 @@ final class Physics3dResourceTest {
     private static RuntimeResourceLoader<SphereCollisionShape3dResource> sphereLoader() {
         return (RuntimeResourceLoader<SphereCollisionShape3dResource>)
                 Physics3dResourceLoaders.all().get(1);
+    }
+
+    /** Returns the typed triangle-mesh loader from the public heterogeneous collection. */
+    @SuppressWarnings("unchecked")
+    private static RuntimeResourceLoader<TriangleMeshCollisionShape3dResource> triangleMeshLoader() {
+        return (RuntimeResourceLoader<TriangleMeshCollisionShape3dResource>)
+                Physics3dResourceLoaders.all().get(2);
     }
 
     /** Creates one portable exact decimal. */

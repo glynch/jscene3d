@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.project.physics3d;
 import io.github.glynch.jscene3d.project.runtime.PhysicsStepWorldModule;
 import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
 import java.util.List;
+import java.util.Optional;
+import org.joml.Vector3fc;
 
 /** World-scoped seam realizing descriptor-backed 3D collision components. */
 public interface Physics3dWorldModule extends PhysicsStepWorldModule {
@@ -35,6 +37,18 @@ public interface Physics3dWorldModule extends PhysicsStepWorldModule {
             Transform3d transform,
             List<CollisionShape3d> shapes,
             CollisionOverlapListener listener);
+
+    /**
+     * Finds the nearest enabled solid collision shape reached by a world-space ray.
+     *
+     * <p>Collision sensors are excluded. The direction need not be normalized.
+     *
+     * @param origin finite world-space ray origin
+     * @param direction finite non-zero ray direction
+     * @param maximumDistance finite non-negative distance limit
+     * @return nearest hit, or empty when no solid shape is reached
+     */
+    Optional<CollisionRaycastHit3d> raycast(Vector3fc origin, Vector3fc direction, float maximumDistance);
 
     /**
      * Returns the current collision-object count.

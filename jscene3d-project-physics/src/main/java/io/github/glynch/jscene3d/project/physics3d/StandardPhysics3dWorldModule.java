@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.physics.PhysicsWorld;
 import io.github.glynch.jscene3d.physics.StaticBody;
 import io.github.glynch.jscene3d.physics.queries.OverlapHit;
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
+import io.github.glynch.jscene3d.physics.queries.RaycastHit;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
@@ -24,9 +25,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.joml.Matrix4fc;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 
 /** Standard renderer-independent backend for descriptor-backed 3D collision components. */
@@ -68,6 +71,12 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         List<Registration> stable = List.copyOf(registrations);
         stable.forEach(Registration::synchronizeTransform);
         stable.stream().filter(Registration::isSensor).forEach(Registration::detectOverlaps);
+    }
+
+    @Override
+    public Optional<CollisionRaycastHit3d> raycast(Vector3fc origin, Vector3fc direction, float maximumDistance) {
+        requireOpen();
+        return physics.raycast(origin, direction, maximumDistance).map(this::projectHit);
     }
 
     @Override
@@ -178,20 +187,6 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         }
     }
 
-    /** Removes one terminal registration and its shape claims. */
-    private void release(Registration registration) {
-        if (!registrations.remove(registration)) {
-            return;
-        }
-        registrationsByComponent.remove(registration.component);
-        registrationsByObject.remove(registration.object);
-        registration.shapes.forEach(shape -> shapeOwners.remove(shape, registration));
-        removePreviousOverlaps(registration.component);
-        if (registration.object.isRegistered()) {
-            physics.remove(registration.object);
-        }
-    }
-
     /** Forgets relationships to an object which can no longer be named safely by later exit signals. */
     private void removePreviousOverlaps(CollisionObject3d removed) {
         registrations.stream()
@@ -216,11 +211,26 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         return shape;
     }
 
+    /** Converts one backend raycast result without leaking backend collision identities. */
+    private CollisionRaycastHit3d projectHit(RaycastHit hit) {
+        Registration owner = registrationsByObject.get(hit.collisionObject());
+        if (owner == null) {
+            throw new IllegalStateException("physics raycast object has no project registration");
+        }
+        return new CollisionRaycastHit3d(
+                owner.component,
+                projectShape(hit.collider()),
+                hit.distance(),
+                hit.point(new Vector3f()),
+                hit.normal(new Vector3f()));
+    }
+
     /** Converts one project resource to a backend shape without transferring ownership. */
     private static CollisionShape backendShape(CollisionShape3dResource resource) {
         return switch (resource) {
             case BoxCollisionShape3dResource box -> new BoxShape(box.width(), box.height(), box.depth());
             case SphereCollisionShape3dResource sphere -> new SphereShape(sphere.radius());
+            case TriangleMeshCollisionShape3dResource mesh -> mesh.shape();
         };
     }
 
@@ -299,9 +309,23 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
                 return;
             }
             closed = true;
-            StandardPhysics3dWorldModule.this.release(this);
+            release();
             shapesByCollider.clear();
             previous = new LinkedHashMap<>();
+        }
+
+        /** Removes this terminal registration and its shape claims from the owning module. */
+        private void release() {
+            if (!registrations.remove(this)) {
+                return;
+            }
+            registrationsByComponent.remove(component);
+            registrationsByObject.remove(object);
+            shapes.forEach(shape -> shapeOwners.remove(shape, this));
+            removePreviousOverlaps(component);
+            if (object.isRegistered()) {
+                physics.remove(object);
+            }
         }
 
         /** Attaches every project shape in stable authored membership order. */

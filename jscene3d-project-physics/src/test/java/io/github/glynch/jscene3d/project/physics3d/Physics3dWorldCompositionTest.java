@@ -57,6 +57,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -107,6 +108,13 @@ final class Physics3dWorldCompositionTest {
         assertThat(physics.collisionObjectCount()).isEqualTo(2);
         assertThat(physics.collisionShapeCount()).isEqualTo(3);
         world.activate();
+        CollisionRaycastHit3d raycast = physics.raycast(
+                        new Vector3f(-3.0F, 0.0F, 0.0F), new Vector3f(1.0F, 0.0F, 0.0F), 10.0F)
+                .orElseThrow();
+        assertThat(raycast.object().componentId()).isEqualTo(STATIC_BODY);
+        assertThat(raycast.shape().componentId()).isEqualTo(STATIC_SHAPE);
+        assertThat(raycast.distance()).isEqualTo(2.0F);
+        assertThat(raycast.point(new Vector3f())).isEqualTo(new Vector3f(-1.0F, 0.0F, 0.0F));
         world.advanceFixed(STEP);
 
         assertThat(overlaps).hasSize(2);

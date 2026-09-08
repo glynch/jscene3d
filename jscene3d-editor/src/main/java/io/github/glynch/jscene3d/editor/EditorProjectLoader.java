@@ -29,7 +29,12 @@ import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dDescriptors;
+import io.github.glynch.jscene3d.project.runtime.ProjectContent;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
+import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
+import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -50,6 +55,12 @@ import java.util.Set;
 final class EditorProjectLoader {
     private static final String PROJECT_RESOURCES = "src/main/resources";
     private static final String IMPORT_CACHE = "target/import-cache";
+    private static final RuntimeResourceProvider UNAVAILABLE_RESOURCES = new RuntimeResourceProvider() {
+        @Override
+        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
+            throw new IllegalStateException("published runtime resources are unavailable");
+        }
+    };
 
     private final ProjectLoader projectLoader;
     private final ExtensionCatalogLoader extensionLoader;
@@ -81,7 +92,8 @@ final class EditorProjectLoader {
 
         RegisteredTypeCatalog types = loadTypeCatalog(project, diagnostics);
         List<ImportDefinition> imports = loadImports(project, diagnostics);
-        DefinitionResolver definitions = loadDefinitions(project, authored, types, imports, diagnostics);
+        ProjectContent content = loadContent(project, authored, types, imports, diagnostics);
+        DefinitionResolver definitions = content.definitions();
         List<EditorAssetItem> assets = loadAssets(project, authored, definitions, types, imports, diagnostics);
         Optional<WorldDefinition> startupWorld = loadStartupWorld(project, authored, definitions, types, diagnostics);
         if (startupWorld.isEmpty()) {
@@ -91,7 +103,7 @@ final class EditorProjectLoader {
         WorldDefinition world = startupWorld.orElseThrow();
         EditorHierarchyNode hierarchy = projectHierarchy(world, definitions, types, diagnostics);
         EditorProjectSession session =
-                new EditorProjectSession(project, authored, types, definitions, world, hierarchy, assets);
+                new EditorProjectSession(project, authored, types, content, world, hierarchy, assets);
         return new EditorProjectLoadResult(Optional.of(session), List.copyOf(diagnostics));
     }
 
@@ -168,26 +180,25 @@ final class EditorProjectLoader {
         return List.copyOf(imports);
     }
 
-    /** Combines authored definitions with already-published generated definitions. */
-    private static DefinitionResolver loadDefinitions(
+    /** Combines authored definitions with already-published definitions and spatial resources. */
+    private static ProjectContent loadContent(
             GameProject project,
             AssetCatalog authored,
             RegisteredTypeCatalog types,
             List<ImportDefinition> imports,
             LinkedHashSet<ProjectDiagnostic> diagnostics) {
         if (imports.size() != project.imports().size()) {
-            return authored;
+            return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
         }
         try {
             return PublishedProjectContent.load(
-                            project, types, authored, project.root().resolve(IMPORT_CACHE), List.of())
-                    .definitions();
+                    project, types, authored, project.root().resolve(IMPORT_CACHE), Spatial3dResourceLoaders.all());
         } catch (IllegalArgumentException | IllegalStateException | UncheckedIOException exception) {
             diagnostics.add(error(
                     project.root().resolve(IMPORT_CACHE),
                     EditorDiagnosticCode.IMPORT_CONTENT_UNAVAILABLE,
                     exception.toString()));
-            return authored;
+            return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
         }
     }
 

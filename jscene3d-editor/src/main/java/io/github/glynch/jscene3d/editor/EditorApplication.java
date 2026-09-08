@@ -10,6 +10,8 @@ import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -17,7 +19,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -25,12 +26,10 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
-import javafx.scene.control.Slider;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.ToolBar;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
@@ -42,20 +41,17 @@ import org.jspecify.annotations.Nullable;
 
 /** Production JavaFX shell for the JScene3D visual editor. */
 public final class EditorApplication extends Application {
-    private final ViewportInteraction interaction;
     private final EditorProjectLoader projectLoader;
     private final TreeView<EditorHierarchyNode> hierarchy;
     private final ListView<EditorAssetItem> assets;
     private final ListView<ProjectDiagnostic> diagnostics;
 
     private @Nullable GLCanvas canvas;
-    private double previousPointerX;
-    private double previousPointerY;
+    private @Nullable ViewportController viewportController;
     private boolean disposalRequested;
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
     public EditorApplication() {
-        interaction = new ViewportInteraction();
         projectLoader =
                 new EditorProjectLoader(EditorBuildInfo.engineVersion(), EditorApplication.class.getClassLoader());
         hierarchy = new TreeView<>();
@@ -68,13 +64,13 @@ public final class EditorApplication extends Application {
     public void start(Stage stage) {
         Label status = createStatus();
         GLCanvas viewportCanvas = createCanvas();
-        ViewportController controller =
-                new ViewportController(viewportCanvas, interaction, status, () -> completeDisposal(stage));
+        ViewportController controller = new ViewportController(viewportCanvas, status, () -> completeDisposal(stage));
         canvas = viewportCanvas;
+        viewportController = controller;
         installViewportEvents(viewportCanvas, controller);
 
         BorderPane root = new BorderPane();
-        root.setTop(createTopControls(stage, viewportCanvas, controller, status));
+        root.setTop(createTopControls(stage, status));
         root.setLeft(createNavigation());
         root.setCenter(createViewportPane(viewportCanvas));
         root.setRight(createInspector());
@@ -118,7 +114,7 @@ public final class EditorApplication extends Application {
         GLCanvas result = new GLCanvas.Builder()
                 .setExecutor(LWJGLExecutor.LWJGL_MODULE)
                 .setContextDescription(context)
-                .setFlipY(true)
+                .setFlipY(false)
                 .setMSAA(0)
                 .setSwapBuffers(2)
                 .setFps(60.0)
@@ -130,32 +126,16 @@ public final class EditorApplication extends Application {
         return result;
     }
 
-    /** Installs rendering, focus, keyboard, and pointer callbacks on the viewport. */
+    /** Installs rendering and focus callbacks on the viewport. */
     private void installViewportEvents(GLCanvas viewportCanvas, ViewportController controller) {
         viewportCanvas.addOnRenderEvent(controller::render);
         viewportCanvas.addOnDisposeEvent(ignored -> controller.dispose());
         viewportCanvas.focusedProperty().addListener((ignored, oldValue, focused) -> controller.setFocused(focused));
-        viewportCanvas.setOnKeyPressed(event -> {
-            if (event.getCode() == KeyCode.SPACE) {
-                interaction.setSpinning(!interaction.isSpinning());
-                controller.synchronizeAnimationControl();
-                event.consume();
-            }
-        });
-        viewportCanvas.setOnMousePressed(event -> {
-            viewportCanvas.requestFocus();
-            previousPointerX = event.getX();
-            previousPointerY = event.getY();
-        });
-        viewportCanvas.setOnMouseDragged(event -> {
-            interaction.drag((float) (event.getX() - previousPointerX), (float) (event.getY() - previousPointerY));
-            previousPointerX = event.getX();
-            previousPointerY = event.getY();
-        });
+        viewportCanvas.setOnMousePressed(ignored -> viewportCanvas.requestFocus());
     }
 
-    /** Creates the application menu and ordinary JavaFX viewport controls. */
-    private VBox createTopControls(Stage stage, GLCanvas viewportCanvas, ViewportController controller, Label status) {
+    /** Creates the application menu and project toolbar. */
+    private VBox createTopControls(Stage stage, Label status) {
         MenuItem openProject = new MenuItem("Open Project…");
         openProject.setOnAction(ignored -> chooseProject(stage, status));
         Menu file = new Menu("File");
@@ -163,21 +143,7 @@ public final class EditorApplication extends Application {
 
         Button openButton = new Button("Open Project…");
         openButton.setOnAction(ignored -> chooseProject(stage, status));
-        Button reset = new Button("Reset orientation");
-        reset.setOnAction(ignored -> {
-            interaction.requestReset();
-            viewportCanvas.requestFocus();
-        });
-        CheckBox animate = new CheckBox("Animate preview");
-        animate.setSelected(interaction.isSpinning());
-        animate.selectedProperty().addListener((ignored, oldValue, selected) -> interaction.setSpinning(selected));
-        Slider speed = new Slider(0.0, 2.0, interaction.rotationSpeed());
-        speed.setPrefWidth(160.0);
-        speed.valueProperty()
-                .addListener((ignored, oldValue, value) -> interaction.setRotationSpeed(value.floatValue()));
-        controller.setAnimationControl(animate);
-        ToolBar toolbar = new ToolBar(
-                openButton, new Separator(), reset, new Separator(), animate, new Label("Rotation speed"), speed);
+        ToolBar toolbar = new ToolBar(openButton);
         return new VBox(new MenuBar(file), toolbar);
     }
 
@@ -220,7 +186,7 @@ public final class EditorApplication extends Application {
                 heading,
                 new Separator(),
                 new Label("Nothing selected"),
-                new Label("Viewport controls\nSpace: pause or resume\nDrag: rotate preview"));
+                new Label("Select an authored entity or asset to inspect it."));
         inspector.setPadding(new Insets(12.0));
         inspector.setPrefWidth(250.0);
         VBox.setVgrow(inspector, Priority.ALWAYS);
@@ -263,6 +229,7 @@ public final class EditorApplication extends Application {
         if (result.session().isEmpty()) {
             hierarchy.setRoot(null);
             assets.getItems().clear();
+            requireViewportController().clearProject();
             status.setText("Project could not be opened — see diagnostics");
             return;
         }
@@ -272,6 +239,11 @@ public final class EditorApplication extends Application {
         hierarchy.setRoot(root);
         assets.getItems().setAll(session.assets());
         stage.setTitle(session.project().identity().name() + " — JScene3D Editor");
+        requireViewportController()
+                .showProject(
+                        session,
+                        previewDiagnostics ->
+                                applyPreviewDiagnostics(result.diagnostics(), previewDiagnostics, status));
         long errors = result.diagnostics().stream()
                 .filter(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR)
                 .count();
@@ -279,6 +251,28 @@ public final class EditorApplication extends Application {
                 + session.hierarchy().children().size() + " root entities, "
                 + session.assets().size()
                 + " assets, " + errors + " errors");
+    }
+
+    /** Combines project-loading and viewport-composition diagnostics after render-thread preparation. */
+    private void applyPreviewDiagnostics(
+            List<ProjectDiagnostic> projectDiagnostics, List<ProjectDiagnostic> previewDiagnostics, Label status) {
+        List<ProjectDiagnostic> combined = new ArrayList<>(projectDiagnostics);
+        combined.addAll(previewDiagnostics);
+        diagnostics.getItems().setAll(combined);
+        boolean failed = previewDiagnostics.stream()
+                .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
+        if (failed) {
+            status.setText("Project opened, but its viewport preview could not be composed — see diagnostics");
+        }
+    }
+
+    /** Returns the controller installed during JavaFX stage initialization. */
+    private ViewportController requireViewportController() {
+        ViewportController controller = viewportController;
+        if (controller == null) {
+            throw new IllegalStateException("editor viewport has not been initialized");
+        }
+        return controller;
     }
 
     /** Converts one immutable hierarchy projection into JavaFX tree items. */
@@ -318,6 +312,7 @@ public final class EditorApplication extends Application {
     /** Closes JavaFX only after the render thread releases the renderer and surface. */
     private void completeDisposal(Stage stage) {
         canvas = null;
+        viewportController = null;
         stage.setOnCloseRequest(null);
         stage.close();
         Platform.exit();

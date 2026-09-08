@@ -4,62 +4,56 @@
  */
 package io.github.glynch.jscene3d.editor;
 
-import static io.github.glynch.jscene3d.math.Angles.PI_OVER_THREE;
-
-import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
-import io.github.glynch.jscene3d.geometries.BoxGeometry;
-import io.github.glynch.jscene3d.geometries.BufferGeometry;
-import io.github.glynch.jscene3d.materials.BasicMaterial;
-import io.github.glynch.jscene3d.math.Color;
-import io.github.glynch.jscene3d.objects.Group;
-import io.github.glynch.jscene3d.objects.Mesh;
-import io.github.glynch.jscene3d.objects.RotationOrder;
+import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.render.RenderSurface;
 import io.github.glynch.jscene3d.render.RenderSurfaceSize;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.render.RendererOptions;
-import io.github.glynch.jscene3d.scenes.Scene;
+import java.util.List;
+import org.jspecify.annotations.Nullable;
 
-/** Owns the temporary scene and renderer displayed by the editor foundation. */
+/** Owns the renderer and the currently opened authored-world preview. */
 final class EditorPreview implements AutoCloseable {
-    private static final float DRAG_SCALE = 0.008f;
-
     private final Renderer renderer;
-    private final BufferGeometry geometry;
-    private final BasicMaterial cyanMaterial;
-    private final BasicMaterial greenMaterial;
-    private final BasicMaterial orangeMaterial;
-    private final Group model;
-    private final Scene scene;
-    private final PerspectiveCamera camera;
 
+    private @Nullable EditorWorldPreview worldPreview;
     private long frameCount;
     private boolean closed;
 
-    /** Creates the renderer and an asymmetric scene that exposes orientation and Y-flipping. */
+    /** Creates an initially empty renderer for the editor viewport. */
     EditorPreview(RenderSurface surface) {
         renderer = Renderer.create(surface, RendererOptions.defaults());
-        geometry = BoxGeometry.create(1.0f, 1.0f, 1.0f);
-        cyanMaterial = new BasicMaterial(Color.srgb(0x23d9e8));
-        greenMaterial = new BasicMaterial(Color.srgb(0x68c96a));
-        orangeMaterial = new BasicMaterial(Color.srgb(0xffa33a));
-        model = createModel();
-        scene = new Scene();
-        scene.setBackground(Color.srgb(0x101820));
-        scene.add(model);
-        camera = new PerspectiveCamera(PI_OVER_THREE, 1.0f, 0.1f, 100.0f);
-        camera.setPosition(4.2f, 3.0f, 6.4f);
-        camera.lookAt(0.0f, 0.0f, 0.0f);
     }
 
-    /** Renders one frame after applying the latest dimensions and input. */
-    void render(float elapsedSeconds, RenderSurfaceSize size, ViewportInteraction.FrameInput input) {
-        if (closed) {
-            throw new IllegalStateException("Editor preview is closed");
+    /** Replaces the current preview with a safely composed view of the supplied project. */
+    List<ProjectDiagnostic> show(EditorProjectSession session) {
+        requireOpen();
+        clearProject();
+        EditorWorldPreviewLoadResult result = EditorWorldPreview.compose(session);
+        worldPreview = result.preview().orElse(null);
+        return result.diagnostics();
+    }
+
+    /** Removes the current authored-world preview while retaining the surface renderer. */
+    void clearProject() {
+        requireOpen();
+        EditorWorldPreview current = worldPreview;
+        worldPreview = null;
+        if (current != null) {
+            current.close();
         }
-        camera.setAspectRatio((float) size.framebufferWidth() / size.framebufferHeight());
-        apply(input, elapsedSeconds);
-        renderer.render(scene, camera);
+    }
+
+    /** Renders the authored world, or a clear viewport before a project is available. */
+    void render(RenderSurfaceSize size) {
+        requireOpen();
+        EditorWorldPreview current = worldPreview;
+        if (current == null) {
+            renderer.clear();
+        } else {
+            float aspectRatio = (float) size.framebufferWidth() / size.framebufferHeight();
+            current.render(renderer, aspectRatio);
+        }
         frameCount++;
     }
 
@@ -68,7 +62,7 @@ final class EditorPreview implements AutoCloseable {
         return frameCount;
     }
 
-    /** Releases renderer GPU resources before closing the shared resource descriptions. */
+    /** Releases renderer GPU resources before closing the authored world and its resources. */
     @Override
     public void close() {
         if (closed) {
@@ -77,41 +71,19 @@ final class EditorPreview implements AutoCloseable {
         try {
             renderer.close();
         } finally {
-            cyanMaterial.close();
-            greenMaterial.close();
-            orangeMaterial.close();
-            geometry.close();
+            EditorWorldPreview current = worldPreview;
+            worldPreview = null;
+            if (current != null) {
+                current.close();
+            }
             closed = true;
         }
     }
 
-    /** Builds three differently positioned boxes for the temporary preview. */
-    private Group createModel() {
-        Group group = new Group();
-        Mesh left = new Mesh(geometry, greenMaterial);
-        left.setPosition(-1.35f, -0.55f, 0.0f);
-        left.setScale(1.2f, 0.45f, 1.2f);
-        group.add(left);
-        Mesh center = new Mesh(geometry, cyanMaterial);
-        center.setPosition(0.0f, 0.25f, 0.0f);
-        center.setScale(0.8f, 2.0f, 0.8f);
-        group.add(center);
-        Mesh right = new Mesh(geometry, orangeMaterial);
-        right.setPosition(1.35f, -0.2f, 0.0f);
-        right.setScale(0.65f, 1.15f, 0.65f);
-        group.add(right);
-        return group;
-    }
-
-    /** Applies one immutable interaction snapshot to the preview model. */
-    private void apply(ViewportInteraction.FrameInput input, float elapsedSeconds) {
-        if (input.resetRequested()) {
-            model.setRotationFromEuler(0.0f, 0.0f, 0.0f, RotationOrder.XYZ);
-        }
-        model.rotateY(input.horizontalDrag() * DRAG_SCALE);
-        model.rotateX(input.verticalDrag() * DRAG_SCALE);
-        if (input.spinning()) {
-            model.rotateY(elapsedSeconds * input.rotationSpeed());
+    /** Rejects operations after terminal renderer cleanup. */
+    private void requireOpen() {
+        if (closed) {
+            throw new IllegalStateException("Editor preview is closed");
         }
     }
 }

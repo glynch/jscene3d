@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.util.List;
 import java.util.Objects;
@@ -17,7 +18,7 @@ final class EditorProjectSession {
     private final GameProject project;
     private final AssetCatalog authoredAssets;
     private final RegisteredTypeCatalog types;
-    private final DefinitionResolver definitions;
+    private final ProjectContent content;
     private final WorldDefinition startupWorld;
     private final EditorHierarchyNode hierarchy;
     private final List<EditorAssetItem> assets;
@@ -27,14 +28,14 @@ final class EditorProjectSession {
             GameProject project,
             AssetCatalog authoredAssets,
             RegisteredTypeCatalog types,
-            DefinitionResolver definitions,
+            ProjectContent content,
             WorldDefinition startupWorld,
             EditorHierarchyNode hierarchy,
             List<EditorAssetItem> assets) {
         this.project = Objects.requireNonNull(project, "project");
         this.authoredAssets = Objects.requireNonNull(authoredAssets, "authoredAssets");
         this.types = Objects.requireNonNull(types, "types");
-        this.definitions = Objects.requireNonNull(definitions, "definitions");
+        this.content = Objects.requireNonNull(content, "content");
         this.startupWorld = Objects.requireNonNull(startupWorld, "startupWorld");
         this.hierarchy = Objects.requireNonNull(hierarchy, "hierarchy");
         this.assets = List.copyOf(assets);
@@ -57,7 +58,12 @@ final class EditorProjectSession {
 
     /** Returns the combined authored and generated definition resolver. */
     DefinitionResolver definitions() {
-        return definitions;
+        return content.definitions();
+    }
+
+    /** Returns combined definitions and lazily loaded spatial resources for preview composition. */
+    ProjectContent content() {
+        return content;
     }
 
     /** Returns the configured startup world. */

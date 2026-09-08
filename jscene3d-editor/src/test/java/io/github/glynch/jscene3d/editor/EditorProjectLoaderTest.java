@@ -74,6 +74,22 @@ final class EditorProjectLoaderTest {
         assertThat(EditorBuildInfo.engineVersion()).isEqualTo("0.1.0-SNAPSHOT");
     }
 
+    /** Composes spatial components while the deliberately missing application provider remains unloaded. */
+    @Test
+    void composesEditorSafeSpatialPreview() throws IOException {
+        writeProject();
+        EditorProjectSession session =
+                loader().load(temporaryDirectory).session().orElseThrow();
+
+        EditorWorldPreviewLoadResult result = EditorWorldPreview.compose(session);
+
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.preview()).isPresent();
+        try (EditorWorldPreview preview = result.preview().orElseThrow()) {
+            assertThat(preview.isReady()).isTrue();
+        }
+    }
+
     /** Creates the complete valid source project used by the read-only loading test. */
     private void writeProject() throws IOException {
         write("project.json", """
@@ -95,7 +111,17 @@ final class EditorProjectLoaderTest {
                   "engineRequires":">=0.1.0-SNAPSHOT <0.2.0",
                   "displayName":"Editor Test",
                   "types":[],
-                  "components":[]
+                  "components":[{
+                    "id":"example.editor-test/inert-behavior",
+                    "typeVersion":1,
+                    "displayName":"Inert Behavior",
+                    "properties":[],
+                    "actions":[{
+                      "id":"invoke",
+                      "displayName":"Invoke"
+                    }],
+                    "updatePhases":["before-physics"]
+                  }]
                 }
                 """);
         write(
@@ -123,13 +149,28 @@ final class EditorProjectLoaderTest {
                     "entityId":"441eea33-ec8d-4405-aa9b-4bbd28cc7942",
                     "name":"Beacon",
                     "enabled":true,
-                    "components":[],
+                    "components":[{
+                      "componentId":"6947ae19-3787-44a4-8a87-149022182770",
+                      "type":"example.editor-test/inert-behavior",
+                      "typeVersion":1,
+                      "properties":{}
+                    }],
                     "children":[{
                       "entryType":"local",
                       "entityId":"b991ca3e-66bb-4ef0-a682-74773bbef0d0",
                       "name":"Lamp",
                       "enabled":true,
-                      "components":[],
+                      "components":[{
+                        "componentId":"d53eb01b-ea50-43fd-b012-c6df2277872a",
+                        "type":"io.github.glynch.jscene3d.spatial3d/transform-3d",
+                        "typeVersion":1,
+                        "properties":{}
+                      },{
+                        "componentId":"9ab42328-8935-4d3d-850f-3872b624b90e",
+                        "type":"io.github.glynch.jscene3d.spatial3d/perspective-camera-3d",
+                        "typeVersion":1,
+                        "properties":{"primary":true}
+                      }],
                       "children":[]
                     }]
                   }

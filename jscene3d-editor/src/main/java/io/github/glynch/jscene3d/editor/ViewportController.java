@@ -6,9 +6,14 @@ package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.canvas.events.GLRenderEvent;
+import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.render.RenderSurfaceSize;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import javafx.application.Platform;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import org.jspecify.annotations.Nullable;
 
@@ -17,20 +22,18 @@ final class ViewportController {
     private static final System.Logger LOGGER = System.getLogger(ViewportController.class.getName());
 
     private final GLCanvas canvas;
-    private final ViewportInteraction interaction;
     private final Label status;
     private final Runnable disposalComplete;
     private final OpenGlFxRenderSurface surface = new OpenGlFxRenderSurface();
+    private final AtomicReference<@Nullable PreviewRequest> pendingPreview = new AtomicReference<>();
 
     private @Nullable EditorPreview preview;
-    private @Nullable CheckBox animationControl;
     private boolean focused;
     private boolean disposed;
 
     /** Stores the JavaFX controls and state used by rendering callbacks. */
-    ViewportController(GLCanvas canvas, ViewportInteraction interaction, Label status, Runnable disposalComplete) {
+    ViewportController(GLCanvas canvas, Label status, Runnable disposalComplete) {
         this.canvas = canvas;
-        this.interaction = interaction;
         this.status = status;
         this.disposalComplete = disposalComplete;
     }
@@ -48,8 +51,8 @@ final class ViewportController {
                 currentPreview = new EditorPreview(surface);
                 preview = currentPreview;
             }
-            float elapsedSeconds = (float) Math.clamp(event.delta, 0.0, 0.1);
-            currentPreview.render(elapsedSeconds, size, interaction.consume());
+            applyPendingPreview(currentPreview);
+            currentPreview.render(size);
             if (currentPreview.frameCount() % 30L == 0L) {
                 updateStatus(event, size, currentPreview.frameCount());
             }
@@ -79,22 +82,37 @@ final class ViewportController {
         }
     }
 
-    /** Stores the toolbar animation control after the shell creates it. */
-    void setAnimationControl(CheckBox animationControl) {
-        this.animationControl = animationControl;
+    /** Requests composition of one editor-safe project preview on the OpenGL rendering thread. */
+    void showProject(EditorProjectSession session, Consumer<List<ProjectDiagnostic>> completion) {
+        pendingPreview.set(new PreviewRequest(
+                Optional.of(Objects.requireNonNull(session, "session")),
+                Objects.requireNonNull(completion, "completion")));
     }
 
-    /** Reflects a keyboard animation toggle in the toolbar control. */
-    void synchronizeAnimationControl() {
-        CheckBox currentControl = animationControl;
-        if (currentControl != null) {
-            currentControl.setSelected(interaction.isSpinning());
-        }
+    /** Requests removal of the current project preview after an unsuccessful project open. */
+    void clearProject() {
+        pendingPreview.set(new PreviewRequest(Optional.empty(), ignored -> {}));
     }
 
     /** Records JavaFX focus changes for the next visible status update. */
     void setFocused(boolean focused) {
         this.focused = focused;
+    }
+
+    /** Applies the most recent pending project change and reports composition diagnostics on JavaFX. */
+    private void applyPendingPreview(EditorPreview currentPreview) {
+        @Nullable PreviewRequest request = pendingPreview.getAndSet(null);
+        if (request == null) {
+            return;
+        }
+        List<ProjectDiagnostic> previewDiagnostics;
+        if (request.session().isPresent()) {
+            previewDiagnostics = currentPreview.show(request.session().orElseThrow());
+        } else {
+            currentPreview.clearProject();
+            previewDiagnostics = List.of();
+        }
+        Platform.runLater(() -> request.completion().accept(previewDiagnostics));
     }
 
     /** Formats physical, logical, frame-rate, focus, and frame-count diagnostics. */
@@ -124,4 +142,8 @@ final class ViewportController {
             Platform.runLater(() -> status.setText(text));
         }
     }
+
+    /** One immutable cross-thread request to replace or clear the viewport project. */
+    private record PreviewRequest(
+            Optional<EditorProjectSession> session, Consumer<List<ProjectDiagnostic>> completion) {}
 }

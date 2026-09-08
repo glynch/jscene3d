@@ -6,10 +6,12 @@ package io.github.glynch.jscene3d.project.desktop;
 
 import io.github.glynch.jscene3d.game.WorldFrameDriver;
 import io.github.glynch.jscene3d.game.input.ActionSnapshot;
-import io.github.glynch.jscene3d.game.input.InputCapture;
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
+import io.github.glynch.jscene3d.platform.CursorMode;
 import io.github.glynch.jscene3d.platform.GamepadState;
+import io.github.glynch.jscene3d.platform.Key;
+import io.github.glynch.jscene3d.platform.MouseButton;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.project.runtime.HostedProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectHost;
@@ -73,17 +75,35 @@ public final class DesktopProjectRunner {
         ProjectInput input = requireProjectInput(project);
         Spatial3dWorldModule spatial = project.world().requireModule(Spatial3dWorldModule.class);
         WorldFrameDriver frames = new WorldFrameDriver(project.world(), input);
+        DesktopPointerCapture pointerCapture = new DesktopPointerCapture(input.usesRelativePointer());
         project.world().activate();
         window.show();
         long previousFrame = System.nanoTime();
         while (!window.shouldClose()) {
             Window.pollEvents();
             gamepad.poll();
-            ActionSnapshot acquired = input.sample(window.input(), gamepad, InputCapture.NONE);
+            DesktopPointerCapture.Update pointer = pointerCapture.update(
+                    window.isFocused(),
+                    window.input().wasKeyPressed(Key.ESCAPE),
+                    window.input().wasMouseButtonPressed(MouseButton.LEFT));
+            applyPointerTransition(window, pointer);
+            ActionSnapshot acquired = input.sample(window.input(), gamepad, pointer.inputCapture());
             long currentFrame = System.nanoTime();
             frames.advance(Duration.ofNanos(Math.max(0L, currentFrame - previousFrame)), acquired);
             previousFrame = currentFrame;
             render(spatial, renderer, window);
+        }
+    }
+
+    /** Applies a pointer-ownership transition without assigning Escape application-close semantics. */
+    private static void applyPointerTransition(Window window, DesktopPointerCapture.Update update) {
+        if (update.capturePointer()) {
+            window.setCursorMode(CursorMode.DISABLED);
+            if (window.isRawMouseMotionSupported()) {
+                window.setRawMouseMotionEnabled(true);
+            }
+        } else if (update.releasePointer()) {
+            window.setCursorMode(CursorMode.NORMAL);
         }
     }
 

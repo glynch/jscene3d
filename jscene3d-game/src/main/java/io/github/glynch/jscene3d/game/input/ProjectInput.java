@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.game.input;
 
 import io.github.glynch.jscene3d.platform.GamepadState;
 import io.github.glynch.jscene3d.platform.InputState;
+import io.github.glynch.jscene3d.project.input.InputBinding;
 import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -13,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 /** World-scoped adapter that samples an authored input map and publishes semantic state. */
 public final class ProjectInput implements InputWorldModule {
     private final InputMap inputMap;
+    private final boolean relativePointer;
     private ActionSnapshot snapshot = ActionSnapshot.empty();
     private boolean closed;
 
@@ -21,7 +23,11 @@ public final class ProjectInput implements InputWorldModule {
      * @param definition validated project input map
      */
     public ProjectInput(InputMapDefinition definition) {
-        inputMap = InputMap.compile(Objects.requireNonNull(definition, "definition"));
+        InputMapDefinition validDefinition = Objects.requireNonNull(definition, "definition");
+        inputMap = InputMap.compile(validDefinition);
+        relativePointer = validDefinition.actions().values().stream()
+                .flatMap(action -> action.bindings().stream())
+                .anyMatch(InputBinding.MouseDelta.class::isInstance);
     }
 
     /** Creates an input module with no authored actions.
@@ -38,6 +44,15 @@ public final class ProjectInput implements InputWorldModule {
     /** Stores one already compiled map. */
     private ProjectInput(InputMap inputMap) {
         this.inputMap = Objects.requireNonNull(inputMap, "inputMap");
+        relativePointer = false;
+    }
+
+    /** Returns whether the authored map requires unconstrained relative pointer movement.
+     *
+     * @return {@code true} when at least one action has a mouse-delta binding
+     */
+    public boolean usesRelativePointer() {
+        return relativePointer;
     }
 
     /** Samples keyboard and mouse state for the current update.

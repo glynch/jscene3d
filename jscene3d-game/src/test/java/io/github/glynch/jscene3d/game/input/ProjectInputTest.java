@@ -38,6 +38,23 @@ final class ProjectInputTest {
     void providesAnEmptyModuleForProjectsWithoutAnInputMap() {
         try (ProjectInput input = ProjectInput.empty()) {
             assertThat(input.snapshot()).isEqualTo(ActionSnapshot.empty());
+            assertThat(input.usesRelativePointer()).isFalse();
+        }
+    }
+
+    @Test
+    void reportsWhetherTheAuthoredMapUsesRelativePointerInput() {
+        InputMapDefinition relativePointerDefinition = new InputMapDefinition(
+                Path.of("/project/input-map.json"),
+                Map.of(
+                        "look",
+                        new InputActionDefinition(
+                                InputValueType.AXIS_2D, List.of(new InputBinding.MouseDelta(0.002F, -0.002F)))));
+
+        try (ProjectInput buttonsOnly = new ProjectInput(definition());
+                ProjectInput relativePointer = new ProjectInput(relativePointerDefinition)) {
+            assertThat(buttonsOnly.usesRelativePointer()).isFalse();
+            assertThat(relativePointer.usesRelativePointer()).isTrue();
         }
     }
 

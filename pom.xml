@@ -176,6 +176,11 @@
                 <version>${javafx.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-graphics</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.huskerdev</groupId>
                 <artifactId>openglfx-lwjgl</artifactId>
                 <version>${openglfx.version}</version>

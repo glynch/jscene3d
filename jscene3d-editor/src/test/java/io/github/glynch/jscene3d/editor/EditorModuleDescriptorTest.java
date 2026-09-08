@@ -21,6 +21,11 @@ final class EditorModuleDescriptorTest {
     void exposesItsApplicationClassOnlyToJavaFx() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
 
+        assertThat(descriptor.requires())
+                .filteredOn(requirement -> requirement.name().equals("javafx.graphics"))
+                .singleElement()
+                .satisfies(requirement ->
+                        assertThat(requirement.modifiers()).contains(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
         assertThat(descriptor.exports())
                 .singleElement()
                 .returns("io.github.glynch.jscene3d.editor", ModuleDescriptor.Exports::source)

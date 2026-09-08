@@ -129,7 +129,7 @@ abstract class AbstractCollisionObject3d
     }
 
     /** Returns the registration established during authored-reference binding. */
-    private CollisionObject3dRegistration requireRegistration() {
+    final CollisionObject3dRegistration requireRegistration() {
         CollisionObject3dRegistration current = registration;
         if (current == null || current.isClosed()) {
             throw new IllegalStateException("collision object has no open backend registration");

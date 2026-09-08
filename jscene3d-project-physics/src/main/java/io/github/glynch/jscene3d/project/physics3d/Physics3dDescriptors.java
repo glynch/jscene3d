@@ -32,8 +32,10 @@ public final class Physics3dDescriptors {
     private static final ComponentType SHAPE_TYPE = type("collision-shape-3d");
     private static final ComponentType STATIC_BODY_TYPE = type("static-body-3d");
     private static final ComponentType SENSOR_TYPE = type("collision-sensor-3d");
+    private static final ComponentType CHARACTER_BODY_TYPE = type("character-body-3d");
     private static final RegisteredType BOX_RESOURCE_TYPE = resourceType("box-collision-shape-3d");
     private static final RegisteredType SPHERE_RESOURCE_TYPE = resourceType("sphere-collision-shape-3d");
+    private static final RegisteredType CAPSULE_RESOURCE_TYPE = resourceType("capsule-collision-shape-3d");
     private static final RegisteredType TRIANGLE_MESH_RESOURCE_TYPE = resourceType("triangle-mesh-collision-shape-3d");
     private static final RegisteredType OVERLAP_PAYLOAD_TYPE = resourceType("collision-overlap-3d");
 
@@ -43,6 +45,10 @@ public final class Physics3dDescriptors {
     private static final PropertyId CATEGORY_BITS = new PropertyId("category-bits");
     private static final PropertyId MASK_BITS = new PropertyId("mask-bits");
     private static final PropertyId SHAPES = new PropertyId("shapes");
+    private static final PropertyId GRAVITY = new PropertyId("gravity");
+    private static final PropertyId JUMP_SPEED = new PropertyId("jump-speed");
+    private static final PropertyId MAXIMUM_STEP_HEIGHT = new PropertyId("maximum-step-height");
+    private static final PropertyId GROUND_SNAP_DISTANCE = new PropertyId("ground-snap-distance");
     private static final EndpointId OVERLAP_ENTERED = new EndpointId("overlap-entered");
     private static final EndpointId OVERLAP_EXITED = new EndpointId("overlap-exited");
     private static final Set<ComponentLifecycle> COLLISION_LIFECYCLE =
@@ -91,6 +97,15 @@ public final class Physics3dDescriptors {
     }
 
     /**
+     * Returns the explicitly moved character-body component type.
+     *
+     * @return exact version-one character-body component type
+     */
+    public static ComponentType characterBodyType() {
+        return CHARACTER_BODY_TYPE;
+    }
+
+    /**
      * Returns the box collision resource type.
      *
      * @return exact version-one box collision resource type
@@ -106,6 +121,15 @@ public final class Physics3dDescriptors {
      */
     public static RegisteredType sphereResourceType() {
         return SPHERE_RESOURCE_TYPE;
+    }
+
+    /**
+     * Returns the capsule collision resource type.
+     *
+     * @return exact version-one capsule collision resource type
+     */
+    public static RegisteredType capsuleResourceType() {
+        return CAPSULE_RESOURCE_TYPE;
     }
 
     /**
@@ -181,6 +205,42 @@ public final class Physics3dDescriptors {
     }
 
     /**
+     * Returns the character gravity property identity.
+     *
+     * @return character gravity property identity
+     */
+    public static PropertyId gravityProperty() {
+        return GRAVITY;
+    }
+
+    /**
+     * Returns the character jump-speed property identity.
+     *
+     * @return character jump-speed property identity
+     */
+    public static PropertyId jumpSpeedProperty() {
+        return JUMP_SPEED;
+    }
+
+    /**
+     * Returns the character maximum-step-height property identity.
+     *
+     * @return character maximum-step-height property identity
+     */
+    public static PropertyId maximumStepHeightProperty() {
+        return MAXIMUM_STEP_HEIGHT;
+    }
+
+    /**
+     * Returns the character ground-snap-distance property identity.
+     *
+     * @return character ground-snap-distance property identity
+     */
+    public static PropertyId groundSnapDistanceProperty() {
+        return GROUND_SNAP_DISTANCE;
+    }
+
+    /**
      * Returns the overlap-entered signal identity.
      *
      * @return precise-overlap-entered signal identity
@@ -214,8 +274,12 @@ public final class Physics3dDescriptors {
                 "1.0.0",
                 ">=0.1.0 <0.2.0",
                 DescriptorPresentation.named("JScene3D 3D physics"),
-                List.of(boxResourceDescriptor(), sphereResourceDescriptor(), triangleMeshResourceDescriptor()),
-                List.of(shapeDescriptor(), staticBodyDescriptor(), sensorDescriptor()));
+                List.of(
+                        boxResourceDescriptor(),
+                        sphereResourceDescriptor(),
+                        capsuleResourceDescriptor(),
+                        triangleMeshResourceDescriptor()),
+                List.of(shapeDescriptor(), staticBodyDescriptor(), sensorDescriptor(), characterBodyDescriptor()));
     }
 
     /** Describes one immutable box collision resource. */
@@ -233,6 +297,14 @@ public final class Physics3dDescriptors {
     private static RegisteredTypeDescriptor sphereResourceDescriptor() {
         return resourceDescriptor(
                 SPHERE_RESOURCE_TYPE, "Sphere collision shape 3D", List.of(positiveNumber("radius", "Radius")));
+    }
+
+    /** Describes one immutable Y-aligned capsule collision resource. */
+    private static RegisteredTypeDescriptor capsuleResourceDescriptor() {
+        return resourceDescriptor(
+                CAPSULE_RESOURCE_TYPE,
+                "Capsule collision shape 3D",
+                List.of(positiveNumber("radius", "Radius"), nonNegativeNumber("segment-length", "Segment length")));
     }
 
     /** Describes one payload-backed immutable triangle collision mesh for static geometry. */
@@ -283,7 +355,7 @@ public final class Physics3dDescriptors {
     /** Describes one static collision object. */
     private static ComponentTypeDescriptor staticBodyDescriptor() {
         return collisionObject(STATIC_BODY_TYPE, "Static Body 3D")
-                .conflicts(Set.of(SENSOR_TYPE.id()))
+                .conflicts(Set.of(SENSOR_TYPE.id(), CHARACTER_BODY_TYPE.id()))
                 .build();
     }
 
@@ -294,22 +366,40 @@ public final class Physics3dDescriptors {
         EndpointDescriptor exited = EndpointDescriptor.withPayload(
                 OVERLAP_EXITED.value(), OVERLAP_PAYLOAD_TYPE, DescriptorPresentation.named("Overlap exited"));
         return collisionObject(SENSOR_TYPE, "Collision Sensor 3D")
-                .conflicts(Set.of(STATIC_BODY_TYPE.id()))
+                .conflicts(Set.of(STATIC_BODY_TYPE.id(), CHARACTER_BODY_TYPE.id()))
                 .signals(List.of(entered, exited))
+                .build();
+    }
+
+    /** Describes one explicitly moved character body with authored gameplay-scale movement settings. */
+    private static ComponentTypeDescriptor characterBodyDescriptor() {
+        CharacterBody3dSettings defaults = CharacterBody3dSettings.DEFAULT;
+        List<PropertyDescriptor> properties = new ArrayList<>(collisionMembershipProperties());
+        properties.add(nonNegativeNumber(GRAVITY, "Gravity", defaults.gravity()));
+        properties.add(nonNegativeNumber(JUMP_SPEED, "Jump speed", defaults.jumpSpeed()));
+        properties.add(nonNegativeNumber(MAXIMUM_STEP_HEIGHT, "Maximum step height", defaults.maximumStepHeight()));
+        properties.add(nonNegativeNumber(GROUND_SNAP_DISTANCE, "Ground snap distance", defaults.groundSnapDistance()));
+        return collisionObject(CHARACTER_BODY_TYPE, "Character Body 3D")
+                .properties(properties)
+                .conflicts(Set.of(STATIC_BODY_TYPE.id(), SENSOR_TYPE.id()))
                 .build();
     }
 
     /** Starts one collision-object descriptor requiring a sibling Transform3d. */
     private static ComponentTypeDescriptor.Builder collisionObject(ComponentType type, String name) {
-        PropertyDescriptor shapes = PropertyDescriptor.requiredArray(
+        return ComponentTypeDescriptor.builder(type, DescriptorPresentation.named(name))
+                .properties(collisionMembershipProperties())
+                .requiredCapabilities(Set.of(Spatial3dDescriptors.spatialCapability()))
+                .lifecycle(COLLISION_LIFECYCLE);
+    }
+
+    /** Creates the stable explicit collision-shape membership property. */
+    private static List<PropertyDescriptor> collisionMembershipProperties() {
+        return List.of(PropertyDescriptor.requiredArray(
                 SHAPES.value(),
                 ProjectValueKind.COMPONENT_TARGET,
                 DescriptorPresentation.described("Shapes", "Explicit sibling collision-shape membership"),
-                Map.of());
-        return ComponentTypeDescriptor.builder(type, DescriptorPresentation.named(name))
-                .properties(List.of(shapes))
-                .requiredCapabilities(Set.of(Spatial3dDescriptors.spatialCapability()))
-                .lifecycle(COLLISION_LIFECYCLE);
+                Map.of()));
     }
 
     /** Creates one required positive numeric resource property. */
@@ -319,6 +409,27 @@ public final class Physics3dDescriptors {
                 ProjectValueKind.NUMBER,
                 DescriptorPresentation.named(name),
                 Map.of("minimum-exclusive", number(0.0F)),
+                Set.of());
+    }
+
+    /** Creates one required non-negative numeric resource property. */
+    private static PropertyDescriptor nonNegativeNumber(String id, String name) {
+        return PropertyDescriptor.required(
+                id,
+                ProjectValueKind.NUMBER,
+                DescriptorPresentation.named(name),
+                Map.of("minimum", number(0.0F)),
+                Set.of());
+    }
+
+    /** Creates one optional non-negative numeric component property. */
+    private static PropertyDescriptor nonNegativeNumber(PropertyId id, String name, float defaultValue) {
+        return PropertyDescriptor.optionalWithDefault(
+                id.value(),
+                ProjectValueKind.NUMBER,
+                number(defaultValue),
+                DescriptorPresentation.named(name),
+                Map.of("minimum", number(0.0F)),
                 Set.of());
     }
 

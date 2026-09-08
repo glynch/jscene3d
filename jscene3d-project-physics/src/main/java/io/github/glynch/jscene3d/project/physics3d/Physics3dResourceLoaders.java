@@ -17,7 +17,7 @@ import java.util.Map;
 /** Supplies runtime loaders corresponding exactly to {@link Physics3dDescriptors}. */
 public final class Physics3dResourceLoaders {
     private static final List<RuntimeResourceLoader<?>> ALL =
-            List.of(new BoxLoader(), new SphereLoader(), new TriangleMeshLoader());
+            List.of(new BoxLoader(), new SphereLoader(), new CapsuleLoader(), new TriangleMeshLoader());
 
     /** Prevents construction of this stable loader collection. */
     private Physics3dResourceLoaders() {
@@ -68,6 +68,35 @@ public final class Physics3dResourceLoaders {
         @Override
         public SphereCollisionShape3dResource load(ResourceDefinition definition, ResourceContent content) {
             return new SphereCollisionShape3dResource(number(definition.properties(), "radius"));
+        }
+    }
+
+    /** Reconstructs one capsule resource from validated portable properties. */
+    private static final class CapsuleLoader implements RuntimeResourceLoader<CapsuleCollisionShape3dResource> {
+        @Override
+        public RegisteredType type() {
+            return Physics3dDescriptors.capsuleResourceType();
+        }
+
+        @Override
+        public Class<CapsuleCollisionShape3dResource> valueType() {
+            return CapsuleCollisionShape3dResource.class;
+        }
+
+        @Override
+        public CapsuleCollisionShape3dResource load(ResourceDefinition definition, ResourceContent content) {
+            Map<String, ProjectValue> properties = definition.properties();
+            return new CapsuleCollisionShape3dResource(
+                    number(properties, "radius"), nonNegativeNumber(properties, "segment-length"));
+        }
+
+        /** Reads one required non-negative finite float property. */
+        private static float nonNegativeNumber(Map<String, ProjectValue> properties, String name) {
+            ProjectValue value = properties.get(name);
+            if (!(value instanceof ProjectValue.NumberValue number)) {
+                throw new IllegalArgumentException("collision resource property must be a number: " + name);
+            }
+            return CollisionPreconditions.requireNonNegative(number.value().floatValue(), name);
         }
     }
 

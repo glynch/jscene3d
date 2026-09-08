@@ -39,6 +39,21 @@ public interface Physics3dWorldModule extends PhysicsStepWorldModule {
             CollisionOverlapListener listener);
 
     /**
+     * Registers one initially disabled explicitly moved character body.
+     *
+     * @param body descriptor-backed character component
+     * @param transform authoritative entity transform
+     * @param shapes non-empty explicitly referenced shape components
+     * @param settings immutable authored movement settings
+     * @return lifecycle-controlled movement registration
+     */
+    CharacterBody3dRegistration registerCharacterBody(
+            CharacterBody3d body,
+            Transform3d transform,
+            List<CollisionShape3d> shapes,
+            CharacterBody3dSettings settings);
+
+    /**
      * Finds the nearest enabled solid collision shape reached by a world-space ray.
      *
      * <p>Collision sensors are excluded. The direction need not be normalized.

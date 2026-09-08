@@ -54,6 +54,24 @@ public final class Physics3dResourceWriter {
     }
 
     /**
+     * Writes one Y-aligned capsule resource without closing caller-owned output.
+     *
+     * @param output destination
+     * @param radius positive finite radius of the cylindrical body and hemispherical caps
+     * @param segmentLength finite non-negative distance between the cap centres
+     * @throws IOException when serialization fails
+     */
+    public static void writeCapsule(OutputStream output, float radius, float segmentLength) throws IOException {
+        ResourceWriter.write(
+                Objects.requireNonNull(output, "output"),
+                Physics3dDescriptors.capsuleResourceType(),
+                Map.of(
+                        "radius", number(CollisionPreconditions.requirePositive(radius, "radius")),
+                        "segment-length",
+                                number(CollisionPreconditions.requireNonNegative(segmentLength, "segmentLength"))));
+    }
+
+    /**
      * Writes one triangle-mesh resource document and its distinct binary collision payload.
      *
      * <p>The method consumes but does not close either output and defensively validates both arrays.

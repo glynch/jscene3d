@@ -26,6 +26,7 @@ final class Physics3dDescriptorsTest {
         ComponentTypeDescriptor shape = components.get(0);
         ComponentTypeDescriptor body = components.get(1);
         ComponentTypeDescriptor sensor = components.get(2);
+        ComponentTypeDescriptor character = components.get(3);
         PropertyDescriptor membership =
                 Objects.requireNonNull(body.properties().get(Physics3dDescriptors.shapesProperty()));
 
@@ -34,12 +35,21 @@ final class Physics3dDescriptorsTest {
                 .containsExactly(
                         Physics3dDescriptors.collisionShapeType(),
                         Physics3dDescriptors.staticBodyType(),
-                        Physics3dDescriptors.collisionSensorType());
+                        Physics3dDescriptors.collisionSensorType(),
+                        Physics3dDescriptors.characterBodyType());
         assertThat(shape.multiplicity()).isEqualTo(ComponentMultiplicity.MULTIPLE);
         assertThat(membership.valueKind()).isEqualTo(ProjectValueKind.ARRAY);
         assertThat(membership.elementKind()).contains(ProjectValueKind.COMPONENT_TARGET);
         assertThat(body.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
         assertThat(sensor.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
+        assertThat(character.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
+        assertThat(character.properties().keySet())
+                .containsExactly(
+                        Physics3dDescriptors.shapesProperty(),
+                        Physics3dDescriptors.gravityProperty(),
+                        Physics3dDescriptors.jumpSpeedProperty(),
+                        Physics3dDescriptors.maximumStepHeightProperty(),
+                        Physics3dDescriptors.groundSnapDistanceProperty());
         assertThat(sensor.lifecycle())
                 .containsExactlyInAnyOrder(
                         ComponentLifecycle.ACTIVATED, ComponentLifecycle.DEACTIVATED, ComponentLifecycle.DESTROYED);
@@ -66,12 +76,14 @@ final class Physics3dDescriptorsTest {
                 .containsExactly(
                         Physics3dDescriptors.boxResourceType(),
                         Physics3dDescriptors.sphereResourceType(),
+                        Physics3dDescriptors.capsuleResourceType(),
                         Physics3dDescriptors.triangleMeshResourceType());
         assertThat(Physics3dResourceLoaders.all())
                 .extracting(loader -> loader.type())
                 .containsExactly(
                         Physics3dDescriptors.boxResourceType(),
                         Physics3dDescriptors.sphereResourceType(),
+                        Physics3dDescriptors.capsuleResourceType(),
                         Physics3dDescriptors.triangleMeshResourceType());
     }
 }

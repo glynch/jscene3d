@@ -71,6 +71,30 @@ final class Physics3dResourceTest {
         resource.close();
     }
 
+    /** Writes and reconstructs one Y-aligned capsule with an explicitly named cylindrical segment. */
+    @Test
+    void writesAndLoadsCapsule() throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        Physics3dResourceWriter.writeCapsule(output, 0.5F, 1.25F);
+        ResourceDefinition definition = new ResourceDefinition(
+                URI.create("project:/collision/capsule.resource.json"),
+                Physics3dDescriptors.capsuleResourceType(),
+                Map.of("radius", number(0.5F), "segment-length", number(1.25F)));
+
+        CapsuleCollisionShape3dResource resource = capsuleLoader().load(definition, reference -> {
+            throw new AssertionError("capsule resource has no payload");
+        });
+
+        assertThat(new String(output.toByteArray(), StandardCharsets.UTF_8))
+                .contains("capsule-collision-shape-3d", "\"radius\" : 0.5", "\"segment-length\" : 1.25");
+        assertThat(resource.radius()).isEqualTo(0.5F);
+        assertThat(resource.segmentLength()).isEqualTo(1.25F);
+        assertThatThrownBy(() -> new CapsuleCollisionShape3dResource(0.5F, -0.1F))
+                .isInstanceOf(IllegalArgumentException.class);
+        resource.close();
+        assertThat(resource.isClosed()).isTrue();
+    }
+
     /** Round-trips independently published triangle collision geometry through its public resource seam. */
     @Test
     void writesAndLoadsTriangleMesh() throws IOException {
@@ -143,11 +167,18 @@ final class Physics3dResourceTest {
                 Physics3dResourceLoaders.all().get(1);
     }
 
+    /** Returns the typed capsule loader from the public heterogeneous collection. */
+    @SuppressWarnings("unchecked")
+    private static RuntimeResourceLoader<CapsuleCollisionShape3dResource> capsuleLoader() {
+        return (RuntimeResourceLoader<CapsuleCollisionShape3dResource>)
+                Physics3dResourceLoaders.all().get(2);
+    }
+
     /** Returns the typed triangle-mesh loader from the public heterogeneous collection. */
     @SuppressWarnings("unchecked")
     private static RuntimeResourceLoader<TriangleMeshCollisionShape3dResource> triangleMeshLoader() {
         return (RuntimeResourceLoader<TriangleMeshCollisionShape3dResource>)
-                Physics3dResourceLoaders.all().get(2);
+                Physics3dResourceLoaders.all().get(3);
     }
 
     /** Creates one portable exact decimal. */

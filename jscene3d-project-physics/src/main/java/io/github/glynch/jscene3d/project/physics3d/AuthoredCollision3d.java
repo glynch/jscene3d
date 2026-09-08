@@ -33,6 +33,20 @@ final class AuthoredCollision3d {
         return new Shape(reference.reference(), position, orientation, new CollisionFilter3d(category, mask));
     }
 
+    /** Decodes one character body's gameplay-scale movement settings. */
+    static CharacterBody3dSettings characterSettings(Map<PropertyId, ProjectValue> properties) {
+        return new CharacterBody3dSettings(
+                nonNegative(properties, Physics3dDescriptors.gravityProperty()),
+                nonNegative(properties, Physics3dDescriptors.jumpSpeedProperty()),
+                nonNegative(properties, Physics3dDescriptors.maximumStepHeightProperty()),
+                nonNegative(properties, Physics3dDescriptors.groundSnapDistanceProperty()));
+    }
+
+    /** Reads one required non-negative finite numeric component property. */
+    private static float nonNegative(Map<PropertyId, ProjectValue> properties, PropertyId id) {
+        return CollisionPreconditions.requireNonNegative(number(require(properties, id), id.value()), id.value());
+    }
+
     /** Reads one required property. */
     private static ProjectValue require(Map<PropertyId, ProjectValue> properties, PropertyId id) {
         ProjectValue value = properties.get(id);

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.physics3d;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -72,6 +73,25 @@ final class AuthoredCollision3dTest {
         assertThatThrownBy(() -> AuthoredCollision3d.shape(fractionalMask))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("32-bit integer");
+    }
+
+    /** Decodes effective authored character settings and rejects invalid numeric values. */
+    @Test
+    void decodesCharacterSettings() {
+        Map<PropertyId, ProjectValue> properties = Map.of(
+                Physics3dDescriptors.gravityProperty(), number("12.5"),
+                Physics3dDescriptors.jumpSpeedProperty(), number(6),
+                Physics3dDescriptors.maximumStepHeightProperty(), number("0.75"),
+                Physics3dDescriptors.groundSnapDistanceProperty(), number("0.25"));
+
+        CharacterBody3dSettings settings = AuthoredCollision3d.characterSettings(properties);
+
+        assertThat(settings).isEqualTo(new CharacterBody3dSettings(12.5F, 6.0F, 0.75F, 0.25F));
+        Map<PropertyId, ProjectValue> invalid = new LinkedHashMap<>(properties);
+        invalid.put(Physics3dDescriptors.gravityProperty(), new ProjectValue.TextValue("normal"));
+        assertThatThrownBy(() -> AuthoredCollision3d.characterSettings(invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("numbers");
     }
 
     /** Returns a complete effective property map with one replacement or removal. */

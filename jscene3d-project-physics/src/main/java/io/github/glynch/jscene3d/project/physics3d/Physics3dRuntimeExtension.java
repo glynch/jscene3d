@@ -42,6 +42,14 @@ public final class Physics3dRuntimeExtension implements ComponentRuntimeExtensio
                         context.definition().id(),
                         context.world().requireModule(Spatial3dWorldModule.class),
                         context.world().requireModule(Physics3dWorldModule.class)));
+        validRegistry.register(
+                Physics3dDescriptors.characterBodyType(),
+                context -> new InternalCharacterBody3d(
+                        context.owner(),
+                        context.definition().id(),
+                        context.world().requireModule(Spatial3dWorldModule.class),
+                        context.world().requireModule(Physics3dWorldModule.class),
+                        AuthoredCollision3d.characterSettings(context.properties())));
     }
 
     /** Creates the resource-aware collision-shape preparation and construction adapter. */

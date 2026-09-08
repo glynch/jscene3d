@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -86,6 +87,28 @@ final class Spatial3dWorldCompositionTest {
         assertThat(parentTransform.isClosed()).isTrue();
         assertThat(childTransform.isClosed()).isTrue();
         assertThat(spatial.isClosed()).isTrue();
+    }
+
+    /** Converts an authoritative world-space pose back into local state beneath an ownership parent. */
+    @Test
+    void setsWorldPoseWithinTransformHierarchy() throws IOException {
+        Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
+        try (World world = compose(hierarchicalWorld(), spatial).world().orElseThrow()) {
+            Entity child = world.roots().getFirst().children().getFirst();
+            Transform3d transform =
+                    child.component(CHILD_TRANSFORM, Transform3d.class).orElseThrow();
+            Quaternionf orientation = new Quaternionf().rotateY(0.5F);
+
+            transform.setWorldPose(new Vector3f(2.0F, 3.0F, 4.0F), orientation);
+
+            assertThat(translation(transform)).containsExactly(2.0F, 3.0F, 4.0F);
+            assertThat(transform.position()).isEqualTo(new Vector3f(-4.0F, 1.5F, 2.0F));
+            assertThat(transform
+                            .worldMatrix()
+                            .getUnnormalizedRotation(new Quaternionf())
+                            .normalize())
+                    .isEqualTo(orientation);
+        }
     }
 
     /** Releases a destroyed subtree without closing a still-live parent registration. */

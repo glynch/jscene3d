@@ -11,7 +11,10 @@ package io.github.glynch.jscene3d.project.physics3d;
  * world release the resource after its final component lease.
  */
 public sealed interface CollisionShape3dResource extends AutoCloseable
-        permits BoxCollisionShape3dResource, SphereCollisionShape3dResource, TriangleMeshCollisionShape3dResource {
+        permits BoxCollisionShape3dResource,
+                CapsuleCollisionShape3dResource,
+                SphereCollisionShape3dResource,
+                TriangleMeshCollisionShape3dResource {
     /**
      * Returns whether the resource has been released.
      *

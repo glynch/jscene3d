@@ -7,8 +7,11 @@ package io.github.glynch.jscene3d.project.spatial3d;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import java.util.Objects;
+import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Quaternionf;
 import org.joml.Quaternionfc;
+import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 /** World-owned transform component backed by one hidden JScene3D spatial object. */
@@ -60,6 +63,28 @@ final class Object3dTransform implements Transform3d {
     public void setOrientation(float x, float y, float z, float w) {
         requireOpen();
         node.setQuaternion(x, y, z, w);
+    }
+
+    @Override
+    public void setWorldPose(Vector3fc position, Quaternionfc orientation) {
+        requireOpen();
+        Vector3fc validPosition = Objects.requireNonNull(position, "position");
+        Quaternionfc validOrientation = Objects.requireNonNull(orientation, "orientation");
+        Object3D parent = node.parent();
+        if (parent == null) {
+            node.setPosition(validPosition);
+            node.setQuaternion(validOrientation);
+            return;
+        }
+        Vector3f localPosition =
+                parent.matrixWorld().invert(new Matrix4f()).transformPosition(validPosition, new Vector3f());
+        Quaternionf parentOrientation = parent.worldQuaternion(new Quaternionf());
+        Quaternionf localOrientation = parentOrientation
+                .conjugate()
+                .mul(validOrientation, new Quaternionf())
+                .normalize();
+        node.setPosition(localPosition);
+        node.setQuaternion(localOrientation);
     }
 
     @Override

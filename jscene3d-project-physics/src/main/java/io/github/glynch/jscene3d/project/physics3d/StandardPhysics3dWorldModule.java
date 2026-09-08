@@ -4,21 +4,29 @@
  */
 package io.github.glynch.jscene3d.project.physics3d;
 
+import io.github.glynch.jscene3d.physics.CharacterController;
 import io.github.glynch.jscene3d.physics.Collider;
 import io.github.glynch.jscene3d.physics.CollisionFilter;
 import io.github.glynch.jscene3d.physics.CollisionObject;
 import io.github.glynch.jscene3d.physics.CollisionSensor;
+import io.github.glynch.jscene3d.physics.KinematicBody;
 import io.github.glynch.jscene3d.physics.PhysicsWorld;
 import io.github.glynch.jscene3d.physics.StaticBody;
+import io.github.glynch.jscene3d.physics.movement.CharacterControllerSettings;
+import io.github.glynch.jscene3d.physics.movement.CharacterMoveResult;
+import io.github.glynch.jscene3d.physics.movement.KinematicContact;
+import io.github.glynch.jscene3d.physics.movement.KinematicMoveSettings;
 import io.github.glynch.jscene3d.physics.queries.OverlapHit;
 import io.github.glynch.jscene3d.physics.queries.QueryFilter;
 import io.github.glynch.jscene3d.physics.queries.RaycastHit;
 import io.github.glynch.jscene3d.physics.shapes.BoxShape;
+import io.github.glynch.jscene3d.physics.shapes.CapsuleShape;
 import io.github.glynch.jscene3d.physics.shapes.CollisionShape;
 import io.github.glynch.jscene3d.physics.shapes.SphereShape;
 import io.github.glynch.jscene3d.project.runtime.FixedUpdateContext;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -48,7 +56,7 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
     @Override
     public CollisionObject3dRegistration registerStaticBody(
             StaticBody3d body, Transform3d transform, List<CollisionShape3d> shapes) {
-        return register(Objects.requireNonNull(body, "body"), transform, shapes, null);
+        return register(Objects.requireNonNull(body, "body"), transform, shapes, null, null);
     }
 
     @Override
@@ -61,7 +69,22 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
                 Objects.requireNonNull(sensor, "sensor"),
                 transform,
                 shapes,
-                Objects.requireNonNull(listener, "listener"));
+                Objects.requireNonNull(listener, "listener"),
+                null);
+    }
+
+    @Override
+    public CharacterBody3dRegistration registerCharacterBody(
+            CharacterBody3d body,
+            Transform3d transform,
+            List<CollisionShape3d> shapes,
+            CharacterBody3dSettings settings) {
+        return (CharacterBody3dRegistration) register(
+                Objects.requireNonNull(body, "body"),
+                transform,
+                shapes,
+                null,
+                Objects.requireNonNull(settings, "settings"));
     }
 
     @Override
@@ -118,7 +141,8 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
             CollisionObject3d component,
             Transform3d transform,
             List<CollisionShape3d> shapes,
-            @Nullable CollisionOverlapListener listener) {
+            @Nullable CollisionOverlapListener listener,
+            @Nullable CharacterBody3dSettings characterSettings) {
         requireOpen();
         CollisionObject3d validComponent = Objects.requireNonNull(component, "component");
         Transform3d validTransform = Objects.requireNonNull(transform, "transform");
@@ -131,7 +155,8 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         Pose pose = pose(validTransform);
         CollisionObject object = createObject(validComponent, pose);
         object.setEnabled(false);
-        Registration registration = new Registration(validComponent, validTransform, object, validShapes, listener);
+        Registration registration =
+                createRegistration(validComponent, validTransform, object, validShapes, listener, characterSettings);
         try {
             registration.attachShapes();
             registrations.add(registration);
@@ -143,6 +168,27 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
             physics.remove(object);
             throw failure;
         }
+    }
+
+    /** Creates the registration subtype corresponding exactly to the collision-object kind. */
+    private Registration createRegistration(
+            CollisionObject3d component,
+            Transform3d transform,
+            CollisionObject object,
+            List<CollisionShape3d> shapes,
+            @Nullable CollisionOverlapListener listener,
+            @Nullable CharacterBody3dSettings characterSettings) {
+        if (component instanceof CharacterBody3d) {
+            if (!(object instanceof KinematicBody body) || characterSettings == null) {
+                throw new IllegalStateException("character component has no kinematic body or movement settings");
+            }
+            CharacterController controller = new CharacterController(physics, body, backendSettings(characterSettings));
+            return new CharacterRegistration(component, transform, body, shapes, controller);
+        }
+        if (characterSettings != null) {
+            throw new IllegalArgumentException("movement settings require a character body");
+        }
+        return new Registration(component, transform, object, shapes, listener);
     }
 
     /** Validates shape ownership, uniqueness, and exclusive membership before backend mutation. */
@@ -175,6 +221,9 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         if (component instanceof CollisionSensor3d) {
             return physics.addCollisionSensor(pose.position(), pose.orientation());
         }
+        if (component instanceof CharacterBody3d) {
+            return physics.addKinematicBody(pose.position(), pose.orientation());
+        }
         throw new IllegalArgumentException("unsupported collision object component: " + component.getClass());
     }
 
@@ -185,17 +234,6 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         } else if (world != candidate) {
             throw new IllegalArgumentException("physics adapter cannot register components from another world");
         }
-    }
-
-    /** Forgets relationships to an object which can no longer be named safely by later exit signals. */
-    private void removePreviousOverlaps(CollisionObject3d removed) {
-        registrations.stream()
-                .filter(Registration::isSensor)
-                .forEach(registration -> registration
-                        .previous
-                        .entrySet()
-                        .removeIf(entry -> entry.getValue().sensor() == removed
-                                || entry.getValue().other() == removed));
     }
 
     /** Converts one backend collider to its project-level shape component. */
@@ -229,9 +267,35 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
     private static CollisionShape backendShape(CollisionShape3dResource resource) {
         return switch (resource) {
             case BoxCollisionShape3dResource box -> new BoxShape(box.width(), box.height(), box.depth());
+            case CapsuleCollisionShape3dResource capsule -> new CapsuleShape(capsule.radius(), capsule.segmentLength());
             case SphereCollisionShape3dResource sphere -> new SphereShape(sphere.radius());
             case TriangleMeshCollisionShape3dResource mesh -> mesh.shape();
         };
+    }
+
+    /** Converts authored gameplay-scale settings without exposing low-level tuning types. */
+    private static CharacterControllerSettings backendSettings(CharacterBody3dSettings settings) {
+        KinematicMoveSettings movement = KinematicMoveSettings.DEFAULT
+                .withMaximumStepHeight(settings.maximumStepHeight())
+                .withGroundSnapDistance(settings.groundSnapDistance());
+        return CharacterControllerSettings.DEFAULT
+                .withMovementSettings(movement)
+                .withGravity(settings.gravity())
+                .withJumpSpeed(settings.jumpSpeed());
+    }
+
+    /** Converts one exact positive duration to the backend's finite fixed-seconds representation. */
+    private static float fixedSeconds(Duration fixedStep) {
+        Duration valid = Objects.requireNonNull(fixedStep, "fixedStep");
+        if (valid.isZero() || valid.isNegative()) {
+            throw new IllegalArgumentException("fixedStep must be positive");
+        }
+        double seconds = valid.getSeconds() + valid.getNano() / 1_000_000_000.0;
+        float result = (float) seconds;
+        if (!Float.isFinite(result) || result <= 0.0F) {
+            throw new IllegalArgumentException("fixedStep is outside the supported finite range");
+        }
+        return result;
     }
 
     /** Extracts an unscaled rigid pose from one authoritative world transform. */
@@ -259,7 +323,7 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
     }
 
     /** One object registration and its precise shape-pair overlap history. */
-    private final class Registration implements CollisionObject3dRegistration {
+    private class Registration implements CollisionObject3dRegistration {
         private final CollisionObject3d component;
         private final Transform3d transform;
         private final CollisionObject object;
@@ -322,10 +386,21 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
             registrationsByComponent.remove(component);
             registrationsByObject.remove(object);
             shapes.forEach(shape -> shapeOwners.remove(shape, this));
-            removePreviousOverlaps(component);
+            removePreviousOverlaps();
             if (object.isRegistered()) {
                 physics.remove(object);
             }
+        }
+
+        /** Forgets relationships to this object before later sensor exit detection can observe it. */
+        private void removePreviousOverlaps() {
+            registrations.stream()
+                    .filter(Registration::isSensor)
+                    .forEach(registration -> registration
+                            .previous
+                            .entrySet()
+                            .removeIf(entry -> entry.getValue().sensor() == component
+                                    || entry.getValue().other() == component));
         }
 
         /** Attaches every project shape in stable authored membership order. */
@@ -340,7 +415,7 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         }
 
         /** Synchronizes authored transform state before any collision query runs. */
-        private void synchronizeTransform() {
+        void synchronizeTransform() {
             if (closed) {
                 return;
             }
@@ -427,10 +502,104 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
         }
 
         /** Rejects registration access after cleanup. */
-        private void requireRegistrationOpen() {
+        final void requireRegistrationOpen() {
             if (closed) {
                 throw new IllegalStateException("collision object registration is closed");
             }
+        }
+
+        /** Rejects movement while this registration is disabled. */
+        final void requireEnabled() {
+            requireRegistrationOpen();
+            if (!object.isEnabled()) {
+                throw new IllegalStateException("collision object registration is disabled");
+            }
+        }
+
+        /** Returns the descriptor-backed component hidden behind this registration. */
+        final CollisionObject3d component() {
+            return component;
+        }
+
+        /** Returns the authoritative entity transform hidden behind this registration. */
+        final Transform3d transform() {
+            return transform;
+        }
+    }
+
+    /** Character registration whose backend pose is authoritative during physics synchronization. */
+    private final class CharacterRegistration extends Registration implements CharacterBody3dRegistration {
+        private final KinematicBody body;
+        private final CharacterController controller;
+
+        /** Stores one initially disabled kinematic body and its internal movement controller. */
+        private CharacterRegistration(
+                CollisionObject3d component,
+                Transform3d transform,
+                KinematicBody body,
+                List<CollisionShape3d> shapes,
+                CharacterController controller) {
+            super(component, transform, body, shapes, null);
+            this.body = body;
+            this.controller = controller;
+        }
+
+        @Override
+        public CharacterMove3dResult move(Vector3fc planarVelocity, Duration fixedStep) {
+            requireEnabled();
+            return projectMove(controller.move(planarVelocity, fixedSeconds(fixedStep)));
+        }
+
+        @Override
+        public boolean tryJump() {
+            requireEnabled();
+            return controller.tryJump();
+        }
+
+        @Override
+        public boolean isGrounded() {
+            requireRegistrationOpen();
+            return controller.isGrounded();
+        }
+
+        @Override
+        public Vector3f groundNormal(Vector3f destination) {
+            requireRegistrationOpen();
+            return controller.groundNormal(Objects.requireNonNull(destination, "destination"));
+        }
+
+        @Override
+        void synchronizeTransform() {
+            if (!super.isClosed()) {
+                transform().setWorldPose(body.position(new Vector3f()), body.orientation(new Quaternionf()));
+            }
+        }
+
+        /** Converts one internal movement result and every precise contact to project identities. */
+        private CharacterMove3dResult projectMove(CharacterMoveResult result) {
+            List<CharacterContact3d> contacts =
+                    result.contacts().stream().map(this::projectContact).toList();
+            return new CharacterMove3dResult(
+                    result.requestedTranslation(new Vector3f()),
+                    result.appliedTranslation(new Vector3f()),
+                    result.velocity(new Vector3f()),
+                    result.groundNormal(new Vector3f()),
+                    new CharacterMove3dState(result.isGrounded(), result.stepped(), result.jumped()),
+                    contacts);
+        }
+
+        /** Converts one internal contact without leaking collider or body handles. */
+        private CharacterContact3d projectContact(KinematicContact contact) {
+            Collider collider = contact.collider();
+            Registration registration = registrationsByObject.get(collider.collisionObject());
+            if (registration == null) {
+                throw new IllegalStateException("character contact object has no project registration");
+            }
+            return new CharacterContact3d(
+                    registration.component(),
+                    projectShape(collider),
+                    contact.point(new Vector3f()),
+                    contact.normal(new Vector3f()));
         }
     }
 

@@ -25,6 +25,14 @@ final class CollisionPreconditions {
         return value;
     }
 
+    /** Requires a non-negative finite scalar. */
+    static float requireNonNegative(float value, String name) {
+        if (!Float.isFinite(value) || value < 0.0F) {
+            throw new IllegalArgumentException(name + " must be non-negative and finite");
+        }
+        return value;
+    }
+
     /** Copies one finite vector. */
     static Vector3f requireFinite(Vector3fc value, String name) {
         Vector3fc valid = Objects.requireNonNull(value, name);

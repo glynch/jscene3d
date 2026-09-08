@@ -68,6 +68,19 @@ public interface Transform3d extends AutoCloseable {
     void setOrientation(float x, float y, float z, float w);
 
     /**
+     * Sets a world-space rigid pose while preserving this transform's local scale.
+     *
+     * <p>The implementation derives the corresponding local position and orientation from the current spatial
+     * parent. This is the write seam for physics authorities whose state is expressed in world space.
+     *
+     * @param position finite world-space position
+     * @param orientation finite non-zero world-space orientation
+     * @throws IllegalArgumentException if an input is invalid
+     * @throws IllegalStateException if this component is closed
+     */
+    void setWorldPose(Vector3fc position, Quaternionfc orientation);
+
+    /**
      * Sets the local scale.
      *
      * @param x finite local X scale

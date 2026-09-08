@@ -40,6 +40,25 @@ To manually verify a visible, resizable blue window, run:
 Close the window normally or press Escape to finish the build. This is an
 internal development smoke test; applications do not receive raw OpenGL access.
 
+## Run the editor foundation
+
+Launch the native JavaFX editor shell with:
+
+```shell
+./tools/scripts/run-editor.sh
+```
+
+The script first asks Maven to build the editor and prepare its runtime module
+path. Maven completes before the script explicitly launches the editor; no
+Maven lifecycle phase opens a user interface. Editor distribution is a separate
+concern.
+
+The current foundation embeds the actual JScene3D renderer through OpenGLFX and
+shows placeholder hierarchy, asset-browser, and inspector regions around a
+temporary three-box preview. It deliberately does not load or edit a project
+yet. Space pauses or resumes the preview animation, pointer dragging rotates the
+preview, and the toolbar resets its orientation.
+
 ## Run examples
 
 Open the searchable native example browser with:

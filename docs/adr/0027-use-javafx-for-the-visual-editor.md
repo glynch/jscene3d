@@ -29,3 +29,10 @@ belong to the editor application, never `jscene3d-lwjgl` or exported games.
 The prototype qualifies the initial macOS editor; Windows and Linux require
 their own render, input, high-DPI, disposal, and packaged-execution qualification
 before support is claimed.
+
+The production foundation lives in the single `jscene3d-editor` application
+artifact. It owns the JavaFX shell, the OpenGLFX adapter, and editor-specific
+viewport coordination. Its initial hierarchy, asset browser, and inspector are
+explicit placeholders surrounding a temporary renderer scene; they do not
+introduce a second project document model. Project loading and projection of
+authored definitions are subsequent vertical slices.

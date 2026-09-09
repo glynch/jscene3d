@@ -22,6 +22,7 @@ import io.github.glynch.jscene3d.doom.material.DoomMaterialDiagnostic;
 import io.github.glynch.jscene3d.doom.material.DoomMaterialImportResult;
 import io.github.glynch.jscene3d.doom.material.DoomMaterialImporter;
 import io.github.glynch.jscene3d.doom.material.RgbaImage;
+import io.github.glynch.jscene3d.doom.runtime.DoomDoorDescriptors;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.AlphaMode;
@@ -34,6 +35,7 @@ import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
+import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.importing.ImportArtifactDescriptor;
@@ -56,6 +58,7 @@ import io.github.glynch.jscene3d.wad.WadDiagnostic;
 import io.github.glynch.jscene3d.wad.WadLoadResult;
 import io.github.glynch.jscene3d.wad.WadLoader;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,6 +69,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** Publishes selected Doom maps as generated project-native entity definitions and spatial resources. */
 final class DoomProjectImporter implements ProjectImporter {
@@ -178,8 +182,12 @@ final class DoomProjectImporter implements ProjectImporter {
             DoomStaticGeometry geometry,
             DoomMapMaterials sourceMaterials)
             throws IOException {
-        List<RenderBatch> batches = renderBatches(geometry);
-        Map<MaterialKey, DoomMaterial> materials = selectedMaterials(batches, sourceMaterials);
+        List<DoomDoorPublication> doors = DoomDoorPublication.discover(map);
+        Set<Integer> doorSectors =
+                doors.stream().map(DoomDoorPublication::sectorIndex).collect(Collectors.toUnmodifiableSet());
+        List<RenderBatch> batches = renderBatches(geometry, doorSectors);
+        List<DoorRenderBatches> doorBatches = doorRenderBatches(geometry, doors);
+        Map<MaterialKey, DoomMaterial> materials = selectedMaterials(batches, doorBatches, sourceMaterials);
         for (Map.Entry<MaterialKey, DoomMaterial> entry : materials.entrySet()) {
             publishMaterial(context, prefix, entry.getKey(), entry.getValue());
         }
@@ -188,7 +196,7 @@ final class DoomProjectImporter implements ProjectImporter {
         List<ComponentDefinition> components = new ArrayList<>();
         components.add(component(
                 context.definition().id(), prefix + "/root/transform", Spatial3dDescriptors.transformType(), Map.of()));
-        publishCollision(context, prefix, staticCollisionMesh(map, geometry));
+        publishCollision(context, collisionIdentity(prefix), staticCollisionMesh(map, geometry, doorSectors));
         String collisionIdentity = collisionIdentity(prefix);
         references.add(collisionIdentity);
         ComponentId collisionShape = componentId(context.definition().id(), prefix + "/root/collision/static-shape");
@@ -201,6 +209,10 @@ final class DoomProjectImporter implements ProjectImporter {
             references.add(meshIdentity);
             components.add(meshRenderer(context.definition().id(), prefix, index, batch.material()));
         }
+        List<EntityEntry> children = new ArrayList<>();
+        for (DoorRenderBatches door : doorBatches) {
+            children.add(publishDoor(context, prefix, door, references));
+        }
         materials.keySet().stream().map(key -> materialIdentity(prefix, key)).forEach(references::add);
 
         String definitionIdentity = prefix + "/definition";
@@ -210,7 +222,7 @@ final class DoomProjectImporter implements ProjectImporter {
                 prefix.substring(prefix.lastIndexOf('/') + 1),
                 true,
                 components,
-                List.of());
+                children);
         EntityDefinition definition =
                 new EntityDefinition(definitionId, root.name().orElseThrow(), root);
         context.artifact(
@@ -219,10 +231,9 @@ final class DoomProjectImporter implements ProjectImporter {
     }
 
     /** Publishes the static map boundary as collision-specific data distinct from every rendered mesh. */
-    private static void publishCollision(ImportPreparationContext context, String prefix, DoomMeshData collision)
-            throws IOException {
-        String resourceIdentity = collisionIdentity(prefix);
-        String payloadIdentity = prefix + "/payloads/collision/static.mesh";
+    private static void publishCollision(
+            ImportPreparationContext context, String resourceIdentity, DoomMeshData collision) throws IOException {
+        String payloadIdentity = resourceIdentity.replace("/resources/", "/payloads/") + ".mesh";
         context.artifact(
                 ImportArtifactDescriptor.payload(payloadIdentity, COLLISION_MEDIA_TYPE),
                 output -> Physics3dResourceWriter.writeTriangleMeshPayload(
@@ -241,6 +252,78 @@ final class DoomProjectImporter implements ProjectImporter {
                 Physics3dDescriptors.collisionShapeType().id(),
                 Physics3dDescriptors.collisionShapeType().version(),
                 Map.of(Physics3dDescriptors.shapeProperty(), reference(importId, collisionIdentity(prefix))));
+    }
+
+    /** Publishes one movable door's presentation, collision, and descriptor-selected behavior. */
+    private static LocalEntity publishDoor(
+            ImportPreparationContext context, String prefix, DoorRenderBatches door, List<String> references)
+            throws IOException {
+        DoomDoorPublication behavior = door.behavior();
+        String locator = doorLocator(prefix, behavior.sectorIndex());
+        EntityId entityId = entityId(context.definition().id(), locator);
+        ComponentId transformId = componentId(context.definition().id(), locator + "/transform");
+        List<ComponentDefinition> components = new ArrayList<>();
+        components.add(new ComponentDefinition(
+                transformId,
+                Spatial3dDescriptors.transformType().id(),
+                Spatial3dDescriptors.transformType().version(),
+                Map.of(
+                        Spatial3dDescriptors.positionProperty(),
+                        new ProjectValue.ArrayValue(
+                                List.of(number(0.0F), number(behavior.closedHeight()), number(0.0F))))));
+
+        String collision = doorCollisionIdentity(prefix, behavior.sectorIndex());
+        publishCollision(context, collision, door.collision());
+        references.add(collision);
+        ComponentId shapeId = componentId(context.definition().id(), locator + "/collision/shape");
+        components.add(collisionShapeForResource(context.definition().id(), collision, shapeId));
+        components.add(staticBody(context.definition().id(), locator, entityId, shapeId));
+
+        for (int index = 0; index < door.batches().size(); index++) {
+            RenderBatch batch = door.batches().get(index);
+            String mesh = doorMeshIdentity(prefix, behavior.sectorIndex(), index);
+            publishMesh(context, mesh, batch.mesh());
+            references.add(mesh);
+            components.add(meshRenderer(context.definition().id(), locator, mesh, index, prefix, batch.material()));
+        }
+        components.add(doorBehavior(context.definition().id(), locator, entityId, transformId, behavior));
+        return new LocalEntity(entityId, "Door " + behavior.sectorIndex(), true, components, List.of());
+    }
+
+    /** Creates one collision shape retaining an explicitly named generated resource. */
+    private static ComponentDefinition collisionShapeForResource(
+            String importId, String collisionIdentity, ComponentId shapeId) {
+        return new ComponentDefinition(
+                shapeId,
+                Physics3dDescriptors.collisionShapeType().id(),
+                Physics3dDescriptors.collisionShapeType().version(),
+                Map.of(Physics3dDescriptors.shapeProperty(), reference(importId, collisionIdentity)));
+    }
+
+    /** Creates a static collision body on an explicitly selected generated entity. */
+    private static ComponentDefinition staticBody(
+            String importId, String locator, EntityId entityId, ComponentId shapeId) {
+        ProjectValue.ComponentTargetValue target =
+                new ProjectValue.ComponentTargetValue(new ComponentTarget(entityId, shapeId));
+        return component(
+                importId,
+                locator + "/collision/body",
+                Physics3dDescriptors.staticBodyType(),
+                Map.of(Physics3dDescriptors.shapesProperty(), new ProjectValue.ArrayValue(List.of(target))));
+    }
+
+    /** Creates the descriptor-authored door behavior targeting its generated transform. */
+    private static ComponentDefinition doorBehavior(
+            String importId, String locator, EntityId entityId, ComponentId transformId, DoomDoorPublication behavior) {
+        Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
+        properties.put(
+                DoomDoorDescriptors.TRANSFORM_PROPERTY,
+                new ProjectValue.ComponentTargetValue(new ComponentTarget(entityId, transformId)));
+        properties.put(DoomDoorDescriptors.CLOSED_HEIGHT_PROPERTY, number(behavior.closedHeight()));
+        properties.put(DoomDoorDescriptors.OPEN_HEIGHT_PROPERTY, number(behavior.openHeight()));
+        properties.put(DoomDoorDescriptors.SPEED_PROPERTY, number(behavior.speed()));
+        properties.put(DoomDoorDescriptors.HOLD_OPEN_SECONDS_PROPERTY, number(behavior.holdOpenSeconds()));
+        return component(importId, locator + "/behavior", DoomDoorDescriptors.DOOR_TYPE, properties);
     }
 
     /** Creates one static body with explicit sibling membership rather than hierarchy inference. */
@@ -299,21 +382,35 @@ final class DoomProjectImporter implements ProjectImporter {
 
     /** Creates one mesh-renderer component referencing a batched mesh and shared material. */
     private static ComponentDefinition meshRenderer(String importId, String prefix, int index, MaterialKey material) {
+        return meshRenderer(importId, prefix + "/root", meshIdentity(prefix, index), index, prefix, material);
+    }
+
+    /** Creates one renderer for an explicitly named mesh on the selected entity locator. */
+    private static ComponentDefinition meshRenderer(
+            String importId,
+            String entityLocator,
+            String meshIdentity,
+            int index,
+            String mapPrefix,
+            MaterialKey material) {
         Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
-        properties.put(Spatial3dDescriptors.meshProperty(), reference(importId, meshIdentity(prefix, index)));
+        properties.put(Spatial3dDescriptors.meshProperty(), reference(importId, meshIdentity));
         properties.put(
-                Spatial3dDescriptors.materialProperty(), reference(importId, materialIdentity(prefix, material)));
+                Spatial3dDescriptors.materialProperty(), reference(importId, materialIdentity(mapPrefix, material)));
         return component(
                 importId,
-                prefix + "/root/mesh-renderers/" + formatted(index),
+                entityLocator + "/mesh-renderers/" + formatted(index),
                 Spatial3dDescriptors.meshRendererType(),
                 properties);
     }
 
     /** Groups immutable static surfaces by material to avoid one draw resource per source surface. */
-    private static List<RenderBatch> renderBatches(DoomStaticGeometry geometry) {
+    private static List<RenderBatch> renderBatches(DoomStaticGeometry geometry, Set<Integer> doorSectors) {
         Map<MaterialKey, List<DoomMeshData>> meshesByMaterial = new LinkedHashMap<>();
         for (DoomSurface surface : geometry.surfaces()) {
+            if (surface.movingCeilingSector().stream().anyMatch(doorSectors::contains)) {
+                continue;
+            }
             meshesByMaterial
                     .computeIfAbsent(materialKey(surface), ignored -> new ArrayList<>())
                     .add(surface.mesh());
@@ -323,10 +420,52 @@ final class DoomProjectImporter implements ProjectImporter {
                 .toList();
     }
 
+    /** Groups each supported door's rebased surfaces independently from immutable map geometry. */
+    private static List<DoorRenderBatches> doorRenderBatches(
+            DoomStaticGeometry geometry, List<DoomDoorPublication> doors) {
+        List<DoorRenderBatches> result = new ArrayList<>();
+        for (DoomDoorPublication door : doors) {
+            Map<MaterialKey, List<DoomMeshData>> meshesByMaterial = new LinkedHashMap<>();
+            List<DoomMeshData> collision = new ArrayList<>();
+            for (DoomSurface surface : geometry.surfaces()) {
+                if (surface.movingCeilingSector().orElse(-1) != door.sectorIndex()) {
+                    continue;
+                }
+                DoomMeshData rebased = rebaseHeight(surface.mesh(), door.closedHeight());
+                meshesByMaterial
+                        .computeIfAbsent(materialKey(surface), ignored -> new ArrayList<>())
+                        .add(rebased);
+                if (surface.type() != DoomSurface.Type.MASKED_MIDDLE_WALL) {
+                    collision.add(rebased);
+                }
+            }
+            if (collision.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "manual door has no generated moving surfaces: " + door.sectorIndex());
+            }
+            List<RenderBatch> batches = meshesByMaterial.entrySet().stream()
+                    .map(entry -> new RenderBatch(entry.getKey(), combine(entry.getValue())))
+                    .toList();
+            result.add(new DoorRenderBatches(door, batches, withoutDegenerateTriangles(combine(collision))));
+        }
+        return List.copyOf(result);
+    }
+
+    /** Converts world-height vertices into coordinates local to the door's closed transform. */
+    private static DoomMeshData rebaseHeight(DoomMeshData mesh, float closedHeight) {
+        float[] positions = mesh.positions();
+        for (int index = 1; index < positions.length; index += 3) {
+            positions[index] -= closedHeight;
+        }
+        return new DoomMeshData(positions, mesh.normals(), mesh.textureCoordinates(), mesh.indices());
+    }
+
     /** Combines physical surfaces and source-semantic blockers into independently published collision. */
-    private static DoomMeshData staticCollisionMesh(DoomMap map, DoomStaticGeometry geometry) {
+    private static DoomMeshData staticCollisionMesh(
+            DoomMap map, DoomStaticGeometry geometry, Set<Integer> doorSectors) {
         List<DoomMeshData> collisionSurfaces = new ArrayList<>(geometry.surfaces().stream()
                 .filter(surface -> surface.type() != DoomSurface.Type.MASKED_MIDDLE_WALL)
+                .filter(surface -> surface.movingCeilingSector().stream().noneMatch(doorSectors::contains))
                 .map(DoomSurface::mesh)
                 .toList());
         collisionSurfaces.addAll(new DoomBlockingLineGeometryBuilder().build(map));
@@ -406,12 +545,16 @@ final class DoomProjectImporter implements ProjectImporter {
 
     /** Collects only referenced materials while preserving first-surface order. */
     private static Map<MaterialKey, DoomMaterial> selectedMaterials(
-            List<RenderBatch> batches, DoomMapMaterials sourceMaterials) {
+            List<RenderBatch> batches, List<DoorRenderBatches> doors, DoomMapMaterials sourceMaterials) {
         Map<MaterialKey, DoomMaterial> selected = new LinkedHashMap<>();
         for (RenderBatch batch : batches) {
             MaterialKey key = batch.material();
             selected.computeIfAbsent(key, ignored -> sourceMaterial(key, sourceMaterials));
         }
+        doors.stream().flatMap(door -> door.batches().stream()).forEach(batch -> {
+            MaterialKey key = batch.material();
+            selected.computeIfAbsent(key, ignored -> sourceMaterial(key, sourceMaterials));
+        });
         return selected;
     }
 
@@ -565,6 +708,26 @@ final class DoomProjectImporter implements ProjectImporter {
         return prefix + "/resources/collision/static";
     }
 
+    /** Returns the stable generated locator for one source-sector door. */
+    private static String doorLocator(String prefix, int sectorIndex) {
+        return prefix + "/doors/" + formatted(sectorIndex);
+    }
+
+    /** Returns one moving door collision resource identity. */
+    private static String doorCollisionIdentity(String prefix, int sectorIndex) {
+        return prefix + "/resources/collision/doors/" + formatted(sectorIndex);
+    }
+
+    /** Returns one moving door render-mesh identity. */
+    private static String doorMeshIdentity(String prefix, int sectorIndex, int index) {
+        return prefix + "/resources/doors/" + formatted(sectorIndex) + "/meshes/" + formatted(index);
+    }
+
+    /** Creates a portable finite numeric property. */
+    private static ProjectValue.NumberValue number(float value) {
+        return new ProjectValue.NumberValue(new BigDecimal(Float.toString(value)));
+    }
+
     /** Formats stable surface indices for lexical and source ordering to agree. */
     private static String formatted(int index) {
         return String.format(Locale.ROOT, "%05d", index);
@@ -595,4 +758,11 @@ final class DoomProjectImporter implements ProjectImporter {
 
     /** One renderer-ready static mesh and its shared material. */
     private record RenderBatch(MaterialKey material, DoomMeshData mesh) {}
+
+    /** One generated door's material batches and combined collision, all rebased to its closed transform. */
+    private record DoorRenderBatches(DoomDoorPublication behavior, List<RenderBatch> batches, DoomMeshData collision) {
+        private DoorRenderBatches {
+            batches = List.copyOf(batches);
+        }
+    }
 }

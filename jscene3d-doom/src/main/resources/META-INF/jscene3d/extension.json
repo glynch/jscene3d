@@ -11,5 +11,52 @@
       "scope": "importer",
       "displayName": "Classic Doom Maps"
     }
+  ],
+  "components": [
+    {
+      "id": "io.github.glynch.jscene3d.doom/door",
+      "typeVersion": 1,
+      "displayName": "Doom Door",
+      "description": "Moves explicitly published door geometry and collision using classic Doom timing.",
+      "updatePhases": ["before-physics"],
+      "providedCapabilities": ["io.github.glynch.jscene3d.doom/door"],
+      "properties": [
+        {
+          "id": "transform",
+          "valueKind": "component_target",
+          "required": true,
+          "displayName": "Transform",
+          "description": "Explicit generated transform moved with the door."
+        },
+        {
+          "id": "closed-height",
+          "valueKind": "number",
+          "required": true,
+          "displayName": "Closed Height",
+          "description": "Closed local Y position in world units."
+        },
+        {
+          "id": "open-height",
+          "valueKind": "number",
+          "required": true,
+          "displayName": "Open Height",
+          "description": "Open local Y position in world units."
+        },
+        {
+          "id": "speed",
+          "valueKind": "number",
+          "required": true,
+          "displayName": "Speed",
+          "description": "Vertical movement speed in world units per second."
+        },
+        {
+          "id": "hold-open-seconds",
+          "valueKind": "number",
+          "required": true,
+          "displayName": "Hold Open",
+          "description": "Seconds to hold before closing, or zero to remain open."
+        }
+      ]
+    }
   ]
 }

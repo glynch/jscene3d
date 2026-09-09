@@ -20,6 +20,10 @@
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-project-import</artifactId>
         </dependency>
         <dependency>
@@ -33,6 +37,10 @@
         <dependency>
             <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-project-physics</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-project-runtime</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.glynch</groupId>

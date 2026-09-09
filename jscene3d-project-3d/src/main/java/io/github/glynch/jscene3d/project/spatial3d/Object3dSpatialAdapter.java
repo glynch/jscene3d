@@ -141,6 +141,16 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     }
 
     @Override
+    public Transform3d activePrimaryCameraTransform() {
+        Object3dPerspectiveCamera camera = requireActivePrimaryCamera();
+        Object3dTransform transform = transforms.get(camera.owner());
+        if (transform == null) {
+            throw new IllegalStateException("active primary camera entity has no Transform3d");
+        }
+        return transform;
+    }
+
+    @Override
     public boolean isClosed() {
         return closed;
     }

@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.joml.Vector3fc;
 import org.junit.jupiter.api.Test;
 
 /** Verifies every safe presentation component descriptor has one executable factory. */
@@ -175,6 +176,17 @@ final class GamePresentationRuntimeExtensionTest {
         @Override
         public LocalSound createLocalSound(PcmAudioResource audio, AudioCategory category) {
             throw new UnsupportedOperationException("factory test creates no sound");
+        }
+
+        @Override
+        public PositionalSound createPositionalSound(
+                PcmAudioResource audio, AudioCategory category, PositionalSoundAttenuation attenuation) {
+            throw new AssertionError("component does not create positional audio");
+        }
+
+        @Override
+        public void setListenerTransform(Vector3fc position, Vector3fc forward, Vector3fc up) {
+            throw new AssertionError("component does not update the listener");
         }
 
         @Override

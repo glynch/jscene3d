@@ -151,6 +151,8 @@ final class Spatial3dPresentationCompositionTest {
         Entity billboardEntity = world.roots().get(3);
         PerspectiveCamera3d camera =
                 cameraEntity.component(CAMERA, PerspectiveCamera3d.class).orElseThrow();
+        Transform3d cameraTransform =
+                cameraEntity.component(TRANSFORM, Transform3d.class).orElseThrow();
         DirectionalLight3d light =
                 lightEntity.component(LIGHT, DirectionalLight3d.class).orElseThrow();
         MeshRenderer3d renderer =
@@ -161,6 +163,7 @@ final class Spatial3dPresentationCompositionTest {
         assertThat(spatial.isReadyToRender()).isFalse();
         world.activate();
         assertThat(spatial.isReadyToRender()).isTrue();
+        assertThat(spatial.activePrimaryCameraTransform()).isSameAs(cameraTransform);
         world.disable(cameraEntity);
         assertThat(spatial.isReadyToRender()).isFalse();
         world.enable(cameraEntity);

@@ -143,6 +143,14 @@ public interface Spatial3dWorldModule extends WorldModule {
     boolean isReadyToRender();
 
     /**
+     * Returns the transform supplying the effectively active primary camera's world pose.
+     *
+     * @return active primary camera transform
+     * @throws IllegalStateException if this module is closed or no effectively active primary camera exists
+     */
+    Transform3d activePrimaryCameraTransform();
+
+    /**
      * Returns whether this adapter has released all registered spatial and presentation components.
      *
      * @return {@code true} after closure

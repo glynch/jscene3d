@@ -116,6 +116,8 @@ public final class DesktopProjectRunner {
             return;
         }
         if (spatial.isReadyToRender()) {
+            DesktopAudioListenerSynchronizer.synchronize(
+                    spatial.activePrimaryCameraTransform(), presentation::setListenerTransform);
             spatial.render(renderer, window.framebufferAspectRatio());
         } else {
             renderer.clear();

@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -173,6 +174,17 @@ final class ScreenComponentsTest {
         @Override
         public LocalSound createLocalSound(PcmAudioResource audio, AudioCategory category) {
             throw new UnsupportedOperationException("screen composition creates no sound");
+        }
+
+        @Override
+        public PositionalSound createPositionalSound(
+                PcmAudioResource audio, AudioCategory category, PositionalSoundAttenuation attenuation) {
+            throw new AssertionError("screen components do not create positional audio");
+        }
+
+        @Override
+        public void setListenerTransform(Vector3fc position, Vector3fc forward, Vector3fc up) {
+            throw new AssertionError("screen components do not update the listener");
         }
 
         @Override

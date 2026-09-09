@@ -1,6 +1,8 @@
 # JScene3D
 
-JScene3D is a Java 21 scene-graph and rendering library inspired by Three.js.
+JScene3D is a modular Java 21 3D engine with a renderer-independent scene graph,
+OpenGL desktop backend, physics, audio, asset import, descriptor-authored entity
+worlds, application export, and a JavaFX editor preview.
 
 ## Requirements
 
@@ -40,7 +42,7 @@ To manually verify a visible, resizable blue window, run:
 Close the window normally or press Escape to finish the build. This is an
 internal development smoke test; applications do not receive raw OpenGL access.
 
-## Run the editor foundation
+## Run the editor
 
 Launch the native JavaFX editor shell with:
 
@@ -48,16 +50,25 @@ Launch the native JavaFX editor shell with:
 ./tools/scripts/run-editor.sh
 ```
 
-The script first asks Maven to build the editor and prepare its runtime module
-path. Maven completes before the script explicitly launches the editor; no
-Maven lifecycle phase opens a user interface. Editor distribution is a separate
-concern.
+The script incrementally packages the editor and prepares its runtime module
+path with tests skipped. Maven completes before the script explicitly launches
+the editor; no Maven lifecycle phase opens a user interface.
 
-The current foundation embeds the actual JScene3D renderer through OpenGLFX and
-shows placeholder hierarchy, asset-browser, and inspector regions around a
-temporary three-box preview. It deliberately does not load or edit a project
-yet. Space pauses or resumes the preview animation, pointer dragging rotates the
-preview, and the toolbar resets its orientation.
+Pass a project directory to open it immediately:
+
+```shell
+./tools/scripts/run-editor.sh /path/to/project
+```
+
+The JavaFX editor embeds the JScene3D renderer through OpenGLFX. It loads the
+project manifest, safe extension descriptors, authored assets, published import
+generations, and startup world without executing application code. The entry
+world is composed with real spatial presentation and inert implementations for
+non-presentation components, giving the hierarchy, asset catalog, diagnostics,
+and viewport a consistent view of the descriptor-authored project. Project-open
+telemetry reports manifest and asset loading, import resolution, preview
+composition, and first presentation. The current editor is a read-only loader
+and preview; inspector editing and saving are not implemented yet.
 
 ## Run examples
 
@@ -316,10 +327,12 @@ details.
 
 Its service-discovered `io.github.glynch.jscene3d.doom/maps` project importer
 exposes the maps in a WAD as selectable source items. Each selected map produces
-a deterministic, pretty-printed resource of type
-`io.github.glynch.jscene3d.doom/map`. This first content slice preserves the
-classic map records and source provenance; geometry, materials, sprites, audio,
-and gameplay interpretation remain separate later concerns.
+a generated entity definition backed by deterministic mesh, material, texture,
+and triangle-mesh collision artifacts. The published definition contains only
+generic descriptor-backed JScene3D components, so the runtime and editor do not
+need a Doom-specific scene loader. Actor catalogs, sprites, audio, combat rules,
+doors, lifts, triggers, and other gameplay interpretation remain application or
+provider concerns rather than hidden importer behavior.
 
 ## Animation
 
@@ -623,8 +636,11 @@ published-content root; they do not need an application-specific Java launcher.
 application directory containing relative launchers, runtime JARs, native
 dependencies, project data, and published content. Native application bundles
 and installers consume that directory rather than reproducing its content
-selection rules. A conventional executable or self-extracting JAR is not a
-supported game export format.
+selection rules. On macOS, the exporter can wrap the same directory in a
+`jpackage` application image and create a non-interactive DMG suitable for an
+unattended build. A project may declare an `.icns` application icon in its
+manifest. A conventional executable or self-extracting JAR is not a supported
+game export format.
 
 The read-only live Entity hierarchy identifies local authored entities,
 authored definition placements, and runtime-spawned definition roots. Placement
@@ -675,6 +691,7 @@ license notices, and exact selected filenames are recorded beside the assets in
 
 ## Project structure
 
+- `jscene3d-documentation`: versioned architecture and design documentation.
 - `jscene3d-core`: renderer-independent scene, camera, geometry, material,
   texture, and raycasting APIs.
 - `jscene3d-physics`: renderer-independent collision objects and colliders,
@@ -701,7 +718,9 @@ license notices, and exact selected filenames are recorded beside the assets in
   rendering host for manifest-selected project Worlds.
 - `jscene3d-project-export`: build-tool-independent assembly of relocatable
   application directories from authored project data, completed import publications,
-  and caller-resolved runtime JARs.
+  and caller-resolved runtime JARs, plus macOS application-image and DMG packaging.
+- `jscene3d-editor`: read-only JavaFX project loading, descriptor inspection,
+  diagnostics, hierarchy and asset views, and an embedded JScene3D viewport.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives

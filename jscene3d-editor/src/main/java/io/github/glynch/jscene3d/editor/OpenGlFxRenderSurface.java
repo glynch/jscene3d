@@ -4,9 +4,6 @@
  */
 package io.github.glynch.jscene3d.editor;
 
-import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
-import static org.lwjgl.opengl.GL30.glBindFramebuffer;
-
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.canvas.events.GLRenderEvent;
 import io.github.glynch.jscene3d.render.RenderSurface;
@@ -17,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 final class OpenGlFxRenderSurface implements RenderSurface {
     private RenderSurfaceSize currentSize = new RenderSurfaceSize(0, 0, 0, 0);
     private @Nullable Thread contextThread;
+    private @Nullable SrgbPresentationFramebuffer presentation;
     private int presentationFramebuffer;
     private boolean released;
 
@@ -31,6 +29,7 @@ final class OpenGlFxRenderSurface implements RenderSurface {
         int logicalHeight = Math.max((int) Math.ceil(canvas.getHeight()), 0);
         if (dimensionsChanged(framebufferWidth, framebufferHeight, logicalWidth, logicalHeight)) {
             currentSize = new RenderSurfaceSize(framebufferWidth, framebufferHeight, logicalWidth, logicalHeight);
+            requirePresentation().resize(framebufferWidth, framebufferHeight);
         }
     }
 
@@ -39,7 +38,7 @@ final class OpenGlFxRenderSurface implements RenderSurface {
     public void activate() {
         requireAvailable();
         requireContextThread();
-        glBindFramebuffer(GL_FRAMEBUFFER, presentationFramebuffer);
+        requirePresentation().bindLinearFramebuffer();
     }
 
     /** Returns the dimensions captured from the current or most recent callback. */
@@ -55,7 +54,19 @@ final class OpenGlFxRenderSurface implements RenderSurface {
     public void release() {
         requireAvailable();
         requireContextThread();
+        SrgbPresentationFramebuffer current = presentation;
+        presentation = null;
+        if (current != null) {
+            current.close();
+        }
         released = true;
+    }
+
+    /** Converts the completed linear frame to sRGB in OpenGLFX's presentation framebuffer. */
+    void present() {
+        requireAvailable();
+        requireContextThread();
+        requirePresentation().present(presentationFramebuffer);
     }
 
     /** Returns whether any physical or logical dimension changed. */
@@ -65,6 +76,16 @@ final class OpenGlFxRenderSurface implements RenderSurface {
                 || currentSize.framebufferHeight() != framebufferHeight
                 || currentSize.logicalWidth() != logicalWidth
                 || currentSize.logicalHeight() != logicalHeight;
+    }
+
+    /** Lazily creates color-conversion resources in the active OpenGLFX context. */
+    private SrgbPresentationFramebuffer requirePresentation() {
+        SrgbPresentationFramebuffer current = presentation;
+        if (current == null) {
+            current = SrgbPresentationFramebuffer.create();
+            presentation = current;
+        }
+        return current;
     }
 
     /** Claims the first callback thread and rejects access from every other thread. */

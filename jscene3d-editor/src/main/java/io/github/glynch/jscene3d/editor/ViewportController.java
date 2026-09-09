@@ -53,6 +53,7 @@ final class ViewportController {
             }
             applyPendingPreview(currentPreview);
             currentPreview.render(size);
+            surface.present();
             if (currentPreview.frameCount() % 30L == 0L) {
                 updateStatus(event, size, currentPreview.frameCount());
             }

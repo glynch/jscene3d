@@ -11,6 +11,7 @@ EDITOR_MODULE_PATH="${EDITOR_TARGET_DIRECTORY}/editor-module-path"
     -f "${PROJECT_DIRECTORY}/pom.xml" \
     -pl :jscene3d-editor \
     -am \
+    -Dmaven.test.skip=true \
     -Pprepare-editor-run \
     package
 

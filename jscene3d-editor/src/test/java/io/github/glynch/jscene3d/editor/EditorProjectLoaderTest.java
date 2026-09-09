@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -91,6 +92,39 @@ final class EditorProjectLoaderTest {
         try (EditorWorldPreview preview = result.preview().orElseThrow()) {
             assertThat(preview.isReady()).isTrue();
         }
+    }
+
+    /** Discovers installed extension descriptors without adding their implementation classes to the editor module. */
+    @Test
+    void discoversInstalledExtensionMetadata() throws IOException {
+        writeProject();
+        write("project.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/project-1.json",
+                  "schemaVersion":1,
+                  "identity":{"id":"example.editor-test","name":"Editor Test","version":"1.0.0"},
+                  "engine":{"requires":">=0.1.0-SNAPSHOT <0.2.0"},
+                  "runtime":{"applicationExtension":"example.editor-test","entryScene":"worlds/test.world.json"},
+                  "extensions":[
+                    {"id":"example.editor-test","requires":">=1.0.0 <2.0.0"},
+                    {"id":"example.installed","requires":">=1.0.0 <2.0.0"}
+                  ]
+                }
+                """);
+        Path installed = temporaryDirectory.resolve("installed-extension");
+        writeInstalledDescriptor(installed);
+        EditorProjectLoader projectLoader = new EditorProjectLoader(
+                "0.1.0-SNAPSHOT", EditorProjectLoaderTest.class.getClassLoader(), List.of(installed));
+
+        EditorProjectLoadResult result = projectLoader.load(temporaryDirectory);
+
+        assertThat(result.session())
+                .withFailMessage(() -> result.diagnostics().toString())
+                .isPresent();
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.session().orElseThrow().types().extensions())
+                .extracting(extension -> extension.id())
+                .contains("example.installed");
     }
 
     /** Creates the complete valid source project used by the read-only loading test. */
@@ -207,6 +241,24 @@ final class EditorProjectLoaderTest {
         Path path = temporaryDirectory.resolve(relativePath);
         Files.createDirectories(path.getParent());
         Files.writeString(path, content, StandardCharsets.UTF_8);
+    }
+
+    /** Writes one descriptor into a stand-alone installed-extension metadata root. */
+    private static void writeInstalledDescriptor(Path root) throws IOException {
+        Path descriptor = root.resolve("META-INF/jscene3d/extension.json");
+        Files.createDirectories(descriptor.getParent());
+        Files.writeString(descriptor, """
+                {
+                  "$schema":"https://jscene3d.org/schemas/extension-1.json",
+                  "schemaVersion":1,
+                  "id":"example.installed",
+                  "version":"1.0.0",
+                  "engineRequires":">=0.1.0-SNAPSHOT <0.2.0",
+                  "displayName":"Installed Test Extension",
+                  "types":[],
+                  "components":[]
+                }
+                """, StandardCharsets.UTF_8);
     }
 
     /** Creates the editor loader under test with this module's resource class loader. */

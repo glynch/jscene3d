@@ -64,12 +64,19 @@ final class EditorProjectLoader {
     private final ProjectLoader projectLoader;
     private final ExtensionCatalogLoader extensionLoader;
     private final ClassLoader editorClassLoader;
+    private final List<Path> installedExtensionPath;
 
     /** Creates a loader for the running editor version and its safe metadata class path. */
     EditorProjectLoader(String engineVersion, ClassLoader editorClassLoader) {
+        this(engineVersion, editorClassLoader, List.of());
+    }
+
+    /** Creates a loader with installed extension artifacts used only for descriptor discovery. */
+    EditorProjectLoader(String engineVersion, ClassLoader editorClassLoader, List<Path> installedExtensionPath) {
         projectLoader = new ProjectLoader(engineVersion);
         extensionLoader = new ExtensionCatalogLoader(engineVersion);
         this.editorClassLoader = Objects.requireNonNull(editorClassLoader, "editorClassLoader");
+        this.installedExtensionPath = List.copyOf(installedExtensionPath);
     }
 
     /** Loads one project and constructs an immutable session when its startup world is usable. */
@@ -128,21 +135,69 @@ final class EditorProjectLoader {
     private ExtensionCatalogLoadResult loadProjectExtensions(
             GameProject project, LinkedHashSet<ProjectDiagnostic> diagnostics) {
         Path resources = project.root().resolve(PROJECT_RESOURCES);
-        if (!Files.isDirectory(resources)) {
+        List<URL> metadataRoots = extensionMetadataRoots(resources, diagnostics);
+        if (metadataRoots.isEmpty()) {
             return extensionLoader.load(project, editorClassLoader);
         }
         URLClassLoader resourceLoader;
-        try {
-            URL resourceUrl = resources.toUri().toURL();
-            resourceLoader = new URLClassLoader(new URL[] {resourceUrl}, editorClassLoader);
-        } catch (IOException exception) {
-            diagnostics.add(
-                    error(resources, EditorDiagnosticCode.EXTENSION_METADATA_UNAVAILABLE, exception.toString()));
-            return extensionLoader.load(project, editorClassLoader);
-        }
+        resourceLoader = new URLClassLoader(metadataRoots.toArray(URL[]::new), editorClassLoader);
         ExtensionCatalogLoadResult result = extensionLoader.load(project, resourceLoader);
         closeResourceLoader(resourceLoader, resources, diagnostics);
         return result;
+    }
+
+    /** Resolves project-local and installed descriptor roots without loading extension classes. */
+    private List<URL> extensionMetadataRoots(Path projectResources, LinkedHashSet<ProjectDiagnostic> diagnostics) {
+        List<Path> roots = new ArrayList<>();
+        if (Files.isDirectory(projectResources)) {
+            roots.add(projectResources);
+        }
+        for (Path configured : installedExtensionPath) {
+            addExtensionArtifacts(configured, roots, diagnostics);
+        }
+        List<URL> urls = new ArrayList<>();
+        for (Path root : roots) {
+            try {
+                urls.add(root.toUri().toURL());
+            } catch (IOException exception) {
+                diagnostics.add(error(root, EditorDiagnosticCode.EXTENSION_METADATA_UNAVAILABLE, exception.toString()));
+            }
+        }
+        return List.copyOf(urls);
+    }
+
+    /** Adds one artifact or the sorted JAR contents of one installed-extension directory. */
+    private static void addExtensionArtifacts(
+            Path configured, List<Path> roots, LinkedHashSet<ProjectDiagnostic> diagnostics) {
+        if (Files.isRegularFile(configured)) {
+            roots.add(configured);
+            return;
+        }
+        if (!Files.isDirectory(configured)) {
+            diagnostics.add(warning(
+                    configured,
+                    EditorDiagnosticCode.EXTENSION_METADATA_UNAVAILABLE,
+                    "installed extension path does not exist"));
+            return;
+        }
+        if (Files.isRegularFile(configured.resolve(ExtensionCatalogLoader.DESCRIPTOR_RESOURCE))) {
+            roots.add(configured);
+            return;
+        }
+        try (var entries = Files.list(configured)) {
+            entries.filter(Files::isRegularFile)
+                    .filter(EditorProjectLoader::isJar)
+                    .sorted()
+                    .forEach(roots::add);
+        } catch (IOException exception) {
+            diagnostics.add(
+                    warning(configured, EditorDiagnosticCode.EXTENSION_METADATA_UNAVAILABLE, exception.toString()));
+        }
+    }
+
+    /** Returns whether an installed-extension artifact has the conventional JAR suffix. */
+    private static boolean isJar(Path path) {
+        return path.getFileName().toString().endsWith(".jar");
     }
 
     /** Closes the descriptor-only class loader and reports an unlikely resource release failure. */

@@ -52,8 +52,10 @@ public final class EditorApplication extends Application {
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
     public EditorApplication() {
-        projectLoader =
-                new EditorProjectLoader(EditorBuildInfo.engineVersion(), EditorApplication.class.getClassLoader());
+        projectLoader = new EditorProjectLoader(
+                EditorBuildInfo.engineVersion(),
+                EditorApplication.class.getClassLoader(),
+                EditorExtensionPath.configured());
         hierarchy = new TreeView<>();
         assets = new ListView<>();
         diagnostics = new ListView<>();

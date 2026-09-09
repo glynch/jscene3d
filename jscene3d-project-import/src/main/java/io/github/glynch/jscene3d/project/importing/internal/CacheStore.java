@@ -16,6 +16,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
@@ -32,6 +34,7 @@ public final class CacheStore {
     private final Path stagingRoot;
     private final boolean writable;
     private final CacheIndexCodec codec = new CacheIndexCodec();
+    private final Map<String, Optional<ActiveGeneration>> publishedGenerations = new HashMap<>();
 
     /**
      * Creates and resolves one engine-owned cache root.
@@ -63,6 +66,9 @@ public final class CacheStore {
 
     /**
      * Opens published content without creating cache or staging directories.
+     *
+     * <p>The returned read-only view validates each import's active immutable generation on first access and retains
+     * that result for the view's lifetime. Open a new view to observe a subsequently published generation.
      *
      * @param suppliedRoot existing published-content root
      * @return read-only published cache view
@@ -109,7 +115,23 @@ public final class CacheStore {
      * @throws IOException when the active generation is incomplete or invalid
      */
     public Optional<ActiveGeneration> active(String importId) throws IOException {
-        Path importRoot = importsRoot.resolve(Preconditions.requirePortableIdentity(importId, "importId"));
+        String validImportId = Preconditions.requirePortableIdentity(importId, "importId");
+        if (writable) {
+            return loadActive(validImportId);
+        }
+        synchronized (publishedGenerations) {
+            if (publishedGenerations.containsKey(validImportId)) {
+                return publishedGenerations.get(validImportId);
+            }
+            Optional<ActiveGeneration> active = loadActive(validImportId);
+            publishedGenerations.put(validImportId, active);
+            return active;
+        }
+    }
+
+    /** Reads and completely validates the currently published generation for one import. */
+    private Optional<ActiveGeneration> loadActive(String importId) throws IOException {
+        Path importRoot = importsRoot.resolve(importId);
         Path pointer = importRoot.resolve(ACTIVE_GENERATION);
         if (!Files.isRegularFile(pointer)) {
             return Optional.empty();

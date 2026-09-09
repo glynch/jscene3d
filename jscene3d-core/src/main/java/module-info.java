@@ -21,4 +21,5 @@ module io.github.glynch.jscene3d.core {
     exports io.github.glynch.jscene3d.raycasting;
     exports io.github.glynch.jscene3d.scenes;
     exports io.github.glynch.jscene3d.textures;
+    exports io.github.glynch.jscene3d.telemetry;
 }

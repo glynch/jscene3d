@@ -4,14 +4,19 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import static javafx.util.Duration.seconds;
+
 import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -36,11 +41,11 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
-import javafx.util.Duration;
 import org.jspecify.annotations.Nullable;
 
 /** Production JavaFX shell for the JScene3D visual editor. */
 public final class EditorApplication extends Application {
+    private final Telemetry telemetry;
     private final EditorProjectLoader projectLoader;
     private final TreeView<EditorHierarchyNode> hierarchy;
     private final ListView<EditorAssetItem> assets;
@@ -52,6 +57,7 @@ public final class EditorApplication extends Application {
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
     public EditorApplication() {
+        telemetry = Telemetry.recording(new EditorTelemetryRecorder());
         projectLoader = new EditorProjectLoader(
                 EditorBuildInfo.engineVersion(),
                 EditorApplication.class.getClassLoader(),
@@ -64,19 +70,21 @@ public final class EditorApplication extends Application {
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
     @Override
     public void start(Stage stage) {
-        Label status = createStatus();
+        Label projectStatus = createStatus("No project opened");
+        Label viewportStatus = createStatus("Waiting for the first OpenGL frame");
         GLCanvas viewportCanvas = createCanvas();
-        ViewportController controller = new ViewportController(viewportCanvas, status, () -> completeDisposal(stage));
+        ViewportController controller =
+                new ViewportController(viewportCanvas, viewportStatus, () -> completeDisposal(stage));
         canvas = viewportCanvas;
         viewportController = controller;
         installViewportEvents(viewportCanvas, controller);
 
         BorderPane root = new BorderPane();
-        root.setTop(createTopControls(stage, status));
+        root.setTop(createTopControls(stage, projectStatus));
         root.setLeft(createNavigation());
         root.setCenter(createViewportPane(viewportCanvas));
         root.setRight(createInspector());
-        root.setBottom(createDiagnosticsPane(status));
+        root.setBottom(createDiagnosticsPane(projectStatus, viewportStatus));
         root.setStyle("-fx-base: #252a30; -fx-background-color: #1b2026;");
 
         stage.setTitle("JScene3D Editor");
@@ -88,7 +96,7 @@ public final class EditorApplication extends Application {
             disposeCanvas();
         });
         stage.show();
-        loadCommandLineProject(stage, status);
+        loadCommandLineProject(stage, projectStatus);
         viewportCanvas.requestFocus();
         scheduleAutomaticClose();
     }
@@ -100,8 +108,8 @@ public final class EditorApplication extends Application {
     }
 
     /** Creates the status line shown below the viewport. */
-    private static Label createStatus() {
-        Label status = new Label("Waiting for the first OpenGL frame");
+    private static Label createStatus(String initialText) {
+        Label status = new Label(initialText);
         status.setMaxWidth(Double.MAX_VALUE);
         status.setPadding(new Insets(6.0, 10.0, 6.0, 10.0));
         return status;
@@ -196,12 +204,12 @@ public final class EditorApplication extends Application {
     }
 
     /** Creates a compact status and structured-diagnostics region. */
-    private VBox createDiagnosticsPane(Label status) {
+    private VBox createDiagnosticsPane(Label projectStatus, Label viewportStatus) {
         diagnostics.setPlaceholder(new Label("No project diagnostics"));
         diagnostics.setCellFactory(ignored -> new DiagnosticCell());
         diagnostics.setPrefHeight(105.0);
         diagnostics.setMinHeight(72.0);
-        VBox pane = new VBox(4.0, status, new Label("Diagnostics"), diagnostics);
+        VBox pane = new VBox(4.0, projectStatus, viewportStatus, new Label("Diagnostics"), diagnostics);
         pane.setPadding(new Insets(0.0, 8.0, 8.0, 8.0));
         return pane;
     }
@@ -225,14 +233,17 @@ public final class EditorApplication extends Application {
 
     /** Replaces the current editor session with data loaded from one directory. */
     private void openProject(Stage stage, Label status, Path directory) {
-        status.setText("Opening " + directory.toAbsolutePath().normalize());
-        EditorProjectLoadResult result = projectLoader.load(directory);
+        Path normalized = directory.toAbsolutePath().normalize();
+        EditorProjectOpenTrace trace = new EditorProjectOpenTrace(telemetry, normalized);
+        status.setText("Opening " + normalized);
+        EditorProjectLoadResult result = trace.load(operation -> projectLoader.load(normalized, operation));
         diagnostics.getItems().setAll(result.diagnostics());
         if (result.session().isEmpty()) {
+            EditorProjectOpenTiming timing = trace.fail("project loading did not create an editor session");
             hierarchy.setRoot(null);
             assets.getItems().clear();
             requireViewportController().clearProject();
-            status.setText("Project could not be opened — see diagnostics");
+            status.setText("Project could not be opened after " + format(timing.total()) + " — see diagnostics");
             return;
         }
         EditorProjectSession session = result.session().orElseThrow();
@@ -244,28 +255,46 @@ public final class EditorApplication extends Application {
         requireViewportController()
                 .showProject(
                         session,
-                        previewDiagnostics ->
-                                applyPreviewDiagnostics(result.diagnostics(), previewDiagnostics, status));
-        long errors = result.diagnostics().stream()
-                .filter(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR)
-                .count();
-        status.setText("Opened " + session.project().identity().name() + " — "
-                + session.hierarchy().children().size() + " root entities, "
-                + session.assets().size()
-                + " assets, " + errors + " errors");
+                        trace,
+                        completion -> applyPreviewDiagnostics(result.diagnostics(), session, completion, status));
+        status.setText(
+                "Preparing viewport preview for " + session.project().identity().name());
     }
 
     /** Combines project-loading and viewport-composition diagnostics after render-thread preparation. */
     private void applyPreviewDiagnostics(
-            List<ProjectDiagnostic> projectDiagnostics, List<ProjectDiagnostic> previewDiagnostics, Label status) {
+            List<ProjectDiagnostic> projectDiagnostics,
+            EditorProjectSession session,
+            EditorPreviewCompletion completion,
+            Label status) {
         List<ProjectDiagnostic> combined = new ArrayList<>(projectDiagnostics);
-        combined.addAll(previewDiagnostics);
+        combined.addAll(completion.diagnostics());
         diagnostics.getItems().setAll(combined);
-        boolean failed = previewDiagnostics.stream()
+        boolean failed = completion.diagnostics().stream()
                 .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         if (failed) {
-            status.setText("Project opened, but its viewport preview could not be composed — see diagnostics");
+            status.setText("Project opened in " + format(completion.timing().total())
+                    + ", but its viewport preview could not be composed — see diagnostics");
+            return;
         }
+        long errors = combined.stream()
+                .filter(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR)
+                .count();
+        EditorProjectOpenTiming timing = completion.timing();
+        String firstFrame =
+                timing.firstPresentation().map(EditorApplication::format).orElse("not presented");
+        status.setText("Opened " + session.project().identity().name() + " in " + format(timing.total())
+                + " (project " + format(timing.projectLoad())
+                + ", preview " + format(timing.previewComposition())
+                + ", first frame " + firstFrame + ") — "
+                + session.hierarchy().children().size() + " root entities, "
+                + session.assets().size() + " assets, " + errors + " errors");
+    }
+
+    /** Formats a measured duration in milliseconds with useful sub-millisecond precision. */
+    private static String format(Duration duration) {
+        double milliseconds = duration.toNanos() / 1_000_000.0;
+        return String.format(Locale.ROOT, "%.1f ms", milliseconds);
     }
 
     /** Returns the controller installed during JavaFX stage initialization. */
@@ -296,7 +325,7 @@ public final class EditorApplication extends Application {
         if (seconds <= 0) {
             return;
         }
-        PauseTransition closeDelay = new PauseTransition(Duration.seconds(seconds));
+        PauseTransition closeDelay = new PauseTransition(seconds(seconds));
         closeDelay.setOnFinished(ignored -> disposeCanvas());
         closeDelay.play();
     }

@@ -242,6 +242,12 @@ Run the headless world-composition example with:
 ./mvnw -pl jscene3d-project-examples -am -Prun-world-composition-example compile
 ```
 
+Run the local hierarchical-telemetry example with:
+
+```shell
+./mvnw -pl jscene3d-project-examples -am -Prun-telemetry-example compile
+```
+
 Run the headless authored-collision example with:
 
 ```shell

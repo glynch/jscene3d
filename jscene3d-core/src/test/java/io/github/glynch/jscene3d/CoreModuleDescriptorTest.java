@@ -38,6 +38,7 @@ final class CoreModuleDescriptorTest {
                         "io.github.glynch.jscene3d.objects",
                         "io.github.glynch.jscene3d.raycasting",
                         "io.github.glynch.jscene3d.scenes",
+                        "io.github.glynch.jscene3d.telemetry",
                         "io.github.glynch.jscene3d.textures");
     }
 }

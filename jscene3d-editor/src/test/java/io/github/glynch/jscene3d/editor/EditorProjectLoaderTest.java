@@ -8,11 +8,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.telemetry.Telemetry;
+import io.github.glynch.jscene3d.telemetry.TelemetryMeasurement;
+import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -72,6 +77,32 @@ final class EditorProjectLoaderTest {
                 .returns(
                         "project.directory.missing",
                         diagnostic -> diagnostic.code().code());
+    }
+
+    /** Records each material loading phase beneath the caller-owned operation. */
+    @Test
+    void recordsProjectLoadingPhases() throws IOException {
+        writeProject();
+        List<TelemetryMeasurement> measurements = new ArrayList<>();
+        Telemetry telemetry = Telemetry.recording(measurements::add);
+
+        try (TelemetryOperation operation = telemetry.begin("test.project.load", Map.of())) {
+            EditorProjectLoadResult result = loader().load(temporaryDirectory, operation);
+            assertThat(result.session()).isPresent();
+        }
+
+        assertThat(measurements)
+                .extracting(TelemetryMeasurement::name)
+                .containsExactly(
+                        "project.manifest.load",
+                        "project.asset-catalog.scan",
+                        "project.extensions.load",
+                        "project.import-definitions.load",
+                        "project.published-content.load",
+                        "project.assets.validate",
+                        "project.startup-world.load",
+                        "project.hierarchy.project",
+                        "test.project.load");
     }
 
     /** Reads the engine version filtered into the built editor artifact. */

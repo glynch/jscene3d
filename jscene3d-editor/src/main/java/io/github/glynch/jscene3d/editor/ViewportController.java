@@ -40,6 +40,7 @@ final class ViewportController {
 
     /** Renders one OpenGLFX frame through the actual JScene3D renderer. */
     void render(GLRenderEvent event) {
+        @Nullable PendingPresentation pendingPresentation = null;
         try {
             surface.beginFrame(canvas, event);
             RenderSurfaceSize size = surface.size();
@@ -51,13 +52,20 @@ final class ViewportController {
                 currentPreview = new EditorPreview(surface);
                 preview = currentPreview;
             }
-            applyPendingPreview(currentPreview);
-            currentPreview.render(size);
-            surface.present();
+            pendingPresentation = applyPendingPreview(currentPreview);
+            if (pendingPresentation == null) {
+                currentPreview.render(size);
+                surface.present();
+            } else {
+                presentFirstFrame(currentPreview, size, pendingPresentation);
+            }
             if (currentPreview.frameCount() % 30L == 0L) {
                 updateStatus(event, size, currentPreview.frameCount());
             }
         } catch (RuntimeException exception) {
+            if (pendingPresentation != null) {
+                pendingPresentation.request().trace().orElseThrow().fail(exception);
+            }
             canvas.setFps(0.0);
             LOGGER.log(System.Logger.Level.ERROR, "Editor viewport rendering failed", exception);
             updateStatus("Rendering failed: " + exception.getMessage());
@@ -84,15 +92,17 @@ final class ViewportController {
     }
 
     /** Requests composition of one editor-safe project preview on the OpenGL rendering thread. */
-    void showProject(EditorProjectSession session, Consumer<List<ProjectDiagnostic>> completion) {
-        pendingPreview.set(new PreviewRequest(
+    void showProject(
+            EditorProjectSession session, EditorProjectOpenTrace trace, Consumer<EditorPreviewCompletion> completion) {
+        replacePendingPreview(new PreviewRequest(
                 Optional.of(Objects.requireNonNull(session, "session")),
+                Optional.of(Objects.requireNonNull(trace, "trace")),
                 Objects.requireNonNull(completion, "completion")));
     }
 
     /** Requests removal of the current project preview after an unsuccessful project open. */
     void clearProject() {
-        pendingPreview.set(new PreviewRequest(Optional.empty(), ignored -> {}));
+        replacePendingPreview(new PreviewRequest(Optional.empty(), Optional.empty(), ignored -> {}));
     }
 
     /** Records JavaFX focus changes for the next visible status update. */
@@ -101,19 +111,58 @@ final class ViewportController {
     }
 
     /** Applies the most recent pending project change and reports composition diagnostics on JavaFX. */
-    private void applyPendingPreview(EditorPreview currentPreview) {
+    private @Nullable PendingPresentation applyPendingPreview(EditorPreview currentPreview) {
         @Nullable PreviewRequest request = pendingPreview.getAndSet(null);
         if (request == null) {
-            return;
+            return null;
         }
-        List<ProjectDiagnostic> previewDiagnostics;
         if (request.session().isPresent()) {
-            previewDiagnostics = currentPreview.show(request.session().orElseThrow());
-        } else {
-            currentPreview.clearProject();
-            previewDiagnostics = List.of();
+            EditorProjectOpenTrace trace = request.trace().orElseThrow();
+            try {
+                List<ProjectDiagnostic> previewDiagnostics = trace.compose(
+                        () -> currentPreview.show(request.session().orElseThrow()));
+                boolean failed = previewDiagnostics.stream()
+                        .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
+                if (failed) {
+                    EditorProjectOpenTiming timing = trace.fail("preview composition produced errors");
+                    complete(request, previewDiagnostics, timing);
+                    return null;
+                }
+                return new PendingPresentation(request, previewDiagnostics);
+            } catch (RuntimeException exception) {
+                trace.fail(exception);
+                throw exception;
+            }
         }
-        Platform.runLater(() -> request.completion().accept(previewDiagnostics));
+        currentPreview.clearProject();
+        return null;
+    }
+
+    /** Presents a newly composed preview before reporting the project open as complete. */
+    private void presentFirstFrame(
+            EditorPreview currentPreview, RenderSurfaceSize size, PendingPresentation pendingPresentation) {
+        PreviewRequest request = pendingPresentation.request();
+        EditorProjectOpenTrace trace = request.trace().orElseThrow();
+        EditorProjectOpenTiming timing = trace.present(() -> {
+            currentPreview.render(size);
+            surface.present();
+        });
+        complete(request, pendingPresentation.diagnostics(), timing);
+    }
+
+    /** Delivers one immutable preview completion on the JavaFX Application Thread. */
+    private static void complete(
+            PreviewRequest request, List<ProjectDiagnostic> previewDiagnostics, EditorProjectOpenTiming timing) {
+        EditorPreviewCompletion result = new EditorPreviewCompletion(previewDiagnostics, timing);
+        Platform.runLater(() -> request.completion().accept(result));
+    }
+
+    /** Replaces a queued preview request and closes any trace which can no longer complete. */
+    private void replacePendingPreview(PreviewRequest request) {
+        @Nullable PreviewRequest replaced = pendingPreview.getAndSet(request);
+        if (replaced != null) {
+            replaced.trace().ifPresent(EditorProjectOpenTrace::cancel);
+        }
     }
 
     /** Formats physical, logical, frame-rate, focus, and frame-count diagnostics. */
@@ -146,5 +195,10 @@ final class ViewportController {
 
     /** One immutable cross-thread request to replace or clear the viewport project. */
     private record PreviewRequest(
-            Optional<EditorProjectSession> session, Consumer<List<ProjectDiagnostic>> completion) {}
+            Optional<EditorProjectSession> session,
+            Optional<EditorProjectOpenTrace> trace,
+            Consumer<EditorPreviewCompletion> completion) {}
+
+    /** Composed preview waiting for its first render and presentation in the current frame. */
+    private record PendingPresentation(PreviewRequest request, List<ProjectDiagnostic> diagnostics) {}
 }

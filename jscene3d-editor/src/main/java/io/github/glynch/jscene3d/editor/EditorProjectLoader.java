@@ -35,6 +35,8 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.telemetry.Telemetry;
+import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URL;
@@ -81,33 +83,55 @@ final class EditorProjectLoader {
 
     /** Loads one project and constructs an immutable session when its startup world is usable. */
     EditorProjectLoadResult load(Path projectDirectory) {
+        try (TelemetryOperation operation = Telemetry.disabled().begin("editor.project.load", Map.of())) {
+            return load(projectDirectory, operation);
+        }
+    }
+
+    /** Loads one project while recording its material phases beneath the supplied operation. */
+    EditorProjectLoadResult load(Path projectDirectory, TelemetryOperation operation) {
+        Objects.requireNonNull(operation, "operation");
         LinkedHashSet<ProjectDiagnostic> diagnostics = new LinkedHashSet<>();
-        ProjectLoadResult projectResult = projectLoader.load(projectDirectory);
+        ProjectLoadResult projectResult =
+                operation.measure("project.manifest.load", Map.of(), () -> projectLoader.load(projectDirectory));
         diagnostics.addAll(projectResult.diagnostics());
         if (projectResult.project().isEmpty()) {
             return failure(diagnostics);
         }
         GameProject project = projectResult.project().orElseThrow();
 
-        AssetCatalogLoadResult assetResult = AssetCatalog.scan(project.root());
+        AssetCatalogLoadResult assetResult =
+                operation.measure("project.asset-catalog.scan", Map.of(), () -> AssetCatalog.scan(project.root()));
         diagnostics.addAll(assetResult.diagnostics());
         if (assetResult.catalog().isEmpty()) {
             return failure(diagnostics);
         }
         AssetCatalog authored = assetResult.catalog().orElseThrow();
 
-        RegisteredTypeCatalog types = loadTypeCatalog(project, diagnostics);
-        List<ImportDefinition> imports = loadImports(project, diagnostics);
-        ProjectContent content = loadContent(project, authored, types, imports, diagnostics);
+        RegisteredTypeCatalog types =
+                operation.measure("project.extensions.load", Map.of(), () -> loadTypeCatalog(project, diagnostics));
+        List<ImportDefinition> imports =
+                operation.measure("project.import-definitions.load", Map.of(), () -> loadImports(project, diagnostics));
+        ProjectContent content = operation.measure(
+                "project.published-content.load",
+                Map.of(),
+                () -> loadContent(project, authored, types, imports, diagnostics));
         DefinitionResolver definitions = content.definitions();
-        List<EditorAssetItem> assets = loadAssets(project, authored, definitions, types, imports, diagnostics);
-        Optional<WorldDefinition> startupWorld = loadStartupWorld(project, authored, definitions, types, diagnostics);
+        List<EditorAssetItem> assets = operation.measure(
+                "project.assets.validate",
+                Map.of(),
+                () -> loadAssets(project, authored, definitions, types, imports, diagnostics));
+        Optional<WorldDefinition> startupWorld = operation.measure(
+                "project.startup-world.load",
+                Map.of(),
+                () -> loadStartupWorld(project, authored, definitions, types, diagnostics));
         if (startupWorld.isEmpty()) {
             return failure(diagnostics);
         }
 
         WorldDefinition world = startupWorld.orElseThrow();
-        EditorHierarchyNode hierarchy = projectHierarchy(world, definitions, types, diagnostics);
+        EditorHierarchyNode hierarchy = operation.measure(
+                "project.hierarchy.project", Map.of(), () -> projectHierarchy(world, definitions, types, diagnostics));
         EditorProjectSession session =
                 new EditorProjectSession(project, authored, types, content, world, hierarchy, assets);
         return new EditorProjectLoadResult(Optional.of(session), List.copyOf(diagnostics));

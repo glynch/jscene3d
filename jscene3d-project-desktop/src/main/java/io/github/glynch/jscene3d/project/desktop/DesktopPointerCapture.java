@@ -20,17 +20,47 @@ final class DesktopPointerCapture {
 
     /** Resolves one polled input state into game-input ownership and native cursor transitions. */
     Update update(boolean focused, boolean escapePressed, boolean primaryPressed) {
-        if (!enabled) {
+        if (isDisabled()) {
             return Update.UNCHANGED;
         }
-        if (captured && (!focused || escapePressed)) {
-            captured = false;
-            return new Update(POINTER_CAPTURE, false, true);
+        if (shouldReleaseCapture(focused, escapePressed)) {
+            return releaseCapture();
         }
-        if (!captured && focused && primaryPressed) {
-            captured = true;
-            return new Update(InputCapture.NONE, true, false);
+        if (shouldAcquireCapture(focused, primaryPressed)) {
+            return acquireCapture();
         }
+        return maintainCurrentState();
+    }
+
+    /** Returns whether pointer capture is unnecessary for the authored input map. */
+    private boolean isDisabled() {
+        return !enabled;
+    }
+
+    /** Returns whether focus or explicit release input should relinquish current capture. */
+    private boolean shouldReleaseCapture(boolean focused, boolean escapePressed) {
+        return captured && (!focused || escapePressed);
+    }
+
+    /** Returns whether the current primary press should acquire an uncaptured pointer. */
+    private boolean shouldAcquireCapture(boolean focused, boolean primaryPressed) {
+        return !captured && focused && primaryPressed;
+    }
+
+    /** Relinquishes native pointer ownership while suppressing project pointer input. */
+    private Update releaseCapture() {
+        captured = false;
+        return new Update(POINTER_CAPTURE, false, true);
+    }
+
+    /** Acquires native pointer ownership while consuming the initiating primary press. */
+    private Update acquireCapture() {
+        captured = true;
+        return new Update(POINTER_CAPTURE, true, false);
+    }
+
+    /** Preserves current ownership and exposes input only while the pointer is captured. */
+    private Update maintainCurrentState() {
         return new Update(captured ? InputCapture.NONE : POINTER_CAPTURE, false, false);
     }
 

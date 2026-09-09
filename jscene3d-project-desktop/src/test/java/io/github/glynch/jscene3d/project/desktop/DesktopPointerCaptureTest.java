@@ -14,13 +14,13 @@ final class DesktopPointerCaptureTest {
     private static final InputCapture POINTER_CAPTURE = new InputCapture(false, true);
 
     @Test
-    void suppressesReleasedPointerThenDeliversTheCaptureClickToTheProject() {
+    void suppressesReleasedPointerAndTheClickWhichCapturesIt() {
         DesktopPointerCapture pointer = new DesktopPointerCapture(true);
 
         assertThat(pointer.update(true, false, false))
                 .isEqualTo(new DesktopPointerCapture.Update(POINTER_CAPTURE, false, false));
         assertThat(pointer.update(true, false, true))
-                .isEqualTo(new DesktopPointerCapture.Update(InputCapture.NONE, true, false));
+                .isEqualTo(new DesktopPointerCapture.Update(POINTER_CAPTURE, true, false));
         assertThat(pointer.update(true, false, false))
                 .isEqualTo(new DesktopPointerCapture.Update(InputCapture.NONE, false, false));
         assertThat(pointer.update(true, false, true))

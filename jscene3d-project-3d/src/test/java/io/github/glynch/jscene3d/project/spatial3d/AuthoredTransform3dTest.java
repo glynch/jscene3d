@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.spatial3d;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.math.BigDecimal;
 import java.util.Arrays;

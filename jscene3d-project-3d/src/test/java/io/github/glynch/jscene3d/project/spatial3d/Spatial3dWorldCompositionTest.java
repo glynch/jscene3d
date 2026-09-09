@@ -25,6 +25,7 @@ import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;

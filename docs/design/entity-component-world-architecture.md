@@ -1097,6 +1097,26 @@ if crash isolation or hot restart provides enough value to justify that extra
 boundary. JavaFX and OpenGLFX are editor dependencies and are never
 included in exported games unless a game explicitly uses them itself.
 
+## Screen presentation components
+
+Screen presentation uses the same entity and component model as the 3D world;
+it does not introduce a special HUD node type or a second hierarchy. A
+`screen-canvas` component registers one ordinary entity subtree as an overlay.
+Descendant `screen-region` components resolve anchored rectangles, while content
+components such as `screen-image` and `bitmap-number` draw descriptor-selected
+overlay-image resources into those regions.
+
+Game-specific HUD behavior remains a game component. It binds explicitly to
+game-state capabilities and generic screen-content components by stable
+component target, then updates their presentation-neutral values. Layout, glyph
+resources, and initial values therefore remain editor-visible project data; the
+game extension supplies only semantic binding that a generic editor cannot
+infer.
+
+Overlay images are screen-presentation resources, separate from 3D texture
+resources. Import may share source pixels, but runtime resource types do not
+expose renderer texture objects for screen drawing.
+
 ## Initial module seams
 
 The first implementation should preserve these seams even if existing Maven

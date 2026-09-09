@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.spatial3d;
+package io.github.glynch.jscene3d.project.spatial3d.internal.resource;
 
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
@@ -17,7 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /** Versioned private binary codec behind the public spatial-resource interface. */
-final class Spatial3dResourceCodec {
+public final class Spatial3dResourceCodec {
     private static final int MAGIC = 0x4a334d48;
     private static final int VERSION = 1;
     private static final int MAX_ATTRIBUTES = 64;
@@ -29,8 +29,14 @@ final class Spatial3dResourceCodec {
         throw new AssertionError("Spatial3dResourceCodec cannot be instantiated");
     }
 
-    /** Writes one complete mesh payload without closing caller-owned output. */
-    static void writeMesh(OutputStream output, BufferGeometry geometry) throws IOException {
+    /**
+     * Writes one complete mesh payload without closing caller-owned output.
+     *
+     * @param output destination for the encoded mesh
+     * @param geometry mesh geometry to encode
+     * @throws IOException when the payload cannot be written
+     */
+    public static void writeMesh(OutputStream output, BufferGeometry geometry) throws IOException {
         if (!geometry.morphTargets().isEmpty()) {
             throw new IllegalArgumentException("mesh resource version 1 does not support morph targets");
         }
@@ -65,8 +71,14 @@ final class Spatial3dResourceCodec {
         data.flush();
     }
 
-    /** Reads one complete mesh payload without closing caller-owned input. */
-    static BufferGeometry readMesh(InputStream input) throws IOException {
+    /**
+     * Reads one complete mesh payload without closing caller-owned input.
+     *
+     * @param input encoded mesh payload
+     * @return decoded mesh geometry
+     * @throws IOException when the payload is invalid or cannot be read
+     */
+    public static BufferGeometry readMesh(InputStream input) throws IOException {
         DataInputStream data = new DataInputStream(input);
         require(data.readInt() == MAGIC, "mesh payload has an invalid magic value");
         require(data.readInt() == VERSION, "unsupported mesh payload version");

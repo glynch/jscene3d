@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryConte
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import java.util.Locale;
 import java.util.Objects;
 

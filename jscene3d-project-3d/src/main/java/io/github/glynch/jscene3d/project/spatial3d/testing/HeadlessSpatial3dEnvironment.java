@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.spatial3d;
+package io.github.glynch.jscene3d.project.spatial3d.testing;
 
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
@@ -15,6 +15,10 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
+import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
+import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.List;
 import java.util.Optional;

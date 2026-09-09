@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.spatial3d;
 
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.List;
 import java.util.Map;

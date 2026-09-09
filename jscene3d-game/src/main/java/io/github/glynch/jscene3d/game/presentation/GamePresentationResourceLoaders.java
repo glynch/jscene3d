@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.runtime.ResourceContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.render.OverlayImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -19,7 +20,7 @@ import java.util.Map;
 
 /** Supplies runtime loaders corresponding exactly to {@link GamePresentationDescriptors}. */
 public final class GamePresentationResourceLoaders {
-    private static final List<RuntimeResourceLoader<?>> ALL = List.of(new PcmAudioLoader());
+    private static final List<RuntimeResourceLoader<?>> ALL = List.of(new PcmAudioLoader(), new OverlayImageLoader());
 
     /** Prevents construction of this stable loader collection. */
     private GamePresentationResourceLoaders() {
@@ -109,6 +110,38 @@ public final class GamePresentationResourceLoaders {
                 return result;
             } catch (ArithmeticException failure) {
                 throw new IllegalArgumentException("resource property must be an exact integer: " + name, failure);
+            }
+        }
+    }
+
+    /** Reconstructs one immutable screen image from its exact row-major sRGB RGBA payload. */
+    private static final class OverlayImageLoader implements RuntimeResourceLoader<OverlayImageResource> {
+        @Override
+        public RegisteredType type() {
+            return GamePresentationDescriptors.overlayImageResourceType();
+        }
+
+        @Override
+        public Class<OverlayImageResource> valueType() {
+            return OverlayImageResource.class;
+        }
+
+        @Override
+        public OverlayImageResource load(ResourceDefinition definition, ResourceContent content) throws IOException {
+            Map<String, ProjectValue> values = definition.properties();
+            int width = PcmAudioLoader.positiveInteger(PcmAudioLoader.require(values, "width"), "width");
+            int height = PcmAudioLoader.positiveInteger(PcmAudioLoader.require(values, "height"), "height");
+            ProjectValue payload = PcmAudioLoader.require(values, "payload");
+            if (!(payload instanceof ProjectValue.ReferenceValue reference)) {
+                throw new IllegalArgumentException("overlay image payload must be a reference");
+            }
+            int byteCount = Math.multiplyExact(Math.multiplyExact(width, height), 4);
+            try (InputStream input = content.openPayload(reference.reference())) {
+                byte[] pixels = input.readNBytes(byteCount);
+                if (pixels.length != byteCount || input.read() != -1) {
+                    throw new IllegalArgumentException("overlay image payload length must be " + byteCount + " bytes");
+                }
+                return OverlayImageResource.owning(OverlayImage.srgbRgba(width, height, pixels));
             }
         }
     }

@@ -43,8 +43,8 @@ import io.github.glynch.jscene3d.project.importing.extension.ImportPreparationCo
 import io.github.glynch.jscene3d.project.importing.extension.ProjectImporter;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dDescriptors;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dResourceWriter;
-import io.github.glynch.jscene3d.project.spatial3d.Spatial3dDescriptors;
-import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceWriter;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.spatial3d.resource.Spatial3dResourceWriter;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.textures.Texture;

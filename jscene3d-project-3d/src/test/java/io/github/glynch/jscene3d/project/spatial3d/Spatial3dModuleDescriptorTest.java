@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.spatial3d;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import org.junit.jupiter.api.Test;
 
 /** Verifies the named-module boundary for the 3D project adapter. */

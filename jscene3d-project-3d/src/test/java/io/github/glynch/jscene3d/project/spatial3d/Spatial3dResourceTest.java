@@ -20,6 +20,8 @@ import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.runtime.ResourceContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.spatial3d.resource.Spatial3dResourceWriter;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.textures.Texture;
@@ -230,36 +232,6 @@ final class Spatial3dResourceTest {
                 .hasMessageContaining("closed");
     }
 
-    /** Copies one loaded sRGB texture into immutable screen-overlay storage. */
-    @Test
-    void createsOverlayImageFromSrgbTexture() throws IOException {
-        ResourceReference payload = ResourceReference.imported("model/payloads/overlay.rgba8");
-        byte[] pixels = new byte[] {1, 2, 3, 4};
-        Texture3dResource resource = textureLoader()
-                .load(textureDefinition(payload, 1, 1, "srgb"), reference -> new ByteArrayInputStream(pixels));
-
-        var image = resource.overlayImage();
-
-        assertThat(image.width()).isEqualTo(1);
-        assertThat(image.height()).isEqualTo(1);
-        resource.close();
-    }
-
-    /** Rejects linear data textures because overlays require an explicit sRGB interpretation. */
-    @Test
-    void rejectsOverlayImageFromLinearTexture() throws IOException {
-        ResourceReference payload = ResourceReference.imported("model/payloads/data.rgba8");
-        Texture3dResource resource = textureLoader()
-                .load(
-                        textureDefinition(payload, 1, 1, "linear"),
-                        reference -> new ByteArrayInputStream(new byte[] {1, 2, 3, 4}));
-
-        assertThatThrownBy(resource::overlayImage)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("sRGB");
-        resource.close();
-    }
-
     /** Rejects malformed texture documents and pixel envelopes before publishing runtime state. */
     @Test
     void rejectsInvalidTextureContent() {
@@ -293,8 +265,14 @@ final class Spatial3dResourceTest {
         byte[] corrupted = payload.toByteArray();
         corrupted[0] = 0;
         ByteArrayInputStream corruptedInput = new ByteArrayInputStream(corrupted);
+        ResourceDefinition corruptedMesh = new ResourceDefinition(
+                URI.create("import:model/resources/corrupted"),
+                Spatial3dDescriptors.meshResourceType(),
+                Map.of("payload", new ProjectValue.ReferenceValue(PAYLOAD)));
+        ResourceContent corruptedContent = reference -> corruptedInput;
+        RuntimeResourceLoader<Mesh3dResource> loader = meshLoader();
 
-        assertThatThrownBy(() -> Spatial3dResourceCodec.readMesh(corruptedInput))
+        assertThatThrownBy(() -> loader.load(corruptedMesh, corruptedContent))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("magic");
         ResourceDefinition wrongPayload = new ResourceDefinition(

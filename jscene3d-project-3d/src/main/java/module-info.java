@@ -11,4 +11,7 @@ module io.github.glynch.jscene3d.project.spatial3d {
     requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.project.spatial3d;
+    exports io.github.glynch.jscene3d.project.spatial3d.descriptor;
+    exports io.github.glynch.jscene3d.project.spatial3d.resource;
+    exports io.github.glynch.jscene3d.project.spatial3d.testing;
 }

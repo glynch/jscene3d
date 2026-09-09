@@ -41,10 +41,10 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegis
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
-import io.github.glynch.jscene3d.project.spatial3d.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;

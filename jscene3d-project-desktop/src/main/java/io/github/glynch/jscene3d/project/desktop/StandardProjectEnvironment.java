@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
 import io.github.glynch.jscene3d.game.presentation.GamePresentationDescriptors;
 import io.github.glynch.jscene3d.game.presentation.GamePresentationResourceLoaders;
+import io.github.glynch.jscene3d.game.presentation.GamePresentationRuntimeExtension;
 import io.github.glynch.jscene3d.game.presentation.PresentationWorldModule;
 import io.github.glynch.jscene3d.game.project3d.Game3dDescriptors;
 import io.github.glynch.jscene3d.game.project3d.Game3dRuntimeExtension;
@@ -28,10 +29,10 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
-import io.github.glynch.jscene3d.project.spatial3d.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,7 +69,11 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
 
     @Override
     public List<ComponentRuntimeExtension> runtimeExtensions() {
-        return List.of(new Spatial3dRuntimeExtension(), new Physics3dRuntimeExtension(), new Game3dRuntimeExtension());
+        return List.of(
+                new Spatial3dRuntimeExtension(),
+                new Physics3dRuntimeExtension(),
+                new Game3dRuntimeExtension(),
+                new GamePresentationRuntimeExtension());
     }
 
     @Override

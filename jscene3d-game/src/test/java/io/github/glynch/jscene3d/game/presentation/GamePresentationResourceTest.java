@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 /** Exercises the complete version-one game-presentation resource storage boundary. */
 final class GamePresentationResourceTest {
     private static final ResourceReference PAYLOAD = ResourceReference.imported("presentation/pistol.pcm16le");
+    private static final ResourceReference IMAGE_PAYLOAD = ResourceReference.imported("presentation/digit.rgba8");
 
     /** Round-trips signed stereo PCM and enforces terminal resource ownership. */
     @Test
@@ -84,14 +85,42 @@ final class GamePresentationResourceTest {
     void describesPcmAudioResource() {
         assertThat(GamePresentationResourceLoaders.all())
                 .extracting(RuntimeResourceLoader::type)
-                .containsExactly(GamePresentationDescriptors.pcmAudioResourceType());
+                .containsExactly(
+                        GamePresentationDescriptors.pcmAudioResourceType(),
+                        GamePresentationDescriptors.overlayImageResourceType());
         assertThat(GamePresentationDescriptors.extensionDescriptor().types())
-                .singleElement()
-                .satisfies(descriptor -> {
-                    assertThat(descriptor.type()).isEqualTo(GamePresentationDescriptors.pcmAudioResourceType());
-                    assertThat(descriptor.properties())
-                            .containsOnlyKeys("payload", "channels", "sample-rate", "sample-count");
-                });
+                .extracting(descriptor -> descriptor.type())
+                .containsExactly(
+                        GamePresentationDescriptors.pcmAudioResourceType(),
+                        GamePresentationDescriptors.overlayImageResourceType());
+        assertThat(GamePresentationDescriptors.extensionDescriptor().components())
+                .extracting(component -> component.type())
+                .containsExactly(
+                        GamePresentationDescriptors.screenCanvasType(),
+                        GamePresentationDescriptors.screenRegionType(),
+                        GamePresentationDescriptors.screenImageType(),
+                        GamePresentationDescriptors.bitmapNumberType());
+    }
+
+    /** Round-trips one immutable screen image independently of any 3D texture resource. */
+    @Test
+    void roundTripsOverlayImageResource() throws IOException {
+        byte[] pixels = {1, 2, 3, 4, 5, 6, 7, 8};
+        ByteArrayOutputStream definitionOutput = new ByteArrayOutputStream();
+        ByteArrayOutputStream payloadOutput = new ByteArrayOutputStream();
+
+        GamePresentationResourceWriter.writeOverlayImageDefinition(definitionOutput, 2, 1, IMAGE_PAYLOAD);
+        GamePresentationResourceWriter.writeOverlayImagePayload(payloadOutput, 2, 1, pixels);
+        OverlayImageResource resource = overlayImageLoader()
+                .load(imageDefinition(2, 1), reference -> new ByteArrayInputStream(payloadOutput.toByteArray()));
+
+        assertThat(new String(definitionOutput.toByteArray(), StandardCharsets.UTF_8))
+                .contains("io.github.glynch.jscene3d.presentation/overlay-image")
+                .contains("\"$ref\" : \"import:presentation/digit.rgba8\"");
+        assertThat(resource.image().width()).isEqualTo(2);
+        assertThat(resource.image().height()).isEqualTo(1);
+        resource.close();
+        assertThatThrownBy(resource::image).isInstanceOf(IllegalStateException.class);
     }
 
     /** Returns the typed PCM loader from the public heterogeneous collection. */
@@ -99,6 +128,13 @@ final class GamePresentationResourceTest {
     private static RuntimeResourceLoader<PcmAudioResource> loader() {
         return (RuntimeResourceLoader<PcmAudioResource>)
                 GamePresentationResourceLoaders.all().getFirst();
+    }
+
+    /** Returns the typed overlay-image loader from the public heterogeneous collection. */
+    @SuppressWarnings("unchecked")
+    private static RuntimeResourceLoader<OverlayImageResource> overlayImageLoader() {
+        return (RuntimeResourceLoader<OverlayImageResource>)
+                GamePresentationResourceLoaders.all().get(1);
     }
 
     /** Builds one PCM resource definition with caller-selected format metadata. */
@@ -123,6 +159,17 @@ final class GamePresentationResourceTest {
                 URI.create("import:presentation/pistol"),
                 GamePresentationDescriptors.pcmAudioResourceType(),
                 properties);
+    }
+
+    /** Builds one overlay-image resource definition with caller-selected dimensions. */
+    private static ResourceDefinition imageDefinition(int width, int height) {
+        return new ResourceDefinition(
+                URI.create("import:presentation/digit"),
+                GamePresentationDescriptors.overlayImageResourceType(),
+                Map.of(
+                        "payload", new ProjectValue.ReferenceValue(IMAGE_PAYLOAD),
+                        "width", number(width),
+                        "height", number(height)));
     }
 
     /** Creates one portable integer value. */

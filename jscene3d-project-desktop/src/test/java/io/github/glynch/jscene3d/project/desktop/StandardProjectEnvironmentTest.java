@@ -79,7 +79,8 @@ final class StandardProjectEnvironmentTest {
                 .containsExactly(
                         "io.github.glynch.jscene3d.spatial3d",
                         "io.github.glynch.jscene3d.physics3d",
-                        "io.github.glynch.jscene3d.game3d");
+                        "io.github.glynch.jscene3d.game3d",
+                        "io.github.glynch.jscene3d.presentation");
         assertThat(modules)
                 .extracting(binding -> binding.type().getName())
                 .containsExactly(

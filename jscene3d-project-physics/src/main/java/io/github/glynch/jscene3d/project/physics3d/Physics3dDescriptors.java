@@ -18,7 +18,7 @@ import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
-import io.github.glynch.jscene3d.project.spatial3d.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.math.BigDecimal;
 import java.util.ArrayList;

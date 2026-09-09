@@ -11,7 +11,7 @@ import io.github.glynch.jscene3d.project.component.ComponentMultiplicity;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
-import io.github.glynch.jscene3d.project.spatial3d.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;

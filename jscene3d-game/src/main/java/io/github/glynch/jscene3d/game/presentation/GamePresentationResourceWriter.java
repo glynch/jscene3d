@@ -62,6 +62,53 @@ public final class GamePresentationResourceWriter {
         Objects.requireNonNull(output, "output").write(bytes.array());
     }
 
+    /**
+     * Writes one overlay-image resource document for an independently published RGBA payload.
+     *
+     * @param output destination for the resource document
+     * @param width image width in pixels
+     * @param height image height in pixels
+     * @param payloadReference published RGBA payload reference
+     * @throws IOException if the document cannot be written
+     */
+    public static void writeOverlayImageDefinition(
+            OutputStream output, int width, int height, ResourceReference payloadReference) throws IOException {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("overlay image dimensions must be positive");
+        }
+        ResourceWriter.write(
+                Objects.requireNonNull(output, "output"),
+                GamePresentationDescriptors.overlayImageResourceType(),
+                Map.of(
+                        "payload",
+                                new ProjectValue.ReferenceValue(
+                                        Objects.requireNonNull(payloadReference, "payloadReference")),
+                        "width", number(width),
+                        "height", number(height)));
+    }
+
+    /**
+     * Writes one exact row-major sRGB RGBA overlay-image payload.
+     *
+     * @param output destination for the payload
+     * @param width image width in pixels
+     * @param height image height in pixels
+     * @param pixels row-major sRGB RGBA bytes
+     * @throws IOException if the payload cannot be written
+     */
+    public static void writeOverlayImagePayload(OutputStream output, int width, int height, byte[] pixels)
+            throws IOException {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("overlay image dimensions must be positive");
+        }
+        byte[] validPixels = Objects.requireNonNull(pixels, "pixels");
+        int expected = Math.multiplyExact(Math.multiplyExact(width, height), 4);
+        if (validPixels.length != expected) {
+            throw new IllegalArgumentException("overlay image pixels must contain exactly " + expected + " bytes");
+        }
+        Objects.requireNonNull(output, "output").write(validPixels);
+    }
+
     /** Creates one exact portable integer. */
     private static ProjectValue.NumberValue number(int value) {
         return new ProjectValue.NumberValue(BigDecimal.valueOf(value));

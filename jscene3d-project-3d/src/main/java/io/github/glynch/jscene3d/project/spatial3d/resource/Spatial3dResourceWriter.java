@@ -2,13 +2,15 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.spatial3d;
+package io.github.glynch.jscene3d.project.spatial3d.resource;
 
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.Material;
 import io.github.glynch.jscene3d.materials.StandardMaterial;
 import io.github.glynch.jscene3d.project.resource.ResourceWriter;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.spatial3d.internal.resource.Spatial3dResourceCodec;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.textures.Texture;

@@ -15,6 +15,8 @@ import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.runtime.ResourceContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.spatial3d.internal.resource.Spatial3dResourceCodec;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.textures.MipmapMode;
 import io.github.glynch.jscene3d.textures.Texture;

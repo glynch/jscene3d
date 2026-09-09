@@ -30,6 +30,10 @@ public final class Game3dDescriptors {
     private static final PropertyId TURN_RIGHT_ACTION = new PropertyId("turn-right-action");
     private static final PropertyId MOVE_SPEED = new PropertyId("move-speed");
     private static final PropertyId TURN_SPEED_DEGREES = new PropertyId("turn-speed-degrees");
+    private static final PropertyId MAXIMUM_KEYBOARD_TURN_SPEED_DEGREES =
+            new PropertyId("maximum-keyboard-turn-speed-degrees");
+    private static final PropertyId KEYBOARD_TURN_ACCELERATION_DEGREES =
+            new PropertyId("keyboard-turn-acceleration-degrees");
     private static final PropertyId POINTER_SENSITIVITY = new PropertyId("pointer-sensitivity");
     private static final PropertyId MAXIMUM_PITCH_DEGREES = new PropertyId("maximum-pitch-degrees");
     private static final ExtensionDescriptor DESCRIPTOR = createDescriptor();
@@ -118,6 +122,22 @@ public final class Game3dDescriptors {
         return TURN_SPEED_DEGREES;
     }
 
+    /** Returns the held-key maximum turn-rate property identity.
+     *
+     * @return maximum keyboard turn-rate property identity
+     */
+    public static PropertyId maximumKeyboardTurnSpeedDegreesProperty() {
+        return MAXIMUM_KEYBOARD_TURN_SPEED_DEGREES;
+    }
+
+    /** Returns the held-key angular-acceleration property identity.
+     *
+     * @return keyboard turn-acceleration property identity
+     */
+    public static PropertyId keyboardTurnAccelerationDegreesProperty() {
+        return KEYBOARD_TURN_ACCELERATION_DEGREES;
+    }
+
     /** Returns the relative-pointer sensitivity property identity.
      *
      * @return pointer-sensitivity property identity
@@ -163,7 +183,9 @@ public final class Game3dDescriptors {
                         required(TURN_LEFT_ACTION, ProjectValueKind.TEXT, "Turn left action"),
                         required(TURN_RIGHT_ACTION, ProjectValueKind.TEXT, "Turn right action"),
                         positiveNumber(MOVE_SPEED, "Move speed"),
-                        positiveNumber(TURN_SPEED_DEGREES, "Turn speed"),
+                        positiveNumber(TURN_SPEED_DEGREES, "Initial keyboard and continuous look speed"),
+                        positiveNumber(MAXIMUM_KEYBOARD_TURN_SPEED_DEGREES, "Maximum keyboard turn speed"),
+                        positiveNumber(KEYBOARD_TURN_ACCELERATION_DEGREES, "Keyboard turn acceleration"),
                         positiveNumber(POINTER_SENSITIVITY, "Pointer sensitivity"),
                         boundedPitch()))
                 .updatePhases(Set.of(ComponentUpdatePhase.BEFORE_PHYSICS, ComponentUpdatePhase.FRAME_UPDATE))

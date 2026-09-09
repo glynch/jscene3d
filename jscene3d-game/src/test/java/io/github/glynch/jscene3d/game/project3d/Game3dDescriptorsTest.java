@@ -28,6 +28,8 @@ final class Game3dDescriptorsTest {
                         Game3dDescriptors.turnRightActionProperty(),
                         Game3dDescriptors.moveSpeedProperty(),
                         Game3dDescriptors.turnSpeedDegreesProperty(),
+                        Game3dDescriptors.maximumKeyboardTurnSpeedDegreesProperty(),
+                        Game3dDescriptors.keyboardTurnAccelerationDegreesProperty(),
                         Game3dDescriptors.pointerSensitivityProperty(),
                         Game3dDescriptors.maximumPitchDegreesProperty());
         assertThat(controller.updatePhases())

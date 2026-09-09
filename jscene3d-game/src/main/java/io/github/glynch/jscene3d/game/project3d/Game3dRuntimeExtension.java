@@ -39,6 +39,8 @@ public final class Game3dRuntimeExtension implements ComponentRuntimeExtension {
                             new FirstPersonCharacterController3d.Tuning(
                                     properties.finiteFloat(Game3dDescriptors.moveSpeedProperty()),
                                     properties.finiteFloat(Game3dDescriptors.turnSpeedDegreesProperty()),
+                                    properties.finiteFloat(Game3dDescriptors.maximumKeyboardTurnSpeedDegreesProperty()),
+                                    properties.finiteFloat(Game3dDescriptors.keyboardTurnAccelerationDegreesProperty()),
                                     properties.finiteFloat(Game3dDescriptors.pointerSensitivityProperty()),
                                     properties.finiteFloat(Game3dDescriptors.maximumPitchDegreesProperty())));
                 });

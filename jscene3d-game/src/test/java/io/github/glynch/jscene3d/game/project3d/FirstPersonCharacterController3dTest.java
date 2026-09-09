@@ -95,14 +95,49 @@ final class FirstPersonCharacterController3dTest {
     }
 
     @Test
+    void acceleratesHeldKeyboardTurningToAnAuthoredLimitAndResetsAfterRelease() {
+        MutableInput input = new MutableInput();
+        RecordingTransform view = new RecordingTransform();
+        FirstPersonCharacterController3d controller = new FirstPersonCharacterController3d(
+                input,
+                new FirstPersonCharacterController3d.Actions(MOVE, LOOK, TURN_LEFT, TURN_RIGHT),
+                new FirstPersonCharacterController3d.Tuning(8.0F, 180.0F, 234.0F, 540.0F, 0.0015F, 85.0F));
+        controller.bindReferences(references(new RecordingBody(), view));
+        FixedUpdateContext fixed = new FixedUpdateContext(0, Duration.ofMillis(100), Duration.ZERO);
+        input.snapshot = ActionSnapshot.builder().down(TURN_RIGHT).build();
+
+        controller.onBeforePhysics(fixed);
+        float firstYaw = view.orientation.getEulerAnglesYXZ(new Vector3f()).y;
+        controller.onBeforePhysics(fixed);
+        float secondYaw = view.orientation.getEulerAnglesYXZ(new Vector3f()).y;
+        controller.onBeforePhysics(fixed);
+        float thirdYaw = view.orientation.getEulerAnglesYXZ(new Vector3f()).y;
+        controller.onBeforePhysics(fixed);
+        float fourthYaw = view.orientation.getEulerAnglesYXZ(new Vector3f()).y;
+
+        assertThat(firstYaw).isCloseTo(-(float) Math.toRadians(18.0), TOLERANCE);
+        assertThat(secondYaw - firstYaw).isCloseTo(-(float) Math.toRadians(23.4), TOLERANCE);
+        assertThat(thirdYaw - secondYaw).isCloseTo(-(float) Math.toRadians(23.4), TOLERANCE);
+        assertThat(fourthYaw - thirdYaw).isCloseTo(-(float) Math.toRadians(23.4), TOLERANCE);
+
+        input.snapshot = ActionSnapshot.empty();
+        controller.onBeforePhysics(fixed);
+        input.snapshot = ActionSnapshot.builder().down(TURN_RIGHT).build();
+        controller.onBeforePhysics(fixed);
+        float resetYaw = view.orientation.getEulerAnglesYXZ(new Vector3f()).y;
+
+        assertThat(resetYaw - fourthYaw).isCloseTo(-(float) Math.toRadians(18.0), TOLERANCE);
+    }
+
+    @Test
     void validatesRuntimeTuningBeyondDescriptorKinds() {
         MutableInput input = new MutableInput();
         FirstPersonCharacterController3d.Actions actions =
                 new FirstPersonCharacterController3d.Actions(MOVE, LOOK, TURN_LEFT, TURN_RIGHT);
         FirstPersonCharacterController3d.Tuning zeroMoveSpeed =
-                new FirstPersonCharacterController3d.Tuning(0.0F, 180.0F, 0.001F, 85.0F);
+                new FirstPersonCharacterController3d.Tuning(0.0F, 180.0F, 360.0F, 540.0F, 0.001F, 85.0F);
         FirstPersonCharacterController3d.Tuning invalidPitch =
-                new FirstPersonCharacterController3d.Tuning(8.0F, 180.0F, 0.001F, 90.0F);
+                new FirstPersonCharacterController3d.Tuning(8.0F, 180.0F, 360.0F, 540.0F, 0.001F, 90.0F);
 
         assertThatThrownBy(() -> new FirstPersonCharacterController3d(input, actions, zeroMoveSpeed))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -116,7 +151,7 @@ final class FirstPersonCharacterController3dTest {
         return new FirstPersonCharacterController3d(
                 input,
                 new FirstPersonCharacterController3d.Actions(MOVE, LOOK, TURN_LEFT, TURN_RIGHT),
-                new FirstPersonCharacterController3d.Tuning(8.0F, 180.0F, 0.0015F, 85.0F));
+                new FirstPersonCharacterController3d.Tuning(8.0F, 180.0F, 360.0F, 540.0F, 0.0015F, 85.0F));
     }
 
     private static ComponentReferenceResolver references(CharacterBody3d body, Transform3d view) {

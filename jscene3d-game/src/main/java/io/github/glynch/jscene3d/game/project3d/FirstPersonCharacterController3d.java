@@ -29,12 +29,16 @@ final class FirstPersonCharacterController3d implements ComponentReferenceBinder
     private final InputAction turnRightAction;
     private final float moveSpeed;
     private final float turnSpeed;
+    private final float maximumKeyboardTurnSpeed;
+    private final float keyboardTurnAcceleration;
     private final float pointerSensitivity;
     private final float maximumPitch;
     private Optional<CharacterBody3d> characterBody = Optional.empty();
     private Optional<Transform3d> viewTransform = Optional.empty();
     private float yaw;
     private float pitch;
+    private float currentKeyboardTurnSpeed;
+    private int keyboardTurnDirection;
     private boolean pointerLookConsumed;
 
     FirstPersonCharacterController3d(InputWorldModule input, Actions actions, Tuning tuning) {
@@ -47,6 +51,13 @@ final class FirstPersonCharacterController3d implements ComponentReferenceBinder
         Tuning validTuning = Objects.requireNonNull(tuning, "tuning");
         moveSpeed = requirePositive(validTuning.moveSpeed(), "moveSpeed");
         turnSpeed = (float) Math.toRadians(requirePositive(validTuning.turnSpeedDegrees(), "turnSpeedDegrees"));
+        maximumKeyboardTurnSpeed = (float) Math.toRadians(requireAtLeast(
+                validTuning.maximumKeyboardTurnSpeedDegrees(),
+                validTuning.turnSpeedDegrees(),
+                "maximumKeyboardTurnSpeedDegrees"));
+        keyboardTurnAcceleration = (float) Math.toRadians(
+                requirePositive(validTuning.keyboardTurnAccelerationDegrees(), "keyboardTurnAccelerationDegrees"));
+        currentKeyboardTurnSpeed = turnSpeed;
         pointerSensitivity = requirePositive(validTuning.pointerSensitivity(), "pointerSensitivity");
         maximumPitch = (float) Math.toRadians(requirePitch(validTuning.maximumPitchDegrees()));
     }
@@ -93,11 +104,30 @@ final class FirstPersonCharacterController3d implements ComponentReferenceBinder
         InputVector2 look = pointerLookConsumed ? InputVector2.ZERO : snapshot.axis2d(lookAction);
         float keyboardTurn = snapshot.axis(turnLeftAction, turnRightAction);
         float elapsedSeconds = update.step().toNanos() / 1_000_000_000.0F;
-        yaw -= (look.x() + keyboardTurn) * turnSpeed * elapsedSeconds;
+        yaw -= look.x() * turnSpeed * elapsedSeconds;
+        yaw -= keyboardTurnRate(keyboardTurn, elapsedSeconds) * elapsedSeconds;
         pitch = Math.clamp(pitch + look.y() * turnSpeed * elapsedSeconds, -maximumPitch, maximumPitch);
         if (!look.equals(InputVector2.ZERO) || keyboardTurn != 0.0F) {
             updateViewOrientation();
         }
+    }
+
+    /** Returns the signed keyboard turn rate for this step, advancing held-key acceleration for the next step. */
+    private float keyboardTurnRate(float input, float elapsedSeconds) {
+        int direction = Float.compare(input, 0.0F);
+        if (direction == 0) {
+            keyboardTurnDirection = 0;
+            currentKeyboardTurnSpeed = turnSpeed;
+            return 0.0F;
+        }
+        if (direction != keyboardTurnDirection) {
+            keyboardTurnDirection = direction;
+            currentKeyboardTurnSpeed = turnSpeed;
+        }
+        float rate = input * currentKeyboardTurnSpeed;
+        currentKeyboardTurnSpeed = Math.min(
+                maximumKeyboardTurnSpeed, currentKeyboardTurnSpeed + keyboardTurnAcceleration * elapsedSeconds);
+        return rate;
     }
 
     private void updateViewOrientation() {
@@ -135,6 +165,13 @@ final class FirstPersonCharacterController3d implements ComponentReferenceBinder
         return value;
     }
 
+    private static float requireAtLeast(float value, float minimum, String name) {
+        if (!Float.isFinite(value) || value < minimum) {
+            throw new IllegalArgumentException(name + " must be finite and at least " + minimum + ": " + value);
+        }
+        return value;
+    }
+
     record Actions(InputAction move, InputAction look, InputAction turnLeft, InputAction turnRight) {
         Actions {
             Objects.requireNonNull(move, "move");
@@ -144,5 +181,11 @@ final class FirstPersonCharacterController3d implements ComponentReferenceBinder
         }
     }
 
-    record Tuning(float moveSpeed, float turnSpeedDegrees, float pointerSensitivity, float maximumPitchDegrees) {}
+    record Tuning(
+            float moveSpeed,
+            float turnSpeedDegrees,
+            float maximumKeyboardTurnSpeedDegrees,
+            float keyboardTurnAccelerationDegrees,
+            float pointerSensitivity,
+            float maximumPitchDegrees) {}
 }

@@ -91,7 +91,7 @@ final class DoomImportExtensionTest {
         Files.writeString(
                 projectDirectory.resolve("imports/maps.import.json"), IMPORT_DEFINITION, StandardCharsets.UTF_8);
         wadPath = projectDirectory.resolve("assets/content.wad");
-        List<TestDoomWadFiles.LumpContent> lumps = TestDoomWadFiles.validMap("MAP01");
+        List<TestDoomWadFiles.LumpContent> lumps = TestDoomWadFiles.doorMap("MAP01");
         lumps.addAll(TestDoomWadFiles.validMap("E1M1"));
         TestDoomWadFiles.write(wadPath, TestDoomWadFiles.withMinimalMaterials(lumps));
         project = new ProjectLoader("0.1.0-SNAPSHOT")
@@ -131,7 +131,9 @@ final class DoomImportExtensionTest {
                     .contains(
                             "maps/MAP01/definition",
                             "maps/MAP01/resources/collision/static",
-                            "maps/MAP01/payloads/collision/static.mesh");
+                            "maps/MAP01/payloads/collision/static.mesh",
+                            "maps/MAP01/resources/collision/doors/00001",
+                            "maps/MAP01/resources/collision/door-obstruction/00001");
             prepared.commit();
         }
 
@@ -144,7 +146,12 @@ final class DoomImportExtensionTest {
                         "io.github.glynch.jscene3d.spatial3d/transform-3d",
                         "io.github.glynch.jscene3d.physics3d/static-body-3d",
                         "io.github.glynch.jscene3d.physics3d/collision-shape-3d",
-                        "io.github.glynch.jscene3d.spatial3d/mesh-renderer-3d")
+                        "io.github.glynch.jscene3d.physics3d/collision-sensor-3d",
+                        "io.github.glynch.jscene3d.spatial3d/mesh-renderer-3d",
+                        "io.github.glynch.jscene3d.doom/door",
+                        "\"profile\" : \"normal\"",
+                        "\"obstruction-entered\"",
+                        "\"obstruction-exited\"")
                 .doesNotContain(projectDirectory.toString())
                 .endsWith("}\n");
     }

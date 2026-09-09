@@ -18,7 +18,7 @@
       "typeVersion": 1,
       "displayName": "Doom Door",
       "description": "Moves explicitly published door geometry and collision using classic Doom timing.",
-      "updatePhases": ["before-physics"],
+      "updatePhases": ["before-physics", "after-physics"],
       "providedCapabilities": ["io.github.glynch.jscene3d.doom/door"],
       "properties": [
         {
@@ -55,6 +55,33 @@
           "required": true,
           "displayName": "Hold Open",
           "description": "Seconds to hold before closing, or zero to remain open."
+        },
+        {
+          "id": "profile",
+          "valueKind": "text",
+          "required": true,
+          "displayName": "Profile",
+          "description": "Imported semantic door profile used by presentation components."
+        }
+      ],
+      "actions": [
+        {
+          "id": "obstruction-entered",
+          "payload": {
+            "type": "io.github.glynch.jscene3d.physics3d/collision-overlap-3d",
+            "typeVersion": 1
+          },
+          "displayName": "Obstruction Entered",
+          "description": "Receives a precise overlap when a character enters the generated closing boundary."
+        },
+        {
+          "id": "obstruction-exited",
+          "payload": {
+            "type": "io.github.glynch.jscene3d.physics3d/collision-overlap-3d",
+            "typeVersion": 1
+          },
+          "displayName": "Obstruction Exited",
+          "description": "Receives a precise overlap when a character leaves the generated closing boundary."
         }
       ]
     }

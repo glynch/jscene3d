@@ -9,13 +9,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.doom.runtime.DoomDoor;
 import io.github.glynch.jscene3d.doom.runtime.DoomDoorDescriptors;
+import io.github.glynch.jscene3d.project.component.EndpointId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.physics3d.Physics3dDescriptors;
 import io.github.glynch.jscene3d.project.runtime.Entity;
 import io.github.glynch.jscene3d.project.runtime.FixedUpdateContext;
+import io.github.glynch.jscene3d.project.runtime.RuntimeAction;
+import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
+import io.github.glynch.jscene3d.project.runtime.RuntimePayloadAction;
+import io.github.glynch.jscene3d.project.runtime.RuntimeSignal;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Quaternionf;
@@ -30,7 +40,7 @@ final class DoomDoorComponentTest {
     @Test
     void opensAndStaysOpen() {
         RecordingTransform transform = new RecordingTransform(2.0F, 99.0F, 3.0F);
-        DoomDoorComponent door = new DoomDoorComponent(1.0F, 3.0F, 4.0F, 0.0F);
+        DoomDoorComponent door = new DoomDoorComponent(DoomDoor.Profile.NORMAL, 1.0F, 3.0F, 4.0F, 0.0F);
         door.bindReferences(references(transform));
 
         assertThat(transform.position()).isEqualTo(new Vector3f(2.0F, 1.0F, 3.0F));
@@ -52,7 +62,7 @@ final class DoomDoorComponentTest {
     @Test
     void waitsAndCloses() {
         RecordingTransform transform = new RecordingTransform(0.0F, 0.0F, 0.0F);
-        DoomDoorComponent door = new DoomDoorComponent(-1.0F, 1.0F, 8.0F, 0.5F);
+        DoomDoorComponent door = new DoomDoorComponent(DoomDoor.Profile.BLAZE, -1.0F, 1.0F, 8.0F, 0.5F);
         door.bindReferences(references(transform));
 
         door.activate();
@@ -74,7 +84,7 @@ final class DoomDoorComponentTest {
     @Test
     void reopensWhileClosing() {
         RecordingTransform transform = new RecordingTransform(0.0F, 0.0F, 0.0F);
-        DoomDoorComponent door = new DoomDoorComponent(0.0F, 2.0F, 4.0F, 0.25F);
+        DoomDoorComponent door = new DoomDoorComponent(DoomDoor.Profile.NORMAL, 0.0F, 2.0F, 4.0F, 0.25F);
         door.bindReferences(references(transform));
         door.activate();
         door.onBeforePhysics(update(Duration.ofMillis(500)));
@@ -91,19 +101,39 @@ final class DoomDoorComponentTest {
         assertThat(door.currentHeight()).isEqualTo(2.0F);
     }
 
+    /** Reverses a closing door after its descriptor-connected sensor reports an obstruction. */
+    @Test
+    void reopensWhenClosingIsObstructed() {
+        RecordingTransform transform = new RecordingTransform(0.0F, 0.0F, 0.0F);
+        DoomDoorComponent door = new DoomDoorComponent(DoomDoor.Profile.NORMAL, 0.0F, 2.0F, 4.0F, 0.25F);
+        RecordingEndpoints endpoints = new RecordingEndpoints();
+        door.bindReferences(references(transform));
+        door.bindEndpoints(endpoints);
+        door.activate();
+        door.onBeforePhysics(update(Duration.ofMillis(500)));
+        door.onBeforePhysics(update(Duration.ofMillis(250)));
+        door.onBeforePhysics(update(Duration.ofMillis(125)));
+
+        endpoints.execute(DoomDoorDescriptors.OBSTRUCTION_ENTERED_ACTION);
+        door.onAfterPhysics(update(Duration.ofMillis(125)));
+
+        assertThat(door.phase()).isEqualTo(DoomDoor.Phase.OPENING);
+        assertThat(door.currentHeight()).isEqualTo(1.5F);
+    }
+
     /** Rejects non-finite, inverted, stationary, and negative-duration authored configurations. */
     @Test
     void rejectsInvalidConfiguration() {
-        assertThatThrownBy(() -> new DoomDoorComponent(Float.NaN, 1.0F, 1.0F, 0.0F))
+        assertThatThrownBy(() -> new DoomDoorComponent(DoomDoor.Profile.NORMAL, Float.NaN, 1.0F, 1.0F, 0.0F))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("closedHeight");
-        assertThatThrownBy(() -> new DoomDoorComponent(2.0F, 1.0F, 1.0F, 0.0F))
+        assertThatThrownBy(() -> new DoomDoorComponent(DoomDoor.Profile.NORMAL, 2.0F, 1.0F, 1.0F, 0.0F))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("openHeight");
-        assertThatThrownBy(() -> new DoomDoorComponent(0.0F, 1.0F, 0.0F, 0.0F))
+        assertThatThrownBy(() -> new DoomDoorComponent(DoomDoor.Profile.NORMAL, 0.0F, 1.0F, 0.0F, 0.0F))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("speed");
-        assertThatThrownBy(() -> new DoomDoorComponent(0.0F, 1.0F, 1.0F, -1.0F))
+        assertThatThrownBy(() -> new DoomDoorComponent(DoomDoor.Profile.NORMAL, 0.0F, 1.0F, 1.0F, -1.0F))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("holdOpenSeconds");
     }
@@ -130,6 +160,32 @@ final class DoomDoorComponentTest {
                 throw new UnsupportedOperationException();
             }
         };
+    }
+
+    /** Captures descriptor-declared payload actions without requiring a composed world. */
+    private static final class RecordingEndpoints implements ComponentEndpoints {
+        private final Map<EndpointId, RuntimePayloadAction> actions = new LinkedHashMap<>();
+
+        @Override
+        public RuntimeSignal signal(EndpointId endpoint) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void action(EndpointId endpoint, RuntimeAction action) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void action(EndpointId endpoint, RuntimePayloadAction action) {
+            actions.put(endpoint, action);
+        }
+
+        /** Executes one bound collision action with its declared payload identity. */
+        private void execute(EndpointId endpoint) {
+            Objects.requireNonNull(actions.get(endpoint))
+                    .execute(new RuntimePayload(Physics3dDescriptors.overlapPayloadType(), new Object()));
+        }
     }
 
     private static final class RecordingTransform implements Transform3d {

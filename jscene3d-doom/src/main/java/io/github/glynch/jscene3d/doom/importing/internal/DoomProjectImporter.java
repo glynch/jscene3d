@@ -33,11 +33,14 @@ import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.contract.EntityContract;
 import io.github.glynch.jscene3d.project.entity.ComponentTarget;
+import io.github.glynch.jscene3d.project.entity.EndpointTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
+import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.importing.ImportArtifactDescriptor;
 import io.github.glynch.jscene3d.project.importing.SourceItem;
 import io.github.glynch.jscene3d.project.importing.extension.ImportInspectionContext;
@@ -78,6 +81,8 @@ final class DoomProjectImporter implements ProjectImporter {
     private static final String MESH_MEDIA_TYPE = "application/vnd.jscene3d.mesh-v1";
     private static final String TEXTURE_MEDIA_TYPE = "application/vnd.jscene3d.rgba8-v1";
     private static final String COLLISION_MEDIA_TYPE = "application/vnd.jscene3d.triangle-mesh-collision-v1";
+    private static final int CHARACTER_COLLISION_CATEGORY = 2;
+    private static final int DOOR_OBSTRUCTION_SENSOR_CATEGORY = 4;
 
     @Override
     public void inspect(ImportInspectionContext context) {
@@ -210,8 +215,9 @@ final class DoomProjectImporter implements ProjectImporter {
             components.add(meshRenderer(context.definition().id(), prefix, index, batch.material()));
         }
         List<EntityEntry> children = new ArrayList<>();
+        List<SignalConnection> connections = new ArrayList<>();
         for (DoorRenderBatches door : doorBatches) {
-            children.add(publishDoor(context, prefix, door, references));
+            children.add(publishDoor(context, prefix, door, references, connections));
         }
         materials.keySet().stream().map(key -> materialIdentity(prefix, key)).forEach(references::add);
 
@@ -223,8 +229,8 @@ final class DoomProjectImporter implements ProjectImporter {
                 true,
                 components,
                 children);
-        EntityDefinition definition =
-                new EntityDefinition(definitionId, root.name().orElseThrow(), root);
+        EntityDefinition definition = new EntityDefinition(
+                definitionId, root.name().orElseThrow(), EntityContract.empty(), connections, root);
         context.artifact(
                 ImportArtifactDescriptor.entityDefinition(definitionIdentity, definitionId, references),
                 output -> DefinitionWriter.write(output, definition));
@@ -256,7 +262,11 @@ final class DoomProjectImporter implements ProjectImporter {
 
     /** Publishes one movable door's presentation, collision, and descriptor-selected behavior. */
     private static LocalEntity publishDoor(
-            ImportPreparationContext context, String prefix, DoorRenderBatches door, List<String> references)
+            ImportPreparationContext context,
+            String prefix,
+            DoorRenderBatches door,
+            List<String> references,
+            List<SignalConnection> connections)
             throws IOException {
         DoomDoorPublication behavior = door.behavior();
         String locator = doorLocator(prefix, behavior.sectorIndex());
@@ -286,18 +296,100 @@ final class DoomProjectImporter implements ProjectImporter {
             references.add(mesh);
             components.add(meshRenderer(context.definition().id(), locator, mesh, index, prefix, batch.material()));
         }
-        components.add(doorBehavior(context.definition().id(), locator, entityId, transformId, behavior));
-        return new LocalEntity(entityId, "Door " + behavior.sectorIndex(), true, components, List.of());
+        ComponentId behaviorId = componentId(context.definition().id(), locator + "/behavior");
+        components.add(doorBehavior(entityId, transformId, behaviorId, behavior));
+        String obstructionShape = doorObstructionShapeIdentity(prefix, behavior.sectorIndex());
+        Bounds3d obstructionBounds = Bounds3d.of(door.collision());
+        publishBoxCollision(context, obstructionShape, obstructionBounds);
+        references.add(obstructionShape);
+        LocalEntity obstruction = doorObstructionSensor(
+                context.definition().id(),
+                locator,
+                obstructionShape,
+                obstructionBounds,
+                entityId,
+                behaviorId,
+                connections);
+        return new LocalEntity(entityId, "Door " + behavior.sectorIndex(), true, components, List.of(obstruction));
+    }
+
+    /** Creates one generated child sensor which follows the door and reports character-only overlaps. */
+    private static LocalEntity doorObstructionSensor(
+            String importId,
+            String doorLocator,
+            String shapeIdentity,
+            Bounds3d bounds,
+            EntityId doorEntity,
+            ComponentId behaviorId,
+            List<SignalConnection> connections) {
+        String locator = doorLocator + "/obstruction";
+        EntityId sensorEntity = entityId(importId, locator);
+        ComponentId shapeId = componentId(importId, locator + "/shape");
+        ComponentId sensorId = componentId(importId, locator + "/sensor");
+        ComponentDefinition transform = component(
+                importId,
+                locator + "/transform",
+                Spatial3dDescriptors.transformType(),
+                Map.of(
+                        Spatial3dDescriptors.positionProperty(),
+                        new ProjectValue.ArrayValue(List.of(
+                                number(bounds.centerX()), number(bounds.centerY()), number(bounds.centerZ())))));
+        ComponentDefinition shape = collisionShapeForResource(
+                importId,
+                shapeIdentity,
+                shapeId,
+                Map.of(
+                        Physics3dDescriptors.categoryBitsProperty(), number(DOOR_OBSTRUCTION_SENSOR_CATEGORY),
+                        Physics3dDescriptors.maskBitsProperty(), number(CHARACTER_COLLISION_CATEGORY)));
+        ComponentDefinition sensor = collisionObject(
+                importId, locator + "/sensor", Physics3dDescriptors.collisionSensorType(), sensorEntity, shapeId);
+        connections.add(new SignalConnection(
+                EndpointTarget.component(sensorEntity, sensorId, Physics3dDescriptors.overlapEnteredSignal()),
+                EndpointTarget.component(doorEntity, behaviorId, DoomDoorDescriptors.OBSTRUCTION_ENTERED_ACTION)));
+        connections.add(new SignalConnection(
+                EndpointTarget.component(sensorEntity, sensorId, Physics3dDescriptors.overlapExitedSignal()),
+                EndpointTarget.component(doorEntity, behaviorId, DoomDoorDescriptors.OBSTRUCTION_EXITED_ACTION)));
+        return new LocalEntity(
+                sensorEntity, "Door obstruction sensor", true, List.of(transform, shape, sensor), List.of());
+    }
+
+    /** Publishes one convex sensor box from the exact local bounds of a movable door collision mesh. */
+    private static void publishBoxCollision(ImportPreparationContext context, String identity, Bounds3d bounds)
+            throws IOException {
+        context.artifact(
+                ImportArtifactDescriptor.resource(identity, Physics3dDescriptors.boxResourceType(), List.of()),
+                output -> Physics3dResourceWriter.writeBox(output, bounds.width(), bounds.height(), bounds.depth()));
     }
 
     /** Creates one collision shape retaining an explicitly named generated resource. */
     private static ComponentDefinition collisionShapeForResource(
             String importId, String collisionIdentity, ComponentId shapeId) {
+        return collisionShapeForResource(importId, collisionIdentity, shapeId, Map.of());
+    }
+
+    /** Creates one collision shape with explicitly authored filtering additions. */
+    private static ComponentDefinition collisionShapeForResource(
+            String importId, String collisionIdentity, ComponentId shapeId, Map<PropertyId, ProjectValue> additions) {
+        Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
+        properties.put(Physics3dDescriptors.shapeProperty(), reference(importId, collisionIdentity));
+        properties.putAll(additions);
         return new ComponentDefinition(
                 shapeId,
                 Physics3dDescriptors.collisionShapeType().id(),
                 Physics3dDescriptors.collisionShapeType().version(),
-                Map.of(Physics3dDescriptors.shapeProperty(), reference(importId, collisionIdentity)));
+                properties);
+    }
+
+    /** Creates one collision-object component with exact sibling shape membership. */
+    private static ComponentDefinition collisionObject(
+            String importId, String locator, ComponentType type, EntityId entityId, ComponentId shapeId) {
+        ProjectValue.ComponentTargetValue target =
+                new ProjectValue.ComponentTargetValue(new ComponentTarget(entityId, shapeId));
+        return component(
+                importId,
+                locator,
+                type,
+                Map.of(Physics3dDescriptors.shapesProperty(), new ProjectValue.ArrayValue(List.of(target))));
     }
 
     /** Creates a static collision body on an explicitly selected generated entity. */
@@ -314,7 +406,7 @@ final class DoomProjectImporter implements ProjectImporter {
 
     /** Creates the descriptor-authored door behavior targeting its generated transform. */
     private static ComponentDefinition doorBehavior(
-            String importId, String locator, EntityId entityId, ComponentId transformId, DoomDoorPublication behavior) {
+            EntityId entityId, ComponentId transformId, ComponentId behaviorId, DoomDoorPublication behavior) {
         Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
         properties.put(
                 DoomDoorDescriptors.TRANSFORM_PROPERTY,
@@ -323,7 +415,11 @@ final class DoomProjectImporter implements ProjectImporter {
         properties.put(DoomDoorDescriptors.OPEN_HEIGHT_PROPERTY, number(behavior.openHeight()));
         properties.put(DoomDoorDescriptors.SPEED_PROPERTY, number(behavior.speed()));
         properties.put(DoomDoorDescriptors.HOLD_OPEN_SECONDS_PROPERTY, number(behavior.holdOpenSeconds()));
-        return component(importId, locator + "/behavior", DoomDoorDescriptors.DOOR_TYPE, properties);
+        properties.put(
+                DoomDoorDescriptors.PROFILE_PROPERTY,
+                new ProjectValue.TextValue(behavior.profile().name().toLowerCase(Locale.ROOT)));
+        return new ComponentDefinition(
+                behaviorId, DoomDoorDescriptors.DOOR_TYPE.id(), DoomDoorDescriptors.DOOR_TYPE.version(), properties);
     }
 
     /** Creates one static body with explicit sibling membership rather than hierarchy inference. */
@@ -718,6 +814,11 @@ final class DoomProjectImporter implements ProjectImporter {
         return prefix + "/resources/collision/doors/" + formatted(sectorIndex);
     }
 
+    /** Returns one moving door's convex obstruction-sensor resource identity. */
+    private static String doorObstructionShapeIdentity(String prefix, int sectorIndex) {
+        return prefix + "/resources/collision/door-obstruction/" + formatted(sectorIndex);
+    }
+
     /** Returns one moving door render-mesh identity. */
     private static String doorMeshIdentity(String prefix, int sectorIndex, int index) {
         return prefix + "/resources/doors/" + formatted(sectorIndex) + "/meshes/" + formatted(index);
@@ -763,6 +864,43 @@ final class DoomProjectImporter implements ProjectImporter {
     private record DoorRenderBatches(DoomDoorPublication behavior, List<RenderBatch> batches, DoomMeshData collision) {
         private DoorRenderBatches {
             batches = List.copyOf(batches);
+        }
+    }
+
+    /** Positive local extents and centre derived from one non-empty collision mesh. */
+    private record Bounds3d(float centerX, float centerY, float centerZ, float width, float height, float depth) {
+        /** Computes a finite axis-aligned bound directly from the published door vertices. */
+        private static Bounds3d of(DoomMeshData mesh) {
+            float[] positions = mesh.positions();
+            if (positions.length == 0) {
+                throw new IllegalArgumentException("door collision mesh must contain positions");
+            }
+            float minimumX = positions[0];
+            float maximumX = positions[0];
+            float minimumY = positions[1];
+            float maximumY = positions[1];
+            float minimumZ = positions[2];
+            float maximumZ = positions[2];
+            for (int index = 3; index < positions.length; index += 3) {
+                minimumX = Math.min(minimumX, positions[index]);
+                maximumX = Math.max(maximumX, positions[index]);
+                minimumY = Math.min(minimumY, positions[index + 1]);
+                maximumY = Math.max(maximumY, positions[index + 1]);
+                minimumZ = Math.min(minimumZ, positions[index + 2]);
+                maximumZ = Math.max(maximumZ, positions[index + 2]);
+            }
+            return new Bounds3d(
+                    midpoint(minimumX, maximumX),
+                    midpoint(minimumY, maximumY),
+                    midpoint(minimumZ, maximumZ),
+                    maximumX - minimumX,
+                    maximumY - minimumY,
+                    maximumZ - minimumZ);
+        }
+
+        /** Avoids adding two potentially large finite coordinates before halving. */
+        private static float midpoint(float minimum, float maximum) {
+            return minimum + (maximum - minimum) * 0.5F;
         }
     }
 }

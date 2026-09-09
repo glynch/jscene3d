@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.data.Offset.offset;
 
 import io.github.glynch.jscene3d.doom.map.DoomMap;
+import io.github.glynch.jscene3d.doom.runtime.DoomDoor;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -26,11 +27,13 @@ final class DoomDoorPublicationTest {
 
         assertThat(doors).hasSize(2);
         assertThat(doors.get(0).sectorIndex()).isEqualTo(1);
+        assertThat(doors.get(0).profile()).isEqualTo(DoomDoor.Profile.NORMAL);
         assertThat(doors.get(0).closedHeight()).isEqualTo(0.0F);
         assertThat(doors.get(0).openHeight()).isEqualTo(3.875F);
         assertThat(doors.get(0).speed()).isEqualTo(2.1875F);
         assertThat(doors.get(0).holdOpenSeconds()).isZero();
         assertThat(doors.get(1).sectorIndex()).isEqualTo(2);
+        assertThat(doors.get(1).profile()).isEqualTo(DoomDoor.Profile.BLAZE);
         assertThat(doors.get(1).closedHeight()).isEqualTo(1.0F);
         assertThat(doors.get(1).openHeight()).isEqualTo(3.875F);
         assertThat(doors.get(1).speed()).isEqualTo(8.75F);

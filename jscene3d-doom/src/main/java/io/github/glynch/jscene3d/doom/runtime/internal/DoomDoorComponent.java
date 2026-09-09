@@ -7,6 +7,9 @@ package io.github.glynch.jscene3d.doom.runtime.internal;
 import io.github.glynch.jscene3d.doom.runtime.DoomDoor;
 import io.github.glynch.jscene3d.doom.runtime.DoomDoorDescriptors;
 import io.github.glynch.jscene3d.project.runtime.FixedUpdateContext;
+import io.github.glynch.jscene3d.project.runtime.RuntimePayload;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
+import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
@@ -16,7 +19,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Moves one explicitly targeted transform according to descriptor-authored Doom door behavior. */
-final class DoomDoorComponent implements DoomDoor, ComponentReferenceBinder, ComponentUpdateCallbacks {
+final class DoomDoorComponent
+        implements DoomDoor, ComponentReferenceBinder, ComponentEndpointBinder, ComponentUpdateCallbacks {
+    private final Profile profile;
     private final float closedHeight;
     private final float openHeight;
     private final float speed;
@@ -25,9 +30,11 @@ final class DoomDoorComponent implements DoomDoor, ComponentReferenceBinder, Com
     private Phase phase = Phase.CLOSED;
     private float currentHeight;
     private Duration remainingHold = Duration.ZERO;
+    private int obstructionCount;
 
     /** Retains validated authored door motion independently of its generated geometry. */
-    DoomDoorComponent(float closedHeight, float openHeight, float speed, float holdOpenSeconds) {
+    DoomDoorComponent(Profile profile, float closedHeight, float openHeight, float speed, float holdOpenSeconds) {
+        this.profile = Objects.requireNonNull(profile, "profile");
         this.closedHeight = requireFinite(closedHeight, "closedHeight");
         this.openHeight = requireFinite(openHeight, "openHeight");
         this.speed = requirePositive(speed, "speed");
@@ -40,6 +47,13 @@ final class DoomDoorComponent implements DoomDoor, ComponentReferenceBinder, Com
         }
         holdOpen = Duration.ofNanos(Math.round(validHold * 1_000_000_000.0));
         currentHeight = closedHeight;
+    }
+
+    @Override
+    public void bindEndpoints(ComponentEndpoints endpoints) {
+        ComponentEndpoints validEndpoints = Objects.requireNonNull(endpoints, "endpoints");
+        validEndpoints.action(DoomDoorDescriptors.OBSTRUCTION_ENTERED_ACTION, this::obstructionEntered);
+        validEndpoints.action(DoomDoorDescriptors.OBSTRUCTION_EXITED_ACTION, this::obstructionExited);
     }
 
     @Override
@@ -56,6 +70,11 @@ final class DoomDoorComponent implements DoomDoor, ComponentReferenceBinder, Com
             return true;
         }
         return false;
+    }
+
+    @Override
+    public Profile profile() {
+        return profile;
     }
 
     @Override
@@ -79,6 +98,26 @@ final class DoomDoorComponent implements DoomDoor, ComponentReferenceBinder, Com
                 // Stable phases have no work.
             }
         }
+    }
+
+    @Override
+    public void onAfterPhysics(FixedUpdateContext update) {
+        Objects.requireNonNull(update, "update");
+        if (phase == Phase.CLOSING && obstructionCount > 0) {
+            phase = Phase.OPENING;
+        }
+    }
+
+    /** Records one precise overlap reported by the generated door obstruction sensor. */
+    private void obstructionEntered(RuntimePayload payload) {
+        Objects.requireNonNull(payload, "payload");
+        obstructionCount++;
+    }
+
+    /** Removes one precise overlap while tolerating teardown ordering after sensor destruction. */
+    private void obstructionExited(RuntimePayload payload) {
+        Objects.requireNonNull(payload, "payload");
+        obstructionCount = Math.max(0, obstructionCount - 1);
     }
 
     /** Advances toward the open position and selects the authored terminal behavior. */

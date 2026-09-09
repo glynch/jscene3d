@@ -6,13 +6,20 @@ package io.github.glynch.jscene3d.doom.importing.internal;
 
 import io.github.glynch.jscene3d.doom.geometry.DoomUnits;
 import io.github.glynch.jscene3d.doom.map.DoomMap;
+import io.github.glynch.jscene3d.doom.runtime.DoomDoor;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 /** Descriptor-ready behavior derived from supported classic Doom manual-door linedefs. */
-record DoomDoorPublication(int sectorIndex, float closedHeight, float openHeight, float speed, float holdOpenSeconds) {
+record DoomDoorPublication(
+        int sectorIndex,
+        DoomDoor.Profile profile,
+        float closedHeight,
+        float openHeight,
+        float speed,
+        float holdOpenSeconds) {
     private static final int MANUAL_OPEN_STAY = 31;
     private static final int MANUAL_BLAZE_RAISE = 117;
     private static final float OPEN_CLEARANCE = DoomUnits.toWorld(4.0F);
@@ -45,6 +52,7 @@ record DoomDoorPublication(int sectorIndex, float closedHeight, float openHeight
         boolean blaze = special == MANUAL_BLAZE_RAISE;
         return new DoomDoorPublication(
                 sectorIndex,
+                blaze ? DoomDoor.Profile.BLAZE : DoomDoor.Profile.NORMAL,
                 closed,
                 adjacent - OPEN_CLEARANCE,
                 blaze ? BLAZE_SPEED : NORMAL_SPEED,

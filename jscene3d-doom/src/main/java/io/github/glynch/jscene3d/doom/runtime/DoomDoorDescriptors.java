@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.doom.runtime;
 import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeId;
+import io.github.glynch.jscene3d.project.component.EndpointId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 
 /** Stable portable identities shared by Doom map publication and runtime behavior. */
@@ -33,6 +34,15 @@ public final class DoomDoorDescriptors {
 
     /** Open hold duration in seconds, or zero for an open-and-stay door. */
     public static final PropertyId HOLD_OPEN_SECONDS_PROPERTY = new PropertyId("hold-open-seconds");
+
+    /** Imported semantic profile used by presentation components. */
+    public static final PropertyId PROFILE_PROPERTY = new PropertyId("profile");
+
+    /** Action notified when a descriptor-connected obstruction sensor begins overlapping a character. */
+    public static final EndpointId OBSTRUCTION_ENTERED_ACTION = new EndpointId("obstruction-entered");
+
+    /** Action notified when a descriptor-connected obstruction sensor stops overlapping a character. */
+    public static final EndpointId OBSTRUCTION_EXITED_ACTION = new EndpointId("obstruction-exited");
 
     private DoomDoorDescriptors() {}
 }

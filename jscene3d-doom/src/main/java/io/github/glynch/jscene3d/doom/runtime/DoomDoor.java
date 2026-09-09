@@ -6,6 +6,14 @@ package io.github.glynch.jscene3d.doom.runtime;
 
 /** Runtime capability of one descriptor-authored vertically opening Doom door. */
 public interface DoomDoor {
+    /** Door movement and presentation profile derived from the source linedef semantics. */
+    enum Profile {
+        /** Ordinary manual door speed and sound family. */
+        NORMAL,
+        /** Fast blaze door speed and sound family. */
+        BLAZE
+    }
+
     /** Motion phases exposed for diagnostics and tests. */
     enum Phase {
         /** The door is at its closed height. */
@@ -26,6 +34,13 @@ public interface DoomDoor {
      * @return whether the request changed the door's phase
      */
     boolean activate();
+
+    /**
+     * Returns the imported behavior profile used to select presentation without inferring it from timing values.
+     *
+     * @return exact descriptor-authored profile
+     */
+    Profile profile();
 
     /**
      * Returns the current motion phase.

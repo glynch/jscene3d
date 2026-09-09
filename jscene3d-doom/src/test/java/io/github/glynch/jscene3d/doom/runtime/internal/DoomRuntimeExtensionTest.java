@@ -36,15 +36,20 @@ final class DoomRuntimeExtensionTest {
                 DoomDoorDescriptors.SPEED_PROPERTY,
                 number(8.75F),
                 DoomDoorDescriptors.HOLD_OPEN_SECONDS_PROPERTY,
-                number(150.0F / 35.0F)));
+                number(150.0F / 35.0F),
+                DoomDoorDescriptors.PROFILE_PROPERTY,
+                new ProjectValue.TextValue("blaze")));
 
         assertThat(extension.id()).isEqualTo("io.github.glynch.jscene3d.doom");
         assertThat(factories).containsOnlyKeys(DoomDoorDescriptors.DOOR_TYPE);
         assertThat(Objects.requireNonNull(factories.get(DoomDoorDescriptors.DOOR_TYPE))
                         .create(context(properties)))
                 .isInstanceOf(DoomDoor.class)
-                .extracting(value -> ((DoomDoor) value).currentHeight())
-                .isEqualTo(-2.0F);
+                .satisfies(value -> {
+                    DoomDoor door = (DoomDoor) value;
+                    assertThat(door.currentHeight()).isEqualTo(-2.0F);
+                    assertThat(door.profile()).isEqualTo(DoomDoor.Profile.BLAZE);
+                });
     }
 
     private static ComponentFactoryContext context(ComponentProperties properties) {

@@ -5,6 +5,8 @@
 package io.github.glynch.jscene3d.editor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -125,6 +127,41 @@ final class EditorProjectLoaderTest {
         assertThat(result.session().orElseThrow().types().extensions())
                 .extracting(extension -> extension.id())
                 .contains("example.installed");
+    }
+
+    /** Checks a valid project through the editor's non-graphical load and preview command. */
+    @Test
+    void checksProjectWithoutOpeningGraphicalEditor() throws IOException {
+        writeProject();
+        EditorProjectLoader projectLoader = loader();
+
+        assertThatCode(() -> EditorProjectCheck.check(projectLoader, temporaryDirectory))
+                .doesNotThrowAnyException();
+    }
+
+    /** Rejects a project which cannot produce an editor session. */
+    @Test
+    void rejectsInvalidProjectCheck() {
+        Path missing = temporaryDirectory.resolve("missing");
+        EditorProjectLoader projectLoader = loader();
+
+        assertThatThrownBy(() -> EditorProjectCheck.check(projectLoader, missing))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("project load failed");
+    }
+
+    /** Parses the dedicated headless-check argument without consuming ordinary project arguments. */
+    @Test
+    void recognizesProjectCheckArgument() {
+        assertThat(EditorProjectCheck.requestedProject(
+                        new String[] {temporaryDirectory.toString(), "--check-project=project"}))
+                .contains(Path.of("project").toAbsolutePath().normalize());
+        assertThat(EditorProjectCheck.requestedProject(new String[] {temporaryDirectory.toString()}))
+                .isEmpty();
+        String[] emptyProjectArgument = {"--check-project="};
+        assertThatThrownBy(() -> EditorProjectCheck.requestedProject(emptyProjectArgument))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires a project directory");
     }
 
     /** Creates the complete valid source project used by the read-only loading test. */

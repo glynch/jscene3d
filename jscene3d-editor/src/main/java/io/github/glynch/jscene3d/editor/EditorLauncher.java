@@ -17,6 +17,11 @@ public final class EditorLauncher {
      * @param arguments command-line arguments passed to JavaFX
      */
     public static void main(String[] arguments) {
+        var checkedProject = EditorProjectCheck.requestedProject(arguments);
+        if (checkedProject.isPresent()) {
+            EditorProjectCheck.check(checkedProject.orElseThrow());
+            return;
+        }
         Application.launch(EditorApplication.class, arguments);
     }
 }

@@ -4,6 +4,7 @@
  */
 /** Genre-independent game lifecycle, semantic input, and scene-physics integration. */
 module io.github.glynch.jscene3d.game {
+    requires transitive io.github.glynch.jscene3d.audio;
     requires transitive io.github.glynch.jscene3d.core;
     requires transitive io.github.glynch.jscene3d.physics;
     requires transitive io.github.glynch.jscene3d.lwjgl;
@@ -15,5 +16,6 @@ module io.github.glynch.jscene3d.game {
     exports io.github.glynch.jscene3d.game;
     exports io.github.glynch.jscene3d.game.input;
     exports io.github.glynch.jscene3d.game.physics;
+    exports io.github.glynch.jscene3d.game.presentation;
     exports io.github.glynch.jscene3d.game.project3d;
 }

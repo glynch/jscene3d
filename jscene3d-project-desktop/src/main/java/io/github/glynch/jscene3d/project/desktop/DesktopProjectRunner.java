@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.game.WorldFrameDriver;
 import io.github.glynch.jscene3d.game.input.ActionSnapshot;
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
+import io.github.glynch.jscene3d.game.presentation.PresentationWorldModule;
 import io.github.glynch.jscene3d.platform.CursorMode;
 import io.github.glynch.jscene3d.platform.GamepadState;
 import io.github.glynch.jscene3d.platform.Key;
@@ -74,6 +75,7 @@ public final class DesktopProjectRunner {
     private static void runLoop(HostedProject project, Window window, Renderer renderer, GamepadState gamepad) {
         ProjectInput input = requireProjectInput(project);
         Spatial3dWorldModule spatial = project.world().requireModule(Spatial3dWorldModule.class);
+        PresentationWorldModule presentation = project.world().requireModule(PresentationWorldModule.class);
         WorldFrameDriver frames = new WorldFrameDriver(project.world(), input);
         DesktopPointerCapture pointerCapture = new DesktopPointerCapture(input.usesRelativePointer());
         project.world().activate();
@@ -91,7 +93,7 @@ public final class DesktopProjectRunner {
             long currentFrame = System.nanoTime();
             frames.advance(Duration.ofNanos(Math.max(0L, currentFrame - previousFrame)), acquired);
             previousFrame = currentFrame;
-            render(spatial, renderer, window);
+            render(spatial, presentation, renderer, window);
         }
     }
 
@@ -108,7 +110,8 @@ public final class DesktopProjectRunner {
     }
 
     /** Renders and presents one frame when the window has a drawable framebuffer. */
-    private static void render(Spatial3dWorldModule spatial, Renderer renderer, Window window) {
+    private static void render(
+            Spatial3dWorldModule spatial, PresentationWorldModule presentation, Renderer renderer, Window window) {
         if (window.framebufferWidth() <= 0 || window.framebufferHeight() <= 0) {
             return;
         }
@@ -117,6 +120,7 @@ public final class DesktopProjectRunner {
         } else {
             renderer.clear();
         }
+        presentation.renderOverlays(renderer);
         window.swapBuffers();
     }
 

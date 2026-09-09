@@ -230,6 +230,36 @@ final class Spatial3dResourceTest {
                 .hasMessageContaining("closed");
     }
 
+    /** Copies one loaded sRGB texture into immutable screen-overlay storage. */
+    @Test
+    void createsOverlayImageFromSrgbTexture() throws IOException {
+        ResourceReference payload = ResourceReference.imported("model/payloads/overlay.rgba8");
+        byte[] pixels = new byte[] {1, 2, 3, 4};
+        Texture3dResource resource = textureLoader()
+                .load(textureDefinition(payload, 1, 1, "srgb"), reference -> new ByteArrayInputStream(pixels));
+
+        var image = resource.overlayImage();
+
+        assertThat(image.width()).isEqualTo(1);
+        assertThat(image.height()).isEqualTo(1);
+        resource.close();
+    }
+
+    /** Rejects linear data textures because overlays require an explicit sRGB interpretation. */
+    @Test
+    void rejectsOverlayImageFromLinearTexture() throws IOException {
+        ResourceReference payload = ResourceReference.imported("model/payloads/data.rgba8");
+        Texture3dResource resource = textureLoader()
+                .load(
+                        textureDefinition(payload, 1, 1, "linear"),
+                        reference -> new ByteArrayInputStream(new byte[] {1, 2, 3, 4}));
+
+        assertThatThrownBy(resource::overlayImage)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("sRGB");
+        resource.close();
+    }
+
     /** Rejects malformed texture documents and pixel envelopes before publishing runtime state. */
     @Test
     void rejectsInvalidTextureContent() {

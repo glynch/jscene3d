@@ -6,6 +6,9 @@ package io.github.glynch.jscene3d.project.desktop;
 
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
+import io.github.glynch.jscene3d.game.presentation.GamePresentationDescriptors;
+import io.github.glynch.jscene3d.game.presentation.GamePresentationResourceLoaders;
+import io.github.glynch.jscene3d.game.presentation.PresentationWorldModule;
 import io.github.glynch.jscene3d.game.project3d.Game3dDescriptors;
 import io.github.glynch.jscene3d.game.project3d.Game3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
@@ -59,7 +62,8 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
         return List.of(
                 Spatial3dDescriptors.extensionDescriptor(),
                 Physics3dDescriptors.extensionDescriptor(),
-                Game3dDescriptors.extensionDescriptor());
+                Game3dDescriptors.extensionDescriptor(),
+                GamePresentationDescriptors.extensionDescriptor());
     }
 
     @Override
@@ -73,7 +77,8 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
         return List.of(
                 WorldModuleBinding.of(InputWorldModule.class, input),
                 WorldModuleBinding.of(Spatial3dWorldModule.class, Spatial3dAdapters.standard()),
-                WorldModuleBinding.of(Physics3dWorldModule.class, Physics3dAdapters.standard()));
+                WorldModuleBinding.of(Physics3dWorldModule.class, Physics3dAdapters.standard()),
+                WorldModuleBinding.of(PresentationWorldModule.class, new StandardPresentationWorldModule()));
     }
 
     @Override
@@ -81,6 +86,7 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
         List<RuntimeResourceLoader<?>> loaders = new ArrayList<>();
         loaders.addAll(Spatial3dResourceLoaders.all());
         loaders.addAll(Physics3dResourceLoaders.all());
+        loaders.addAll(GamePresentationResourceLoaders.all());
         return PublishedProjectContent.load(project, types, authored, publishedImports, loaders);
     }
 }

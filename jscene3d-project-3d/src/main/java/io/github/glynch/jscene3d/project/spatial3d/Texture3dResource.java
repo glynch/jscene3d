@@ -4,7 +4,10 @@
  */
 package io.github.glynch.jscene3d.project.spatial3d;
 
+import io.github.glynch.jscene3d.render.OverlayImage;
 import io.github.glynch.jscene3d.textures.Texture;
+import io.github.glynch.jscene3d.textures.TextureColorSpace;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /** Shared immutable-use runtime texture resource owning its renderer-independent image and sampler description. */
@@ -37,6 +40,22 @@ public final class Texture3dResource implements AutoCloseable {
      */
     public boolean isClosed() {
         return closed;
+    }
+
+    /**
+     * Copies this resource's retained sRGB image into an immutable screen-overlay image.
+     *
+     * @return independently owned overlay image
+     * @throws IllegalStateException if this resource is closed or does not contain sRGB color data
+     */
+    public OverlayImage overlayImage() {
+        Texture value = texture();
+        if (value.colorSpace() != TextureColorSpace.SRGB) {
+            throw new IllegalStateException("overlay images require an sRGB texture resource");
+        }
+        ByteBuffer pixels = ByteBuffer.allocate(value.pixelByteCount());
+        value.copyPixelsTo(pixels);
+        return OverlayImage.srgbRgba(value.width(), value.height(), pixels.flip());
     }
 
     /** Closes the owned texture exactly once. */

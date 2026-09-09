@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.glynch.jscene3d.game.input.ActionSnapshot;
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
+import io.github.glynch.jscene3d.game.presentation.PresentationWorldModule;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.input.InputActionDefinition;
@@ -71,7 +72,8 @@ final class StandardProjectEnvironmentTest {
                 .containsExactly(
                         "io.github.glynch.jscene3d.spatial3d",
                         "io.github.glynch.jscene3d.physics3d",
-                        "io.github.glynch.jscene3d.game3d");
+                        "io.github.glynch.jscene3d.game3d",
+                        "io.github.glynch.jscene3d.presentation");
         assertThat(environment.runtimeExtensions())
                 .extracting(extension -> extension.id())
                 .containsExactly(
@@ -83,7 +85,8 @@ final class StandardProjectEnvironmentTest {
                 .containsExactly(
                         InputWorldModule.class.getName(),
                         Spatial3dWorldModule.class.getName(),
-                        Physics3dWorldModule.class.getName());
+                        Physics3dWorldModule.class.getName(),
+                        PresentationWorldModule.class.getName());
         assertThat(modules.getFirst().module())
                 .isInstanceOf(InputWorldModule.class)
                 .extracting(module -> ((InputWorldModule) module).snapshot())

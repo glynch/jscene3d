@@ -29,7 +29,7 @@ final class DesktopPointerCapture {
         }
         if (!captured && focused && primaryPressed) {
             captured = true;
-            return new Update(POINTER_CAPTURE, true, false);
+            return new Update(InputCapture.NONE, true, false);
         }
         return new Update(captured ? InputCapture.NONE : POINTER_CAPTURE, false, false);
     }

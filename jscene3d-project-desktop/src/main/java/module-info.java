@@ -4,6 +4,7 @@
  */
 /** Standard native desktop host for composed JScene3D game projects. */
 module io.github.glynch.jscene3d.project.desktop {
+    requires io.github.glynch.jscene3d.audio;
     requires io.github.glynch.jscene3d.game;
     requires io.github.glynch.jscene3d.lwjgl;
     requires transitive io.github.glynch.jscene3d.project;

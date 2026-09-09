@@ -35,6 +35,9 @@ final class EditorProjectLoaderTest {
         assertThat(result.diagnostics()).isEmpty();
         EditorProjectSession session = result.session().orElseThrow();
         assertThat(session.project().identity().name()).isEqualTo("Editor Test");
+        assertThat(session.types().extensions())
+                .extracting(extension -> extension.id())
+                .contains("io.github.glynch.jscene3d.game3d", "io.github.glynch.jscene3d.presentation");
         assertThat(session.assets())
                 .extracting(EditorAssetItem::label)
                 .containsExactly("Reusable Beacon", "Test World");

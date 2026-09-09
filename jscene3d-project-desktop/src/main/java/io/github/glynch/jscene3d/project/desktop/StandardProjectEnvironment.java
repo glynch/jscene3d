@@ -4,13 +4,12 @@
  */
 package io.github.glynch.jscene3d.project.desktop;
 
+import io.github.glynch.jscene3d.game.StandardGameDescriptors;
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
-import io.github.glynch.jscene3d.game.presentation.GamePresentationDescriptors;
 import io.github.glynch.jscene3d.game.presentation.GamePresentationResourceLoaders;
 import io.github.glynch.jscene3d.game.presentation.GamePresentationRuntimeExtension;
 import io.github.glynch.jscene3d.game.presentation.PresentationWorldModule;
-import io.github.glynch.jscene3d.game.project3d.Game3dDescriptors;
 import io.github.glynch.jscene3d.game.project3d.Game3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
@@ -19,7 +18,6 @@ import io.github.glynch.jscene3d.project.importing.PublishedProjectContent;
 import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dAdapters;
-import io.github.glynch.jscene3d.project.physics3d.Physics3dDescriptors;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dResourceLoaders;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dWorldModule;
@@ -32,7 +30,6 @@ import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
-import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,11 +57,7 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
 
     @Override
     public List<ExtensionDescriptor> descriptors() {
-        return List.of(
-                Spatial3dDescriptors.extensionDescriptor(),
-                Physics3dDescriptors.extensionDescriptor(),
-                Game3dDescriptors.extensionDescriptor(),
-                GamePresentationDescriptors.extensionDescriptor());
+        return StandardGameDescriptors.all();
     }
 
     @Override

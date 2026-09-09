@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.game.StandardGameDescriptors;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetCatalogLoadResult;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -28,12 +29,10 @@ import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
-import io.github.glynch.jscene3d.project.physics3d.Physics3dDescriptors;
 import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
-import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
@@ -113,8 +112,7 @@ final class EditorProjectLoader {
         diagnostics.addAll(extensionResult.diagnostics());
         List<ExtensionDescriptor> descriptors =
                 new ArrayList<>(extensionResult.catalog().extensions());
-        addIfAbsent(descriptors, Spatial3dDescriptors.extensionDescriptor());
-        addIfAbsent(descriptors, Physics3dDescriptors.extensionDescriptor());
+        StandardGameDescriptors.all().forEach(descriptor -> addIfAbsent(descriptors, descriptor));
         try {
             return RegisteredTypeCatalog.of(descriptors);
         } catch (IllegalArgumentException exception) {

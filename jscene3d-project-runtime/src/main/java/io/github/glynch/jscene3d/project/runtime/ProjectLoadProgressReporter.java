@@ -10,7 +10,7 @@ package io.github.glynch.jscene3d.project.runtime;
  * responsive loading surface without moving graphics or audio realization to another thread.
  */
 @FunctionalInterface
-public interface ProjectLoadProgress {
+public interface ProjectLoadProgressReporter {
     /**
      * Receives one completed-or-starting load phase in declaration order.
      *

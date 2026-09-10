@@ -8,7 +8,7 @@ import io.github.glynch.jscene3d.loaders.OverlayImageLoader;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
-import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgress;
+import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgressReporter;
 import io.github.glynch.jscene3d.render.OverlayCanvas;
 import io.github.glynch.jscene3d.render.OverlayImage;
 import io.github.glynch.jscene3d.render.Renderer;
@@ -28,7 +28,7 @@ final class DesktopLaunchSplash {
     private final Optional<OverlayImage> studioLogo;
     private final List<OverlayImage> poweredByBadges;
     private final Duration minimumDuration;
-    private ProjectLoadProgress.Phase phase = ProjectLoadProgress.Phase.MANIFEST;
+    private ProjectLoadProgressReporter.Phase phase = ProjectLoadProgressReporter.Phase.MANIFEST;
 
     /** Loads configured launch images before any runtime world is composed. */
     private DesktopLaunchSplash(String projectName, Optional<GameProject.SplashConfiguration> configuration) {
@@ -61,7 +61,7 @@ final class DesktopLaunchSplash {
     }
 
     /** Repaints one real load phase and keeps the native window responsive. */
-    void present(ProjectLoadProgress.Phase current, Renderer renderer, Window window) {
+    void present(ProjectLoadProgressReporter.Phase current, Renderer renderer, Window window) {
         phase = Objects.requireNonNull(current, "current");
         Window.pollEvents();
         window.setTitle(projectName + " — " + phase.description());

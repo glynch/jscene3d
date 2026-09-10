@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.project.desktop;
 
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.platform.Window;
-import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgress;
+import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgressReporter;
 import io.github.glynch.jscene3d.render.OverlayCanvas;
 import io.github.glynch.jscene3d.render.Renderer;
 import java.util.Objects;
@@ -18,7 +18,7 @@ final class DesktopLoadingIndicator {
     private static final Color PROGRESS_COLOR = Color.srgb(0xef762f);
 
     private final String projectName;
-    private ProjectLoadProgress.Phase phase = ProjectLoadProgress.Phase.MANIFEST;
+    private ProjectLoadProgressReporter.Phase phase = ProjectLoadProgressReporter.Phase.MANIFEST;
     private boolean presented;
 
     /** Creates an indicator owned by one named project window. */
@@ -27,7 +27,7 @@ final class DesktopLoadingIndicator {
     }
 
     /** Presents a completed loading phase over an already rendered menu frame. */
-    void present(ProjectLoadProgress.Phase current, Renderer renderer, Window window) {
+    void present(ProjectLoadProgressReporter.Phase current, Renderer renderer, Window window) {
         phase = Objects.requireNonNull(current, "current");
         presented = true;
         Window.pollEvents();

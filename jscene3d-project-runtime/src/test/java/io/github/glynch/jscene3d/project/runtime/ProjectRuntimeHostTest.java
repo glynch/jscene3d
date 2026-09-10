@@ -71,13 +71,13 @@ final class ProjectRuntimeHostTest {
 
     /** Reports stable truthful phases around the existing synchronous host boundary. */
     @Test
-    void reportsProjectLoadProgress() throws IOException {
+    void reportsProjectLoadPhases() throws IOException {
         Path projectRoot = writeProject("worlds/main.world.json");
-        List<ProjectLoadProgress.Phase> phases = new ArrayList<>();
+        List<ProjectLoadProgressReporter.Phase> phases = new ArrayList<>();
         try (URLClassLoader loader = runtimeClassLoader();
                 HostedProject ignored = runtimeHost(loader, environment(new RecordingApplicationExtension(), null))
                         .load(projectRoot, phases::add)) {
-            assertThat(phases).containsExactly(ProjectLoadProgress.Phase.values());
+            assertThat(phases).containsExactly(ProjectLoadProgressReporter.Phase.values());
         }
     }
 

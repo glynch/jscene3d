@@ -894,7 +894,7 @@ world, and returns a `HostedProject`. Applications therefore do not generate or
 maintain a project-specific world loader.
 
 Project composition reports stable coarse-grained milestones through an
-optional `ProjectLoadProgress` callback. This is progress from completed or
+optional `ProjectLoadProgressReporter` callback. This is progress from completed or
 starting host phases, not elapsed-time animation or estimated asset counts.
 Callbacks run on the loading thread and must return promptly, allowing a desktop
 host to keep its native window responsive while preserving the thread affinity

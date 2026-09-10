@@ -22,7 +22,7 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.HostedProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectHostException;
 import io.github.glynch.jscene3d.project.runtime.ProjectLaunchRequest;
-import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgress;
+import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgressReporter;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeHost;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.render.Renderer;
@@ -154,7 +154,7 @@ public final class DesktopProjectRunner {
             DesktopLaunchSplash splash, long shownAt, Renderer renderer, Window window) {
         while (!window.shouldClose()
                 && !DesktopLaunchPolicy.minimumElapsed(shownAt, System.nanoTime(), splash.minimumDuration())) {
-            splash.present(ProjectLoadProgress.Phase.READY, renderer, window);
+            splash.present(ProjectLoadProgressReporter.Phase.READY, renderer, window);
         }
     }
 
@@ -312,7 +312,7 @@ public final class DesktopProjectRunner {
         }
 
         /** Loads and activates the manifest-selected startup world. */
-        private void start(ProjectLoadProgress progress) {
+        private void start(ProjectLoadProgressReporter progress) {
             application.setResumeAvailable(false);
             HostedProject loaded = host.load(projectRoot, launchRequest, progress);
             boolean startupMenu = !launchRequest.isPlaytest()
@@ -331,7 +331,7 @@ public final class DesktopProjectRunner {
         }
 
         /** Applies at most one world-requested transition between completed host frames. */
-        private boolean applyPendingCommand(ProjectLoadProgress progress) {
+        private boolean applyPendingCommand(ProjectLoadProgressReporter progress) {
             Objects.requireNonNull(progress, "progress");
             return application
                     .takeRequest()
@@ -340,7 +340,7 @@ public final class DesktopProjectRunner {
         }
 
         /** Applies one host-owned application transition. */
-        private boolean apply(ApplicationCommand command, ProjectLoadProgress progress) {
+        private boolean apply(ApplicationCommand command, ProjectLoadProgressReporter progress) {
             DesktopSessionLifecycle<RunningWorld> active = requireLifecycle();
             boolean continueRunning = active.apply(
                     command,

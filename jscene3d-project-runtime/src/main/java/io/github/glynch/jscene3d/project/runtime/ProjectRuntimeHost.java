@@ -61,7 +61,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @param progress load-progress receiver
      * @return composed inactive project
      */
-    public HostedProject load(Path projectRoot, ProjectLoadProgress progress) {
+    public HostedProject load(Path projectRoot, ProjectLoadProgressReporter progress) {
         return load(projectRoot, ProjectLaunchRequest.standard(), progress);
     }
 
@@ -84,10 +84,10 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @param progress load-progress receiver
      * @return composed inactive project
      */
-    public HostedProject load(Path projectRoot, ProjectLaunchRequest request, ProjectLoadProgress progress) {
-        ProjectLoadProgress validProgress = Objects.requireNonNull(progress, "progress");
+    public HostedProject load(Path projectRoot, ProjectLaunchRequest request, ProjectLoadProgressReporter progress) {
+        ProjectLoadProgressReporter validProgress = Objects.requireNonNull(progress, "progress");
         ProjectLaunchRequest validRequest = Objects.requireNonNull(request, "request");
-        validProgress.report(ProjectLoadProgress.Phase.MANIFEST);
+        validProgress.report(ProjectLoadProgressReporter.Phase.MANIFEST);
         GameProject project = loadProject(projectRoot);
         Path startupScene = validRequest
                 .scene()
@@ -115,7 +115,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @param progress load-progress receiver
      * @return composed inactive gameplay project
      */
-    public HostedProject loadEntry(Path projectRoot, ProjectLoadProgress progress) {
+    public HostedProject loadEntry(Path projectRoot, ProjectLoadProgressReporter progress) {
         return loadEntry(projectRoot, ProjectLaunchRequest.standard(), progress);
     }
 
@@ -138,10 +138,11 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @param progress load-progress receiver
      * @return composed inactive gameplay project
      */
-    public HostedProject loadEntry(Path projectRoot, ProjectLaunchRequest request, ProjectLoadProgress progress) {
-        ProjectLoadProgress validProgress = Objects.requireNonNull(progress, "progress");
+    public HostedProject loadEntry(
+            Path projectRoot, ProjectLaunchRequest request, ProjectLoadProgressReporter progress) {
+        ProjectLoadProgressReporter validProgress = Objects.requireNonNull(progress, "progress");
         ProjectLaunchRequest validRequest = Objects.requireNonNull(request, "request");
-        validProgress.report(ProjectLoadProgress.Phase.MANIFEST);
+        validProgress.report(ProjectLoadProgressReporter.Phase.MANIFEST);
         GameProject project = loadProject(projectRoot);
         Path entryScene = validRequest
                 .scene()
@@ -161,20 +162,20 @@ public final class ProjectRuntimeHost implements ProjectHost {
 
     /** Composes one validated authored world while retaining the loaded project configuration. */
     private HostedProject load(
-            GameProject project, Path worldPath, ProjectLaunchRequest request, ProjectLoadProgress progress) {
-        progress.report(ProjectLoadProgress.Phase.EXTENSIONS);
+            GameProject project, Path worldPath, ProjectLaunchRequest request, ProjectLoadProgressReporter progress) {
+        progress.report(ProjectLoadProgressReporter.Phase.EXTENSIONS);
         RegisteredTypeCatalog types = loadTypes(project);
-        progress.report(ProjectLoadProgress.Phase.ASSETS);
+        progress.report(ProjectLoadProgressReporter.Phase.ASSETS);
         AssetCatalog assets = loadAssets(project);
         AssetMetadata startup = startupAsset(worldPath, assets);
-        progress.report(ProjectLoadProgress.Phase.INPUT);
+        progress.report(ProjectLoadProgressReporter.Phase.INPUT);
         Optional<InputMapDefinition> inputMap = loadInputMap(project);
         List<ComponentRuntimeExtension> extensions = runtimeExtensions();
-        progress.report(ProjectLoadProgress.Phase.CONTENT);
+        progress.report(ProjectLoadProgressReporter.Phase.CONTENT);
         ProjectContent content = loadContent(project, types, assets);
-        progress.report(ProjectLoadProgress.Phase.MODULES);
+        progress.report(ProjectLoadProgressReporter.Phase.MODULES);
         List<WorldModuleBinding<?>> modules = List.copyOf(environment.createWorldModules(inputMap));
-        progress.report(ProjectLoadProgress.Phase.WORLD);
+        progress.report(ProjectLoadProgressReporter.Phase.WORLD);
         WorldCompositionResult composition = WorldComposer.compose(
                 content.definitions(),
                 AssetRef.<WorldDefinition>to(startup.id()),
@@ -190,9 +191,9 @@ public final class ProjectRuntimeHost implements ProjectHost {
         }
         HostedProject hosted =
                 new HostedProject(project, assets, composition.world().orElseThrow(), request);
-        progress.report(ProjectLoadProgress.Phase.APPLICATION);
+        progress.report(ProjectLoadProgressReporter.Phase.APPLICATION);
         prepareApplication(hosted, extensions);
-        progress.report(ProjectLoadProgress.Phase.READY);
+        progress.report(ProjectLoadProgressReporter.Phase.READY);
         return hosted;
     }
 

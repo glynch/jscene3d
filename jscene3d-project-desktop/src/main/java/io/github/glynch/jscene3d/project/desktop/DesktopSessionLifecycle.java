@@ -55,25 +55,33 @@ final class DesktopSessionLifecycle<T extends AutoCloseable> implements AutoClos
         Supplier<T> validMenuLoader = Objects.requireNonNull(menuLoader, "menuLoader");
         Supplier<T> validGameplayLoader = Objects.requireNonNull(gameplayLoader, "gameplayLoader");
         return switch (command) {
-            case SHOW_MENU -> showMenu(validMenuLoader);
-            case NEW_GAME -> newGame(validGameplayLoader);
-            case RESUME -> resume();
+            case SHOW_MENU -> {
+                showMenu(validMenuLoader);
+                yield true;
+            }
+            case NEW_GAME -> {
+                newGame(validGameplayLoader);
+                yield true;
+            }
+            case RESUME -> {
+                resume();
+                yield true;
+            }
             case QUIT -> false;
         };
     }
 
     /** Opens a fresh menu only while distinct startup-menu semantics and gameplay are active. */
-    private boolean showMenu(Supplier<T> menuLoader) {
+    private void showMenu(Supplier<T> menuLoader) {
         if (!startupMenu || gameplay == null || current != gameplay) {
-            return true;
+            return;
         }
         menu = Objects.requireNonNull(menuLoader.get(), "loaded menu");
         current = menu;
-        return true;
     }
 
     /** Loads a replacement before closing either prior world, preserving state on load failure. */
-    private boolean newGame(Supplier<T> gameplayLoader) {
+    private void newGame(Supplier<T> gameplayLoader) {
         T replacement = Objects.requireNonNull(gameplayLoader.get(), "loaded gameplay");
         try {
             closeMenu();
@@ -84,17 +92,15 @@ final class DesktopSessionLifecycle<T extends AutoCloseable> implements AutoClos
         }
         gameplay = replacement;
         current = gameplay;
-        return true;
     }
 
     /** Returns to retained gameplay and closes the transient menu. */
-    private boolean resume() {
+    private void resume() {
         if (!canResume()) {
-            return true;
+            return;
         }
         closeMenu();
         current = gameplay;
-        return true;
     }
 
     @Override

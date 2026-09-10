@@ -221,11 +221,12 @@ public final class ExportPlan {
     /** Recursively collects project references from one portable resource property. */
     private static void addProjectReferences(GameProject project, ProjectValue value, Map<Path, ExportFile> files) {
         switch (value) {
-            case ProjectValue.ReferenceValue reference -> {
-                if (reference.reference().kind() == ResourceReference.Kind.PROJECT) {
-                    addProjectFile(
-                            project, files, reference.reference().projectPath().orElseThrow());
-                }
+            case ProjectValue.ReferenceValue reference
+            when reference.reference().kind() == ResourceReference.Kind.PROJECT ->
+                addProjectFile(
+                        project, files, reference.reference().projectPath().orElseThrow());
+            case ProjectValue.ReferenceValue ignored -> {
+                // Asset, import, and entity references do not name project files.
             }
             case ProjectValue.ArrayValue array ->
                 array.values().forEach(element -> addProjectReferences(project, element, files));

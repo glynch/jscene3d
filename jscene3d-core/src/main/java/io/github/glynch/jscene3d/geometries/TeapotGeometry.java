@@ -14,7 +14,10 @@ public final class TeapotGeometry {
     private static final int LID_PATCH_END = 28;
     private static final int PATCH_COUNT = 32;
     private static final int CONTROL_POINTS_PER_PATCH = 16;
+
+    @SuppressWarnings("java:S9133") // The source data's height is 3.15; this is not an approximation of pi.
     private static final double DATA_HEIGHT = 3.15;
+
     private static final double BLINN_SCALE = 1.3;
     private static final double FITTED_LID_SCALE = 1.077;
 

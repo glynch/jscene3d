@@ -1,0 +1,78 @@
+.root {
+    -fx-base: #252a30;
+}
+
+.editor-splash {
+    -fx-background-color:
+        radial-gradient(center 78% 78%, radius 68%, rgba(154, 53, 19, 0.34), transparent),
+        linear-gradient(to bottom right, #070a0d 0%, #111820 55%, #1b2025 100%);
+    -fx-padding: 48px;
+}
+
+.editor-splash-card {
+    -fx-background-color: rgba(10, 14, 18, 0.94);
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(156, 171, 181, 0.45);
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.65), 28, 0.25, 0, 12);
+    -fx-padding: 44px 52px 34px 52px;
+}
+
+.editor-splash-brand,
+.editor-splash-brand-accent {
+    -fx-font-family: "Arial Black";
+    -fx-font-size: 48px;
+    -fx-font-weight: 900;
+    -fx-text-fill: #eef3f5;
+}
+
+.editor-splash-brand-accent {
+    -fx-text-fill: #ef642d;
+}
+
+.editor-splash-product {
+    -fx-font-family: "Arial";
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #9eabb3;
+}
+
+.editor-splash-rule {
+    -fx-background-color: linear-gradient(to right, #df4e20, #ff9b3d 38%, transparent 100%);
+}
+
+.editor-splash-project-name {
+    -fx-font-size: 22px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #f0f3f4;
+}
+
+.editor-splash-project-path {
+    -fx-font-size: 12px;
+    -fx-text-fill: #7f8d96;
+}
+
+.editor-splash-phase {
+    -fx-font-size: 14px;
+    -fx-text-fill: #c8d0d5;
+}
+
+.editor-splash-progress {
+    -fx-accent: #e65b28;
+}
+
+.editor-splash-progress > .track {
+    -fx-background-color: #202a31;
+    -fx-background-radius: 2px;
+}
+
+.editor-splash-progress > .bar {
+    -fx-background-insets: 0;
+    -fx-background-radius: 2px;
+}
+
+.editor-splash-version {
+    -fx-font-size: 11px;
+    -fx-text-fill: #69767e;
+}

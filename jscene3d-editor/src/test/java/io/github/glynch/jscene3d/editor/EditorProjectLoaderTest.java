@@ -105,6 +105,30 @@ final class EditorProjectLoaderTest {
                         "test.project.load");
     }
 
+    /** Reports the authored identity and every visible loading phase in execution order. */
+    @Test
+    void reportsVisibleProjectLoadingProgress() throws IOException {
+        writeProject();
+        RecordingProgress progress = new RecordingProgress();
+
+        try (TelemetryOperation operation = Telemetry.disabled().begin("test.project.load", Map.of())) {
+            EditorProjectLoadResult result = loader().load(temporaryDirectory, operation, progress);
+            assertThat(result.session()).isPresent();
+        }
+
+        assertThat(progress.projectNames).containsExactly("Editor Test");
+        assertThat(progress.phases)
+                .containsExactly(
+                        EditorLoadingPhase.READING_MANIFEST,
+                        EditorLoadingPhase.SCANNING_ASSETS,
+                        EditorLoadingPhase.LOADING_EXTENSIONS,
+                        EditorLoadingPhase.READING_IMPORTS,
+                        EditorLoadingPhase.LOADING_PUBLISHED_CONTENT,
+                        EditorLoadingPhase.VALIDATING_ASSETS,
+                        EditorLoadingPhase.LOADING_STARTUP_WORLD,
+                        EditorLoadingPhase.BUILDING_HIERARCHY);
+    }
+
     /** Reads the engine version filtered into the built editor artifact. */
     @Test
     void readsEmbeddedEngineVersion() {
@@ -332,5 +356,21 @@ final class EditorProjectLoaderTest {
     /** Creates the editor loader under test with this module's resource class loader. */
     private static EditorProjectLoader loader() {
         return new EditorProjectLoader("0.1.0-SNAPSHOT", EditorProjectLoaderTest.class.getClassLoader());
+    }
+
+    /** Records background-safe progress callbacks for assertions. */
+    private static final class RecordingProgress implements EditorProjectLoadProgress {
+        private final List<String> projectNames = new ArrayList<>();
+        private final List<EditorLoadingPhase> phases = new ArrayList<>();
+
+        @Override
+        public void projectIdentified(String projectName) {
+            projectNames.add(projectName);
+        }
+
+        @Override
+        public void phaseStarted(EditorLoadingPhase phase) {
+            phases.add(phase);
+        }
     }
 }

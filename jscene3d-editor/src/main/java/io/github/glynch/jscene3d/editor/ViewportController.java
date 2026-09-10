@@ -23,19 +23,22 @@ final class ViewportController {
 
     private final GLCanvas canvas;
     private final Label status;
+    private final Runnable firstFramePresented;
     private final Runnable disposalComplete;
     private final OpenGlFxRenderSurface surface = new OpenGlFxRenderSurface();
     private final AtomicReference<@Nullable PreviewRequest> pendingPreview = new AtomicReference<>();
 
     private @Nullable EditorPreview preview;
     private boolean focused;
+    private boolean firstFrameReported;
     private boolean disposed;
 
     /** Stores the JavaFX controls and state used by rendering callbacks. */
-    ViewportController(GLCanvas canvas, Label status, Runnable disposalComplete) {
+    ViewportController(GLCanvas canvas, Label status, Runnable firstFramePresented, Runnable disposalComplete) {
         this.canvas = canvas;
         this.status = status;
-        this.disposalComplete = disposalComplete;
+        this.firstFramePresented = Objects.requireNonNull(firstFramePresented, "firstFramePresented");
+        this.disposalComplete = Objects.requireNonNull(disposalComplete, "disposalComplete");
     }
 
     /** Renders one OpenGLFX frame through the actual JScene3D renderer. */
@@ -59,6 +62,7 @@ final class ViewportController {
             } else {
                 presentFirstFrame(currentPreview, size, pendingPresentation);
             }
+            reportFirstFramePresented();
             if (currentPreview.frameCount() % 30L == 0L) {
                 updateStatus(event, size, currentPreview.frameCount());
             }
@@ -155,6 +159,15 @@ final class ViewportController {
             PreviewRequest request, List<ProjectDiagnostic> previewDiagnostics, EditorProjectOpenDurations durations) {
         EditorPreviewResult result = new EditorPreviewResult(previewDiagnostics, durations);
         Platform.runLater(() -> request.completion().accept(result));
+    }
+
+    /** Reports the first successfully presented viewport frame exactly once on JavaFX. */
+    private void reportFirstFramePresented() {
+        if (firstFrameReported) {
+            return;
+        }
+        firstFrameReported = true;
+        Platform.runLater(firstFramePresented);
     }
 
     /** Replaces a queued preview request and closes any trace which can no longer complete. */

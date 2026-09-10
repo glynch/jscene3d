@@ -17,6 +17,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -45,14 +48,18 @@ import org.jspecify.annotations.Nullable;
 
 /** Production JavaFX shell for the JScene3D visual editor. */
 public final class EditorApplication extends Application {
+    private static final System.Logger LOGGER = System.getLogger(EditorApplication.class.getName());
+
     private final Telemetry telemetry;
     private final EditorProjectLoader projectLoader;
+    private final ExecutorService projectLoadingExecutor;
     private final TreeView<EditorHierarchyNode> hierarchy;
     private final ListView<EditorAssetItem> assets;
     private final ListView<ProjectDiagnostic> diagnostics;
 
     private @Nullable GLCanvas canvas;
     private @Nullable ViewportController viewportController;
+    private @Nullable EditorSplashScreen splashScreen;
     private boolean disposalRequested;
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
@@ -62,6 +69,10 @@ public final class EditorApplication extends Application {
                 EditorBuildInfo.engineVersion(),
                 EditorApplication.class.getClassLoader(),
                 EditorExtensionPath.configured());
+        projectLoadingExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
+                .daemon()
+                .name("jscene3d-editor-project-loader")
+                .factory());
         hierarchy = new TreeView<>();
         assets = new ListView<>();
         diagnostics = new ListView<>();
@@ -70,25 +81,35 @@ public final class EditorApplication extends Application {
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
     @Override
     public void start(Stage stage) {
+        boolean startupProjectRequested = !getParameters().getUnnamed().isEmpty();
         Label projectStatus = createStatus("No project opened");
         Label viewportStatus = createStatus("Waiting for the first OpenGL frame");
+        EditorSplashTiming splashTiming =
+                EditorSplashTiming.fromNamedArguments(getParameters().getNamed());
+        EditorSplashScreen loadingScreen = new EditorSplashScreen(EditorBuildInfo.engineVersion(), splashTiming);
         GLCanvas viewportCanvas = createCanvas();
-        ViewportController controller =
-                new ViewportController(viewportCanvas, viewportStatus, () -> completeDisposal(stage));
+        ViewportController controller = new ViewportController(
+                viewportCanvas,
+                viewportStatus,
+                () -> finishStartupSplash(loadingScreen, startupProjectRequested),
+                () -> completeDisposal(stage));
         canvas = viewportCanvas;
         viewportController = controller;
+        splashScreen = loadingScreen;
         installViewportEvents(viewportCanvas, controller);
 
-        BorderPane root = new BorderPane();
-        root.setTop(createTopControls(stage, projectStatus));
-        root.setLeft(createNavigation());
-        root.setCenter(createViewportPane(viewportCanvas));
-        root.setRight(createInspector());
-        root.setBottom(createDiagnosticsPane(projectStatus, viewportStatus));
-        root.setStyle("-fx-base: #252a30; -fx-background-color: #1b2026;");
+        BorderPane editor = new BorderPane();
+        editor.setTop(createTopControls(stage, projectStatus));
+        editor.setLeft(createNavigation());
+        editor.setCenter(createViewportPane(viewportCanvas));
+        editor.setRight(createInspector());
+        editor.setBottom(createDiagnosticsPane(projectStatus, viewportStatus));
+        editor.setStyle("-fx-background-color: #1b2026;");
+        StackPane root = new StackPane(editor, loadingScreen);
+        loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_VIEWPORT);
 
         stage.setTitle("JScene3D Editor");
-        stage.setScene(new Scene(root, 1280.0, 780.0));
+        stage.setScene(createScene(root));
         stage.setMinWidth(800.0);
         stage.setMinHeight(520.0);
         stage.setOnCloseRequest(event -> {
@@ -96,6 +117,7 @@ public final class EditorApplication extends Application {
             disposeCanvas();
         });
         stage.show();
+        loadingScreen.markDisplayed();
         loadCommandLineProject(stage, projectStatus);
         viewportCanvas.requestFocus();
         scheduleAutomaticClose();
@@ -104,7 +126,17 @@ public final class EditorApplication extends Application {
     /** Releases the OpenGLFX peer if JavaFX stops without an ordinary close request. */
     @Override
     public void stop() {
+        projectLoadingExecutor.shutdownNow();
         disposeCanvas();
+    }
+
+    /** Creates the editor scene and installs its packaged visual theme. */
+    private static Scene createScene(StackPane root) {
+        Scene scene = new Scene(root, 1280.0, 780.0);
+        scene.getStylesheets()
+                .add(Objects.requireNonNull(EditorApplication.class.getResource("editor.css"), "editor.css")
+                        .toExternalForm());
+        return scene;
     }
 
     /** Creates the status line shown below the viewport. */
@@ -231,12 +263,22 @@ public final class EditorApplication extends Application {
         }
     }
 
-    /** Replaces the current editor session with data loaded from one directory. */
+    /** Starts loading one directory without blocking JavaFX rendering or splash progress. */
     private void openProject(Stage stage, Label status, Path directory) {
         Path normalized = directory.toAbsolutePath().normalize();
         EditorProjectOpenTrace trace = new EditorProjectOpenTrace(telemetry, normalized);
         status.setText("Opening " + normalized);
-        EditorProjectLoadResult result = trace.load(operation -> projectLoader.load(normalized, operation));
+        EditorSplashScreen loadingScreen = requireSplashScreen();
+        loadingScreen.showProject(normalized);
+        EditorProjectLoadTask task = new EditorProjectLoadTask(projectLoader, trace, normalized, loadingScreen);
+        task.setOnSucceeded(ignored -> applyLoadedProject(stage, status, trace, task.getValue()));
+        task.setOnFailed(ignored -> handleProjectLoadFailure(status, trace, task.getException()));
+        projectLoadingExecutor.execute(task);
+    }
+
+    /** Applies background-loaded editor state and queues its preview on the OpenGL thread. */
+    private void applyLoadedProject(
+            Stage stage, Label status, EditorProjectOpenTrace trace, EditorProjectLoadResult result) {
         diagnostics.getItems().setAll(result.diagnostics());
         if (result.session().isEmpty()) {
             EditorProjectOpenDurations durations = trace.fail("project loading did not create an editor session");
@@ -244,6 +286,7 @@ public final class EditorApplication extends Application {
             assets.getItems().clear();
             requireViewportController().clearProject();
             status.setText("Project could not be opened after " + format(durations.total()) + " — see diagnostics");
+            requireSplashScreen().finish();
             return;
         }
         EditorProjectSession session = result.session().orElseThrow();
@@ -252,13 +295,33 @@ public final class EditorApplication extends Application {
         hierarchy.setRoot(root);
         assets.getItems().setAll(session.assets());
         stage.setTitle(session.project().identity().name() + " — JScene3D Editor");
-        requireViewportController()
-                .showProject(
-                        session,
-                        trace,
-                        completion -> applyPreviewDiagnostics(result.diagnostics(), session, completion, status));
+        EditorSplashScreen loadingScreen = requireSplashScreen();
+        loadingScreen.projectIdentified(session.project().identity().name());
+        loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
+        requireViewportController().showProject(session, trace, completion -> {
+            applyPreviewDiagnostics(result.diagnostics(), session, completion, status);
+            loadingScreen.finish();
+        });
         status.setText(
                 "Preparing viewport preview for " + session.project().identity().name());
+    }
+
+    /** Restores the editor after an unexpected background-loading failure. */
+    private void handleProjectLoadFailure(Label status, EditorProjectOpenTrace trace, Throwable failure) {
+        trace.fail(failure);
+        hierarchy.setRoot(null);
+        assets.getItems().clear();
+        requireViewportController().clearProject();
+        status.setText("Project could not be opened — " + Objects.requireNonNullElse(failure.getMessage(), failure));
+        LOGGER.log(System.Logger.Level.ERROR, "Editor project loading failed", failure);
+        requireSplashScreen().finish();
+    }
+
+    /** Dismisses startup branding after the empty viewport presents when no project was requested. */
+    private static void finishStartupSplash(EditorSplashScreen loadingScreen, boolean startupProjectRequested) {
+        if (!startupProjectRequested) {
+            loadingScreen.finish();
+        }
     }
 
     /** Combines project-loading and viewport-composition diagnostics after render-thread preparation. */
@@ -306,6 +369,15 @@ public final class EditorApplication extends Application {
         return controller;
     }
 
+    /** Returns the splash view installed during JavaFX stage initialization. */
+    private EditorSplashScreen requireSplashScreen() {
+        EditorSplashScreen current = splashScreen;
+        if (current == null) {
+            throw new IllegalStateException("editor splash screen has not been initialized");
+        }
+        return current;
+    }
+
     /** Converts one immutable hierarchy projection into JavaFX tree items. */
     private static TreeItem<EditorHierarchyNode> createTreeItem(EditorHierarchyNode node) {
         TreeItem<EditorHierarchyNode> item = new TreeItem<>(node);
@@ -337,6 +409,7 @@ public final class EditorApplication extends Application {
             return;
         }
         disposalRequested = true;
+        projectLoadingExecutor.shutdownNow();
         currentCanvas.dispose();
     }
 
@@ -344,6 +417,7 @@ public final class EditorApplication extends Application {
     private void completeDisposal(Stage stage) {
         canvas = null;
         viewportController = null;
+        splashScreen = null;
         stage.setOnCloseRequest(null);
         stage.close();
         Platform.exit();

@@ -90,8 +90,16 @@ final class EditorProjectLoader {
 
     /** Loads one project while recording its material phases beneath the supplied operation. */
     EditorProjectLoadResult load(Path projectDirectory, TelemetryOperation operation) {
+        return load(projectDirectory, operation, EditorProjectLoadProgress.NONE);
+    }
+
+    /** Loads one project while recording telemetry and publishing user-facing phase changes. */
+    EditorProjectLoadResult load(
+            Path projectDirectory, TelemetryOperation operation, EditorProjectLoadProgress progress) {
         Objects.requireNonNull(operation, "operation");
+        Objects.requireNonNull(progress, "progress");
         LinkedHashSet<ProjectDiagnostic> diagnostics = new LinkedHashSet<>();
+        progress.phaseStarted(EditorLoadingPhase.READING_MANIFEST);
         ProjectLoadResult projectResult =
                 operation.measure("project.manifest.load", Map.of(), () -> projectLoader.load(projectDirectory));
         diagnostics.addAll(projectResult.diagnostics());
@@ -99,7 +107,9 @@ final class EditorProjectLoader {
             return failure(diagnostics);
         }
         GameProject project = projectResult.project().orElseThrow();
+        progress.projectIdentified(project.identity().name());
 
+        progress.phaseStarted(EditorLoadingPhase.SCANNING_ASSETS);
         AssetCatalogLoadResult assetResult =
                 operation.measure("project.asset-catalog.scan", Map.of(), () -> AssetCatalog.scan(project.root()));
         diagnostics.addAll(assetResult.diagnostics());
@@ -108,19 +118,24 @@ final class EditorProjectLoader {
         }
         AssetCatalog authored = assetResult.catalog().orElseThrow();
 
+        progress.phaseStarted(EditorLoadingPhase.LOADING_EXTENSIONS);
         RegisteredTypeCatalog types =
                 operation.measure("project.extensions.load", Map.of(), () -> loadTypeCatalog(project, diagnostics));
+        progress.phaseStarted(EditorLoadingPhase.READING_IMPORTS);
         List<ImportDefinition> imports =
                 operation.measure("project.import-definitions.load", Map.of(), () -> loadImports(project, diagnostics));
+        progress.phaseStarted(EditorLoadingPhase.LOADING_PUBLISHED_CONTENT);
         ProjectContent content = operation.measure(
                 "project.published-content.load",
                 Map.of(),
                 () -> loadContent(project, authored, types, imports, diagnostics));
         DefinitionResolver definitions = content.definitions();
+        progress.phaseStarted(EditorLoadingPhase.VALIDATING_ASSETS);
         List<EditorAssetItem> assets = operation.measure(
                 "project.assets.validate",
                 Map.of(),
                 () -> loadAssets(project, authored, definitions, types, imports, diagnostics));
+        progress.phaseStarted(EditorLoadingPhase.LOADING_STARTUP_WORLD);
         Optional<WorldDefinition> startupWorld = operation.measure(
                 "project.startup-world.load",
                 Map.of(),
@@ -130,6 +145,7 @@ final class EditorProjectLoader {
         }
 
         WorldDefinition world = startupWorld.orElseThrow();
+        progress.phaseStarted(EditorLoadingPhase.BUILDING_HIERARCHY);
         EditorHierarchyNode hierarchy = operation.measure(
                 "project.hierarchy.project", Map.of(), () -> projectHierarchy(world, definitions, types, diagnostics));
         EditorProjectSession session =

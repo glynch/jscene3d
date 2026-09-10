@@ -444,6 +444,7 @@ final class ExtensionCatalogLoaderTest {
                         Optional.empty(),
                         Optional.empty(),
                         Optional.empty()),
+                GameProject.LaunchConfiguration.empty(),
                 List.of(new GameProject.ExtensionRequirement(extensionId, requirement)),
                 new GameProject.ProjectFiles(List.of(), List.of(), List.of()));
     }

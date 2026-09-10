@@ -13,6 +13,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -57,6 +58,10 @@ final class ProjectLoaderTest {
         createFile("scenes/main.scene.json");
         createFile("game/systems.json");
         createFile("config/input.json");
+        createFile("branding/background.png");
+        createFile("branding/title.png");
+        createFile("branding/studio.png");
+        createFile("branding/powered-by.png");
         createFile("assets/game.dat");
         createFile("imports/game.import.json");
         createFile("exports/desktop.json");
@@ -102,6 +107,15 @@ final class ProjectLoaderTest {
                     "entryScene": "scenes/main.scene.json",
                     "projectSystems": "game/systems.json",
                     "inputMap": "config/input.json"
+                  },
+                  "launch": {
+                    "splash": {
+                      "background": "branding/background.png",
+                      "title": "branding/title.png",
+                      "studioLogo": "branding/studio.png",
+                      "poweredByBadges": ["branding/powered-by.png"],
+                      "minimumDurationSeconds": 2.0
+                    }
                   },
                   "extensions": [
                     {
@@ -360,6 +374,13 @@ final class ProjectLoaderTest {
         assertThat(project.runtime().entryScene()).isEqualTo(canonicalRoot.resolve("scenes/main.scene.json"));
         assertThat(project.runtime().projectSystems()).contains(canonicalRoot.resolve("game/systems.json"));
         assertThat(project.runtime().inputMap()).contains(canonicalRoot.resolve("config/input.json"));
+        assertThat(project.launch().splash()).get().satisfies(splash -> {
+            assertThat(splash.background()).isEqualTo(canonicalRoot.resolve("branding/background.png"));
+            assertThat(splash.title()).isEqualTo(canonicalRoot.resolve("branding/title.png"));
+            assertThat(splash.studioLogo()).contains(canonicalRoot.resolve("branding/studio.png"));
+            assertThat(splash.poweredByBadges()).containsExactly(canonicalRoot.resolve("branding/powered-by.png"));
+            assertThat(splash.minimumDuration()).isEqualTo(Duration.ofSeconds(2));
+        });
         assertThat(project.extensions())
                 .containsExactly(
                         new GameProject.ExtensionRequirement("example.test-game", ">=1.0.0 <2.0.0"),

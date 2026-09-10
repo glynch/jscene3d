@@ -34,6 +34,9 @@
     "runtime": {
       "$ref": "#/$defs/runtime"
     },
+    "launch": {
+      "$ref": "#/$defs/launch"
+    },
     "extensions": {
       "type": "array",
       "minItems": 1,
@@ -195,6 +198,43 @@
         },
         "inputMap": {
           "type": "string"
+        }
+      }
+    },
+    "launch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "splash": {
+          "$ref": "#/$defs/splash"
+        }
+      }
+    },
+    "splash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "title", "poweredByBadges", "minimumDurationSeconds"],
+      "properties": {
+        "background": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "studioLogo": {
+          "type": "string"
+        },
+        "poweredByBadges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "minimumDurationSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
         }
       }
     },

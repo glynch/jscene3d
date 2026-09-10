@@ -17,9 +17,11 @@ import io.github.glynch.jscene3d.project.internal.SemanticVersionRequirement;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectDiagnosticCode;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -93,6 +95,7 @@ public final class ManifestValidator {
         GameProject.Legal legal = validateLegal(raw.legal());
         GameProject.EngineCompatibility engine = validateEngine(raw.engine());
         GameProject.RuntimeConfiguration runtime = validateRuntime(raw.runtime());
+        GameProject.LaunchConfiguration launch = validateLaunch(raw.launch());
         List<GameProject.ExtensionRequirement> extensions = validateExtensions(raw.extensions());
         List<GameProject.AssetSource> assets = validateAssets(raw.assets());
         List<Path> imports = validatePathList(raw.imports(), "/imports");
@@ -104,7 +107,7 @@ public final class ManifestValidator {
         }
         GameProject.Metadata metadata = new GameProject.Metadata(identity, authors, links, legal, catalog);
         GameProject.ProjectFiles files = new GameProject.ProjectFiles(assets, imports, exportPresets);
-        return Optional.of(new GameProject(root, metadata, engine, runtime, extensions, files));
+        return Optional.of(new GameProject(root, metadata, engine, runtime, launch, extensions, files));
     }
 
     /** Validates the authoritative integer schema version and optional schema URI. */
@@ -265,6 +268,53 @@ public final class ManifestValidator {
         Path safeEntryScene = entryScene.orElse(root.resolve("invalid.scene.json"));
         return new GameProject.RuntimeConfiguration(
                 safeExtension, safeEntryScene, startupScene, projectSystems, inputMap);
+    }
+
+    /** Validates optional application launch presentation. */
+    private GameProject.LaunchConfiguration validateLaunch(RawManifest.@Nullable LaunchConfiguration raw) {
+        if (raw == null || raw.splash() == null) {
+            return GameProject.LaunchConfiguration.empty();
+        }
+        RawManifest.SplashConfiguration splash = raw.splash();
+        Optional<Path> background = paths.resolveRequired(splash.background(), "/launch/splash/background", true);
+        Optional<Path> title = paths.resolveRequired(splash.title(), "/launch/splash/title", true);
+        Optional<Path> studioLogo = paths.resolveOptional(splash.studioLogo(), "/launch/splash/studioLogo", true);
+        if (splash.poweredByBadges() == null) {
+            diagnostics.error(
+                    ProjectDiagnosticCode.FIELD_REQUIRED,
+                    "poweredByBadges is required",
+                    "/launch/splash/poweredByBadges");
+        }
+        List<Path> badges = validatePathList(splash.poweredByBadges(), "/launch/splash/poweredByBadges");
+        Duration minimumDuration = validateMinimumSplashDuration(splash.minimumDurationSeconds());
+        return new GameProject.LaunchConfiguration(Optional.of(new GameProject.SplashConfiguration(
+                background.orElse(root.resolve("invalid-background.png")),
+                title.orElse(root.resolve("invalid-title.png")),
+                studioLogo,
+                badges,
+                minimumDuration)));
+    }
+
+    /** Converts a finite non-negative authored duration to millisecond precision. */
+    private Duration validateMinimumSplashDuration(@Nullable BigDecimal seconds) {
+        String location = "/launch/splash/minimumDurationSeconds";
+        if (seconds == null) {
+            diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "minimumDurationSeconds is required", location);
+            return Duration.ZERO;
+        }
+        try {
+            long milliseconds = seconds.movePointRight(3).longValueExact();
+            if (milliseconds < 0 || milliseconds > 10_000) {
+                throw new ArithmeticException("outside supported range");
+            }
+            return Duration.ofMillis(milliseconds);
+        } catch (ArithmeticException failure) {
+            diagnostics.error(
+                    ProjectDiagnosticCode.FIELD_TYPE_INVALID,
+                    "minimumDurationSeconds must be between zero and ten with millisecond precision",
+                    location);
+            return Duration.ZERO;
+        }
     }
 
     /** Validates extension identifiers, version requirements, and uniqueness. */

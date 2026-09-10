@@ -20,6 +20,7 @@ import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireOpt
 
 import java.net.URI;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +32,7 @@ public final class GameProject {
     private final Metadata metadata;
     private final EngineCompatibility engine;
     private final RuntimeConfiguration runtime;
+    private final LaunchConfiguration launch;
     private final List<ExtensionRequirement> extensions;
     private final ProjectFiles files;
 
@@ -41,6 +43,7 @@ public final class GameProject {
      * @param metadata identity and project-browser metadata
      * @param engine engine compatibility
      * @param runtime application startup configuration
+     * @param launch application launch presentation
      * @param extensions extension requirements in declaration order
      * @param files project content references
      */
@@ -49,12 +52,14 @@ public final class GameProject {
             Metadata metadata,
             EngineCompatibility engine,
             RuntimeConfiguration runtime,
+            LaunchConfiguration launch,
             List<ExtensionRequirement> extensions,
             ProjectFiles files) {
         this.root = requireNormalizedAbsolute(root, "root");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.runtime = Objects.requireNonNull(runtime, "runtime");
+        this.launch = Objects.requireNonNull(launch, "launch");
         this.extensions = List.copyOf(extensions);
         this.files = Objects.requireNonNull(files, "files");
     }
@@ -120,6 +125,15 @@ public final class GameProject {
      */
     public RuntimeConfiguration runtime() {
         return runtime;
+    }
+
+    /**
+     * Returns application launch presentation.
+     *
+     * @return launch configuration
+     */
+    public LaunchConfiguration launch() {
+        return launch;
     }
 
     /**
@@ -425,6 +439,55 @@ public final class GameProject {
             return "RuntimeConfiguration[applicationExtension=" + applicationExtension + ", entryScene=" + entryScene
                     + ", startupScene=" + startupScene + ", projectSystems=" + projectSystems + ", inputMap="
                     + inputMap + ']';
+        }
+    }
+
+    /** Optional application launch presentation.
+     *
+     * @param splash optional initial splash screen
+     */
+    public record LaunchConfiguration(Optional<SplashConfiguration> splash) {
+        /** Validates optional launch presentation. */
+        public LaunchConfiguration {
+            Objects.requireNonNull(splash, "splash");
+        }
+
+        /**
+         * Returns launch configuration without a splash screen.
+         *
+         * @return empty launch configuration
+         */
+        public static LaunchConfiguration empty() {
+            return new LaunchConfiguration(Optional.empty());
+        }
+    }
+
+    /** Initial project-owned launch screen shown while the application loads.
+     *
+     * @param background normalized absolute background-image path
+     * @param title normalized absolute game-title image path
+     * @param studioLogo optional normalized absolute studio-logo path
+     * @param poweredByBadges normalized absolute middleware badge paths
+     * @param minimumDuration minimum visible duration
+     */
+    public record SplashConfiguration(
+            Path background,
+            Path title,
+            Optional<Path> studioLogo,
+            List<Path> poweredByBadges,
+            Duration minimumDuration) {
+        private static final Duration MAXIMUM_DURATION = Duration.ofSeconds(10);
+
+        /** Validates immutable splash-screen values. */
+        public SplashConfiguration {
+            background = requireNormalizedAbsolute(background, "background");
+            title = requireNormalizedAbsolute(title, "title");
+            studioLogo = requireOptionalNormalizedAbsolute(studioLogo, "studioLogo");
+            poweredByBadges = immutableNormalizedAbsolutePaths(poweredByBadges, "poweredByBadges");
+            Objects.requireNonNull(minimumDuration, "minimumDuration");
+            if (minimumDuration.isNegative() || minimumDuration.compareTo(MAXIMUM_DURATION) > 0) {
+                throw new IllegalArgumentException("minimumDuration must be between zero and ten seconds");
+            }
         }
     }
 

@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.manifest.internal;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.math.BigDecimal;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -18,6 +19,7 @@ import org.jspecify.annotations.Nullable;
  * @param legal nullable raw legal references
  * @param engine nullable raw engine compatibility
  * @param runtime nullable raw runtime configuration
+ * @param launch nullable raw launch presentation
  * @param extensions nullable raw extension requirements
  * @param assets nullable raw source assets
  * @param imports nullable raw import definitions
@@ -33,6 +35,7 @@ public record RawManifest(
         @Nullable Legal legal,
         @Nullable Engine engine,
         @Nullable RuntimeConfiguration runtime,
+        @Nullable LaunchConfiguration launch,
         @Nullable List<@Nullable ExtensionRequirement> extensions,
         @Nullable List<@Nullable Asset> assets,
         @Nullable List<@Nullable String> imports,
@@ -80,6 +83,17 @@ public record RawManifest(
             @Nullable String startupScene,
             @Nullable String projectSystems,
             @Nullable String inputMap) {}
+
+    /** Nullable raw launch presentation. */
+    record LaunchConfiguration(@Nullable SplashConfiguration splash) {}
+
+    /** Nullable raw splash-screen presentation. */
+    record SplashConfiguration(
+            @Nullable String background,
+            @Nullable String title,
+            @Nullable String studioLogo,
+            @Nullable List<@Nullable String> poweredByBadges,
+            @Nullable BigDecimal minimumDurationSeconds) {}
 
     /** Nullable raw extension requirement. */
     record ExtensionRequirement(

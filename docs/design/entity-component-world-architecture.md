@@ -889,9 +889,16 @@ insufficient.
 Editor play and exported games enter the engine through the same `ProjectHost`
 contract. The host, rather than application source code, loads `project.json`,
 discovers the runtime extensions present in the application, scans authored
-assets, resolves the manifest's startup world, composes that world, and returns
-a `HostedProject`. Applications therefore do not generate or maintain a
-project-specific world loader.
+assets, selects the optional startup scene or the entry scene, composes that
+world, and returns a `HostedProject`. Applications therefore do not generate or
+maintain a project-specific world loader.
+
+Project composition reports stable coarse-grained milestones through an
+optional `ProjectLoadProgress` callback. This is progress from completed or
+starting host phases, not elapsed-time animation or estimated asset counts.
+Callbacks run on the loading thread and must return promptly, allowing a desktop
+host to keep its native window responsive while preserving the thread affinity
+required by OpenGL and audio realization.
 
 An application supplies behavior through a `ComponentRuntimeExtension`
 provider. A provider which also implements `ApplicationRuntimeExtension` may
@@ -899,6 +906,22 @@ perform application-level preparation after composition. Discovery only makes
 a provider available; the application extension named by the project manifest
 controls which provider participates as the application entry point. Component
 participation remains controlled by authored component type declarations.
+
+The desktop host owns application lifecycle transitions requested through
+`ApplicationControl`. A distinct startup scene may implement a main menu. New
+Game transactionally loads a fresh entry world before releasing prior state,
+Show Menu retains and stops advancing gameplay, Resume returns to that exact
+world, and Quit ends the host loop. Menu rendering and command selection remain
+authored application behavior; the desktop module only owns world lifetime and
+transition semantics.
+
+Optional launch presentation is manifest data rather than a generated Java
+bootstrap. The desktop host opens the native window before world composition,
+presents a project-owned background, title, optional studio logo, middleware
+badges, and real load progress for the authored minimum duration, and displays it
+only once per process launch. Later world replacement retains the menu beneath a
+compact progress surface. A startup failure remains visible in the native window
+instead of being reduced to a terminal exception alone.
 
 The host executable selects a `ProjectRuntimeEnvironment`. The environment
 supplies the engine capabilities included in that build: built-in component
@@ -928,6 +951,13 @@ application-directory layout, relative launcher generation, and staged replaceme
 Maven or a future editor resolves the runtime artifact set but does not
 reproduce those export rules. Native bundles and archives will wrap this same
 application directory rather than assembling games independently.
+
+Runtime project-file selection includes the startup and entry scenes, launch
+presentation, declared runtime resources, and project-file references nested in
+resource properties. Editable source inputs used only to produce published
+imports remain excluded. Export dependency discovery therefore follows authored
+resource references instead of requiring every game build to maintain a
+parallel copy list.
 
 The application directory is the canonical assembled export and the first
 supported output format. It contains relative launchers, application and engine

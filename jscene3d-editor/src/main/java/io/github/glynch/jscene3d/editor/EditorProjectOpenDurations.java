@@ -8,5 +8,5 @@ import java.time.Duration;
 import java.util.Optional;
 
 /** Completed durations for one editor project-open path. */
-record EditorProjectOpenTiming(
+record EditorProjectOpenDurations(
         Duration total, Duration projectLoad, Duration previewComposition, Optional<Duration> firstPresentation) {}

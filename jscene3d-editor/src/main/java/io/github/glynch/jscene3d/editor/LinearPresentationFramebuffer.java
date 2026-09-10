@@ -68,7 +68,7 @@ import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 import static org.lwjgl.opengl.GL30.glRenderbufferStorage;
 
 /** Owns a linear editor render target and converts its completed frame to sRGB for JavaFX. */
-final class SrgbPresentationFramebuffer implements AutoCloseable {
+final class LinearPresentationFramebuffer implements AutoCloseable {
     private static final String VERTEX_SOURCE = """
             #version 330 core
             out vec2 textureCoordinate;
@@ -113,14 +113,14 @@ final class SrgbPresentationFramebuffer implements AutoCloseable {
     private int height;
 
     /** Stores successfully created context-local presentation resources. */
-    private SrgbPresentationFramebuffer(int program, int linearFrameLocation, int vertexArray) {
+    private LinearPresentationFramebuffer(int program, int linearFrameLocation, int vertexArray) {
         this.program = program;
         this.linearFrameLocation = linearFrameLocation;
         this.vertexArray = vertexArray;
     }
 
     /** Creates the immutable shader and vertex-array resources used by every framebuffer size. */
-    static SrgbPresentationFramebuffer create() {
+    static LinearPresentationFramebuffer create() {
         int program = createProgram();
         int vertexArray = 0;
         try {
@@ -129,7 +129,7 @@ final class SrgbPresentationFramebuffer implements AutoCloseable {
                 throw new IllegalStateException("sRGB presentation program has no active linearFrame uniform");
             }
             vertexArray = glGenVertexArrays();
-            return new SrgbPresentationFramebuffer(program, linearFrameLocation, vertexArray);
+            return new LinearPresentationFramebuffer(program, linearFrameLocation, vertexArray);
         } catch (RuntimeException exception) {
             if (vertexArray != 0) {
                 glDeleteVertexArrays(vertexArray);

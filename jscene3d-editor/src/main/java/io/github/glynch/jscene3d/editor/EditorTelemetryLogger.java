@@ -9,10 +9,10 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /** Writes editor-owned telemetry measurements to the local process log. */
-final class EditorTelemetryRecorder implements Consumer<TelemetryMeasurement> {
-    private static final System.Logger LOGGER = System.getLogger(EditorTelemetryRecorder.class.getName());
+final class EditorTelemetryLogger implements Consumer<TelemetryMeasurement> {
+    private static final System.Logger LOGGER = System.getLogger(EditorTelemetryLogger.class.getName());
 
-    /** Records one completed operation without logging its potentially sensitive attributes. */
+    /** Logs one completed operation without including its potentially sensitive attributes. */
     @Override
     public void accept(TelemetryMeasurement measurement) {
         System.Logger.Level level =

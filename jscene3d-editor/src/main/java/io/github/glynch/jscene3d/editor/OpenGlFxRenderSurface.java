@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
 final class OpenGlFxRenderSurface implements RenderSurface {
     private RenderSurfaceSize currentSize = new RenderSurfaceSize(0, 0, 0, 0);
     private @Nullable Thread contextThread;
-    private @Nullable SrgbPresentationFramebuffer presentation;
+    private @Nullable LinearPresentationFramebuffer presentation;
     private int presentationFramebuffer;
     private boolean released;
 
@@ -54,7 +54,7 @@ final class OpenGlFxRenderSurface implements RenderSurface {
     public void release() {
         requireAvailable();
         requireContextThread();
-        SrgbPresentationFramebuffer current = presentation;
+        LinearPresentationFramebuffer current = presentation;
         presentation = null;
         if (current != null) {
             current.close();
@@ -79,10 +79,10 @@ final class OpenGlFxRenderSurface implements RenderSurface {
     }
 
     /** Lazily creates color-conversion resources in the active OpenGLFX context. */
-    private SrgbPresentationFramebuffer requirePresentation() {
-        SrgbPresentationFramebuffer current = presentation;
+    private LinearPresentationFramebuffer requirePresentation() {
+        LinearPresentationFramebuffer current = presentation;
         if (current == null) {
-            current = SrgbPresentationFramebuffer.create();
+            current = LinearPresentationFramebuffer.create();
             presentation = current;
         }
         return current;

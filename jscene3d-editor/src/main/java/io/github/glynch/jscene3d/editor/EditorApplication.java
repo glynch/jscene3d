@@ -57,7 +57,7 @@ public final class EditorApplication extends Application {
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
     public EditorApplication() {
-        telemetry = Telemetry.recording(new EditorTelemetryRecorder());
+        telemetry = Telemetry.recording(new EditorTelemetryLogger());
         projectLoader = new EditorProjectLoader(
                 EditorBuildInfo.engineVersion(),
                 EditorApplication.class.getClassLoader(),
@@ -239,11 +239,11 @@ public final class EditorApplication extends Application {
         EditorProjectLoadResult result = trace.load(operation -> projectLoader.load(normalized, operation));
         diagnostics.getItems().setAll(result.diagnostics());
         if (result.session().isEmpty()) {
-            EditorProjectOpenTiming timing = trace.fail("project loading did not create an editor session");
+            EditorProjectOpenDurations durations = trace.fail("project loading did not create an editor session");
             hierarchy.setRoot(null);
             assets.getItems().clear();
             requireViewportController().clearProject();
-            status.setText("Project could not be opened after " + format(timing.total()) + " — see diagnostics");
+            status.setText("Project could not be opened after " + format(durations.total()) + " — see diagnostics");
             return;
         }
         EditorProjectSession session = result.session().orElseThrow();
@@ -265,27 +265,27 @@ public final class EditorApplication extends Application {
     private void applyPreviewDiagnostics(
             List<ProjectDiagnostic> projectDiagnostics,
             EditorProjectSession session,
-            EditorPreviewCompletion completion,
+            EditorPreviewResult result,
             Label status) {
         List<ProjectDiagnostic> combined = new ArrayList<>(projectDiagnostics);
-        combined.addAll(completion.diagnostics());
+        combined.addAll(result.diagnostics());
         diagnostics.getItems().setAll(combined);
-        boolean failed = completion.diagnostics().stream()
+        boolean failed = result.diagnostics().stream()
                 .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         if (failed) {
-            status.setText("Project opened in " + format(completion.timing().total())
+            status.setText("Project opened in " + format(result.durations().total())
                     + ", but its viewport preview could not be composed — see diagnostics");
             return;
         }
         long errors = combined.stream()
                 .filter(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR)
                 .count();
-        EditorProjectOpenTiming timing = completion.timing();
+        EditorProjectOpenDurations durations = result.durations();
         String firstFrame =
-                timing.firstPresentation().map(EditorApplication::format).orElse("not presented");
-        status.setText("Opened " + session.project().identity().name() + " in " + format(timing.total())
-                + " (project " + format(timing.projectLoad())
-                + ", preview " + format(timing.previewComposition())
+                durations.firstPresentation().map(EditorApplication::format).orElse("not presented");
+        status.setText("Opened " + session.project().identity().name() + " in " + format(durations.total())
+                + " (project " + format(durations.projectLoad())
+                + ", preview " + format(durations.previewComposition())
                 + ", first frame " + firstFrame + ") — "
                 + session.hierarchy().children().size() + " root entities, "
                 + session.assets().size() + " assets, " + errors + " errors");

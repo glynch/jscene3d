@@ -72,7 +72,7 @@ final class EditorProjectOpenTrace {
     }
 
     /** Measures the first rendered and presented frame, then completes the trace. */
-    synchronized EditorProjectOpenTiming present(Runnable action) {
+    synchronized EditorProjectOpenDurations present(Runnable action) {
         requireIncomplete();
         Objects.requireNonNull(action, "action");
         TelemetryOperation operation = root.begin("editor.preview.first-presentation", Map.of());
@@ -87,16 +87,16 @@ final class EditorProjectOpenTrace {
             firstPresentation = Optional.of(operation.elapsed());
             closeRoot();
         }
-        return timing();
+        return durations();
     }
 
     /** Completes a trace which cannot reach first presentation. */
-    synchronized EditorProjectOpenTiming fail(String message) {
+    synchronized EditorProjectOpenDurations fail(String message) {
         if (!complete) {
             root.fail(message);
             closeRoot();
         }
-        return timing();
+        return durations();
     }
 
     /** Completes a trace after an unexpected failure. */
@@ -113,8 +113,8 @@ final class EditorProjectOpenTrace {
     }
 
     /** Returns the durations captured so far, including the fixed total after completion. */
-    synchronized EditorProjectOpenTiming timing() {
-        return new EditorProjectOpenTiming(root.elapsed(), projectLoad, previewComposition, firstPresentation);
+    synchronized EditorProjectOpenDurations durations() {
+        return new EditorProjectOpenDurations(root.elapsed(), projectLoad, previewComposition, firstPresentation);
     }
 
     /** Closes the trace root exactly once. */

@@ -36,14 +36,14 @@ import io.github.glynch.jscene3d.render.Renderer;
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
 
-final class SrgbPresentationFramebufferIT {
+final class LinearPresentationFramebufferIT {
     private static final int FRAMEBUFFER_SIZE = 64;
 
     @Test
     void encodesLinearFrameForTheOpenGlFxHostFramebuffer() {
         try (Window window = Window.create("OpenGLFX color presentation integration test");
                 Renderer renderer = Renderer.create(window);
-                SrgbPresentationFramebuffer presentation = SrgbPresentationFramebuffer.create()) {
+                LinearPresentationFramebuffer presentation = LinearPresentationFramebuffer.create()) {
             HostFramebuffer host = HostFramebuffer.create();
             try {
                 presentation.resize(FRAMEBUFFER_SIZE, FRAMEBUFFER_SIZE);

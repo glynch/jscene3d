@@ -93,7 +93,7 @@ final class ViewportController {
 
     /** Requests composition of one editor-safe project preview on the OpenGL rendering thread. */
     void showProject(
-            EditorProjectSession session, EditorProjectOpenTrace trace, Consumer<EditorPreviewCompletion> completion) {
+            EditorProjectSession session, EditorProjectOpenTrace trace, Consumer<EditorPreviewResult> completion) {
         replacePendingPreview(new PreviewRequest(
                 Optional.of(Objects.requireNonNull(session, "session")),
                 Optional.of(Objects.requireNonNull(trace, "trace")),
@@ -124,8 +124,8 @@ final class ViewportController {
                 boolean failed = previewDiagnostics.stream()
                         .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
                 if (failed) {
-                    EditorProjectOpenTiming timing = trace.fail("preview composition produced errors");
-                    complete(request, previewDiagnostics, timing);
+                    EditorProjectOpenDurations durations = trace.fail("preview composition produced errors");
+                    complete(request, previewDiagnostics, durations);
                     return null;
                 }
                 return new PendingPresentation(request, previewDiagnostics);
@@ -143,17 +143,17 @@ final class ViewportController {
             EditorPreview currentPreview, RenderSurfaceSize size, PendingPresentation pendingPresentation) {
         PreviewRequest request = pendingPresentation.request();
         EditorProjectOpenTrace trace = request.trace().orElseThrow();
-        EditorProjectOpenTiming timing = trace.present(() -> {
+        EditorProjectOpenDurations durations = trace.present(() -> {
             currentPreview.render(size);
             surface.present();
         });
-        complete(request, pendingPresentation.diagnostics(), timing);
+        complete(request, pendingPresentation.diagnostics(), durations);
     }
 
     /** Delivers one immutable preview completion on the JavaFX Application Thread. */
     private static void complete(
-            PreviewRequest request, List<ProjectDiagnostic> previewDiagnostics, EditorProjectOpenTiming timing) {
-        EditorPreviewCompletion result = new EditorPreviewCompletion(previewDiagnostics, timing);
+            PreviewRequest request, List<ProjectDiagnostic> previewDiagnostics, EditorProjectOpenDurations durations) {
+        EditorPreviewResult result = new EditorPreviewResult(previewDiagnostics, durations);
         Platform.runLater(() -> request.completion().accept(result));
     }
 
@@ -197,7 +197,7 @@ final class ViewportController {
     private record PreviewRequest(
             Optional<EditorProjectSession> session,
             Optional<EditorProjectOpenTrace> trace,
-            Consumer<EditorPreviewCompletion> completion) {}
+            Consumer<EditorPreviewResult> completion) {}
 
     /** Composed preview waiting for its first render and presentation in the current frame. */
     private record PendingPresentation(PreviewRequest request, List<ProjectDiagnostic> diagnostics) {}

@@ -25,12 +25,12 @@ final class EditorProjectOpenTraceTest {
 
         String loaded = trace.load(operation -> "loaded");
         String composed = trace.compose(() -> "composed");
-        EditorProjectOpenTiming timing = trace.present(() -> {});
+        EditorProjectOpenDurations durations = trace.present(() -> {});
 
         assertThat(loaded).isEqualTo("loaded");
         assertThat(composed).isEqualTo("composed");
-        assertThat(timing.firstPresentation()).isPresent();
-        assertThat(timing.total()).isGreaterThanOrEqualTo(Duration.ZERO);
+        assertThat(durations.firstPresentation()).isPresent();
+        assertThat(durations.total()).isGreaterThanOrEqualTo(Duration.ZERO);
         assertThat(measurements)
                 .extracting(TelemetryMeasurement::name)
                 .containsExactly(
@@ -52,9 +52,9 @@ final class EditorProjectOpenTraceTest {
                 new EditorProjectOpenTrace(Telemetry.recording(measurements::add), Path.of("missing-project"));
 
         trace.load(operation -> "unavailable");
-        EditorProjectOpenTiming timing = trace.fail("no editor session");
+        EditorProjectOpenDurations durations = trace.fail("no editor session");
 
-        assertThat(timing.firstPresentation()).isEmpty();
+        assertThat(durations.firstPresentation()).isEmpty();
         assertThat(measurements.getLast().outcome()).isEqualTo(TelemetryMeasurement.Outcome.FAILED);
         assertThat(measurements.getLast().failureMessage()).contains("no editor session");
     }

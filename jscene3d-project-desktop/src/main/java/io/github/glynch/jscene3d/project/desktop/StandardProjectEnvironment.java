@@ -5,6 +5,8 @@
 package io.github.glynch.jscene3d.project.desktop;
 
 import io.github.glynch.jscene3d.game.StandardGameDescriptors;
+import io.github.glynch.jscene3d.game.application.ApplicationControl;
+import io.github.glynch.jscene3d.game.application.GameApplicationRuntimeExtension;
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
 import io.github.glynch.jscene3d.game.presentation.GamePresentationResourceLoaders;
@@ -35,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /** Standard game environment combining semantic input, 3D presentation, and 3D physics.
  *
@@ -44,15 +47,22 @@ import java.util.Optional;
  */
 public final class StandardProjectEnvironment implements ProjectRuntimeEnvironment {
     private final Path publishedImports;
+    private final Supplier<ApplicationControl> applicationControls;
 
     /** Selects the read-only published-import cache used by project composition.
      *
      * @param publishedImports cache containing complete build- or editor-published generations
      */
     public StandardProjectEnvironment(Path publishedImports) {
+        this(publishedImports, new DesktopApplicationState()::createControl);
+    }
+
+    /** Retains the desktop session's world-control adapter factory. */
+    StandardProjectEnvironment(Path publishedImports, Supplier<ApplicationControl> applicationControls) {
         this.publishedImports = Objects.requireNonNull(publishedImports, "publishedImports")
                 .toAbsolutePath()
                 .normalize();
+        this.applicationControls = Objects.requireNonNull(applicationControls, "applicationControls");
     }
 
     @Override
@@ -63,6 +73,7 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
     @Override
     public List<ComponentRuntimeExtension> runtimeExtensions() {
         return List.of(
+                new GameApplicationRuntimeExtension(),
                 new Spatial3dRuntimeExtension(),
                 new Physics3dRuntimeExtension(),
                 new Game3dRuntimeExtension(),
@@ -74,6 +85,7 @@ public final class StandardProjectEnvironment implements ProjectRuntimeEnvironme
         ProjectInput input = inputMap.map(ProjectInput::new).orElseGet(ProjectInput::empty);
         return List.of(
                 WorldModuleBinding.of(InputWorldModule.class, input),
+                WorldModuleBinding.of(ApplicationControl.class, applicationControls.get()),
                 WorldModuleBinding.of(Spatial3dWorldModule.class, Spatial3dAdapters.standard()),
                 WorldModuleBinding.of(Physics3dWorldModule.class, Physics3dAdapters.standard()),
                 WorldModuleBinding.of(PresentationWorldModule.class, new StandardPresentationWorldModule()));

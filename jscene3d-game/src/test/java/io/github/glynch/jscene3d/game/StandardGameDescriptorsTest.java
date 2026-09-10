@@ -17,6 +17,7 @@ final class StandardGameDescriptorsTest {
         assertThat(StandardGameDescriptors.all())
                 .extracting(ExtensionDescriptor::id)
                 .containsExactly(
+                        "io.github.glynch.jscene3d.application",
                         "io.github.glynch.jscene3d.spatial3d",
                         "io.github.glynch.jscene3d.physics3d",
                         "io.github.glynch.jscene3d.game3d",

@@ -52,9 +52,27 @@ public final class ProjectRuntimeHost implements ProjectHost {
     @Override
     public HostedProject load(Path projectRoot) {
         GameProject project = loadProject(projectRoot);
+        Path startupScene =
+                project.runtime().startupScene().orElse(project.runtime().entryScene());
+        return load(project, startupScene);
+    }
+
+    /**
+     * Loads the manifest-selected gameplay entry world rather than an optional startup world.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @return composed inactive gameplay project
+     */
+    public HostedProject loadEntry(Path projectRoot) {
+        GameProject project = loadProject(projectRoot);
+        return load(project, project.runtime().entryScene());
+    }
+
+    /** Composes one validated authored world while retaining the loaded project configuration. */
+    private HostedProject load(GameProject project, Path worldPath) {
         RegisteredTypeCatalog types = loadTypes(project);
         AssetCatalog assets = loadAssets(project);
-        AssetMetadata startup = startupAsset(project, assets);
+        AssetMetadata startup = startupAsset(worldPath, assets);
         Optional<InputMapDefinition> inputMap = loadInputMap(project);
         List<ComponentRuntimeExtension> extensions = runtimeExtensions();
         ProjectContent content = loadContent(project, types, assets);
@@ -127,13 +145,13 @@ public final class ProjectRuntimeHost implements ProjectHost {
                 .orElseThrow(() -> new ProjectHostException("asset catalog loading failed", result.diagnostics()));
     }
 
-    /** Resolves the manifest entry path to one world-definition identity. */
-    private static AssetMetadata startupAsset(GameProject project, AssetCatalog assets) {
+    /** Resolves one selected authored path to a world-definition identity. */
+    private static AssetMetadata startupAsset(Path worldPath, AssetCatalog assets) {
         AssetMetadata startup = assets.assets().stream()
-                .filter(asset -> asset.path().equals(project.runtime().entryScene()))
+                .filter(asset -> asset.path().equals(worldPath))
                 .findFirst()
-                .orElseThrow(() -> new ProjectHostException("startup world is absent from the asset catalog: "
-                        + project.runtime().entryScene()));
+                .orElseThrow(
+                        () -> new ProjectHostException("startup world is absent from the asset catalog: " + worldPath));
         if (startup.kind() != AssetKind.WORLD_DEFINITION) {
             throw new ProjectHostException("startup asset is not a world definition: " + startup.path());
         }

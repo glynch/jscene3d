@@ -14,6 +14,7 @@ module io.github.glynch.jscene3d.game {
     requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.game;
+    exports io.github.glynch.jscene3d.game.application;
     exports io.github.glynch.jscene3d.game.input;
     exports io.github.glynch.jscene3d.game.physics;
     exports io.github.glynch.jscene3d.game.presentation;

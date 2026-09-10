@@ -28,11 +28,19 @@ final class ProjectModelTest {
     @Test
     void givesProjectConfigurationsValueSemantics() {
         GameProject.RuntimeConfiguration runtime = new GameProject.RuntimeConfiguration(
-                "example.game", ROOT.resolve("main.scene.json"), Optional.empty(), Optional.empty());
+                "example.game",
+                ROOT.resolve("main.scene.json"),
+                Optional.of(ROOT.resolve("menu.scene.json")),
+                Optional.empty(),
+                Optional.empty());
         GameProject.RuntimeConfiguration sameRuntime = new GameProject.RuntimeConfiguration(
-                "example.game", ROOT.resolve("main.scene.json"), Optional.empty(), Optional.empty());
+                "example.game",
+                ROOT.resolve("main.scene.json"),
+                Optional.of(ROOT.resolve("menu.scene.json")),
+                Optional.empty(),
+                Optional.empty());
         GameProject.RuntimeConfiguration differentRuntime = new GameProject.RuntimeConfiguration(
-                "example.other", ROOT.resolve("main.scene.json"), Optional.empty(), Optional.empty());
+                "example.other", ROOT.resolve("main.scene.json"), Optional.empty(), Optional.empty(), Optional.empty());
         GameProject.ProjectFiles files = new GameProject.ProjectFiles(
                 List.of(), List.of(ROOT.resolve("game.import.json")), List.of(ROOT.resolve("desktop.json")));
         GameProject.ProjectFiles sameFiles = new GameProject.ProjectFiles(
@@ -43,6 +51,7 @@ final class ProjectModelTest {
                 .hasSameHashCodeAs(sameRuntime)
                 .isNotEqualTo(differentRuntime);
         assertThat(runtime.toString()).contains("applicationExtension=example.game", "main.scene.json");
+        assertThat(runtime.startupScene()).contains(ROOT.resolve("menu.scene.json"));
         assertThat(files).isEqualTo(sameFiles).hasSameHashCodeAs(sameFiles).isNotEqualTo(runtime);
         assertThat(files.toString()).contains("game.import.json", "desktop.json");
     }

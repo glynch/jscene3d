@@ -19,6 +19,7 @@ final class ActionSnapshotTest {
                 .pressed(RIGHT)
                 .released(LEFT)
                 .pointerDelta(2.5, -1.5)
+                .pointer(new PointerSnapshot(160.0, 100.0, 320, 200, true, true, false))
                 .build();
 
         assertThat(snapshot.isDown(RIGHT)).isTrue();
@@ -27,6 +28,7 @@ final class ActionSnapshotTest {
         assertThat(snapshot.axis(LEFT, RIGHT)).isEqualTo(1.0F);
         assertThat(snapshot.pointerDeltaX()).isEqualTo(2.5);
         assertThat(snapshot.pointerDeltaY()).isEqualTo(-1.5);
+        assertThat(snapshot.pointer()).contains(new PointerSnapshot(160.0, 100.0, 320, 200, true, true, false));
     }
 
     @Test
@@ -37,6 +39,7 @@ final class ActionSnapshotTest {
                 .released(LEFT)
                 .down(RIGHT)
                 .pointerDelta(3.0, 4.0)
+                .pointer(new PointerSnapshot(40.0, 60.0, 800, 600, true, false, false))
                 .build();
 
         ActionSnapshot merged = older.merge(newer);
@@ -52,6 +55,7 @@ final class ActionSnapshotTest {
         assertThat(held.wasPressed(LEFT)).isFalse();
         assertThat(held.wasReleased(LEFT)).isFalse();
         assertThat(held.pointerDeltaX()).isZero();
+        assertThat(held.pointer()).contains(new PointerSnapshot(40.0, 60.0, 800, 600, true, false, false));
     }
 
     @Test
@@ -101,5 +105,36 @@ final class ActionSnapshotTest {
         assertThatThrownBy(() -> new InputVector2(Float.POSITIVE_INFINITY, 0.0F))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new InputVector2(0.0F, -2.0F)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void mergesAndConsumesAbsolutePointerTransitions() {
+        ActionSnapshot older = ActionSnapshot.builder()
+                .pointer(new PointerSnapshot(10.0, 20.0, 320, 200, true, true, false))
+                .build();
+        ActionSnapshot newer = ActionSnapshot.builder()
+                .pointer(new PointerSnapshot(30.0, 40.0, 640, 400, false, false, true))
+                .build();
+
+        PointerSnapshot merged = older.merge(newer).pointer().orElseThrow();
+        PointerSnapshot preserved =
+                older.merge(ActionSnapshot.empty()).pointer().orElseThrow();
+        PointerSnapshot held = older.heldOnly().pointer().orElseThrow();
+
+        assertThat(merged).isEqualTo(new PointerSnapshot(30.0, 40.0, 640, 400, false, true, true));
+        assertThat(preserved).isEqualTo(new PointerSnapshot(10.0, 20.0, 320, 200, true, true, false));
+        assertThat(held).isEqualTo(new PointerSnapshot(10.0, 20.0, 320, 200, true, false, false));
+    }
+
+    @Test
+    void validatesAbsolutePointerCoordinatesAndViewport() {
+        assertThatThrownBy(() -> new PointerSnapshot(Double.NaN, 0.0, 1, 1, false, false, false))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PointerSnapshot(0.0, Double.POSITIVE_INFINITY, 1, 1, false, false, false))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PointerSnapshot(0.0, 0.0, 0, 1, false, false, false))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PointerSnapshot(0.0, 0.0, 1, 0, false, false, false))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

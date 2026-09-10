@@ -77,6 +77,7 @@ public record RawManifest(
     record RuntimeConfiguration(
             @Nullable String applicationExtension,
             @Nullable String entryScene,
+            @Nullable String startupScene,
             @Nullable String projectSystems,
             @Nullable String inputMap) {}
 

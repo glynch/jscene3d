@@ -66,6 +66,26 @@ final class ProjectRuntimeHostTest {
         }
     }
 
+    /** Selects the optional startup world independently from the gameplay entry world. */
+    @Test
+    void loadsStartupAndEntryWorldsIndependently() throws IOException {
+        Path projectRoot = writeProject("worlds/main.world.json", "worlds/menu.world.json");
+        Files.writeString(
+                projectRoot.resolve("worlds/menu.world.json"),
+                worldDefinition("8a0187d4-87cd-4b86-9fd7-f8fedbfc3153", "Menu"),
+                StandardCharsets.UTF_8);
+        try (URLClassLoader loader = runtimeClassLoader()) {
+            ProjectRuntimeHost runtimeHost =
+                    runtimeHost(loader, environment(new RecordingApplicationExtension(), null));
+
+            try (HostedProject startup = runtimeHost.load(projectRoot);
+                    HostedProject entry = runtimeHost.loadEntry(projectRoot)) {
+                assertThat(startup.world().definition().name()).isEqualTo("Menu");
+                assertThat(entry.world().definition().name()).isEqualTo("Main");
+            }
+        }
+    }
+
     /** Rejects invalid manifest data while retaining the loader's structured diagnostics. */
     @Test
     void reportsManifestDiagnostics() throws IOException {
@@ -150,6 +170,11 @@ final class ProjectRuntimeHostTest {
 
     /** Creates a generic host at the stable interface used by editor preview and exports. */
     private static ProjectHost host(ClassLoader loader, ProjectRuntimeEnvironment environment) {
+        return runtimeHost(loader, environment);
+    }
+
+    /** Creates the concrete reusable host for tests exercising entry-world selection. */
+    private static ProjectRuntimeHost runtimeHost(ClassLoader loader, ProjectRuntimeEnvironment environment) {
         return new ProjectRuntimeHost("0.1.0-SNAPSHOT", loader, environment);
     }
 
@@ -192,9 +217,15 @@ final class ProjectRuntimeHostTest {
 
     /** Writes a complete minimal project whose extension metadata is supplied by the test class loader. */
     private Path writeProject(String entryScene) throws IOException {
+        return writeProject(entryScene, null);
+    }
+
+    /** Writes a complete minimal project with an optional distinct startup world. */
+    private Path writeProject(String entryScene, @Nullable String startupScene) throws IOException {
         Path projectRoot = temporaryDirectory.resolve("project");
         Files.createDirectories(projectRoot.resolve("worlds"));
-        Files.writeString(projectRoot.resolve("project.json"), manifest(entryScene), StandardCharsets.UTF_8);
+        Files.writeString(
+                projectRoot.resolve("project.json"), manifest(entryScene, startupScene), StandardCharsets.UTF_8);
         Files.writeString(projectRoot.resolve("worlds/main.world.json"), worldDefinition(), StandardCharsets.UTF_8);
         return projectRoot;
     }
@@ -209,9 +240,13 @@ final class ProjectRuntimeHostTest {
                 new URL[] {classPath.toUri().toURL()}, getClass().getClassLoader());
     }
 
-    /** Returns the test project manifest. */
-    private static String manifest(String entryScene) {
-        return String.format(Locale.ROOT, """
+    /** Returns the test project manifest with an optional distinct startup world. */
+    private static String manifest(String entryScene, @Nullable String startupScene) {
+        String startupProperty = startupScene == null
+                ? ""
+                : String.format(Locale.ROOT, ",%n        \"startupScene\": \"%s\"", startupScene);
+        return String.format(
+                Locale.ROOT, """
                 {
                   "$schema": "https://jscene3d.org/schemas/project-1.json",
                   "schemaVersion": 1,
@@ -226,7 +261,7 @@ final class ProjectRuntimeHostTest {
                   },
                   "runtime": {
                     "applicationExtension": "%s",
-                    "entryScene": "%s"
+                    "entryScene": "%s"%s
                   },
                   "extensions": [
                     {"id": "%s", "requires": ">=0.1.0 <0.2.0"}
@@ -237,7 +272,7 @@ final class ProjectRuntimeHostTest {
                     "players": {"minimum": 1, "maximum": 1}
                   }
                 }
-                """, APPLICATION_ID, APPLICATION_ID, entryScene, APPLICATION_ID);
+                """, APPLICATION_ID, APPLICATION_ID, entryScene, startupProperty, APPLICATION_ID);
     }
 
     /** Returns safe metadata for the test application component. */
@@ -264,13 +299,18 @@ final class ProjectRuntimeHostTest {
 
     /** Returns one world containing the application component. */
     private static String worldDefinition() {
+        return worldDefinition(WORLD_ASSET_ID, "Main");
+    }
+
+    /** Returns one world containing the application component. */
+    private static String worldDefinition(String assetId, String name) {
         return String.format(Locale.ROOT, """
                 {
                   "$schema": "https://jscene3d.org/schemas/world-definition-1.json",
                   "assetId": "%s",
                   "assetType": "world-definition",
                   "formatVersion": 1,
-                  "name": "Main",
+                  "name": "%s",
                   "connections": [],
                   "roots": [
                     {
@@ -290,7 +330,7 @@ final class ProjectRuntimeHostTest {
                     }
                   ]
                 }
-                """, WORLD_ASSET_ID, COMPONENT_ID, APPLICATION_ID);
+                """, assetId, name, COMPONENT_ID, APPLICATION_ID);
     }
 
     /** Application provider used to prove ServiceLoader discovery and preparation. */

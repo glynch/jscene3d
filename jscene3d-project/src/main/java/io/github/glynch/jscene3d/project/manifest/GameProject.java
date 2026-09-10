@@ -331,6 +331,7 @@ public final class GameProject {
     public static final class RuntimeConfiguration {
         private final String applicationExtension;
         private final Path entryScene;
+        private final Optional<Path> startupScene;
         private final Optional<Path> projectSystems;
         private final Optional<Path> inputMap;
 
@@ -338,14 +339,20 @@ public final class GameProject {
          * Creates validated runtime configuration.
          *
          * @param applicationExtension extension that creates project-specific runtime objects
-         * @param entryScene normalized absolute entry-scene path
+         * @param entryScene normalized absolute gameplay entry-scene path
+         * @param startupScene optional normalized absolute scene shown before gameplay
          * @param projectSystems optional normalized absolute project-systems path
          * @param inputMap optional normalized absolute input-map path
          */
         public RuntimeConfiguration(
-                String applicationExtension, Path entryScene, Optional<Path> projectSystems, Optional<Path> inputMap) {
+                String applicationExtension,
+                Path entryScene,
+                Optional<Path> startupScene,
+                Optional<Path> projectSystems,
+                Optional<Path> inputMap) {
             this.applicationExtension = requireProjectId(applicationExtension, "applicationExtension");
             this.entryScene = requireNormalizedAbsolute(entryScene, "entryScene");
+            this.startupScene = requireOptionalNormalizedAbsolute(startupScene, "startupScene");
             this.projectSystems = requireOptionalNormalizedAbsolute(projectSystems, "projectSystems");
             this.inputMap = requireOptionalNormalizedAbsolute(inputMap, "inputMap");
         }
@@ -360,12 +367,21 @@ public final class GameProject {
         }
 
         /**
-         * Returns the initial scene used for preview, play, and export.
+         * Returns the gameplay entry scene.
          *
          * @return normalized absolute entry-scene path
          */
         public Path entryScene() {
             return entryScene;
+        }
+
+        /**
+         * Returns the optional scene shown before gameplay begins.
+         *
+         * @return normalized absolute startup-scene path when configured
+         */
+        public Optional<Path> startupScene() {
+            return startupScene;
         }
 
         /**
@@ -394,19 +410,21 @@ public final class GameProject {
             return other instanceof RuntimeConfiguration configuration
                     && applicationExtension.equals(configuration.applicationExtension)
                     && entryScene.equals(configuration.entryScene)
+                    && startupScene.equals(configuration.startupScene)
                     && projectSystems.equals(configuration.projectSystems)
                     && inputMap.equals(configuration.inputMap);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(applicationExtension, entryScene, projectSystems, inputMap);
+            return Objects.hash(applicationExtension, entryScene, startupScene, projectSystems, inputMap);
         }
 
         @Override
         public String toString() {
             return "RuntimeConfiguration[applicationExtension=" + applicationExtension + ", entryScene=" + entryScene
-                    + ", projectSystems=" + projectSystems + ", inputMap=" + inputMap + ']';
+                    + ", startupScene=" + startupScene + ", projectSystems=" + projectSystems + ", inputMap="
+                    + inputMap + ']';
         }
     }
 

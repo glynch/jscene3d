@@ -26,6 +26,7 @@ final class GameModuleDescriptorTest {
         assertThat(exports)
                 .containsExactlyInAnyOrder(
                         "io.github.glynch.jscene3d.game",
+                        "io.github.glynch.jscene3d.game.application",
                         "io.github.glynch.jscene3d.game.input",
                         "io.github.glynch.jscene3d.game.presentation",
                         "io.github.glynch.jscene3d.game.physics",

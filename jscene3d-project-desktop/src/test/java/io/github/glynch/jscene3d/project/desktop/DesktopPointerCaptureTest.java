@@ -51,4 +51,15 @@ final class DesktopPointerCaptureTest {
         assertThat(pointer.update(false, true, false))
                 .isEqualTo(new DesktopPointerCapture.Update(InputCapture.NONE, false, false));
     }
+
+    @Test
+    void forgetsCaptureWhenTheHostSwitchesWorlds() {
+        DesktopPointerCapture pointer = new DesktopPointerCapture(true);
+        pointer.update(true, false, true);
+
+        pointer.reset();
+
+        assertThat(pointer.update(true, false, false))
+                .isEqualTo(new DesktopPointerCapture.Update(POINTER_CAPTURE, false, false));
+    }
 }

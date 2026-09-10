@@ -439,7 +439,11 @@ final class ExtensionCatalogLoaderTest {
                 metadata,
                 new GameProject.EngineCompatibility(">=0.1.0 <0.2.0", Optional.empty()),
                 new GameProject.RuntimeConfiguration(
-                        extensionId, root.resolve("main.scene.json"), Optional.empty(), Optional.empty()),
+                        extensionId,
+                        root.resolve("main.scene.json"),
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty()),
                 List.of(new GameProject.ExtensionRequirement(extensionId, requirement)),
                 new GameProject.ProjectFiles(List.of(), List.of(), List.of()));
     }

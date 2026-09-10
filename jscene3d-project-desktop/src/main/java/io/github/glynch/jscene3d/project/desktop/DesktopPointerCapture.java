@@ -32,6 +32,11 @@ final class DesktopPointerCapture {
         return maintainCurrentState();
     }
 
+    /** Forgets native ownership after the host changes the presented world. */
+    void reset() {
+        captured = false;
+    }
+
     /** Returns whether pointer capture is unnecessary for the authored input map. */
     private boolean isDisabled() {
         return !enabled;

@@ -248,7 +248,7 @@ public final class ManifestValidator {
     private GameProject.RuntimeConfiguration validateRuntime(RawManifest.@Nullable RuntimeConfiguration raw) {
         if (raw == null) {
             diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "runtime is required", "/runtime");
-            raw = new RawManifest.RuntimeConfiguration(null, null, null, null);
+            raw = new RawManifest.RuntimeConfiguration(null, null, null, null, null);
         }
         String extension = fields.requiredText(raw.applicationExtension(), "/runtime/applicationExtension");
         if (!extension.isEmpty() && !isProjectId(extension)) {
@@ -258,11 +258,13 @@ public final class ManifestValidator {
                     "/runtime/applicationExtension");
         }
         Optional<Path> entryScene = paths.resolveRequired(raw.entryScene(), "/runtime/entryScene", true);
+        Optional<Path> startupScene = paths.resolveOptional(raw.startupScene(), "/runtime/startupScene", true);
         Optional<Path> projectSystems = paths.resolveOptional(raw.projectSystems(), "/runtime/projectSystems", true);
         Optional<Path> inputMap = paths.resolveOptional(raw.inputMap(), "/runtime/inputMap", true);
         String safeExtension = isProjectId(extension) ? extension : "invalid.extension";
         Path safeEntryScene = entryScene.orElse(root.resolve("invalid.scene.json"));
-        return new GameProject.RuntimeConfiguration(safeExtension, safeEntryScene, projectSystems, inputMap);
+        return new GameProject.RuntimeConfiguration(
+                safeExtension, safeEntryScene, startupScene, projectSystems, inputMap);
     }
 
     /** Validates extension identifiers, version requirements, and uniqueness. */

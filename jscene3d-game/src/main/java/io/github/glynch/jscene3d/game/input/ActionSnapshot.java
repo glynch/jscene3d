@@ -8,20 +8,20 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /** Immutable semantic action and relative-pointer state for one update. */
 public final class ActionSnapshot {
     private static final ActionSnapshot EMPTY =
-            new ActionSnapshot(Set.of(), Set.of(), Set.of(), Map.of(), Map.of(), 0.0, 0.0);
+            new ActionSnapshot(Set.of(), Set.of(), Set.of(), Map.of(), Map.of(), PointerInput.EMPTY);
 
     private final Set<InputAction> down;
     private final Set<InputAction> pressed;
     private final Set<InputAction> released;
     private final Map<InputAction, Float> axes1d;
     private final Map<InputAction, InputVector2> axes2d;
-    private final double pointerDeltaX;
-    private final double pointerDeltaY;
+    private final PointerInput pointerInput;
 
     /** Stores immutable action sets and finite relative-pointer movement. */
     ActionSnapshot(
@@ -30,15 +30,13 @@ public final class ActionSnapshot {
             Set<InputAction> released,
             Map<InputAction, Float> axes1d,
             Map<InputAction, InputVector2> axes2d,
-            double pointerDeltaX,
-            double pointerDeltaY) {
+            PointerInput pointerInput) {
         this.down = Set.copyOf(down);
         this.pressed = Set.copyOf(pressed);
         this.released = Set.copyOf(released);
         this.axes1d = Map.copyOf(axes1d);
         this.axes2d = Map.copyOf(axes2d);
-        this.pointerDeltaX = requireFinite(pointerDeltaX, "pointerDeltaX");
-        this.pointerDeltaY = requireFinite(pointerDeltaY, "pointerDeltaY");
+        this.pointerInput = Objects.requireNonNull(pointerInput, "pointerInput");
     }
 
     /**
@@ -126,7 +124,7 @@ public final class ActionSnapshot {
      * @return finite horizontal movement
      */
     public double pointerDeltaX() {
-        return pointerDeltaX;
+        return pointerInput.deltaX();
     }
 
     /**
@@ -135,7 +133,15 @@ public final class ActionSnapshot {
      * @return finite vertical movement
      */
     public double pointerDeltaY() {
-        return pointerDeltaY;
+        return pointerInput.deltaY();
+    }
+
+    /** Returns absolute primary-pointer state when supplied by the current host.
+     *
+     * @return pointer state in logical viewport coordinates, when available
+     */
+    public Optional<PointerSnapshot> pointer() {
+        return pointerInput.absolute();
     }
 
     /**
@@ -148,14 +154,9 @@ public final class ActionSnapshot {
         ActionSnapshot validNewer = Objects.requireNonNull(newer, "newer");
         Set<InputAction> mergedPressed = union(pressed, validNewer.pressed);
         Set<InputAction> mergedReleased = union(released, validNewer.released);
+        PointerInput mergedPointer = pointerInput.merge(validNewer.pointerInput);
         return new ActionSnapshot(
-                validNewer.down,
-                mergedPressed,
-                mergedReleased,
-                validNewer.axes1d,
-                validNewer.axes2d,
-                pointerDeltaX + validNewer.pointerDeltaX,
-                pointerDeltaY + validNewer.pointerDeltaY);
+                validNewer.down, mergedPressed, mergedReleased, validNewer.axes1d, validNewer.axes2d, mergedPointer);
     }
 
     /**
@@ -164,9 +165,12 @@ public final class ActionSnapshot {
      * @return held-only snapshot
      */
     public ActionSnapshot heldOnly() {
-        return down.isEmpty() && axes1d.isEmpty() && axes2d.isEmpty()
+        return down.isEmpty()
+                        && axes1d.isEmpty()
+                        && axes2d.isEmpty()
+                        && pointerInput.absolute().isEmpty()
                 ? EMPTY
-                : new ActionSnapshot(down, Set.of(), Set.of(), axes1d, axes2d, 0.0, 0.0);
+                : new ActionSnapshot(down, Set.of(), Set.of(), axes1d, axes2d, pointerInput.heldOnly());
     }
 
     @Override
@@ -182,20 +186,30 @@ public final class ActionSnapshot {
                 && released.equals(snapshot.released)
                 && axes1d.equals(snapshot.axes1d)
                 && axes2d.equals(snapshot.axes2d)
-                && Double.compare(pointerDeltaX, snapshot.pointerDeltaX) == 0
-                && Double.compare(pointerDeltaY, snapshot.pointerDeltaY) == 0;
+                && pointerInput.equals(snapshot.pointerInput);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(down, pressed, released, axes1d, axes2d, pointerDeltaX, pointerDeltaY);
+        return Objects.hash(down, pressed, released, axes1d, axes2d, pointerInput);
     }
 
     @Override
     public String toString() {
         return "ActionSnapshot{down=" + down + ", pressed=" + pressed + ", released=" + released + ", axes1d="
-                + axes1d + ", axes2d=" + axes2d + ", pointerDeltaX=" + pointerDeltaX + ", pointerDeltaY="
-                + pointerDeltaY + '}';
+                + axes1d + ", axes2d=" + axes2d + ", pointerDeltaX=" + pointerInput.deltaX()
+                + ", pointerDeltaY=" + pointerInput.deltaY() + ", pointer=" + pointerInput.absolute() + '}';
+    }
+
+    /** Returns this action state with host-supplied absolute pointer state. */
+    ActionSnapshot withPointer(PointerSnapshot value) {
+        return new ActionSnapshot(
+                down,
+                pressed,
+                released,
+                axes1d,
+                axes2d,
+                pointerInput.withAbsolute(Objects.requireNonNull(value, "value")));
     }
 
     /** Returns the set union without exposing mutable storage. */
@@ -222,6 +236,7 @@ public final class ActionSnapshot {
         private final Map<InputAction, InputVector2> axes2d = new HashMap<>();
         private double pointerDeltaX;
         private double pointerDeltaY;
+        private Optional<PointerSnapshot> pointer = Optional.empty();
 
         /** Creates an empty builder. */
         private Builder() {}
@@ -311,13 +326,24 @@ public final class ActionSnapshot {
             return this;
         }
 
+        /** Sets absolute primary-pointer state supplied by a host or replay.
+         *
+         * @param value immutable logical pointer sample
+         * @return this builder
+         */
+        public Builder pointer(PointerSnapshot value) {
+            pointer = Optional.of(Objects.requireNonNull(value, "value"));
+            return this;
+        }
+
         /**
          * Builds the immutable snapshot.
          *
          * @return immutable action snapshot
          */
         public ActionSnapshot build() {
-            return new ActionSnapshot(down, pressed, released, axes1d, axes2d, pointerDeltaX, pointerDeltaY);
+            return new ActionSnapshot(
+                    down, pressed, released, axes1d, axes2d, new PointerInput(pointerDeltaX, pointerDeltaY, pointer));
         }
 
         /** Clamps a finite aggregate to the authored axis range. */
@@ -326,6 +352,41 @@ public final class ActionSnapshot {
                 throw new IllegalArgumentException("axis value must be finite: " + value);
             }
             return Math.clamp(value, -1.0F, 1.0F);
+        }
+    }
+
+    /** Relative and optional absolute pointer state grouped behind one immutable value. */
+    private record PointerInput(double deltaX, double deltaY, Optional<PointerSnapshot> absolute) {
+        private static final PointerInput EMPTY = new PointerInput(0.0, 0.0, Optional.empty());
+
+        /** Validates finite movement and a non-null optional absolute sample. */
+        private PointerInput {
+            requireFinite(deltaX, "pointerDeltaX");
+            requireFinite(deltaY, "pointerDeltaY");
+            Objects.requireNonNull(absolute, "absolute");
+        }
+
+        /** Accumulates transitions and movement while adopting the latest available position. */
+        private PointerInput merge(PointerInput newer) {
+            Optional<PointerSnapshot> mergedAbsolute;
+            if (newer.absolute.isEmpty()) {
+                mergedAbsolute = absolute;
+            } else {
+                PointerSnapshot newest = newer.absolute.orElseThrow();
+                mergedAbsolute = Optional.of(
+                        absolute.map(previous -> previous.merge(newest)).orElse(newest));
+            }
+            return new PointerInput(deltaX + newer.deltaX, deltaY + newer.deltaY, mergedAbsolute);
+        }
+
+        /** Preserves position and held state while consuming transient movement and transitions. */
+        private PointerInput heldOnly() {
+            return new PointerInput(0.0, 0.0, absolute.map(PointerSnapshot::heldOnly));
+        }
+
+        /** Replaces only the absolute host pointer sample. */
+        private PointerInput withAbsolute(PointerSnapshot value) {
+            return new PointerInput(deltaX, deltaY, Optional.of(value));
         }
     }
 }

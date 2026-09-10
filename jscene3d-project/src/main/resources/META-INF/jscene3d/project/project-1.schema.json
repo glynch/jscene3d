@@ -187,6 +187,9 @@
         "entryScene": {
           "type": "string"
         },
+        "startupScene": {
+          "type": "string"
+        },
         "projectSystems": {
           "type": "string"
         },

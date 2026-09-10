@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.desktop;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.game.application.ApplicationControl;
 import io.github.glynch.jscene3d.game.input.ActionSnapshot;
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
 import io.github.glynch.jscene3d.game.input.ProjectInput;
@@ -70,6 +71,7 @@ final class StandardProjectEnvironmentTest {
         assertThat(environment.descriptors())
                 .extracting(descriptor -> descriptor.id())
                 .containsExactly(
+                        "io.github.glynch.jscene3d.application",
                         "io.github.glynch.jscene3d.spatial3d",
                         "io.github.glynch.jscene3d.physics3d",
                         "io.github.glynch.jscene3d.game3d",
@@ -77,6 +79,7 @@ final class StandardProjectEnvironmentTest {
         assertThat(environment.runtimeExtensions())
                 .extracting(extension -> extension.id())
                 .containsExactly(
+                        "io.github.glynch.jscene3d.application",
                         "io.github.glynch.jscene3d.spatial3d",
                         "io.github.glynch.jscene3d.physics3d",
                         "io.github.glynch.jscene3d.game3d",
@@ -85,6 +88,7 @@ final class StandardProjectEnvironmentTest {
                 .extracting(binding -> binding.type().getName())
                 .containsExactly(
                         InputWorldModule.class.getName(),
+                        ApplicationControl.class.getName(),
                         Spatial3dWorldModule.class.getName(),
                         Physics3dWorldModule.class.getName(),
                         PresentationWorldModule.class.getName());

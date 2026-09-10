@@ -78,6 +78,21 @@ public final class ProjectInput implements InputWorldModule {
         return snapshot;
     }
 
+    /** Samples semantic actions together with host-normalized absolute pointer state.
+     *
+     * @param input current window input
+     * @param gamepad assigned gamepad state, or {@code null}
+     * @param capture host-interface ownership for this update
+     * @param pointer current primary-pointer state in logical viewport coordinates
+     * @return published semantic snapshot
+     */
+    public ActionSnapshot sample(
+            InputState input, @Nullable GamepadState gamepad, InputCapture capture, PointerSnapshot pointer) {
+        requireOpen();
+        snapshot = inputMap.sample(input, gamepad, capture).withPointer(Objects.requireNonNull(pointer, "pointer"));
+        return snapshot;
+    }
+
     /** Publishes semantic state supplied by tests, replay, or another non-window host.
      *
      * @param input immutable semantic snapshot

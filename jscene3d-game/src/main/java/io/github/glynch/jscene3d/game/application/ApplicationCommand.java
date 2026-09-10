@@ -10,6 +10,8 @@ import java.util.Arrays;
 public enum ApplicationCommand {
     /** Replaces the current gameplay world with the project's startup world while retaining gameplay for resume. */
     SHOW_MENU("show-menu"),
+    /** Replaces terminal gameplay with the project's startup world and discards the gameplay session. */
+    RETURN_TO_MENU("return-to-menu"),
     /** Replaces any retained gameplay with a fresh instance of the manifest entry world. */
     NEW_GAME("new-game"),
     /** Returns to the retained gameplay world when one exists. */

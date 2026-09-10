@@ -59,6 +59,10 @@ final class DesktopSessionLifecycle<T extends AutoCloseable> implements AutoClos
                 showMenu(validMenuLoader);
                 yield true;
             }
+            case RETURN_TO_MENU -> {
+                returnToMenu(validMenuLoader);
+                yield true;
+            }
             case NEW_GAME -> {
                 newGame(validGameplayLoader);
                 yield true;
@@ -77,6 +81,23 @@ final class DesktopSessionLifecycle<T extends AutoCloseable> implements AutoClos
             return;
         }
         menu = Objects.requireNonNull(menuLoader.get(), "loaded menu");
+        current = menu;
+    }
+
+    /** Loads a fresh startup menu and discards any terminal gameplay, leaving no resumable session. */
+    private void returnToMenu(Supplier<T> menuLoader) {
+        if (!startupMenu || gameplay == null) {
+            return;
+        }
+        T replacement = Objects.requireNonNull(menuLoader.get(), "loaded menu");
+        try {
+            closeMenu();
+            closeGameplay();
+        } catch (RuntimeException failure) {
+            closeAfterFailure(replacement, failure);
+            throw failure;
+        }
+        menu = replacement;
         current = menu;
     }
 

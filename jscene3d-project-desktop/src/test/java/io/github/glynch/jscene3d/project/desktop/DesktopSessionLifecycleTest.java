@@ -85,6 +85,24 @@ final class DesktopSessionLifecycleTest {
         }
     }
 
+    @Test
+    void returnsToANonResumableStartupMenuAndDiscardsTerminalGameplay() {
+        WorldStub startupMenu = new WorldStub(0);
+        WorldStub gameplay = new WorldStub(1);
+        WorldStub returnedMenu = new WorldStub(2);
+        try (var lifecycle = new DesktopSessionLifecycle<WorldStub>(true)) {
+            lifecycle.start(startupMenu);
+            lifecycle.apply(ApplicationCommand.NEW_GAME, () -> returnedMenu, () -> gameplay);
+
+            assertThat(lifecycle.apply(ApplicationCommand.RETURN_TO_MENU, () -> returnedMenu, () -> new WorldStub(3)))
+                    .isTrue();
+
+            assertThat(gameplay.closed).isTrue();
+            assertThat(lifecycle.current()).isSameAs(returnedMenu);
+            assertThat(lifecycle.canResume()).isFalse();
+        }
+    }
+
     /** Minimal observable replacement for one owned running world. */
     private static final class WorldStub implements AutoCloseable {
         private final int identity;

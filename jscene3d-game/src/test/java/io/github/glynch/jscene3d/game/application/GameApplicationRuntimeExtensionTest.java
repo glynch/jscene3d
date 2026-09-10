@@ -62,7 +62,8 @@ final class GameApplicationRuntimeExtensionTest {
                 .isEqualTo(GameApplicationDescriptors.commandBindingType());
         assertThat(ApplicationCommand.values())
                 .extracting(ApplicationCommand::id)
-                .containsExactly("show-menu", "new-game", "resume", "quit");
+                .containsExactly("show-menu", "return-to-menu", "new-game", "resume", "quit");
+        assertThat(ApplicationCommand.fromId("return-to-menu")).isEqualTo(ApplicationCommand.RETURN_TO_MENU);
         assertThat(ApplicationCommand.fromId("resume")).isEqualTo(ApplicationCommand.RESUME);
         assertThatThrownBy(() -> ApplicationCommand.fromId("restart"))
                 .isInstanceOf(IllegalArgumentException.class)

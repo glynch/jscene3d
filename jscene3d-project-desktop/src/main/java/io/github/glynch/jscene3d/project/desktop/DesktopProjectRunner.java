@@ -39,6 +39,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class DesktopProjectRunner {
     private static final int PRIMARY_GAMEPAD_SLOT = 0;
+    private static final DesktopLaunchPolicy LAUNCH_POLICY = new DesktopLaunchPolicy();
 
     private final ProjectRuntimeHost projectHost;
     private final DesktopApplicationState applicationState;
@@ -65,7 +66,13 @@ public final class DesktopProjectRunner {
      */
     public void run(Path projectRoot) {
         Path root = Objects.requireNonNull(projectRoot, "projectRoot");
-        GameProject project = loadProject(root);
+        GameProject project;
+        try {
+            project = loadProject(root);
+        } catch (RuntimeException failure) {
+            runStartupFailure(projectName(root), failure);
+            return;
+        }
         try (DesktopProjectSession session = new DesktopProjectSession(projectHost, applicationState, root)) {
             runLoaded(session, project);
         }
@@ -77,11 +84,56 @@ public final class DesktopProjectRunner {
         try (Window window = Window.create(title);
                 Renderer renderer = Renderer.create(window);
                 GamepadState gamepad = new GamepadState(PRIMARY_GAMEPAD_SLOT)) {
-            DesktopLaunchSplash splash = DesktopLaunchSplash.load(project);
+            DesktopLaunchSplash splash;
+            try {
+                splash = DesktopLaunchSplash.load(project);
+            } catch (RuntimeException failure) {
+                new DesktopStartupFailure(title, failure).run(renderer, window);
+                return;
+            }
+            boolean presentInitialSplash = project.launch().splash().isPresent() && LAUNCH_POLICY.claimInitialSplash();
+            long splashShownAt = System.nanoTime();
             window.show();
-            session.start(phase -> splash.present(phase, renderer, window));
+            try {
+                session.start(
+                        presentInitialSplash
+                                ? phase -> splash.present(phase, renderer, window)
+                                : ignored -> Window.pollEvents());
+            } catch (RuntimeException failure) {
+                new DesktopStartupFailure(title, failure).run(renderer, window);
+                return;
+            }
+            if (presentInitialSplash) {
+                awaitMinimumSplashDuration(splash, splashShownAt, renderer, window);
+            }
+            if (window.shouldClose()) {
+                return;
+            }
             window.setTitle(title);
             runLoop(session, window, renderer, gamepad);
+        }
+    }
+
+    /** Keeps one startup failure visible even when no validated project could be constructed. */
+    private static void runStartupFailure(String projectName, RuntimeException failure) {
+        try (Window window = Window.create(projectName);
+                Renderer renderer = Renderer.create(window)) {
+            new DesktopStartupFailure(projectName, failure).run(renderer, window);
+        }
+    }
+
+    /** Derives a stable fallback title when manifest validation fails. */
+    private static String projectName(Path projectRoot) {
+        Path fileName = projectRoot.toAbsolutePath().normalize().getFileName();
+        return fileName == null ? "JScene3D project" : fileName.toString();
+    }
+
+    /** Keeps polling and presenting a ready splash until its authored minimum duration elapses. */
+    private static void awaitMinimumSplashDuration(
+            DesktopLaunchSplash splash, long shownAt, Renderer renderer, Window window) {
+        while (!window.shouldClose()
+                && !DesktopLaunchPolicy.minimumElapsed(shownAt, System.nanoTime(), splash.minimumDuration())) {
+            splash.present(ProjectLoadProgress.Phase.READY, renderer, window);
         }
     }
 
@@ -94,6 +146,7 @@ public final class DesktopProjectRunner {
 
     /** Activates and advances the project until the platform requests closure. */
     private static void runLoop(DesktopProjectSession session, Window window, Renderer renderer, GamepadState gamepad) {
+        DesktopLoadingIndicator loading = new DesktopLoadingIndicator(window.title());
         long previousFrame = System.nanoTime();
         while (!window.shouldClose()) {
             RunningWorld current = session.current();
@@ -109,7 +162,12 @@ public final class DesktopProjectRunner {
             long currentFrame = System.nanoTime();
             current.frames.advance(Duration.ofNanos(Math.max(0L, currentFrame - previousFrame)), acquired);
             previousFrame = currentFrame;
-            if (!session.applyPendingCommand()) {
+            boolean continueRunning = session.applyPendingCommand(phase -> {
+                renderContents(session.current().spatial, session.current().presentation, renderer, window);
+                loading.present(phase, renderer, window);
+            });
+            loading.finish(window);
+            if (!continueRunning) {
                 break;
             }
             if (current != session.current()) {
@@ -156,6 +214,15 @@ public final class DesktopProjectRunner {
     /** Renders and presents one frame when the window has a drawable framebuffer. */
     private static void render(
             Spatial3dWorldModule spatial, PresentationWorldModule presentation, Renderer renderer, Window window) {
+        renderContents(spatial, presentation, renderer, window);
+        if (window.framebufferWidth() > 0 && window.framebufferHeight() > 0) {
+            window.swapBuffers();
+        }
+    }
+
+    /** Renders one frame without presenting it so a host overlay may be added first. */
+    private static void renderContents(
+            Spatial3dWorldModule spatial, PresentationWorldModule presentation, Renderer renderer, Window window) {
         if (window.framebufferWidth() <= 0 || window.framebufferHeight() <= 0) {
             return;
         }
@@ -167,7 +234,6 @@ public final class DesktopProjectRunner {
             renderer.clear();
         }
         presentation.renderOverlays(renderer);
-        window.swapBuffers();
     }
 
     /** Activated world and the host-side adapters required by one desktop frame. */
@@ -244,15 +310,19 @@ public final class DesktopProjectRunner {
         }
 
         /** Applies at most one world-requested transition between completed host frames. */
-        private boolean applyPendingCommand() {
-            return application.takeRequest().map(this::apply).orElse(true);
+        private boolean applyPendingCommand(ProjectLoadProgress progress) {
+            Objects.requireNonNull(progress, "progress");
+            return application
+                    .takeRequest()
+                    .map(command -> apply(command, progress))
+                    .orElse(true);
         }
 
         /** Applies one host-owned application transition. */
-        private boolean apply(ApplicationCommand command) {
+        private boolean apply(ApplicationCommand command, ProjectLoadProgress progress) {
             return switch (command) {
                 case SHOW_MENU -> showMenu();
-                case NEW_GAME -> newGame();
+                case NEW_GAME -> newGame(progress);
                 case RESUME -> resume();
                 case QUIT -> false;
             };
@@ -270,11 +340,12 @@ public final class DesktopProjectRunner {
         }
 
         /** Replaces all previous gameplay state with a fresh entry world. */
-        private boolean newGame() {
+        private boolean newGame(ProjectLoadProgress progress) {
+            RunningWorld replacement = new RunningWorld(host.loadEntry(projectRoot, progress), true);
             closeMenu();
             closeGameplay();
             application.setResumeAvailable(false);
-            gameplay = new RunningWorld(host.loadEntry(projectRoot), true);
+            gameplay = replacement;
             current = gameplay;
             return true;
         }

@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgress;
 import io.github.glynch.jscene3d.render.OverlayCanvas;
 import io.github.glynch.jscene3d.render.OverlayImage;
 import io.github.glynch.jscene3d.render.Renderer;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,6 +27,7 @@ final class DesktopLaunchSplash {
     private final Optional<OverlayImage> title;
     private final Optional<OverlayImage> studioLogo;
     private final List<OverlayImage> poweredByBadges;
+    private final Duration minimumDuration;
     private ProjectLoadProgress.Phase phase = ProjectLoadProgress.Phase.MANIFEST;
 
     /** Loads configured launch images before any runtime world is composed. */
@@ -41,6 +43,9 @@ final class DesktopLaunchSplash {
                 .flatMap(splash -> splash.poweredByBadges().stream())
                 .map(OverlayImageLoader::load)
                 .toList();
+        minimumDuration = configuration
+                .map(GameProject.SplashConfiguration::minimumDuration)
+                .orElse(Duration.ZERO);
     }
 
     /** Creates launch presentation for one validated project. */
@@ -48,6 +53,11 @@ final class DesktopLaunchSplash {
         GameProject validProject = Objects.requireNonNull(project, "project");
         return new DesktopLaunchSplash(
                 validProject.identity().name(), validProject.launch().splash());
+    }
+
+    /** Returns the configured minimum time this launch screen must remain visible. */
+    Duration minimumDuration() {
+        return minimumDuration;
     }
 
     /** Repaints one real load phase and keeps the native window responsive. */

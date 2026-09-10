@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.physics3d;
 
+import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
 import io.github.glynch.jscene3d.project.component.ComponentMultiplicity;
 import io.github.glynch.jscene3d.project.component.ComponentType;
@@ -33,6 +34,7 @@ public final class Physics3dDescriptors {
     private static final ComponentType STATIC_BODY_TYPE = type("static-body-3d");
     private static final ComponentType SENSOR_TYPE = type("collision-sensor-3d");
     private static final ComponentType CHARACTER_BODY_TYPE = type("character-body-3d");
+    private static final CapabilityId CHARACTER_BODY_CAPABILITY = new CapabilityId(EXTENSION_ID + "/character-body-3d");
     private static final RegisteredType BOX_RESOURCE_TYPE = resourceType("box-collision-shape-3d");
     private static final RegisteredType SPHERE_RESOURCE_TYPE = resourceType("sphere-collision-shape-3d");
     private static final RegisteredType CAPSULE_RESOURCE_TYPE = resourceType("capsule-collision-shape-3d");
@@ -103,6 +105,15 @@ public final class Physics3dDescriptors {
      */
     public static ComponentType characterBodyType() {
         return CHARACTER_BODY_TYPE;
+    }
+
+    /**
+     * Returns the capability supplied by a character body.
+     *
+     * @return character-body capability identity
+     */
+    public static CapabilityId characterBodyCapability() {
+        return CHARACTER_BODY_CAPABILITY;
     }
 
     /**
@@ -381,6 +392,7 @@ public final class Physics3dDescriptors {
         properties.add(nonNegativeNumber(GROUND_SNAP_DISTANCE, "Ground snap distance", defaults.groundSnapDistance()));
         return collisionObject(CHARACTER_BODY_TYPE, "Character Body 3D")
                 .properties(properties)
+                .providedCapabilities(Set.of(CHARACTER_BODY_CAPABILITY))
                 .conflicts(Set.of(STATIC_BODY_TYPE.id(), SENSOR_TYPE.id()))
                 .build();
     }

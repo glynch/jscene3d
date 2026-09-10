@@ -4,12 +4,26 @@
  */
 package io.github.glynch.jscene3d.project.desktop;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.project.runtime.ProjectLaunchRequest;
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 final class DesktopProjectRunnerTest {
+    @Test
+    void marksNamedPlaytestWindow() {
+        ProjectLaunchRequest request =
+                ProjectLaunchRequest.playtest("moving-floor-34", Path.of("worlds/map01.world.json"), Map.of());
+
+        assertThat(DesktopProjectRunner.windowTitle("Doomed Corridors", request))
+                .isEqualTo("Doomed Corridors [PLAYTEST: moving-floor-34]");
+        assertThat(DesktopProjectRunner.windowTitle("Doomed Corridors", ProjectLaunchRequest.standard()))
+                .isEqualTo("Doomed Corridors");
+    }
+
     @Test
     @SuppressWarnings("NullAway") // Deliberate nulls verify public boundary validation.
     void validatesConstructionAndProjectRoot() {

@@ -18,6 +18,7 @@ import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.extension.ApplicationRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.io.IOException;
 import java.net.URL;
@@ -28,6 +29,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -96,6 +98,29 @@ final class ProjectRuntimeHostTest {
                 assertThat(startup.world().definition().name()).isEqualTo("Menu");
                 assertThat(entry.world().definition().name()).isEqualTo("Main");
             }
+        }
+    }
+
+    /** Loads an explicitly selected playtest world and exposes its parameters to application preparation. */
+    @Test
+    void loadsExplicitLaunchRequest() throws IOException {
+        Path projectRoot = writeProject("worlds/main.world.json", "worlds/menu.world.json");
+        Files.writeString(
+                projectRoot.resolve("worlds/menu.world.json"),
+                worldDefinition("8a0187d4-87cd-4b86-9fd7-f8fedbfc3153", "Menu"),
+                StandardCharsets.UTF_8);
+        ProjectLaunchRequest request = ProjectLaunchRequest.playtest(
+                "moving-floor-34",
+                Path.of("worlds/main.world.json"),
+                Map.of("example.invulnerable", new ProjectValue.BooleanValue(true)));
+
+        try (URLClassLoader loader = runtimeClassLoader();
+                HostedProject hosted = runtimeHost(loader, environment(new RecordingApplicationExtension(), null))
+                        .load(projectRoot, request)) {
+            assertThat(hosted.world().definition().name()).isEqualTo("Main");
+            assertThat(hosted.launchRequest()).isSameAs(request);
+            assertThat(hosted.launchRequest().parameter("example.invulnerable"))
+                    .contains(new ProjectValue.BooleanValue(true));
         }
     }
 

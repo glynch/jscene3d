@@ -40,6 +40,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.assertj.core.data.Offset;
+import org.joml.Quaternionf;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -67,6 +69,52 @@ final class CharacterBody3dWorldCompositionTest {
 
     @TempDir
     private Path temporaryDirectory;
+
+    /** Teleports a composed character before activation and preserves that pose when physics starts. */
+    @Test
+    void teleportsCharacterBeforeWorldActivation() throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("character.world.json"), worldDefinition());
+        AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
+        World world = WorldComposer.compose(
+                        assets,
+                        AssetRef.to(WORLD_ID),
+                        RegisteredTypeCatalog.of(List.of(
+                                Spatial3dDescriptors.extensionDescriptor(),
+                                Physics3dDescriptors.extensionDescriptor())),
+                        List.of(new Spatial3dRuntimeExtension(), new Physics3dRuntimeExtension()),
+                        List.of(
+                                WorldModuleBinding.of(Spatial3dWorldModule.class, Spatial3dAdapters.standard()),
+                                WorldModuleBinding.of(Physics3dWorldModule.class, Physics3dAdapters.standard())),
+                        new ShapeResources())
+                .world()
+                .orElseThrow();
+        Entity characterEntity = world.roots().get(2);
+        CharacterBody3d character =
+                characterEntity.component(CHARACTER_BODY, CharacterBody3d.class).orElseThrow();
+        Transform3d transform = characterEntity
+                .component(CHARACTER_TRANSFORM, Transform3d.class)
+                .orElseThrow();
+        Vector3f destination = new Vector3f(5.0F, 8.0F, -2.0F);
+        Quaternionf orientation = new Quaternionf().rotationY(0.5F);
+
+        character.teleport(destination, orientation);
+
+        assertThat(transform.position()).isEqualTo(destination);
+        assertOrientation(transform.orientation(), orientation);
+        world.activate();
+        world.advanceFixed(STEP);
+        assertThat(transform.position()).isEqualTo(destination);
+        assertOrientation(transform.orientation(), orientation);
+        world.close();
+    }
+
+    /** Compares quaternion values without depending on mutable JOML object identity. */
+    private static void assertOrientation(Quaternionfc actual, Quaternionfc expected) {
+        assertThat(actual.x()).isCloseTo(expected.x(), TOLERANCE);
+        assertThat(actual.y()).isCloseTo(expected.y(), TOLERANCE);
+        assertThat(actual.z()).isCloseTo(expected.z(), TOLERANCE);
+        assertThat(actual.w()).isCloseTo(expected.w(), TOLERANCE);
+    }
 
     /** Grounds a capsule, slides it along a wall, and publishes the resolved pose to its entity transform. */
     @Test

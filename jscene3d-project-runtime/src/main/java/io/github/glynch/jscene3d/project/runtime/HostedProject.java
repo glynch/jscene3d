@@ -13,12 +13,14 @@ public final class HostedProject implements AutoCloseable {
     private final GameProject project;
     private final AssetCatalog assets;
     private final World world;
+    private final ProjectLaunchRequest launchRequest;
 
     /** Stores one successfully composed host result. */
-    HostedProject(GameProject project, AssetCatalog assets, World world) {
+    HostedProject(GameProject project, AssetCatalog assets, World world, ProjectLaunchRequest launchRequest) {
         this.project = Objects.requireNonNull(project, "project");
         this.assets = Objects.requireNonNull(assets, "assets");
         this.world = Objects.requireNonNull(world, "world");
+        this.launchRequest = Objects.requireNonNull(launchRequest, "launchRequest");
     }
 
     /**
@@ -46,6 +48,15 @@ public final class HostedProject implements AutoCloseable {
      */
     public World world() {
         return world;
+    }
+
+    /**
+     * Returns the request that selected and parameterized this hosted world.
+     *
+     * @return immutable launch request
+     */
+    public ProjectLaunchRequest launchRequest() {
+        return launchRequest;
     }
 
     /** Closes the world and its owned adapters. Repeated closure is harmless. */

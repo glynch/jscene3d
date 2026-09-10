@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jscene3d.org/schemas/playtest-profiles-1.json",
+  "title": "JScene3D local playtest profiles",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profiles"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schemaVersion": {"const": 1},
+    "profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scene"],
+        "properties": {
+          "scene": {"type": "string", "minLength": 1},
+          "parameters": {"type": "object"}
+        }
+      }
+    }
+  }
+}

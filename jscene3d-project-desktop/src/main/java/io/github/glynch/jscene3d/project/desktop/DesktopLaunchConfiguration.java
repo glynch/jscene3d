@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.desktop;
 
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 
 /** Resolved values needed to start one packaged desktop project. */
@@ -15,12 +16,15 @@ final class DesktopLaunchConfiguration {
     private final String engineVersion;
     private final Path projectDirectory;
     private final Path contentDirectory;
+    private final Optional<String> playtestProfile;
 
     /** Stores validated command-line or launch-property values. */
-    private DesktopLaunchConfiguration(String engineVersion, Path projectDirectory, Path contentDirectory) {
+    private DesktopLaunchConfiguration(
+            String engineVersion, Path projectDirectory, Path contentDirectory, Optional<String> playtestProfile) {
         this.engineVersion = requireNonBlank(engineVersion, "engineVersion");
         this.projectDirectory = Objects.requireNonNull(projectDirectory, "projectDirectory");
         this.contentDirectory = Objects.requireNonNull(contentDirectory, "contentDirectory");
+        this.playtestProfile = Objects.requireNonNull(playtestProfile, "playtestProfile");
     }
 
     /**
@@ -36,7 +40,7 @@ final class DesktopLaunchConfiguration {
         Objects.requireNonNull(properties, "properties");
         return switch (arguments.length) {
             case 0 -> fromProperties(properties);
-            case ARGUMENT_COUNT -> fromArguments(arguments);
+            case ARGUMENT_COUNT -> fromArguments(arguments, properties);
             default ->
                 throw new IllegalArgumentException(
                         "expected either no arguments with packaged launch properties or engine-version, "
@@ -59,9 +63,18 @@ final class DesktopLaunchConfiguration {
         return contentDirectory;
     }
 
+    /** Returns the optional local-development profile selected outside the public game interface. */
+    Optional<String> playtestProfile() {
+        return playtestProfile;
+    }
+
     /** Resolves the ordered command-line form. */
-    private static DesktopLaunchConfiguration fromArguments(String[] arguments) {
-        return new DesktopLaunchConfiguration(arguments[0], Path.of(arguments[1]), Path.of(arguments[2]));
+    private static DesktopLaunchConfiguration fromArguments(String[] arguments, Properties properties) {
+        return new DesktopLaunchConfiguration(
+                arguments[0],
+                Path.of(arguments[1]),
+                Path.of(arguments[2]),
+                optionalProperty(properties, DesktopProjectLauncher.PLAYTEST_PROFILE_PROPERTY));
     }
 
     /** Resolves the native-packager property form. */
@@ -69,7 +82,15 @@ final class DesktopLaunchConfiguration {
         return new DesktopLaunchConfiguration(
                 requireProperty(properties, DesktopProjectLauncher.ENGINE_VERSION_PROPERTY),
                 Path.of(requireProperty(properties, DesktopProjectLauncher.PROJECT_DIRECTORY_PROPERTY)),
-                Path.of(requireProperty(properties, DesktopProjectLauncher.CONTENT_DIRECTORY_PROPERTY)));
+                Path.of(requireProperty(properties, DesktopProjectLauncher.CONTENT_DIRECTORY_PROPERTY)),
+                optionalProperty(properties, DesktopProjectLauncher.PLAYTEST_PROFILE_PROPERTY));
+    }
+
+    /** Returns one optional trimmed launch property. */
+    private static Optional<String> optionalProperty(Properties properties, String name) {
+        return Optional.ofNullable(properties.getProperty(name))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty());
     }
 
     /** Returns one required non-blank launch property. */

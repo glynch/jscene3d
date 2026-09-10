@@ -4,6 +4,11 @@
  */
 package io.github.glynch.jscene3d.project.desktop;
 
+import io.github.glynch.jscene3d.project.playtest.PlaytestProfile;
+import io.github.glynch.jscene3d.project.playtest.PlaytestProfileLoader;
+import io.github.glynch.jscene3d.project.runtime.ProjectLaunchRequest;
+import java.nio.file.Path;
+
 /** Command-line entry point for a packaged desktop project.
  *
  * <p>The packaging layer supplies the engine version, packaged project root, and published-content
@@ -20,6 +25,9 @@ public final class DesktopProjectLauncher {
 
     /** Launch property containing the packaged published-content directory. */
     public static final String CONTENT_DIRECTORY_PROPERTY = "jscene3d.launch.content.directory";
+
+    /** Optional local-development property selecting a named playtest profile. */
+    public static final String PLAYTEST_PROFILE_PROPERTY = "jscene3d.playtest.profile";
 
     /** Prevents construction of this command-line entry point. */
     private DesktopProjectLauncher() {
@@ -43,6 +51,16 @@ public final class DesktopProjectLauncher {
                 configuration.engineVersion(),
                 DesktopProjectLauncher.class.getClassLoader(),
                 configuration.contentDirectory());
-        runner.run(configuration.projectDirectory());
+        ProjectLaunchRequest request = configuration
+                .playtestProfile()
+                .map(name -> playtestRequest(configuration.projectDirectory(), name))
+                .orElseGet(ProjectLaunchRequest::standard);
+        runner.run(configuration.projectDirectory(), request);
+    }
+
+    /** Resolves one local profile into the generic runtime request consumed by desktop and editor hosts. */
+    private static ProjectLaunchRequest playtestRequest(Path projectRoot, String name) {
+        PlaytestProfile profile = new PlaytestProfileLoader().load(projectRoot, name);
+        return ProjectLaunchRequest.playtest(profile.name(), profile.scene(), profile.parameters());
     }
 }

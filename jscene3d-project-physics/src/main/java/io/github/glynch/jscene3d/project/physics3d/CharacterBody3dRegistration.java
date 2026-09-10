@@ -5,11 +5,20 @@
 package io.github.glynch.jscene3d.project.physics3d;
 
 import java.time.Duration;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 /** Backend registration providing character movement without exposing low-level physics handles. */
 public interface CharacterBody3dRegistration extends CollisionObject3dRegistration {
+    /**
+     * Repositions the registered character and synchronizes its authoritative transform immediately.
+     *
+     * @param position new finite world-space position
+     * @param orientation new finite world-space orientation; normalized internally
+     */
+    void teleport(Vector3fc position, Quaternionfc orientation);
+
     /**
      * Resolves one fixed character movement update.
      *

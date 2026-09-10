@@ -37,6 +37,7 @@ final class ProjectModuleDescriptorTest {
                         "io.github.glynch.jscene3d.project.input",
                         "io.github.glynch.jscene3d.project.imports",
                         "io.github.glynch.jscene3d.project.manifest",
+                        "io.github.glynch.jscene3d.project.playtest",
                         "io.github.glynch.jscene3d.project.resource",
                         "io.github.glynch.jscene3d.project.scene",
                         "io.github.glynch.jscene3d.project.value",

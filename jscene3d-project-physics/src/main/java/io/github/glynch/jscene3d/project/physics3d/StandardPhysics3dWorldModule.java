@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.joml.Matrix4fc;
 import org.joml.Quaternionf;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 import org.jspecify.annotations.Nullable;
@@ -542,6 +543,14 @@ final class StandardPhysics3dWorldModule implements Physics3dWorldModule {
             super(component, transform, body, shapes, null);
             this.body = body;
             this.controller = controller;
+        }
+
+        @Override
+        public void teleport(Vector3fc position, Quaternionfc orientation) {
+            requireRegistrationOpen();
+            controller.teleport(
+                    Objects.requireNonNull(position, "position"), Objects.requireNonNull(orientation, "orientation"));
+            synchronizeTransform();
         }
 
         @Override

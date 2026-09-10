@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +34,28 @@ final class DesktopProjectLauncherTest {
         assertThat(configuration.engineVersion()).isEqualTo("0.1.0");
         assertThat(configuration.projectDirectory()).isEqualTo(Path.of("project"));
         assertThat(configuration.contentDirectory()).isEqualTo(Path.of("content"));
+        assertThat(configuration.playtestProfile()).isEmpty();
+    }
+
+    @Test
+    void resolvesLocalPlaytestProfileWithoutChangingPackagedArguments() {
+        Properties properties = packagedProperties();
+        properties.setProperty(DesktopProjectLauncher.PLAYTEST_PROFILE_PROPERTY, " moving-floor-34 ");
+
+        DesktopLaunchConfiguration configuration = DesktopLaunchConfiguration.resolve(new String[0], properties);
+
+        assertThat(configuration.playtestProfile()).isEqualTo(Optional.of("moving-floor-34"));
+    }
+
+    @Test
+    void resolvesLocalPlaytestProfileWithExplicitArguments() {
+        Properties properties = new Properties();
+        properties.setProperty(DesktopProjectLauncher.PLAYTEST_PROFILE_PROPERTY, "moving-floor-34");
+
+        DesktopLaunchConfiguration configuration =
+                DesktopLaunchConfiguration.resolve(new String[] {"0.1.0", "project", "content"}, properties);
+
+        assertThat(configuration.playtestProfile()).contains("moving-floor-34");
     }
 
     @Test

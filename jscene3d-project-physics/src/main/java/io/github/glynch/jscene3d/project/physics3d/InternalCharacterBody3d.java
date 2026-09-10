@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
 import java.time.Duration;
 import java.util.List;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
@@ -32,6 +33,11 @@ final class InternalCharacterBody3d extends AbstractCollisionObject3d implements
     CharacterBody3dRegistration register(
             Physics3dWorldModule physics, Transform3d transform, List<CollisionShape3d> resolvedShapes) {
         return physics.registerCharacterBody(this, transform, resolvedShapes, settings);
+    }
+
+    @Override
+    public void teleport(Vector3fc position, Quaternionfc orientation) {
+        registration().teleport(position, orientation);
     }
 
     @Override

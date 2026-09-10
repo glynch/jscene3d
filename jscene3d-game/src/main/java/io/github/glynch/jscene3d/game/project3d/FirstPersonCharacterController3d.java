@@ -76,6 +76,7 @@ final class FirstPersonCharacterController3d implements ComponentReferenceBinder
     @Override
     public void onBeforePhysics(FixedUpdateContext update) {
         Objects.requireNonNull(update, "update");
+        synchronizeViewOrientation();
         ActionSnapshot snapshot = input.snapshot();
         applyPointerLook(snapshot);
         applyContinuousLook(snapshot, update);
@@ -133,6 +134,13 @@ final class FirstPersonCharacterController3d implements ComponentReferenceBinder
     private void updateViewOrientation() {
         Quaternionf orientation = new Quaternionf().rotationYXZ(yaw, pitch, 0.0F);
         requiredViewTransform().setOrientation(orientation.x, orientation.y, orientation.z, orientation.w);
+    }
+
+    /** Adopts an externally staged view pose before calculating look input or view-relative movement. */
+    private void synchronizeViewOrientation() {
+        Vector3f angles = requiredViewTransform().orientation().getEulerAnglesYXZ(new Vector3f());
+        pitch = Math.clamp(angles.x, -maximumPitch, maximumPitch);
+        yaw = angles.y;
     }
 
     private Vector3f planarVelocity(InputVector2 move) {

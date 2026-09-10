@@ -210,6 +210,7 @@ final class ApplicationDirectoryExporterTest {
         write(projectRoot.resolve("assets/model.gltf"), "raw import source");
         write(projectRoot.resolve("imports/model.import.json"), importDefinition());
         write(projectRoot.resolve("export/desktop.json"), "{}");
+        write(projectRoot.resolve("playtest/profiles.json"), "{}");
         write(projectRoot.resolve("LICENSE"), "Sample license");
         write(projectRoot.resolve("pom.xml"), "<project />");
         write(projectRoot.resolve("src/main/java/SampleGameApplication.java"), "class SampleGameApplication {}");

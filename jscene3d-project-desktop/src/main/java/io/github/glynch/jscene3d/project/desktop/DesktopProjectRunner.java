@@ -21,6 +21,7 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.HostedProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectHostException;
+import io.github.glynch.jscene3d.project.runtime.ProjectLaunchRequest;
 import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgress;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeHost;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
@@ -65,7 +66,17 @@ public final class DesktopProjectRunner {
      * @param projectRoot project directory containing {@code project.json}
      */
     public void run(Path projectRoot) {
+        run(projectRoot, ProjectLaunchRequest.standard());
+    }
+
+    /** Runs one explicitly selected scene and parameter set until its window requests closure.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @param request immutable launch request, including an optional playtest profile
+     */
+    public void run(Path projectRoot, ProjectLaunchRequest request) {
         Path root = Objects.requireNonNull(projectRoot, "projectRoot");
+        ProjectLaunchRequest validRequest = Objects.requireNonNull(request, "request");
         GameProject project;
         try {
             project = loadProject(root);
@@ -73,14 +84,15 @@ public final class DesktopProjectRunner {
             runStartupFailure(projectName(root), failure);
             return;
         }
-        try (DesktopProjectSession session = new DesktopProjectSession(projectHost, applicationState, root)) {
-            runLoaded(session, project);
+        try (DesktopProjectSession session =
+                new DesktopProjectSession(projectHost, applicationState, root, validRequest)) {
+            runLoaded(session, project, validRequest);
         }
     }
 
     /** Owns native resources while startup and one composed project are active. */
-    private static void runLoaded(DesktopProjectSession session, GameProject project) {
-        String title = project.identity().name();
+    private static void runLoaded(DesktopProjectSession session, GameProject project, ProjectLaunchRequest request) {
+        String title = windowTitle(project.identity().name(), request);
         try (Window window = Window.create(title);
                 Renderer renderer = Renderer.create(window);
                 GamepadState gamepad = new GamepadState(PRIMARY_GAMEPAD_SLOT)) {
@@ -91,7 +103,9 @@ public final class DesktopProjectRunner {
                 new DesktopStartupFailure(title, failure).run(renderer, window);
                 return;
             }
-            boolean presentInitialSplash = project.launch().splash().isPresent() && LAUNCH_POLICY.claimInitialSplash();
+            boolean presentInitialSplash = !request.isPlaytest()
+                    && project.launch().splash().isPresent()
+                    && LAUNCH_POLICY.claimInitialSplash();
             long splashShownAt = System.nanoTime();
             window.show();
             try {
@@ -112,6 +126,13 @@ public final class DesktopProjectRunner {
             window.setTitle(title);
             runLoop(session, window, renderer, gamepad);
         }
+    }
+
+    /** Adds an unmistakable development-only suffix to named playtest windows. */
+    static String windowTitle(String projectName, ProjectLaunchRequest request) {
+        return request.profile()
+                .map(profile -> projectName + " [PLAYTEST: " + profile + "]")
+                .orElse(projectName);
     }
 
     /** Keeps one startup failure visible even when no validated project could be constructed. */
@@ -275,20 +296,27 @@ public final class DesktopProjectRunner {
         private final ProjectRuntimeHost host;
         private final DesktopApplicationState application;
         private final Path projectRoot;
+        private final ProjectLaunchRequest launchRequest;
 
         private @Nullable DesktopSessionLifecycle<RunningWorld> lifecycle;
 
-        private DesktopProjectSession(ProjectRuntimeHost host, DesktopApplicationState application, Path projectRoot) {
+        private DesktopProjectSession(
+                ProjectRuntimeHost host,
+                DesktopApplicationState application,
+                Path projectRoot,
+                ProjectLaunchRequest launchRequest) {
             this.host = Objects.requireNonNull(host, "host");
             this.application = Objects.requireNonNull(application, "application");
             this.projectRoot = Objects.requireNonNull(projectRoot, "projectRoot");
+            this.launchRequest = Objects.requireNonNull(launchRequest, "launchRequest");
         }
 
         /** Loads and activates the manifest-selected startup world. */
         private void start(ProjectLoadProgress progress) {
             application.setResumeAvailable(false);
-            HostedProject loaded = host.load(projectRoot, progress);
-            boolean startupMenu = loaded.project().runtime().startupScene().isPresent();
+            HostedProject loaded = host.load(projectRoot, launchRequest, progress);
+            boolean startupMenu = !launchRequest.isPlaytest()
+                    && loaded.project().runtime().startupScene().isPresent();
             DesktopSessionLifecycle<RunningWorld> started = new DesktopSessionLifecycle<>(startupMenu);
             started.start(new RunningWorld(loaded, !startupMenu));
             lifecycle = started;
@@ -317,7 +345,7 @@ public final class DesktopProjectRunner {
             boolean continueRunning = active.apply(
                     command,
                     () -> new RunningWorld(host.load(projectRoot), false),
-                    () -> new RunningWorld(host.loadEntry(projectRoot, progress), true));
+                    () -> new RunningWorld(host.loadEntry(projectRoot, launchRequest, progress), true));
             application.setResumeAvailable(active.canResume());
             return continueRunning;
         }

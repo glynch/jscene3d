@@ -5,11 +5,23 @@
 package io.github.glynch.jscene3d.project.physics3d;
 
 import java.time.Duration;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 /** Live descriptor-backed collision body moved explicitly by gameplay behavior. */
 public interface CharacterBody3d extends CollisionObject3d {
+    /**
+     * Repositions the character immediately and clears accumulated movement state.
+     *
+     * <p>This operation is valid before world activation, allowing launch configuration and editor play-from-here
+     * workflows to establish an initial pose through the physics-authoritative character module.
+     *
+     * @param position new finite world-space position
+     * @param orientation new finite world-space orientation; normalized internally
+     */
+    void teleport(Vector3fc position, Quaternionfc orientation);
+
     /**
      * Resolves one fixed update of world-space planar velocity through physics.
      *

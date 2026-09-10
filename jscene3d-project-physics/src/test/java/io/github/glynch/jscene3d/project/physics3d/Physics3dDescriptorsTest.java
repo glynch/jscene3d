@@ -43,6 +43,7 @@ final class Physics3dDescriptorsTest {
         assertThat(body.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
         assertThat(sensor.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
         assertThat(character.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
+        assertThat(character.providedCapabilities()).containsExactly(Physics3dDescriptors.characterBodyCapability());
         assertThat(character.properties().keySet())
                 .containsExactly(
                         Physics3dDescriptors.shapesProperty(),

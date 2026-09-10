@@ -51,7 +51,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
 
     @Override
     public HostedProject load(Path projectRoot) {
-        return load(projectRoot, ignored -> {});
+        return load(projectRoot, ProjectLaunchRequest.standard(), ignored -> {});
     }
 
     /**
@@ -62,12 +62,40 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @return composed inactive project
      */
     public HostedProject load(Path projectRoot, ProjectLoadProgress progress) {
+        return load(projectRoot, ProjectLaunchRequest.standard(), progress);
+    }
+
+    /**
+     * Loads an explicitly requested project scene and launch parameters.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @param request scene selection and project-defined parameters
+     * @return composed inactive project
+     */
+    public HostedProject load(Path projectRoot, ProjectLaunchRequest request) {
+        return load(projectRoot, request, ignored -> {});
+    }
+
+    /**
+     * Loads an explicitly requested project scene while reporting synchronous milestones.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @param request scene selection and project-defined parameters
+     * @param progress load-progress receiver
+     * @return composed inactive project
+     */
+    public HostedProject load(Path projectRoot, ProjectLaunchRequest request, ProjectLoadProgress progress) {
         ProjectLoadProgress validProgress = Objects.requireNonNull(progress, "progress");
+        ProjectLaunchRequest validRequest = Objects.requireNonNull(request, "request");
         validProgress.report(ProjectLoadProgress.Phase.MANIFEST);
         GameProject project = loadProject(projectRoot);
-        Path startupScene =
-                project.runtime().startupScene().orElse(project.runtime().entryScene());
-        return load(project, startupScene, validProgress);
+        Path startupScene = validRequest
+                .scene()
+                .map(scene -> resolveRequestedScene(project, scene))
+                .orElseGet(() -> project.runtime()
+                        .startupScene()
+                        .orElse(project.runtime().entryScene()));
+        return load(project, startupScene, validRequest, validProgress);
     }
 
     /**
@@ -77,7 +105,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @return composed inactive gameplay project
      */
     public HostedProject loadEntry(Path projectRoot) {
-        return loadEntry(projectRoot, ignored -> {});
+        return loadEntry(projectRoot, ProjectLaunchRequest.standard(), ignored -> {});
     }
 
     /**
@@ -88,14 +116,52 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @return composed inactive gameplay project
      */
     public HostedProject loadEntry(Path projectRoot, ProjectLoadProgress progress) {
+        return loadEntry(projectRoot, ProjectLaunchRequest.standard(), progress);
+    }
+
+    /**
+     * Loads gameplay using an optional explicit scene and launch parameters.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @param request scene selection and project-defined parameters
+     * @return composed inactive gameplay project
+     */
+    public HostedProject loadEntry(Path projectRoot, ProjectLaunchRequest request) {
+        return loadEntry(projectRoot, request, ignored -> {});
+    }
+
+    /**
+     * Loads gameplay using an optional explicit scene while reporting synchronous milestones.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @param request scene selection and project-defined parameters
+     * @param progress load-progress receiver
+     * @return composed inactive gameplay project
+     */
+    public HostedProject loadEntry(Path projectRoot, ProjectLaunchRequest request, ProjectLoadProgress progress) {
         ProjectLoadProgress validProgress = Objects.requireNonNull(progress, "progress");
+        ProjectLaunchRequest validRequest = Objects.requireNonNull(request, "request");
         validProgress.report(ProjectLoadProgress.Phase.MANIFEST);
         GameProject project = loadProject(projectRoot);
-        return load(project, project.runtime().entryScene(), validProgress);
+        Path entryScene = validRequest
+                .scene()
+                .map(scene -> resolveRequestedScene(project, scene))
+                .orElse(project.runtime().entryScene());
+        return load(project, entryScene, validRequest, validProgress);
+    }
+
+    /** Resolves a validated request path against the loaded project boundary. */
+    private static Path resolveRequestedScene(GameProject project, Path requestedScene) {
+        Path selected = project.root().resolve(requestedScene).normalize();
+        if (!selected.startsWith(project.root())) {
+            throw new ProjectHostException("requested scene escapes the project: " + requestedScene);
+        }
+        return selected;
     }
 
     /** Composes one validated authored world while retaining the loaded project configuration. */
-    private HostedProject load(GameProject project, Path worldPath, ProjectLoadProgress progress) {
+    private HostedProject load(
+            GameProject project, Path worldPath, ProjectLaunchRequest request, ProjectLoadProgress progress) {
         progress.report(ProjectLoadProgress.Phase.EXTENSIONS);
         RegisteredTypeCatalog types = loadTypes(project);
         progress.report(ProjectLoadProgress.Phase.ASSETS);
@@ -123,7 +189,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
             throw failure;
         }
         HostedProject hosted =
-                new HostedProject(project, assets, composition.world().orElseThrow());
+                new HostedProject(project, assets, composition.world().orElseThrow(), request);
         progress.report(ProjectLoadProgress.Phase.APPLICATION);
         prepareApplication(hosted, extensions);
         progress.report(ProjectLoadProgress.Phase.READY);

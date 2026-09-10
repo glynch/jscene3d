@@ -56,6 +56,22 @@ final class FirstPersonCharacterController3dTest {
     }
 
     @Test
+    void adoptsExternallyStagedViewOrientationBeforeMoving() {
+        MutableInput input = new MutableInput();
+        RecordingBody body = new RecordingBody();
+        RecordingTransform view = new RecordingTransform();
+        FirstPersonCharacterController3d controller = controller(input);
+        controller.bindReferences(references(body, view));
+        view.setOrientation(0.0F, (float) Math.sin(Math.PI / 4.0), 0.0F, (float) Math.cos(Math.PI / 4.0));
+        input.snapshot = ActionSnapshot.builder().axis2d(MOVE, 0.0F, 1.0F).build();
+
+        controller.onBeforePhysics(new FixedUpdateContext(0, Duration.ofMillis(25), Duration.ZERO));
+
+        assertThat(body.velocity.x).isCloseTo(-8.0F, TOLERANCE);
+        assertThat(body.velocity.z).isCloseTo(0.0F, TOLERANCE);
+    }
+
+    @Test
     void consumesPointerMotionOncePerFrame() {
         MutableInput input = new MutableInput();
         RecordingTransform view = new RecordingTransform();
@@ -191,6 +207,11 @@ final class FirstPersonCharacterController3dTest {
     private static final class RecordingBody implements CharacterBody3d {
         private final Vector3f velocity = new Vector3f();
         private Duration step;
+
+        @Override
+        public void teleport(Vector3fc position, Quaternionfc orientation) {
+            throw new UnsupportedOperationException();
+        }
 
         @Override
         public CharacterMove3dResult move(Vector3fc planarVelocity, Duration fixedStep) {

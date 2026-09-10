@@ -51,10 +51,23 @@ public final class ProjectRuntimeHost implements ProjectHost {
 
     @Override
     public HostedProject load(Path projectRoot) {
+        return load(projectRoot, ignored -> {});
+    }
+
+    /**
+     * Loads the manifest-selected startup world while reporting synchronous milestones.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @param progress load-progress receiver
+     * @return composed inactive project
+     */
+    public HostedProject load(Path projectRoot, ProjectLoadProgress progress) {
+        ProjectLoadProgress validProgress = Objects.requireNonNull(progress, "progress");
+        validProgress.report(ProjectLoadProgress.Phase.MANIFEST);
         GameProject project = loadProject(projectRoot);
         Path startupScene =
                 project.runtime().startupScene().orElse(project.runtime().entryScene());
-        return load(project, startupScene);
+        return load(project, startupScene, validProgress);
     }
 
     /**
@@ -64,19 +77,38 @@ public final class ProjectRuntimeHost implements ProjectHost {
      * @return composed inactive gameplay project
      */
     public HostedProject loadEntry(Path projectRoot) {
+        return loadEntry(projectRoot, ignored -> {});
+    }
+
+    /**
+     * Loads the manifest-selected gameplay world while reporting synchronous milestones.
+     *
+     * @param projectRoot project directory containing {@code project.json}
+     * @param progress load-progress receiver
+     * @return composed inactive gameplay project
+     */
+    public HostedProject loadEntry(Path projectRoot, ProjectLoadProgress progress) {
+        ProjectLoadProgress validProgress = Objects.requireNonNull(progress, "progress");
+        validProgress.report(ProjectLoadProgress.Phase.MANIFEST);
         GameProject project = loadProject(projectRoot);
-        return load(project, project.runtime().entryScene());
+        return load(project, project.runtime().entryScene(), validProgress);
     }
 
     /** Composes one validated authored world while retaining the loaded project configuration. */
-    private HostedProject load(GameProject project, Path worldPath) {
+    private HostedProject load(GameProject project, Path worldPath, ProjectLoadProgress progress) {
+        progress.report(ProjectLoadProgress.Phase.EXTENSIONS);
         RegisteredTypeCatalog types = loadTypes(project);
+        progress.report(ProjectLoadProgress.Phase.ASSETS);
         AssetCatalog assets = loadAssets(project);
         AssetMetadata startup = startupAsset(worldPath, assets);
+        progress.report(ProjectLoadProgress.Phase.INPUT);
         Optional<InputMapDefinition> inputMap = loadInputMap(project);
         List<ComponentRuntimeExtension> extensions = runtimeExtensions();
+        progress.report(ProjectLoadProgress.Phase.CONTENT);
         ProjectContent content = loadContent(project, types, assets);
+        progress.report(ProjectLoadProgress.Phase.MODULES);
         List<WorldModuleBinding<?>> modules = List.copyOf(environment.createWorldModules(inputMap));
+        progress.report(ProjectLoadProgress.Phase.WORLD);
         WorldCompositionResult composition = WorldComposer.compose(
                 content.definitions(),
                 AssetRef.<WorldDefinition>to(startup.id()),
@@ -92,7 +124,9 @@ public final class ProjectRuntimeHost implements ProjectHost {
         }
         HostedProject hosted =
                 new HostedProject(project, assets, composition.world().orElseThrow());
+        progress.report(ProjectLoadProgress.Phase.APPLICATION);
         prepareApplication(hosted, extensions);
+        progress.report(ProjectLoadProgress.Phase.READY);
         return hosted;
     }
 

@@ -16,7 +16,12 @@ import io.github.glynch.jscene3d.platform.GamepadState;
 import io.github.glynch.jscene3d.platform.Key;
 import io.github.glynch.jscene3d.platform.MouseButton;
 import io.github.glynch.jscene3d.platform.Window;
+import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
+import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.HostedProject;
+import io.github.glynch.jscene3d.project.runtime.ProjectHostException;
+import io.github.glynch.jscene3d.project.runtime.ProjectLoadProgress;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeHost;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.render.Renderer;
@@ -37,6 +42,7 @@ public final class DesktopProjectRunner {
 
     private final ProjectRuntimeHost projectHost;
     private final DesktopApplicationState applicationState;
+    private final String engineVersion;
 
     /** Creates a runner using the standard project environment.
      *
@@ -45,9 +51,10 @@ public final class DesktopProjectRunner {
      * @param publishedImports read-only cache of published import generations
      */
     public DesktopProjectRunner(String engineVersion, ClassLoader classLoader, Path publishedImports) {
+        this.engineVersion = Objects.requireNonNull(engineVersion, "engineVersion");
         applicationState = new DesktopApplicationState();
         projectHost = new ProjectRuntimeHost(
-                Objects.requireNonNull(engineVersion, "engineVersion"),
+                this.engineVersion,
                 Objects.requireNonNull(classLoader, "classLoader"),
                 new StandardProjectEnvironment(publishedImports, applicationState::createControl));
     }
@@ -58,25 +65,35 @@ public final class DesktopProjectRunner {
      */
     public void run(Path projectRoot) {
         Path root = Objects.requireNonNull(projectRoot, "projectRoot");
+        GameProject project = loadProject(root);
         try (DesktopProjectSession session = new DesktopProjectSession(projectHost, applicationState, root)) {
-            session.start();
-            runLoaded(session);
+            runLoaded(session, project);
         }
     }
 
-    /** Owns native resources while one already composed project is active. */
-    private static void runLoaded(DesktopProjectSession session) {
-        String title = session.current().project.project().identity().name();
+    /** Owns native resources while startup and one composed project are active. */
+    private static void runLoaded(DesktopProjectSession session, GameProject project) {
+        String title = project.identity().name();
         try (Window window = Window.create(title);
                 Renderer renderer = Renderer.create(window);
                 GamepadState gamepad = new GamepadState(PRIMARY_GAMEPAD_SLOT)) {
+            DesktopLaunchSplash splash = DesktopLaunchSplash.load(project);
+            window.show();
+            session.start(phase -> splash.present(phase, renderer, window));
+            window.setTitle(title);
             runLoop(session, window, renderer, gamepad);
         }
     }
 
+    /** Reads launch presentation before opening the native application shell. */
+    private GameProject loadProject(Path projectRoot) {
+        ProjectLoadResult result = new ProjectLoader(engineVersion).load(projectRoot);
+        return result.project()
+                .orElseThrow(() -> new ProjectHostException("project manifest loading failed", result.diagnostics()));
+    }
+
     /** Activates and advances the project until the platform requests closure. */
     private static void runLoop(DesktopProjectSession session, Window window, Renderer renderer, GamepadState gamepad) {
-        window.show();
         long previousFrame = System.nanoTime();
         while (!window.shouldClose()) {
             RunningWorld current = session.current();
@@ -205,9 +222,9 @@ public final class DesktopProjectRunner {
         }
 
         /** Loads and activates the manifest-selected startup world. */
-        private void start() {
+        private void start(ProjectLoadProgress progress) {
             application.setResumeAvailable(false);
-            HostedProject loaded = host.load(projectRoot);
+            HostedProject loaded = host.load(projectRoot, progress);
             startupMenu = loaded.project().runtime().startupScene().isPresent();
             RunningWorld started = new RunningWorld(loaded, !startupMenu);
             if (startupMenu) {

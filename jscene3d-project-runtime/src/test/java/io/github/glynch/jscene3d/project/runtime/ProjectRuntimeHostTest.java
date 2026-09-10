@@ -25,6 +25,7 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -63,6 +64,18 @@ final class ProjectRuntimeHostTest {
             hosted.close();
             hosted.close();
             assertThat(hosted.world().isClosed()).isTrue();
+        }
+    }
+
+    /** Reports stable truthful phases around the existing synchronous host boundary. */
+    @Test
+    void reportsProjectLoadProgress() throws IOException {
+        Path projectRoot = writeProject("worlds/main.world.json");
+        List<ProjectLoadProgress.Phase> phases = new ArrayList<>();
+        try (URLClassLoader loader = runtimeClassLoader();
+                HostedProject ignored = runtimeHost(loader, environment(new RecordingApplicationExtension(), null))
+                        .load(projectRoot, phases::add)) {
+            assertThat(phases).containsExactly(ProjectLoadProgress.Phase.values());
         }
     }
 

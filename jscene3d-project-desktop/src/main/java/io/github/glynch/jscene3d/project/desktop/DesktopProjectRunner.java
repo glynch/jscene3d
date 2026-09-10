@@ -276,10 +276,7 @@ public final class DesktopProjectRunner {
         private final DesktopApplicationState application;
         private final Path projectRoot;
 
-        private @Nullable RunningWorld current;
-        private @Nullable RunningWorld menu;
-        private @Nullable RunningWorld gameplay;
-        private boolean startupMenu;
+        private @Nullable DesktopSessionLifecycle<RunningWorld> lifecycle;
 
         private DesktopProjectSession(ProjectRuntimeHost host, DesktopApplicationState application, Path projectRoot) {
             this.host = Objects.requireNonNull(host, "host");
@@ -291,22 +288,18 @@ public final class DesktopProjectRunner {
         private void start(ProjectLoadProgress progress) {
             application.setResumeAvailable(false);
             HostedProject loaded = host.load(projectRoot, progress);
-            startupMenu = loaded.project().runtime().startupScene().isPresent();
-            RunningWorld started = new RunningWorld(loaded, !startupMenu);
-            if (startupMenu) {
-                menu = started;
-            } else {
-                gameplay = started;
-            }
-            current = started;
+            boolean startupMenu = loaded.project().runtime().startupScene().isPresent();
+            DesktopSessionLifecycle<RunningWorld> started = new DesktopSessionLifecycle<>(startupMenu);
+            started.start(new RunningWorld(loaded, !startupMenu));
+            lifecycle = started;
         }
 
         /** Returns the currently presented world after startup. */
         private RunningWorld current() {
-            if (current == null) {
+            if (lifecycle == null) {
                 throw new IllegalStateException("desktop project session has not started");
             }
-            return current;
+            return lifecycle.current();
         }
 
         /** Applies at most one world-requested transition between completed host frames. */
@@ -320,68 +313,29 @@ public final class DesktopProjectRunner {
 
         /** Applies one host-owned application transition. */
         private boolean apply(ApplicationCommand command, ProjectLoadProgress progress) {
-            return switch (command) {
-                case SHOW_MENU -> showMenu();
-                case NEW_GAME -> newGame(progress);
-                case RESUME -> resume();
-                case QUIT -> false;
-            };
-        }
-
-        /** Opens a fresh menu world while retaining and no longer advancing gameplay. */
-        private boolean showMenu() {
-            if (!startupMenu || gameplay == null || current != gameplay) {
-                return true;
-            }
-            application.setResumeAvailable(true);
-            menu = new RunningWorld(host.load(projectRoot), false);
-            current = menu;
-            return true;
-        }
-
-        /** Replaces all previous gameplay state with a fresh entry world. */
-        private boolean newGame(ProjectLoadProgress progress) {
-            RunningWorld replacement = new RunningWorld(host.loadEntry(projectRoot, progress), true);
-            closeMenu();
-            closeGameplay();
-            application.setResumeAvailable(false);
-            gameplay = replacement;
-            current = gameplay;
-            return true;
-        }
-
-        /** Closes the menu and returns to the retained gameplay world when available. */
-        private boolean resume() {
-            if (gameplay == null || current != menu) {
-                return true;
-            }
-            closeMenu();
-            application.setResumeAvailable(false);
-            current = gameplay;
-            return true;
+            DesktopSessionLifecycle<RunningWorld> active = requireLifecycle();
+            boolean continueRunning = active.apply(
+                    command,
+                    () -> new RunningWorld(host.load(projectRoot), false),
+                    () -> new RunningWorld(host.loadEntry(projectRoot, progress), true));
+            application.setResumeAvailable(active.canResume());
+            return continueRunning;
         }
 
         @Override
         public void close() {
-            current = null;
-            closeMenu();
-            closeGameplay();
-        }
-
-        /** Closes and forgets the current menu world. */
-        private void closeMenu() {
-            if (menu != null) {
-                menu.close();
-                menu = null;
+            if (lifecycle != null) {
+                lifecycle.close();
+                lifecycle = null;
             }
         }
 
-        /** Closes and forgets the current gameplay world. */
-        private void closeGameplay() {
-            if (gameplay != null) {
-                gameplay.close();
-                gameplay = null;
+        /** Returns initialized lifecycle state for one transition. */
+        private DesktopSessionLifecycle<RunningWorld> requireLifecycle() {
+            if (lifecycle == null) {
+                throw new IllegalStateException("desktop project session has not started");
             }
+            return lifecycle;
         }
     }
 }

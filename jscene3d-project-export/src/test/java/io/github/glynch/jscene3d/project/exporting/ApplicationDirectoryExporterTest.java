@@ -74,10 +74,14 @@ final class ApplicationDirectoryExporterTest {
                         "lib/engine.jar",
                         "lib/sample-game.jar",
                         "project/LICENSE",
+                        "project/branding/background.png",
+                        "project/branding/powered-by.png",
+                        "project/branding/title.png",
                         "project/config/input-map.json",
                         "project/entities/item.entity.json",
                         "project/imports/model.import.json",
                         "project/project.json",
+                        "project/resources/menu-background.resource.json",
                         "project/resources/runtime.bin",
                         "project/worlds/start.world.json");
     }
@@ -198,6 +202,10 @@ final class ApplicationDirectoryExporterTest {
         write(projectRoot.resolve("worlds/start.world.json"), definition("world-definition"));
         write(projectRoot.resolve("entities/item.entity.json"), definition("entity-definition"));
         write(projectRoot.resolve("config/input-map.json"), "{}");
+        write(projectRoot.resolve("branding/background.png"), "background");
+        write(projectRoot.resolve("branding/title.png"), "title");
+        write(projectRoot.resolve("branding/powered-by.png"), "badge");
+        write(projectRoot.resolve("resources/menu-background.resource.json"), encodedImageResource());
         write(projectRoot.resolve("resources/runtime.bin"), "runtime resource");
         write(projectRoot.resolve("assets/model.gltf"), "raw import source");
         write(projectRoot.resolve("imports/model.import.json"), importDefinition());
@@ -232,6 +240,14 @@ final class ApplicationDirectoryExporterTest {
                     "entryScene": "worlds/start.world.json",
                     "inputMap": "config/input-map.json"
                   },
+                  "launch": {
+                    "splash": {
+                      "background": "branding/background.png",
+                      "title": "branding/title.png",
+                      "poweredByBadges": ["branding/powered-by.png"],
+                      "minimumDurationSeconds": 2.0
+                    }
+                  },
                   "extensions": [
                     {
                       "id": "io.github.glynch.sample-game",
@@ -239,6 +255,11 @@ final class ApplicationDirectoryExporterTest {
                     }
                   ],
                   "assets": [
+                    {
+                      "id": "menu-background",
+                      "type": "io.github.glynch.sample/overlay-image",
+                      "path": "resources/menu-background.resource.json"
+                    },
                     {
                       "id": "model",
                       "type": "io.github.glynch.sample/model-source",
@@ -252,6 +273,22 @@ final class ApplicationDirectoryExporterTest {
                   ],
                   "imports": ["imports/model.import.json"],
                   "exportPresets": ["export/desktop.json"]
+                }
+                """;
+    }
+
+    /** Returns one resource definition with an authored project payload dependency. */
+    private static String encodedImageResource() {
+        return """
+                {
+                  "$schema": "https://jscene3d.org/schemas/resource-1.json",
+                  "schemaVersion": 1,
+                  "type": "io.github.glynch.sample/overlay-image",
+                  "typeVersion": 1,
+                  "properties": {
+                    "payload": {"$ref": "project:branding/background.png"},
+                    "encoding": "png"
+                  }
                 }
                 """;
     }

@@ -15,6 +15,11 @@ import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
+import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
+import io.github.glynch.jscene3d.project.resource.ResourceLoadResult;
+import io.github.glynch.jscene3d.project.resource.ResourceLoader;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
+import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -166,14 +171,75 @@ public final class ExportPlan {
         addProjectFile(project, files, project.root().resolve(ProjectLoader.MANIFEST_NAME));
         catalog.assets().stream().map(AssetMetadata::path).forEach(path -> addProjectFile(project, files, path));
         addProjectFile(project, files, project.runtime().entryScene());
+        project.runtime().startupScene().ifPresent(path -> addProjectFile(project, files, path));
         project.runtime().projectSystems().ifPresent(path -> addProjectFile(project, files, path));
         project.runtime().inputMap().ifPresent(path -> addProjectFile(project, files, path));
         project.imports().forEach(path -> addProjectFile(project, files, path));
         addLegalFiles(project, files);
         addRuntimeAssetSources(project, imports, files);
+        addLaunchFiles(project, files);
+        addProjectResourcePayloads(project, imports, files);
         return files.values().stream()
                 .sorted(Comparator.comparing(file -> portablePath(file.destination())))
                 .toList();
+    }
+
+    /** Adds every project-owned image referenced directly by launch presentation. */
+    private static void addLaunchFiles(GameProject project, Map<Path, ExportFile> files) {
+        project.launch().splash().ifPresent(splash -> {
+            addProjectFile(project, files, splash.background());
+            addProjectFile(project, files, splash.title());
+            splash.studioLogo().ifPresent(path -> addProjectFile(project, files, path));
+            splash.poweredByBadges().forEach(path -> addProjectFile(project, files, path));
+        });
+    }
+
+    /** Adds project-file dependencies declared inside runtime-native resource documents. */
+    private static void addProjectResourcePayloads(
+            GameProject project, List<ImportDefinition> imports, Map<Path, ExportFile> files) {
+        Set<Path> importedSources = imports.stream()
+                .map(ImportDefinition::asset)
+                .map(GameProject.AssetSource::path)
+                .collect(Collectors.toUnmodifiableSet());
+        ResourceLoader loader = new ResourceLoader();
+        project.assets().stream()
+                .map(GameProject.AssetSource::path)
+                .filter(path -> !importedSources.contains(path))
+                .filter(ExportPlan::isResourceDefinition)
+                .forEach(path -> addResourcePayloads(project, loader, path, files));
+    }
+
+    /** Loads one authored resource document and adds its project-reference dependencies. */
+    private static void addResourcePayloads(
+            GameProject project, ResourceLoader loader, Path path, Map<Path, ExportFile> files) {
+        ResourceLoadResult result = loader.load(project, path);
+        ResourceDefinition definition =
+                result.resource().orElseThrow(() -> invalidDefinition("resource", result.diagnostics()));
+        definition.properties().values().forEach(value -> addProjectReferences(project, value, files));
+    }
+
+    /** Recursively collects project references from one portable resource property. */
+    private static void addProjectReferences(GameProject project, ProjectValue value, Map<Path, ExportFile> files) {
+        switch (value) {
+            case ProjectValue.ReferenceValue reference -> {
+                if (reference.reference().kind() == ResourceReference.Kind.PROJECT) {
+                    addProjectFile(
+                            project, files, reference.reference().projectPath().orElseThrow());
+                }
+            }
+            case ProjectValue.ArrayValue array ->
+                array.values().forEach(element -> addProjectReferences(project, element, files));
+            case ProjectValue.ObjectValue object ->
+                object.values().values().forEach(element -> addProjectReferences(project, element, files));
+            default -> {
+                // Scalar and entity-target values cannot contain project-file dependencies.
+            }
+        }
+    }
+
+    /** Identifies the stable authored resource-document suffix. */
+    private static boolean isResourceDefinition(Path path) {
+        return path.getFileName().toString().endsWith(".resource.json");
     }
 
     /** Adds optional branding and legal documents declared by the manifest. */

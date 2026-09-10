@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,8 @@ import org.junit.jupiter.api.Test;
 final class GamePresentationResourceTest {
     private static final ResourceReference PAYLOAD = ResourceReference.imported("presentation/pistol.pcm16le");
     private static final ResourceReference IMAGE_PAYLOAD = ResourceReference.imported("presentation/digit.rgba8");
+    private static final byte[] ONE_PIXEL_PNG = Base64.getDecoder()
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
 
     /** Round-trips signed stereo PCM and enforces terminal resource ownership. */
     @Test
@@ -123,6 +126,44 @@ final class GamePresentationResourceTest {
         assertThatThrownBy(resource::image).isInstanceOf(IllegalStateException.class);
     }
 
+    /** Decodes an authored PNG payload without requiring dimensions or importer-side conversion. */
+    @Test
+    void loadsEncodedOverlayImageResource() throws IOException {
+        ByteArrayOutputStream definitionOutput = new ByteArrayOutputStream();
+        GamePresentationResourceWriter.writeEncodedOverlayImageDefinition(definitionOutput, "png", IMAGE_PAYLOAD);
+        OverlayImageResource resource = overlayImageLoader()
+                .load(encodedImageDefinition("png"), reference -> new ByteArrayInputStream(ONE_PIXEL_PNG));
+
+        assertThat(new String(definitionOutput.toByteArray(), StandardCharsets.UTF_8))
+                .contains("\"encoding\" : \"png\"")
+                .doesNotContain("\"width\"")
+                .doesNotContain("\"height\"");
+        assertThat(resource.image().width()).isEqualTo(1);
+        assertThat(resource.image().height()).isEqualTo(1);
+    }
+
+    /** Rejects unsupported or structurally invalid authored image encodings. */
+    @Test
+    void rejectsInvalidEncodedOverlayImages() {
+        ResourceDefinition nonTextEncoding = new ResourceDefinition(
+                URI.create("import:presentation/authored-image"),
+                GamePresentationDescriptors.overlayImageResourceType(),
+                Map.of("payload", new ProjectValue.ReferenceValue(IMAGE_PAYLOAD), "encoding", number(1)));
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> GamePresentationResourceWriter.writeEncodedOverlayImageDefinition(
+                        new ByteArrayOutputStream(), "gif", IMAGE_PAYLOAD))
+                .withMessageContaining("png or jpeg");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> overlayImageLoader()
+                        .load(encodedImageDefinition("gif"), reference -> new ByteArrayInputStream(ONE_PIXEL_PNG)))
+                .withMessageContaining("png or jpeg");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> overlayImageLoader()
+                        .load(nonTextEncoding, reference -> new ByteArrayInputStream(ONE_PIXEL_PNG)))
+                .withMessageContaining("png or jpeg");
+    }
+
     /** Returns the typed PCM loader from the public heterogeneous collection. */
     @SuppressWarnings("unchecked")
     private static RuntimeResourceLoader<PcmAudioResource> loader() {
@@ -170,6 +211,16 @@ final class GamePresentationResourceTest {
                         "payload", new ProjectValue.ReferenceValue(IMAGE_PAYLOAD),
                         "width", number(width),
                         "height", number(height)));
+    }
+
+    /** Builds one encoded overlay-image definition without raw-pixel dimensions. */
+    private static ResourceDefinition encodedImageDefinition(String encoding) {
+        return new ResourceDefinition(
+                URI.create("import:presentation/authored-image"),
+                GamePresentationDescriptors.overlayImageResourceType(),
+                Map.of(
+                        "payload", new ProjectValue.ReferenceValue(IMAGE_PAYLOAD),
+                        "encoding", new ProjectValue.TextValue(encoding)));
     }
 
     /** Creates one portable integer value. */

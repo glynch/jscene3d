@@ -88,6 +88,30 @@ public final class GamePresentationResourceWriter {
     }
 
     /**
+     * Writes one overlay-image resource document backed directly by an authored PNG or JPEG.
+     *
+     * @param output destination for the resource document
+     * @param encoding exact {@code png} or {@code jpeg} encoding
+     * @param payloadReference authored image payload reference
+     * @throws IOException if the document cannot be written
+     */
+    public static void writeEncodedOverlayImageDefinition(
+            OutputStream output, String encoding, ResourceReference payloadReference) throws IOException {
+        String validEncoding = Objects.requireNonNull(encoding, "encoding");
+        if (!(validEncoding.equals("png") || validEncoding.equals("jpeg"))) {
+            throw new IllegalArgumentException("overlay image encoding must be png or jpeg");
+        }
+        ResourceWriter.write(
+                Objects.requireNonNull(output, "output"),
+                GamePresentationDescriptors.overlayImageResourceType(),
+                Map.of(
+                        "payload",
+                                new ProjectValue.ReferenceValue(
+                                        Objects.requireNonNull(payloadReference, "payloadReference")),
+                        "encoding", new ProjectValue.TextValue(validEncoding)));
+    }
+
+    /**
      * Writes one exact row-major sRGB RGBA overlay-image payload.
      *
      * @param output destination for the payload

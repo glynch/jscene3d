@@ -34,6 +34,7 @@ public final class GamePresentationDescriptors {
     private static final CapabilityId SCREEN_CONTENT_CAPABILITY = new CapabilityId(EXTENSION_ID + "/screen-content");
     private static final CapabilityId SCREEN_NUMBER_CAPABILITY = new CapabilityId(EXTENSION_ID + "/screen-number");
     private static final PropertyId PAYLOAD = new PropertyId("payload");
+    private static final PropertyId ENCODING = new PropertyId("encoding");
     private static final PropertyId WIDTH = new PropertyId("width");
     private static final PropertyId HEIGHT = new PropertyId("height");
     private static final PropertyId REFERENCE_WIDTH = new PropertyId("reference-width");
@@ -239,7 +240,7 @@ public final class GamePresentationDescriptors {
                 List.of());
     }
 
-    /** Describes one immutable row-major sRGB RGBA image used by screen presentation. */
+    /** Describes one immutable encoded or row-major sRGB RGBA image used by screen presentation. */
     private static RegisteredTypeDescriptor overlayImageDescriptor() {
         return new RegisteredTypeDescriptor(
                 OVERLAY_IMAGE_RESOURCE,
@@ -247,8 +248,9 @@ public final class GamePresentationDescriptors {
                 DescriptorPresentation.described("Overlay image", "Immutable row-major sRGB RGBA screen image"),
                 List.of(
                         required(PAYLOAD, ProjectValueKind.REFERENCE, "Payload"),
-                        required(WIDTH, ProjectValueKind.NUMBER, "Width"),
-                        required(HEIGHT, ProjectValueKind.NUMBER, "Height")),
+                        optional(ENCODING, ProjectValueKind.TEXT, "Encoding"),
+                        optional(WIDTH, ProjectValueKind.NUMBER, "Width"),
+                        optional(HEIGHT, ProjectValueKind.NUMBER, "Height")),
                 List.of(),
                 List.of(),
                 List.of());
@@ -311,6 +313,10 @@ public final class GamePresentationDescriptors {
 
     private static PropertyDescriptor required(PropertyId id, ProjectValueKind kind, String name) {
         return PropertyDescriptor.required(id.value(), kind, DescriptorPresentation.named(name), Map.of(), Set.of());
+    }
+
+    private static PropertyDescriptor optional(PropertyId id, ProjectValueKind kind, String name) {
+        return PropertyDescriptor.optional(id.value(), kind, DescriptorPresentation.named(name), Map.of(), Set.of());
     }
 
     private static PropertyDescriptor positiveNumber(PropertyId id, String name) {

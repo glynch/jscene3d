@@ -31,6 +31,18 @@ public final class OverlayImageLoader {
     }
 
     /**
+     * Loads encoded PNG or JPEG bytes as a top-row-first sRGB RGBA8 overlay image.
+     *
+     * @param encoded complete PNG or JPEG payload
+     * @return immutable full-color overlay image
+     * @throws NullPointerException if {@code encoded} is {@code null}
+     * @throws TextureLoadException if the payload has an unsupported signature or cannot be decoded
+     */
+    public static OverlayImage load(byte[] encoded) {
+        return ImageDecoder.decode(Path.of("<encoded-overlay-image>"), encoded, OverlayImage::srgbRgba);
+    }
+
+    /**
      * Loads a PNG or JPEG classpath resource as a top-row-first sRGB RGBA8 overlay image.
      *
      * <p>A name beginning with {@code /} is resolved from the classpath root. Other names are

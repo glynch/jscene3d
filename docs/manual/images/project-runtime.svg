@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 720" role="img" aria-labelledby="title description">
+  <title id="title">JScene3D desktop and editor project pipelines</title>
+  <desc id="description">Authored project files and safe descriptors feed separate executable and editor pipelines. The executable path loads runtime extensions and produces an active world. The editor path uses inert implementations and produces a preview world.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#536878"/>
+    </marker>
+    <style>
+      .label { font: 600 18px system-ui, sans-serif; fill: #17202a; }
+      .detail { font: 14px system-ui, sans-serif; fill: #34495e; }
+      .lane { font: 700 21px system-ui, sans-serif; fill: #17202a; }
+      .box { stroke-width: 3; rx: 12; }
+      .arrow { fill: none; stroke: #536878; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1220" height="720" fill="#f7f9fb"/>
+  <line x1="320" y1="360" x2="1180" y2="360" stroke="#c9d2d9" stroke-width="2"/>
+  <text class="lane" x="350" y="45">Executable project</text>
+  <text class="lane" x="350" y="405">Editor preview</text>
+  <rect class="box" x="35" y="90" width="240" height="150" fill="#fff2cc" stroke="#bf9000"/>
+  <text class="label" x="155" y="128" text-anchor="middle">Authored project</text>
+  <text class="detail" x="155" y="162" text-anchor="middle">Manifest + definitions</text>
+  <text class="detail" x="155" y="188" text-anchor="middle">Assets + imports</text>
+  <text class="detail" x="155" y="214" text-anchor="middle">Launch configuration</text>
+  <rect class="box" x="35" y="480" width="240" height="130" fill="#d9d2e9" stroke="#674ea7"/>
+  <text class="label" x="155" y="518" text-anchor="middle">Extension descriptors</text>
+  <text class="detail" x="155" y="552" text-anchor="middle">Safe schemas</text>
+  <text class="detail" x="155" y="578" text-anchor="middle">Capabilities + actions</text>
+  <rect class="box" x="350" y="90" width="225" height="110" fill="#fce5cd" stroke="#b45f06"/>
+  <text class="label" x="462" y="132" text-anchor="middle">Runtime extensions</text>
+  <text class="detail" x="462" y="165" text-anchor="middle">Java implementations</text>
+  <rect class="box" x="350" y="235" width="225" height="90" fill="#cfe2f3" stroke="#0b5394"/>
+  <text class="label" x="462" y="272" text-anchor="middle">ProjectRuntimeHost</text>
+  <text class="detail" x="462" y="300" text-anchor="middle">Loads + composes</text>
+  <rect class="box" x="660" y="190" width="205" height="100" fill="#d9ead3" stroke="#38761d"/>
+  <text class="label" x="762" y="229" text-anchor="middle">HostedProject</text>
+  <text class="detail" x="762" y="258" text-anchor="middle">Inactive World</text>
+  <rect class="box" x="950" y="190" width="220" height="100" fill="#ead1dc" stroke="#a64d79"/>
+  <text class="label" x="1060" y="229" text-anchor="middle">Desktop player</text>
+  <text class="detail" x="1060" y="258" text-anchor="middle">Activates + advances World</text>
+  <rect class="box" x="350" y="465" width="225" height="90" fill="#cfe2f3" stroke="#0b5394"/>
+  <text class="label" x="462" y="502" text-anchor="middle">EditorProjectLoader</text>
+  <text class="detail" x="462" y="530" text-anchor="middle">Read-only project state</text>
+  <rect class="box" x="660" y="465" width="205" height="90" fill="#d0e0e3" stroke="#45818e"/>
+  <text class="label" x="762" y="502" text-anchor="middle">EditorWorldPreview</text>
+  <text class="detail" x="762" y="530" text-anchor="middle">Inert composition</text>
+  <rect class="box" x="950" y="465" width="220" height="90" fill="#d0e0e3" stroke="#45818e"/>
+  <text class="label" x="1060" y="502" text-anchor="middle">Editor</text>
+  <text class="detail" x="1060" y="530" text-anchor="middle">Inspects Preview World</text>
+  <rect class="box" x="350" y="610" width="225" height="70" fill="#e8eef2" stroke="#607d8b"/>
+  <text class="label" x="462" y="640" text-anchor="middle">Inert implementations</text>
+  <text class="detail" x="462" y="663" text-anchor="middle">Safe behavior substitutes</text>
+  <path class="arrow" d="M275 150 C310 150 315 265 350 275"/>
+  <path class="arrow" d="M275 520 C310 520 315 300 350 285"/>
+  <path class="arrow" d="M462 200 L462 235"/>
+  <path class="arrow" d="M575 280 L660 240"/>
+  <path class="arrow" d="M865 240 L950 240"/>
+  <path class="arrow" d="M275 170 C315 260 300 485 350 505"/>
+  <path class="arrow" d="M275 545 L350 520"/>
+  <path class="arrow" d="M575 510 L660 510"/>
+  <path class="arrow" d="M575 645 C625 645 610 545 660 525"/>
+  <path class="arrow" d="M865 510 L950 510"/>
+</svg>

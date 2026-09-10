@@ -4,6 +4,15 @@ JScene3D is a modular Java 21 3D engine with a renderer-independent scene graph,
 OpenGL desktop backend, physics, audio, asset import, descriptor-authored entity
 worlds, application export, and a JavaFX editor preview.
 
+## Learn JScene3D
+
+Start with the [JScene3D manual](docs/manual/README.md). Its rendering
+fundamentals chapter builds a rotating cube while explaining scenes, cameras,
+geometry, materials, meshes, lighting, and the native frame loop. The project
+fundamentals chapter then introduces authored worlds, hierarchical entities,
+components, descriptors, runtime extensions, desktop execution, and editor-safe
+preview.
+
 ## Requirements
 
 - A Java 21 or newer JDK.

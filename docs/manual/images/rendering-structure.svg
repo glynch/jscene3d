@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title description">
+  <title id="title">JScene3D rendering structure</title>
+  <desc id="description">A scene and camera flow into a renderer. The renderer targets a render surface supplied by a window and produces a displayed frame.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#536878"/>
+    </marker>
+    <style>
+      .label { font: 600 22px system-ui, sans-serif; fill: #17202a; }
+      .detail { font: 16px system-ui, sans-serif; fill: #34495e; }
+      .box { stroke-width: 3; rx: 12; }
+      .arrow { fill: none; stroke: #536878; stroke-width: 4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="960" height="440" fill="#f7f9fb"/>
+  <rect class="box" x="55" y="75" width="210" height="120" fill="#d9ead3" stroke="#38761d"/>
+  <text class="label" x="160" y="120" text-anchor="middle">Scene</text>
+  <text class="detail" x="160" y="153" text-anchor="middle">Object hierarchy</text>
+  <rect class="box" x="55" y="245" width="210" height="120" fill="#d9d2e9" stroke="#674ea7"/>
+  <text class="label" x="160" y="290" text-anchor="middle">Camera</text>
+  <text class="detail" x="160" y="323" text-anchor="middle">View + projection</text>
+  <rect class="box" x="375" y="160" width="210" height="120" fill="#cfe2f3" stroke="#0b5394"/>
+  <text class="label" x="480" y="205" text-anchor="middle">Renderer</text>
+  <text class="detail" x="480" y="238" text-anchor="middle">Builds the frame</text>
+  <rect class="box" x="690" y="75" width="215" height="120" fill="#fce5cd" stroke="#b45f06"/>
+  <text class="label" x="797" y="120" text-anchor="middle">RenderSurface</text>
+  <text class="detail" x="797" y="153" text-anchor="middle">Framebuffer target</text>
+  <rect class="box" x="690" y="245" width="215" height="120" fill="#ead1dc" stroke="#a64d79"/>
+  <text class="label" x="797" y="290" text-anchor="middle">Window</text>
+  <text class="detail" x="797" y="323" text-anchor="middle">Presents the frame</text>
+  <path class="arrow" d="M265 135 C325 135 320 195 375 205"/>
+  <path class="arrow" d="M265 305 C325 305 320 245 375 235"/>
+  <path class="arrow" d="M585 205 C635 190 640 145 690 135"/>
+  <path class="arrow" d="M797 195 L797 245"/>
+</svg>

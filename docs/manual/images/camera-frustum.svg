@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title description">
+  <title id="title">Perspective camera frustum</title>
+  <desc id="description">A top-down camera view showing near and far clipping planes, the visible frustum, and objects inside and outside it.</desc>
+  <defs>
+    <style>
+      .label { font: 600 19px system-ui, sans-serif; fill: #17202a; }
+      .detail { font: 16px system-ui, sans-serif; fill: #34495e; }
+    </style>
+  </defs>
+  <rect width="960" height="480" fill="#f7f9fb"/>
+  <path d="M115 240 L790 55 L790 425 Z" fill="#d9ead3" stroke="#38761d" stroke-width="3"/>
+  <path d="M115 240 L790 55 M115 240 L790 425" fill="none" stroke="#38761d" stroke-width="3"/>
+  <line x1="205" y1="215" x2="205" y2="265" stroke="#674ea7" stroke-width="6"/>
+  <line x1="790" y1="55" x2="790" y2="425" stroke="#b45f06" stroke-width="6"/>
+  <path d="M65 215 L115 240 L65 265 Z" fill="#cfe2f3" stroke="#0b5394" stroke-width="3"/>
+  <circle cx="470" cy="235" r="28" fill="#44aa88" stroke="#1e6b55" stroke-width="3"/>
+  <circle cx="480" cy="60" r="28" fill="#ea9999" stroke="#990000" stroke-width="3"/>
+  <circle cx="865" cy="240" r="28" fill="#ea9999" stroke="#990000" stroke-width="3"/>
+  <text class="label" x="75" y="315">Camera</text>
+  <text class="label" x="170" y="195">Near</text>
+  <text class="label" x="755" y="35">Far</text>
+  <text class="label" x="405" y="330">Visible frustum</text>
+  <text class="detail" x="430" y="282">rendered</text>
+  <text class="detail" x="434" y="30">outside FOV</text>
+  <text class="detail" x="815" y="290">past far plane</text>
+</svg>

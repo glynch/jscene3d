@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 560" role="img" aria-labelledby="title description">
+  <title id="title">Scene graph with shared geometry</title>
+  <desc id="description">A scene owns three meshes and a camera. Each mesh has its own transform and material while all three reference one shared box geometry.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#536878"/>
+    </marker>
+    <style>
+      .label { font: 600 20px system-ui, sans-serif; fill: #17202a; }
+      .detail { font: 15px system-ui, sans-serif; fill: #34495e; }
+      .edge { fill: none; stroke: #536878; stroke-width: 3; marker-end: url(#arrow); }
+      .reference { fill: none; stroke: #b45f06; stroke-width: 3; stroke-dasharray: 8 7; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1040" height="560" fill="#f7f9fb"/>
+  <rect x="425" y="35" width="190" height="70" rx="12" fill="#d9ead3" stroke="#38761d" stroke-width="3"/>
+  <text class="label" x="520" y="78" text-anchor="middle">Scene</text>
+  <rect x="55" y="180" width="190" height="90" rx="12" fill="#d9d2e9" stroke="#674ea7" stroke-width="3"/>
+  <text class="label" x="150" y="220" text-anchor="middle">Camera</text>
+  <text class="detail" x="150" y="246" text-anchor="middle">Independent view</text>
+  <g>
+    <rect x="295" y="180" width="190" height="90" rx="12" fill="#cfe2f3" stroke="#0b5394" stroke-width="3"/>
+    <text class="label" x="390" y="220" text-anchor="middle">Mesh A</text>
+    <text class="detail" x="390" y="246" text-anchor="middle">Transform x = -2</text>
+  </g>
+  <g>
+    <rect x="535" y="180" width="190" height="90" rx="12" fill="#cfe2f3" stroke="#0b5394" stroke-width="3"/>
+    <text class="label" x="630" y="220" text-anchor="middle">Mesh B</text>
+    <text class="detail" x="630" y="246" text-anchor="middle">Transform x = 0</text>
+  </g>
+  <g>
+    <rect x="775" y="180" width="190" height="90" rx="12" fill="#cfe2f3" stroke="#0b5394" stroke-width="3"/>
+    <text class="label" x="870" y="220" text-anchor="middle">Mesh C</text>
+    <text class="detail" x="870" y="246" text-anchor="middle">Transform x = 2</text>
+  </g>
+  <rect x="425" y="430" width="190" height="80" rx="12" fill="#fce5cd" stroke="#b45f06" stroke-width="3"/>
+  <text class="label" x="520" y="465" text-anchor="middle">BoxGeometry</text>
+  <text class="detail" x="520" y="489" text-anchor="middle">Shared vertex data</text>
+  <path class="edge" d="M485 105 C420 130 240 130 165 180"/>
+  <path class="edge" d="M500 105 L405 180"/>
+  <path class="edge" d="M540 105 L615 180"/>
+  <path class="edge" d="M570 105 C650 130 800 130 855 180"/>
+  <path class="reference" d="M390 270 C390 340 455 355 495 430"/>
+  <path class="reference" d="M630 270 C630 340 575 355 545 430"/>
+  <path class="reference" d="M870 270 C800 365 650 360 580 430"/>
+  <text class="detail" x="765" y="402" fill="#b45f06">dashed = resource reference</text>
+</svg>

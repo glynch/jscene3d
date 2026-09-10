@@ -8,7 +8,7 @@ import java.time.Duration;
 import java.util.Objects;
 
 /** Process launch policy separating the one-time splash from later world loads. */
-final class DesktopLaunchPolicy {
+final class InitialSplashPolicy {
     private boolean initialSplashAvailable = true;
 
     /** Claims the process's one permitted initial splash presentation. */

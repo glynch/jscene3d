@@ -12,7 +12,7 @@ import io.github.glynch.jscene3d.render.Renderer;
 import java.util.Objects;
 
 /** Persistent native failure surface used when startup cannot reach the main menu. */
-final class DesktopStartupFailure {
+final class DesktopStartupErrorScreen {
     private static final Color BACKGROUND = Color.srgb(0x100b0d);
     private static final Color PANEL = Color.srgb(0x571821);
     private static final Color ACCENT = Color.srgb(0xef354c);
@@ -20,7 +20,7 @@ final class DesktopStartupFailure {
     private final String windowTitle;
 
     /** Creates a concise title from one startup failure. */
-    DesktopStartupFailure(String projectName, RuntimeException failure) {
+    DesktopStartupErrorScreen(String projectName, RuntimeException failure) {
         Objects.requireNonNull(projectName, "projectName");
         Objects.requireNonNull(failure, "failure");
         String detail = failure.getMessage();

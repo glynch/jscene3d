@@ -9,10 +9,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
-final class DesktopLaunchPolicyTest {
+final class InitialSplashPolicyTest {
     @Test
     void grantsTheInitialSplashOnlyOnce() {
-        DesktopLaunchPolicy policy = new DesktopLaunchPolicy();
+        InitialSplashPolicy policy = new InitialSplashPolicy();
 
         assertThat(policy.claimInitialSplash()).isTrue();
         assertThat(policy.claimInitialSplash()).isFalse();
@@ -23,11 +23,11 @@ final class DesktopLaunchPolicyTest {
         long shownAt = 1_000_000_000L;
         Duration minimum = Duration.ofSeconds(2);
 
-        assertThat(DesktopLaunchPolicy.minimumElapsed(shownAt, shownAt, minimum))
+        assertThat(InitialSplashPolicy.minimumElapsed(shownAt, shownAt, minimum))
                 .isFalse();
-        assertThat(DesktopLaunchPolicy.minimumElapsed(shownAt, shownAt + minimum.toNanos() - 1L, minimum))
+        assertThat(InitialSplashPolicy.minimumElapsed(shownAt, shownAt + minimum.toNanos() - 1L, minimum))
                 .isFalse();
-        assertThat(DesktopLaunchPolicy.minimumElapsed(shownAt, shownAt + minimum.toNanos(), minimum))
+        assertThat(InitialSplashPolicy.minimumElapsed(shownAt, shownAt + minimum.toNanos(), minimum))
                 .isTrue();
     }
 }

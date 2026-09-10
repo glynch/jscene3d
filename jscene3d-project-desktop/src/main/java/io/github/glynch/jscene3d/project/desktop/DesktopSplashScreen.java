@@ -18,7 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Project-owned launch artwork and truthful synchronous loading feedback. */
-final class DesktopLaunchSplash {
+final class DesktopSplashScreen {
     private static final Color TRACK_COLOR = Color.srgb(0x252b30);
     private static final Color PROGRESS_COLOR = Color.srgb(0xef762f);
 
@@ -31,7 +31,7 @@ final class DesktopLaunchSplash {
     private ProjectLoadProgressReporter.Phase phase = ProjectLoadProgressReporter.Phase.MANIFEST;
 
     /** Loads configured launch images before any runtime world is composed. */
-    private DesktopLaunchSplash(String projectName, Optional<GameProject.SplashConfiguration> configuration) {
+    private DesktopSplashScreen(String projectName, Optional<GameProject.SplashConfiguration> configuration) {
         this.projectName = Objects.requireNonNull(projectName, "projectName");
         background =
                 configuration.map(GameProject.SplashConfiguration::background).map(OverlayImageLoader::load);
@@ -49,9 +49,9 @@ final class DesktopLaunchSplash {
     }
 
     /** Creates launch presentation for one validated project. */
-    static DesktopLaunchSplash load(GameProject project) {
+    static DesktopSplashScreen load(GameProject project) {
         GameProject validProject = Objects.requireNonNull(project, "project");
-        return new DesktopLaunchSplash(
+        return new DesktopSplashScreen(
                 validProject.identity().name(), validProject.launch().splash());
     }
 

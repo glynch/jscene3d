@@ -40,7 +40,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class DesktopProjectRunner {
     private static final int PRIMARY_GAMEPAD_SLOT = 0;
-    private static final DesktopLaunchPolicy LAUNCH_POLICY = new DesktopLaunchPolicy();
+    private static final InitialSplashPolicy LAUNCH_POLICY = new InitialSplashPolicy();
 
     private final ProjectRuntimeHost projectHost;
     private final DesktopApplicationState applicationState;
@@ -96,11 +96,11 @@ public final class DesktopProjectRunner {
         try (Window window = Window.create(title);
                 Renderer renderer = Renderer.create(window);
                 GamepadState gamepad = new GamepadState(PRIMARY_GAMEPAD_SLOT)) {
-            DesktopLaunchSplash splash;
+            DesktopSplashScreen splash;
             try {
-                splash = DesktopLaunchSplash.load(project);
+                splash = DesktopSplashScreen.load(project);
             } catch (RuntimeException failure) {
-                new DesktopStartupFailure(title, failure).run(renderer, window);
+                new DesktopStartupErrorScreen(title, failure).run(renderer, window);
                 return;
             }
             boolean presentInitialSplash = !request.isPlaytest()
@@ -114,7 +114,7 @@ public final class DesktopProjectRunner {
                                 ? phase -> splash.present(phase, renderer, window)
                                 : ignored -> Window.pollEvents());
             } catch (RuntimeException failure) {
-                new DesktopStartupFailure(title, failure).run(renderer, window);
+                new DesktopStartupErrorScreen(title, failure).run(renderer, window);
                 return;
             }
             if (presentInitialSplash) {
@@ -139,7 +139,7 @@ public final class DesktopProjectRunner {
     private static void runStartupFailure(String projectName, RuntimeException failure) {
         try (Window window = Window.create(projectName);
                 Renderer renderer = Renderer.create(window)) {
-            new DesktopStartupFailure(projectName, failure).run(renderer, window);
+            new DesktopStartupErrorScreen(projectName, failure).run(renderer, window);
         }
     }
 
@@ -151,9 +151,9 @@ public final class DesktopProjectRunner {
 
     /** Keeps polling and presenting a ready splash until its authored minimum duration elapses. */
     private static void awaitMinimumSplashDuration(
-            DesktopLaunchSplash splash, long shownAt, Renderer renderer, Window window) {
+            DesktopSplashScreen splash, long shownAt, Renderer renderer, Window window) {
         while (!window.shouldClose()
-                && !DesktopLaunchPolicy.minimumElapsed(shownAt, System.nanoTime(), splash.minimumDuration())) {
+                && !InitialSplashPolicy.minimumElapsed(shownAt, System.nanoTime(), splash.minimumDuration())) {
             splash.present(ProjectLoadProgressReporter.Phase.READY, renderer, window);
         }
     }

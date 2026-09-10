@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.doom.geometry.DoomMeshData;
 import io.github.glynch.jscene3d.doom.geometry.DoomStaticGeometry;
 import io.github.glynch.jscene3d.doom.geometry.DoomStaticGeometryBuilder;
 import io.github.glynch.jscene3d.doom.geometry.DoomSurface;
+import io.github.glynch.jscene3d.doom.geometry.DoomUnits;
 import io.github.glynch.jscene3d.doom.map.DoomMap;
 import io.github.glynch.jscene3d.doom.map.DoomMapDecodeResult;
 import io.github.glynch.jscene3d.doom.map.DoomMapDecoder;
@@ -22,7 +23,9 @@ import io.github.glynch.jscene3d.doom.material.DoomMaterialDiagnostic;
 import io.github.glynch.jscene3d.doom.material.DoomMaterialImportResult;
 import io.github.glynch.jscene3d.doom.material.DoomMaterialImporter;
 import io.github.glynch.jscene3d.doom.material.RgbaImage;
+import io.github.glynch.jscene3d.doom.runtime.DoomCollisionCategories;
 import io.github.glynch.jscene3d.doom.runtime.DoomDoorDescriptors;
+import io.github.glynch.jscene3d.doom.runtime.DoomFloorDescriptors;
 import io.github.glynch.jscene3d.geometries.BufferAttribute;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.materials.AlphaMode;
@@ -81,8 +84,7 @@ final class DoomProjectImporter implements ProjectImporter {
     private static final String MESH_MEDIA_TYPE = "application/vnd.jscene3d.mesh-v1";
     private static final String TEXTURE_MEDIA_TYPE = "application/vnd.jscene3d.rgba8-v1";
     private static final String COLLISION_MEDIA_TYPE = "application/vnd.jscene3d.triangle-mesh-collision-v1";
-    private static final int CHARACTER_COLLISION_CATEGORY = 2;
-    private static final int DOOR_OBSTRUCTION_SENSOR_CATEGORY = 4;
+    private static final float TRIGGER_DEPTH = DoomUnits.toWorld(2.0F);
 
     @Override
     public void inspect(ImportInspectionContext context) {
@@ -190,9 +192,14 @@ final class DoomProjectImporter implements ProjectImporter {
         List<DoomDoorPublication> doors = DoomDoorPublication.discover(map);
         Set<Integer> doorSectors =
                 doors.stream().map(DoomDoorPublication::sectorIndex).collect(Collectors.toUnmodifiableSet());
-        List<RenderBatch> batches = renderBatches(geometry, doorSectors);
+        List<DoomFloorPublication> floors = DoomFloorPublication.discover(map);
+        Set<Integer> floorSectors =
+                floors.stream().map(DoomFloorPublication::sectorIndex).collect(Collectors.toUnmodifiableSet());
+        List<RenderBatch> batches = renderBatches(geometry, doorSectors, floorSectors);
         List<DoorRenderBatches> doorBatches = doorRenderBatches(geometry, doors);
-        Map<MaterialKey, DoomMaterial> materials = selectedMaterials(batches, doorBatches, sourceMaterials);
+        List<FloorRenderBatches> floorBatches = floorRenderBatches(geometry, floors);
+        Map<MaterialKey, DoomMaterial> materials =
+                selectedMaterials(batches, doorBatches, floorBatches, sourceMaterials);
         for (Map.Entry<MaterialKey, DoomMaterial> entry : materials.entrySet()) {
             publishMaterial(context, prefix, entry.getKey(), entry.getValue());
         }
@@ -201,7 +208,8 @@ final class DoomProjectImporter implements ProjectImporter {
         List<ComponentDefinition> components = new ArrayList<>();
         components.add(component(
                 context.definition().id(), prefix + "/root/transform", Spatial3dDescriptors.transformType(), Map.of()));
-        publishCollision(context, collisionIdentity(prefix), staticCollisionMesh(map, geometry, doorSectors));
+        publishCollision(
+                context, collisionIdentity(prefix), staticCollisionMesh(map, geometry, doorSectors, floorSectors));
         String collisionIdentity = collisionIdentity(prefix);
         references.add(collisionIdentity);
         ComponentId collisionShape = componentId(context.definition().id(), prefix + "/root/collision/static-shape");
@@ -219,6 +227,10 @@ final class DoomProjectImporter implements ProjectImporter {
         for (DoorRenderBatches door : doorBatches) {
             children.add(publishDoor(context, prefix, door, references, connections));
         }
+        for (FloorRenderBatches floor : floorBatches) {
+            children.add(publishFloor(context, prefix, floor, references));
+        }
+        publishFloorTriggers(context, prefix, map, floors, children, references, connections);
         materials.keySet().stream().map(key -> materialIdentity(prefix, key)).forEach(references::add);
 
         String definitionIdentity = prefix + "/definition";
@@ -313,6 +325,122 @@ final class DoomProjectImporter implements ProjectImporter {
         return new LocalEntity(entityId, "Door " + behavior.sectorIndex(), true, components, List.of(obstruction));
     }
 
+    /** Publishes one independently movable floor's presentation, collision, and source-derived behavior. */
+    private static LocalEntity publishFloor(
+            ImportPreparationContext context, String prefix, FloorRenderBatches floor, List<String> references)
+            throws IOException {
+        DoomFloorPublication behavior = floor.behavior();
+        String locator = floorLocator(prefix, behavior.sectorIndex());
+        EntityId entityId = entityId(context.definition().id(), locator);
+        ComponentId transformId = componentId(context.definition().id(), locator + "/transform");
+        List<ComponentDefinition> components = new ArrayList<>();
+        components.add(new ComponentDefinition(
+                transformId,
+                Spatial3dDescriptors.transformType().id(),
+                Spatial3dDescriptors.transformType().version(),
+                Map.of(
+                        Spatial3dDescriptors.positionProperty(),
+                        new ProjectValue.ArrayValue(
+                                List.of(number(0.0F), number(behavior.raisedHeight()), number(0.0F))))));
+
+        String collision = floorCollisionIdentity(prefix, behavior.sectorIndex());
+        publishCollision(context, collision, floor.collision());
+        references.add(collision);
+        ComponentId shapeId = componentId(context.definition().id(), locator + "/collision/shape");
+        components.add(collisionShapeForResource(context.definition().id(), collision, shapeId));
+        components.add(staticBody(context.definition().id(), locator, entityId, shapeId));
+
+        for (int index = 0; index < floor.batches().size(); index++) {
+            RenderBatch batch = floor.batches().get(index);
+            String mesh = floorMeshIdentity(prefix, behavior.sectorIndex(), index);
+            publishMesh(context, mesh, batch.mesh());
+            references.add(mesh);
+            components.add(meshRenderer(context.definition().id(), locator, mesh, index, prefix, batch.material()));
+        }
+        ComponentId behaviorId = componentId(context.definition().id(), locator + "/behavior");
+        components.add(floorBehavior(entityId, transformId, behaviorId, behavior));
+        return new LocalEntity(entityId, "Moving floor " + behavior.sectorIndex(), true, components, List.of());
+    }
+
+    /** Publishes each distinct source trigger once and connects it to every floor sharing its sector tag. */
+    private static void publishFloorTriggers(
+            ImportPreparationContext context,
+            String prefix,
+            DoomMap map,
+            List<DoomFloorPublication> floors,
+            List<EntityEntry> children,
+            List<String> references,
+            List<SignalConnection> connections)
+            throws IOException {
+        Map<Integer, List<DoomFloorPublication>> floorsByTrigger = new LinkedHashMap<>();
+        for (DoomFloorPublication floor : floors) {
+            for (int linedefIndex : floor.triggerLinedefs()) {
+                floorsByTrigger
+                        .computeIfAbsent(linedefIndex, ignored -> new ArrayList<>())
+                        .add(floor);
+            }
+        }
+        for (Map.Entry<Integer, List<DoomFloorPublication>> entry : floorsByTrigger.entrySet()) {
+            children.add(publishFloorTrigger(
+                    context, prefix, map, entry.getKey(), entry.getValue(), references, connections));
+        }
+    }
+
+    /** Creates one oriented player-only overlap volume centered on the source walk-over linedef. */
+    private static LocalEntity publishFloorTrigger(
+            ImportPreparationContext context,
+            String prefix,
+            DoomMap map,
+            int linedefIndex,
+            List<DoomFloorPublication> floors,
+            List<String> references,
+            List<SignalConnection> connections)
+            throws IOException {
+        TriggerVolume volume = TriggerVolume.of(map, linedefIndex);
+        String locator = floorTriggerLocator(prefix, linedefIndex);
+        EntityId triggerEntity = entityId(context.definition().id(), locator);
+        ComponentId shapeId = componentId(context.definition().id(), locator + "/shape");
+        ComponentId sensorId = componentId(context.definition().id(), locator + "/sensor");
+        String shapeIdentity = floorTriggerShapeIdentity(prefix, linedefIndex);
+        context.artifact(
+                ImportArtifactDescriptor.resource(shapeIdentity, Physics3dDescriptors.boxResourceType(), List.of()),
+                output -> Physics3dResourceWriter.writeBox(output, volume.width(), volume.height(), TRIGGER_DEPTH));
+        references.add(shapeIdentity);
+
+        ComponentDefinition transform = component(
+                context.definition().id(),
+                locator + "/transform",
+                Spatial3dDescriptors.transformType(),
+                Map.of(
+                        Spatial3dDescriptors.positionProperty(), volume.position(),
+                        Spatial3dDescriptors.orientationProperty(), volume.orientation()));
+        ComponentDefinition shape = collisionShapeForResource(
+                context.definition().id(),
+                shapeIdentity,
+                shapeId,
+                Map.of(
+                        Physics3dDescriptors.categoryBitsProperty(),
+                                number(DoomCollisionCategories.PLAYER_TRIGGER_SENSOR),
+                        Physics3dDescriptors.maskBitsProperty(), number(DoomCollisionCategories.PLAYER)));
+        ComponentDefinition sensor = collisionObject(
+                context.definition().id(),
+                locator + "/sensor",
+                Physics3dDescriptors.collisionSensorType(),
+                triggerEntity,
+                shapeId);
+        for (DoomFloorPublication floor : floors) {
+            String floorLocator = floorLocator(prefix, floor.sectorIndex());
+            connections.add(new SignalConnection(
+                    EndpointTarget.component(triggerEntity, sensorId, Physics3dDescriptors.overlapEnteredSignal()),
+                    EndpointTarget.component(
+                            entityId(context.definition().id(), floorLocator),
+                            componentId(context.definition().id(), floorLocator + "/behavior"),
+                            DoomFloorDescriptors.TRIGGER_ENTERED_ACTION)));
+        }
+        return new LocalEntity(
+                triggerEntity, "Walk-over trigger " + linedefIndex, true, List.of(transform, shape, sensor), List.of());
+    }
+
     /** Creates one generated child sensor which follows the door and reports character-only overlaps. */
     private static LocalEntity doorObstructionSensor(
             String importId,
@@ -339,8 +467,9 @@ final class DoomProjectImporter implements ProjectImporter {
                 shapeIdentity,
                 shapeId,
                 Map.of(
-                        Physics3dDescriptors.categoryBitsProperty(), number(DOOR_OBSTRUCTION_SENSOR_CATEGORY),
-                        Physics3dDescriptors.maskBitsProperty(), number(CHARACTER_COLLISION_CATEGORY)));
+                        Physics3dDescriptors.categoryBitsProperty(),
+                                number(DoomCollisionCategories.DOOR_OBSTRUCTION_SENSOR),
+                        Physics3dDescriptors.maskBitsProperty(), number(DoomCollisionCategories.DOOR_OBSTRUCTIONS)));
         ComponentDefinition sensor = collisionObject(
                 importId, locator + "/sensor", Physics3dDescriptors.collisionSensorType(), sensorEntity, shapeId);
         connections.add(new SignalConnection(
@@ -422,6 +551,26 @@ final class DoomProjectImporter implements ProjectImporter {
                 behaviorId, DoomDoorDescriptors.DOOR_TYPE.id(), DoomDoorDescriptors.DOOR_TYPE.version(), properties);
     }
 
+    /** Creates the descriptor-authored floor behavior targeting its generated transform. */
+    private static ComponentDefinition floorBehavior(
+            EntityId entityId, ComponentId transformId, ComponentId behaviorId, DoomFloorPublication behavior) {
+        Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
+        properties.put(
+                DoomFloorDescriptors.TRANSFORM_PROPERTY,
+                new ProjectValue.ComponentTargetValue(new ComponentTarget(entityId, transformId)));
+        properties.put(DoomFloorDescriptors.RAISED_HEIGHT_PROPERTY, number(behavior.raisedHeight()));
+        properties.put(DoomFloorDescriptors.LOWERED_HEIGHT_PROPERTY, number(behavior.loweredHeight()));
+        properties.put(DoomFloorDescriptors.SPEED_PROPERTY, number(behavior.speed()));
+        properties.put(
+                DoomFloorDescriptors.PROFILE_PROPERTY,
+                new ProjectValue.TextValue(behavior.profile().name().toLowerCase(Locale.ROOT)));
+        return new ComponentDefinition(
+                behaviorId,
+                DoomFloorDescriptors.FLOOR_TYPE.id(),
+                DoomFloorDescriptors.FLOOR_TYPE.version(),
+                properties);
+    }
+
     /** Creates one static body with explicit sibling membership rather than hierarchy inference. */
     private static ComponentDefinition staticBody(String importId, String prefix, ComponentId shapeId) {
         ProjectValue.ComponentTargetValue target = new ProjectValue.ComponentTargetValue(
@@ -501,10 +650,14 @@ final class DoomProjectImporter implements ProjectImporter {
     }
 
     /** Groups immutable static surfaces by material to avoid one draw resource per source surface. */
-    private static List<RenderBatch> renderBatches(DoomStaticGeometry geometry, Set<Integer> doorSectors) {
+    private static List<RenderBatch> renderBatches(
+            DoomStaticGeometry geometry, Set<Integer> doorSectors, Set<Integer> floorSectors) {
         Map<MaterialKey, List<DoomMeshData>> meshesByMaterial = new LinkedHashMap<>();
         for (DoomSurface surface : geometry.surfaces()) {
             if (surface.movingCeilingSector().stream().anyMatch(doorSectors::contains)) {
+                continue;
+            }
+            if (surface.type() == DoomSurface.Type.FLOOR && floorSectors.contains(surface.sectorIndex())) {
                 continue;
             }
             meshesByMaterial
@@ -547,6 +700,35 @@ final class DoomProjectImporter implements ProjectImporter {
         return List.copyOf(result);
     }
 
+    /** Groups each supported moving floor's plane independently from immutable map geometry. */
+    private static List<FloorRenderBatches> floorRenderBatches(
+            DoomStaticGeometry geometry, List<DoomFloorPublication> floors) {
+        List<FloorRenderBatches> result = new ArrayList<>();
+        for (DoomFloorPublication floor : floors) {
+            Map<MaterialKey, List<DoomMeshData>> meshesByMaterial = new LinkedHashMap<>();
+            List<DoomMeshData> collision = new ArrayList<>();
+            for (DoomSurface surface : geometry.surfaces()) {
+                if (surface.type() != DoomSurface.Type.FLOOR || surface.sectorIndex() != floor.sectorIndex()) {
+                    continue;
+                }
+                DoomMeshData rebased = rebaseHeight(surface.mesh(), floor.raisedHeight());
+                meshesByMaterial
+                        .computeIfAbsent(materialKey(surface), ignored -> new ArrayList<>())
+                        .add(rebased);
+                collision.add(rebased);
+            }
+            if (collision.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "moving floor has no generated floor surfaces: " + floor.sectorIndex());
+            }
+            List<RenderBatch> batches = meshesByMaterial.entrySet().stream()
+                    .map(entry -> new RenderBatch(entry.getKey(), combine(entry.getValue())))
+                    .toList();
+            result.add(new FloorRenderBatches(floor, batches, withoutDegenerateTriangles(combine(collision))));
+        }
+        return List.copyOf(result);
+    }
+
     /** Converts world-height vertices into coordinates local to the door's closed transform. */
     private static DoomMeshData rebaseHeight(DoomMeshData mesh, float closedHeight) {
         float[] positions = mesh.positions();
@@ -558,10 +740,12 @@ final class DoomProjectImporter implements ProjectImporter {
 
     /** Combines physical surfaces and source-semantic blockers into independently published collision. */
     private static DoomMeshData staticCollisionMesh(
-            DoomMap map, DoomStaticGeometry geometry, Set<Integer> doorSectors) {
+            DoomMap map, DoomStaticGeometry geometry, Set<Integer> doorSectors, Set<Integer> floorSectors) {
         List<DoomMeshData> collisionSurfaces = new ArrayList<>(geometry.surfaces().stream()
                 .filter(surface -> surface.type() != DoomSurface.Type.MASKED_MIDDLE_WALL)
                 .filter(surface -> surface.movingCeilingSector().stream().noneMatch(doorSectors::contains))
+                .filter(surface ->
+                        surface.type() != DoomSurface.Type.FLOOR || !floorSectors.contains(surface.sectorIndex()))
                 .map(DoomSurface::mesh)
                 .toList());
         collisionSurfaces.addAll(new DoomBlockingLineGeometryBuilder().build(map));
@@ -641,13 +825,20 @@ final class DoomProjectImporter implements ProjectImporter {
 
     /** Collects only referenced materials while preserving first-surface order. */
     private static Map<MaterialKey, DoomMaterial> selectedMaterials(
-            List<RenderBatch> batches, List<DoorRenderBatches> doors, DoomMapMaterials sourceMaterials) {
+            List<RenderBatch> batches,
+            List<DoorRenderBatches> doors,
+            List<FloorRenderBatches> floors,
+            DoomMapMaterials sourceMaterials) {
         Map<MaterialKey, DoomMaterial> selected = new LinkedHashMap<>();
         for (RenderBatch batch : batches) {
             MaterialKey key = batch.material();
             selected.computeIfAbsent(key, ignored -> sourceMaterial(key, sourceMaterials));
         }
         doors.stream().flatMap(door -> door.batches().stream()).forEach(batch -> {
+            MaterialKey key = batch.material();
+            selected.computeIfAbsent(key, ignored -> sourceMaterial(key, sourceMaterials));
+        });
+        floors.stream().flatMap(floor -> floor.batches().stream()).forEach(batch -> {
             MaterialKey key = batch.material();
             selected.computeIfAbsent(key, ignored -> sourceMaterial(key, sourceMaterials));
         });
@@ -824,6 +1015,31 @@ final class DoomProjectImporter implements ProjectImporter {
         return prefix + "/resources/doors/" + formatted(sectorIndex) + "/meshes/" + formatted(index);
     }
 
+    /** Returns the stable generated locator for one source-sector moving floor. */
+    private static String floorLocator(String prefix, int sectorIndex) {
+        return prefix + "/floors/" + formatted(sectorIndex);
+    }
+
+    /** Returns one moving floor collision resource identity. */
+    private static String floorCollisionIdentity(String prefix, int sectorIndex) {
+        return prefix + "/resources/collision/floors/" + formatted(sectorIndex);
+    }
+
+    /** Returns one moving floor render-mesh identity. */
+    private static String floorMeshIdentity(String prefix, int sectorIndex, int index) {
+        return prefix + "/resources/floors/" + formatted(sectorIndex) + "/meshes/" + formatted(index);
+    }
+
+    /** Returns the stable generated locator for one source-linedef walk-over trigger. */
+    private static String floorTriggerLocator(String prefix, int linedefIndex) {
+        return prefix + "/floor-triggers/" + formatted(linedefIndex);
+    }
+
+    /** Returns one walk-over trigger box resource identity. */
+    private static String floorTriggerShapeIdentity(String prefix, int linedefIndex) {
+        return prefix + "/resources/collision/floor-triggers/" + formatted(linedefIndex);
+    }
+
     /** Creates a portable finite numeric property. */
     private static ProjectValue.NumberValue number(float value) {
         return new ProjectValue.NumberValue(new BigDecimal(Float.toString(value)));
@@ -864,6 +1080,77 @@ final class DoomProjectImporter implements ProjectImporter {
     private record DoorRenderBatches(DoomDoorPublication behavior, List<RenderBatch> batches, DoomMeshData collision) {
         private DoorRenderBatches {
             batches = List.copyOf(batches);
+        }
+    }
+
+    /** One generated moving floor's material batches and collision, all rebased to its raised transform. */
+    private record FloorRenderBatches(
+            DoomFloorPublication behavior, List<RenderBatch> batches, DoomMeshData collision) {
+        private FloorRenderBatches {
+            batches = List.copyOf(batches);
+        }
+    }
+
+    /** Oriented box pose and positive extents derived from one source walk-over linedef. */
+    private record TriggerVolume(
+            ProjectValue.ArrayValue position, ProjectValue.ArrayValue orientation, float width, float height) {
+        /** Computes an exact horizontal line span and the complete adjacent vertical opening. */
+        private static TriggerVolume of(DoomMap map, int linedefIndex) {
+            DoomMap.Linedef linedef = map.linedefs().get(linedefIndex);
+            DoomMap.Vertex start = map.vertices().get(linedef.startVertex());
+            DoomMap.Vertex end = map.vertices().get(linedef.endVertex());
+            float startX = DoomUnits.toWorld(start.x());
+            float startZ = DoomUnits.yToWorldZ(start.y());
+            float endX = DoomUnits.toWorld(end.x());
+            float endZ = DoomUnits.yToWorldZ(end.y());
+            float deltaX = endX - startX;
+            float deltaZ = endZ - startZ;
+            float width = (float) Math.hypot(deltaX, deltaZ);
+            if (width <= 0.0F) {
+                throw new IllegalArgumentException("floor trigger linedef has zero length: " + linedefIndex);
+            }
+
+            List<Integer> adjacentSectors = new ArrayList<>();
+            adjacentSectors.add(map.sidedefs().get(linedef.rightSidedef()).sector());
+            if (linedef.leftSidedef() >= 0) {
+                adjacentSectors.add(map.sidedefs().get(linedef.leftSidedef()).sector());
+            }
+            float bottom = adjacentSectors.stream()
+                    .map(map.sectors()::get)
+                    .map(DoomMap.Sector::floorHeight)
+                    .map(DoomUnits::toWorld)
+                    .min(Float::compare)
+                    .orElseThrow();
+            float top = adjacentSectors.stream()
+                    .map(map.sectors()::get)
+                    .map(DoomMap.Sector::ceilingHeight)
+                    .map(DoomUnits::toWorld)
+                    .max(Float::compare)
+                    .orElseThrow();
+            if (top <= bottom) {
+                throw new IllegalArgumentException("floor trigger has no positive vertical span: " + linedefIndex);
+            }
+            float yaw = (float) Math.atan2(-deltaZ, deltaX);
+            float halfYaw = yaw * 0.5F;
+            return new TriggerVolume(
+                    numbers(midpoint(startX, endX), midpoint(bottom, top), midpoint(startZ, endZ)),
+                    numbers(0.0F, (float) Math.sin(halfYaw), 0.0F, (float) Math.cos(halfYaw)),
+                    width,
+                    top - bottom);
+        }
+
+        /** Avoids adding two potentially large finite coordinates before halving. */
+        private static float midpoint(float first, float second) {
+            return first + (second - first) * 0.5F;
+        }
+
+        /** Creates one portable finite-number array property. */
+        private static ProjectValue.ArrayValue numbers(float... values) {
+            List<ProjectValue> numbers = new ArrayList<>(values.length);
+            for (float value : values) {
+                numbers.add(number(value));
+            }
+            return new ProjectValue.ArrayValue(numbers);
         }
     }
 

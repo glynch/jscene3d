@@ -6,6 +6,8 @@ package io.github.glynch.jscene3d.doom.runtime.internal;
 
 import io.github.glynch.jscene3d.doom.runtime.DoomDoor;
 import io.github.glynch.jscene3d.doom.runtime.DoomDoorDescriptors;
+import io.github.glynch.jscene3d.doom.runtime.DoomFloor;
+import io.github.glynch.jscene3d.doom.runtime.DoomFloorDescriptors;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import java.util.Locale;
@@ -25,7 +27,8 @@ public final class DoomRuntimeExtension implements ComponentRuntimeExtension {
 
     @Override
     public void register(ComponentFactoryRegistry registry) {
-        Objects.requireNonNull(registry, "registry").register(DoomDoorDescriptors.DOOR_TYPE, context -> {
+        ComponentFactoryRegistry validRegistry = Objects.requireNonNull(registry, "registry");
+        validRegistry.register(DoomDoorDescriptors.DOOR_TYPE, context -> {
             var properties = context.properties();
             return new DoomDoorComponent(
                     DoomDoor.Profile.valueOf(properties
@@ -35,6 +38,16 @@ public final class DoomRuntimeExtension implements ComponentRuntimeExtension {
                     properties.finiteFloat(DoomDoorDescriptors.OPEN_HEIGHT_PROPERTY),
                     properties.finiteFloat(DoomDoorDescriptors.SPEED_PROPERTY),
                     properties.finiteFloat(DoomDoorDescriptors.HOLD_OPEN_SECONDS_PROPERTY));
+        });
+        validRegistry.register(DoomFloorDescriptors.FLOOR_TYPE, context -> {
+            var properties = context.properties();
+            return new DoomFloorComponent(
+                    DoomFloor.Profile.valueOf(properties
+                            .text(DoomFloorDescriptors.PROFILE_PROPERTY)
+                            .toUpperCase(Locale.ROOT)),
+                    properties.finiteFloat(DoomFloorDescriptors.RAISED_HEIGHT_PROPERTY),
+                    properties.finiteFloat(DoomFloorDescriptors.LOWERED_HEIGHT_PROPERTY),
+                    properties.finiteFloat(DoomFloorDescriptors.SPEED_PROPERTY));
         });
     }
 }

@@ -7,7 +7,7 @@
   "types": [
     {
       "id": "io.github.glynch.jscene3d.doom/maps",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "scope": "importer",
       "displayName": "Classic Doom Maps"
     }
@@ -82,6 +82,62 @@
           },
           "displayName": "Obstruction Exited",
           "description": "Receives a precise overlap when a character leaves the generated closing boundary."
+        }
+      ]
+    },
+    {
+      "id": "io.github.glynch.jscene3d.doom/floor",
+      "typeVersion": 1,
+      "displayName": "Doom Moving Floor",
+      "description": "Moves explicitly published floor geometry and collision using imported Doom linedef semantics.",
+      "updatePhases": ["before-physics"],
+      "providedCapabilities": ["io.github.glynch.jscene3d.doom/floor"],
+      "properties": [
+        {
+          "id": "transform",
+          "valueKind": "component_target",
+          "required": true,
+          "displayName": "Transform",
+          "description": "Explicit generated transform moved with the floor."
+        },
+        {
+          "id": "raised-height",
+          "valueKind": "number",
+          "required": true,
+          "displayName": "Raised Height",
+          "description": "Original local Y position in world units."
+        },
+        {
+          "id": "lowered-height",
+          "valueKind": "number",
+          "required": true,
+          "displayName": "Lowered Height",
+          "description": "Terminal local Y position in world units."
+        },
+        {
+          "id": "speed",
+          "valueKind": "number",
+          "required": true,
+          "displayName": "Speed",
+          "description": "Vertical movement speed in world units per second."
+        },
+        {
+          "id": "profile",
+          "valueKind": "text",
+          "required": true,
+          "displayName": "Profile",
+          "description": "Imported semantic moving-floor profile."
+        }
+      ],
+      "actions": [
+        {
+          "id": "trigger-entered",
+          "payload": {
+            "type": "io.github.glynch.jscene3d.physics3d/collision-overlap-3d",
+            "typeVersion": 1
+          },
+          "displayName": "Trigger Entered",
+          "description": "Receives the player-only overlap emitted by a generated walk-over trigger."
         }
       ]
     }

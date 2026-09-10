@@ -12,7 +12,7 @@ public final class DoomTypes {
     public static final String EXTENSION_IDENTIFIER = "io.github.glynch.jscene3d.doom";
 
     /** Current version of the Doom extension's registered types. */
-    public static final int TYPE_VERSION = 1;
+    public static final int TYPE_VERSION = 2;
 
     /** Classic-map source importer type. */
     public static final RegisteredType MAP_IMPORTER = new RegisteredType(EXTENSION_IDENTIFIER + "/maps", TYPE_VERSION);

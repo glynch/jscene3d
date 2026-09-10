@@ -80,6 +80,39 @@ final class TestDoomWadFiles {
         return lumps;
     }
 
+    /** Returns a raised single-subsector fixture controlled by one type-19 walk-over trigger. */
+    static List<LumpContent> movingFloorMap(String name) {
+        List<LumpContent> lumps = new ArrayList<>();
+        lumps.add(new LumpContent(name, new byte[0]));
+        lumps.add(new LumpContent("THINGS", shorts(32, 32, 0, 1, 7)));
+        lumps.add(new LumpContent(
+                "LINEDEFS",
+                shorts(
+                        0, 1, 0, 19, 7, 0, 1, 1, 2, 1, 0, 0, 2, 0xffff, 2, 3, 1, 0, 0, 3, 0xffff, 3, 0, 1, 0, 0, 4,
+                        0xffff)));
+        lumps.add(new LumpContent(
+                "SIDEDEFS",
+                concatenate(
+                        sidedef(0, 0, "-", "MIDDLE", "-", 0),
+                        sidedef(0, 0, "-", "-", "-", 1),
+                        sidedef(0, 0, "-", "-", "MIDDLE", 1),
+                        sidedef(0, 0, "-", "-", "MIDDLE", 1),
+                        sidedef(0, 0, "-", "-", "MIDDLE", 1))));
+        lumps.add(new LumpContent("VERTEXES", shorts(0, 0, 0, 64, 64, 64, 64, 0)));
+        lumps.add(new LumpContent(
+                "SEGS", shorts(0, 1, 0, 0, 1, 0, 1, 2, 0, 1, 0, 0, 2, 3, 0, 2, 0, 0, 3, 0, 0, 3, 0, 0)));
+        lumps.add(new LumpContent("SSECTORS", shorts(4, 0)));
+        lumps.add(new LumpContent("NODES", new byte[0]));
+        lumps.add(new LumpContent(
+                "SECTORS",
+                concatenate(
+                        sector(0, 128, "FLOOR0_1", "CEIL1_1", 160, 0, 0),
+                        sector(64, 128, "FLOOR0_1", "CEIL1_1", 160, 0, 7))));
+        lumps.add(new LumpContent("REJECT", new byte[] {0}));
+        lumps.add(new LumpContent("BLOCKMAP", shorts(0, 0, 1, 1, 5, 0, 0, 1, 2, 3, 0xffff)));
+        return lumps;
+    }
+
     /** Prepends the palette, flats, and composite wall textures required by {@link #validMap}. */
     static List<LumpContent> withMinimalMaterials(List<LumpContent> mapLumps) {
         byte[] palette = new byte[256 * 3];

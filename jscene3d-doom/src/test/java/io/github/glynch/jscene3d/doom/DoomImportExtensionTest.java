@@ -125,6 +125,7 @@ final class DoomImportExtensionTest {
         ImportDefinition definition = definition();
 
         try (PreparedImport prepared = manager.prepare(definition)) {
+            assertThat(prepared.preview().diagnostics()).isEmpty();
             assertThat(prepared.preview().isValid()).isTrue();
             assertThat(prepared.preview().artifacts())
                     .extracting(ImportedArtifactMetadata::identity)
@@ -153,6 +154,43 @@ final class DoomImportExtensionTest {
                         "\"obstruction-entered\"",
                         "\"obstruction-exited\"")
                 .doesNotContain(projectDirectory.toString())
+                .endsWith("}\n");
+    }
+
+    /** Publishes a type-19 floor independently from static geometry and connects its player-only walk-over trigger. */
+    @Test
+    void publishesMovingFloorAndTrigger() throws IOException {
+        TestDoomWadFiles.write(
+                wadPath, TestDoomWadFiles.withMinimalMaterials(TestDoomWadFiles.movingFloorMap("MAP01")));
+        ImportManager manager = manager();
+        ImportDefinition definition = definition();
+
+        try (PreparedImport prepared = manager.prepare(definition)) {
+            assertThat(prepared.preview().diagnostics()).isEmpty();
+            assertThat(prepared.preview().isValid()).isTrue();
+            assertThat(prepared.preview().artifacts())
+                    .extracting(ImportedArtifactMetadata::identity)
+                    .contains(
+                            "maps/MAP01/resources/collision/floors/00001",
+                            "maps/MAP01/resources/floors/00001/meshes/00000",
+                            "maps/MAP01/resources/collision/floor-triggers/00000");
+            prepared.commit();
+        }
+
+        String entityDefinition =
+                new String(read(manager, definition, "maps/MAP01/definition"), StandardCharsets.UTF_8);
+        assertThat(entityDefinition)
+                .contains(
+                        "\"name\" : \"Moving floor 1\"",
+                        "io.github.glynch.jscene3d.doom/floor",
+                        "\"profile\" : \"walk_once_lower_to_highest_surrounding\"",
+                        "\"raised-height\" : 2.0",
+                        "\"lowered-height\" : 0.0",
+                        "\"name\" : \"Walk-over trigger 0\"",
+                        "\"category-bits\" : 16.0",
+                        "\"mask-bits\" : 2.0",
+                        "\"endpointId\" : \"overlap-entered\"",
+                        "\"endpointId\" : \"trigger-entered\"")
                 .endsWith("}\n");
     }
 

@@ -7,11 +7,12 @@ package io.github.glynch.jscene3d.editor.builtin.hierarchy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
-import io.github.glynch.jscene3d.editor.EditorInspectorView;
-import io.github.glynch.jscene3d.editor.EditorSelection;
-import io.github.glynch.jscene3d.editor.EditorSelectionModel;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKindId;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItemCollapsibleState;
@@ -19,6 +20,7 @@ import io.github.glynch.jscene3d.editor.view.EditorTreeView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,12 +31,12 @@ final class HierarchyExtensionTest {
     @Test
     void contributesAProjectDrivenTreeAndSharesSelection() {
         EditorProjectContext projects = new EditorProjectContext();
-        EditorSelectionModel editorSelection = new EditorSelectionModel();
-        EditorExtensionHost host = new EditorExtensionHost(projects);
+        EditorSelectionContext editorSelection = new EditorSelectionContext();
+        EditorExtensionHost host = new EditorExtensionHost(projects, editorSelection);
         List<List<EditorViewContribution>> snapshots = new ArrayList<>();
         host.observeViews(snapshots::add);
 
-        host.activate(new HierarchyExtension(projects, editorSelection));
+        host.activate(new HierarchyExtension(projects));
 
         EditorViewContribution contribution = snapshots.getLast().getFirst();
         assertThat(contribution.container()).isEqualTo(EditorViewContainers.PRIMARY_SIDEBAR);
@@ -44,16 +46,16 @@ final class HierarchyExtensionTest {
         EditorTreeView<EditorHierarchyNode> view = (EditorTreeView<EditorHierarchyNode>) contribution.view();
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).isEmpty();
 
-        EditorHierarchyNode child = node("Player", EditorSelection.Kind.LOCAL_ENTITY, List.of());
+        EditorHierarchyNode child = node("Player", EditorHierarchyNode.Kind.LOCAL_ENTITY, List.of());
         EditorHierarchyNode generated = new EditorHierarchyNode(
                 EditorHierarchyNode.Kind.GENERATED_ENTITY,
                 "Generated Door",
                 Optional.empty(),
                 Optional.empty(),
                 false,
-                selection("Generated Door", EditorSelection.Kind.GENERATED_ENTITY),
+                selection("Generated Door", EditorSelectionKinds.GENERATED_ENTITY),
                 List.of());
-        EditorHierarchyNode root = node("MAP01", EditorSelection.Kind.WORLD, List.of(child, generated));
+        EditorHierarchyNode root = node("MAP01", EditorHierarchyNode.Kind.WORLD, List.of(child, generated));
         projects.showProject(
                 new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")), root, List.of());
 
@@ -71,43 +73,36 @@ final class HierarchyExtensionTest {
                         new EditorIcon(EditorIcons.DISABLED, "Initially disabled"));
         assertThat(view.dataProvider().item(generated).tooltip())
                 .contains("Generated entity · read-only · initially disabled");
-        assertThat(editorSelection.selection()).contains(child.selection());
+        assertThat(editorSelection.current()).contains(child.selection());
 
         view.selectionModel().orElseThrow().select(Optional.of(root));
-        assertThat(editorSelection.selection()).contains(root.selection());
+        assertThat(editorSelection.current()).contains(root.selection());
 
         projects.clear();
 
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).isEmpty();
-        assertThat(editorSelection.selection()).isEmpty();
+        assertThat(editorSelection.current()).isEmpty();
         host.close();
         assertThat(snapshots.getLast()).isEmpty();
     }
 
     private static EditorHierarchyNode node(
-            String label, EditorSelection.Kind selectionKind, List<EditorHierarchyNode> children) {
+            String label, EditorHierarchyNode.Kind kind, List<EditorHierarchyNode> children) {
         return new EditorHierarchyNode(
-                kind(selectionKind),
-                label,
-                Optional.empty(),
-                Optional.empty(),
-                true,
-                selection(label, selectionKind),
-                children);
+                kind, label, Optional.empty(), Optional.empty(), true, selection(label, selectionKind(kind)), children);
     }
 
-    private static EditorSelection selection(String label, EditorSelection.Kind selectionKind) {
-        EditorInspectorView inspector = new EditorInspectorView(label, "Test", "test", label, false, List.of());
-        return new EditorSelection(selectionKind, label, inspector);
+    private static EditorSelection selection(String label, EditorSelectionKindId selectionKind) {
+        EditorDetails details = new EditorDetails(label, "Test", "test", label, List.of(), List.of());
+        return new EditorSelection(selectionKind, label, details);
     }
 
-    private static EditorHierarchyNode.Kind kind(EditorSelection.Kind selectionKind) {
-        return switch (selectionKind) {
-            case WORLD -> EditorHierarchyNode.Kind.WORLD;
-            case LOCAL_ENTITY -> EditorHierarchyNode.Kind.LOCAL_ENTITY;
-            case PLACEMENT -> EditorHierarchyNode.Kind.PLACEMENT;
-            case GENERATED_ENTITY -> EditorHierarchyNode.Kind.GENERATED_ENTITY;
-            case ASSET -> throw new IllegalArgumentException("Assets are not hierarchy entries");
+    private static EditorSelectionKindId selectionKind(EditorHierarchyNode.Kind kind) {
+        return switch (kind) {
+            case WORLD -> EditorSelectionKinds.WORLD;
+            case LOCAL_ENTITY -> EditorSelectionKinds.LOCAL_ENTITY;
+            case PLACEMENT -> EditorSelectionKinds.PLACEMENT;
+            case GENERATED_ENTITY -> EditorSelectionKinds.GENERATED_ENTITY;
         };
     }
 }

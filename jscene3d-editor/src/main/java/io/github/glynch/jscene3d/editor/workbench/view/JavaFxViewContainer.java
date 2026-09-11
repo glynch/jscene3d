@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
+import io.github.glynch.jscene3d.editor.view.EditorDetailsView;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
 import io.github.glynch.jscene3d.editor.view.EditorView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
@@ -122,6 +123,9 @@ public final class JavaFxViewContainer implements AutoCloseable {
     }
 
     private RenderedView render(EditorView view) {
+        if (view instanceof EditorDetailsView detailsView) {
+            return renderDetails(detailsView);
+        }
         if (view instanceof EditorCollectionView<?> collectionView) {
             return renderCollection(collectionView);
         }
@@ -131,6 +135,11 @@ public final class JavaFxViewContainer implements AutoCloseable {
         Label unsupported = new Label("Unsupported view kind: " + view.kind());
         unsupported.getStyleClass().add("editor-empty-detail");
         return new RenderedView(unsupported, () -> {}, unsupported::requestFocus);
+    }
+
+    private RenderedView renderDetails(EditorDetailsView view) {
+        JavaFxDetailsViewAdapter adapter = new JavaFxDetailsViewAdapter(view);
+        return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
     }
 
     private <T> RenderedView renderCollection(EditorCollectionView<T> view) {

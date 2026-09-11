@@ -7,11 +7,12 @@ package io.github.glynch.jscene3d.editor.extension.project;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
-import io.github.glynch.jscene3d.editor.EditorInspectorView;
-import io.github.glynch.jscene3d.editor.EditorSelection;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,8 +49,8 @@ final class EditorProjectContextTest {
     }
 
     private static EditorHierarchyNode hierarchy() {
-        EditorInspectorView inspector = new EditorInspectorView("World", "World", "test", "world", false, List.of());
-        EditorSelection selection = new EditorSelection(EditorSelection.Kind.WORLD, "world", inspector);
+        EditorDetails details = new EditorDetails("World", "World", "test", "world", List.of(), List.of());
+        EditorSelection selection = new EditorSelection(EditorSelectionKinds.WORLD, "world", details);
         return new EditorHierarchyNode(
                 EditorHierarchyNode.Kind.WORLD,
                 "World",

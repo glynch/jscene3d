@@ -36,12 +36,14 @@ viewport coordination. Toolkit-independent extension contracts live in
 `jscene3d-editor-api`, preventing editor extensions from exposing JavaFX controls.
 The API separates executable commands from their workbench placements, describes
 views through stable kinds and editor-rendered models (including asynchronous
-trees and searchable collections), identifies icons through namespaced semantic
+trees, searchable collections, and grouped details), identifies icons through namespaced semantic
 identities with required accessible explanations, owns registrations through
 extension-scoped subscriptions, and provides portable status, window-message,
-and diagnostic publication facilities. The initial hierarchy, asset browser,
-and inspector do not introduce a second project document model; they project
-authored definitions through editor-owned views.
+diagnostic publication, and shared-selection facilities. A selection retains a
+namespaced semantic kind, stable identity, and optional immutable details
+projection. The initial hierarchy, asset browser, and inspector do not introduce
+a second project document model; they project authored definitions through
+editor-owned views.
 
 Built-in workbench features use the same extension path as future external
 extensions. The application activates them through an editor extension host,
@@ -49,10 +51,13 @@ which owns contribution lifetimes and exposes project-open/project-close events.
 The Hierarchy contributes an asynchronous, toolkit-independent tree model. The
 Project browser contributes a toolkit-independent collection snapshot with
 optional categories and shared selection; its workbench adapter owns search and
-grid/list presentation. Primary icons describe item kinds while independent
+grid/list presentation. The Inspector is itself a built-in extension in the
+secondary sidebar. It observes the same public selection facility and contributes
+a standard details view; a workbench adapter alone owns its JavaFX property rows,
+collapsible sections, empty state, scrolling, and icon rendering. Primary icons describe item kinds while independent
 decorations describe states such as read-only and initially disabled, allowing
 both meanings to remain visible at once. Workbench-owned JavaFX adapters render
 the views and icons, expose icon explanations as tooltips and accessible text,
-and bridge selection back to the shared editor selection model. JavaFX remains
+and bridge toolkit selection to the public shared-selection interface. JavaFX remains
 an implementation detail of the workbench rather than a requirement for view
 extensions.

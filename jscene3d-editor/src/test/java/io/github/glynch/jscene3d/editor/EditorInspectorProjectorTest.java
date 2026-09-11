@@ -7,6 +7,9 @@ package io.github.glynch.jscene3d.editor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
@@ -44,29 +47,30 @@ final class EditorInspectorProjectorTest {
         RegisteredTypeCatalog types = catalog();
         LocalEntity entity = entity(COMPONENT_TYPE.id());
 
-        EditorInspectorView inspection = EditorInspectorProjector.entity(
+        EditorDetails inspection = EditorInspectorProjector.entity(
                         entity, Path.of("/project/worlds/map01.world.json"), Path.of("/project"), types, false)
-                .inspector();
+                .details()
+                .orElseThrow();
 
         assertThat(inspection)
-                .returns("Player", EditorInspectorView::title)
-                .returns("Local entity", EditorInspectorView::kind)
-                .returns("worlds/map01.world.json", EditorInspectorView::source)
-                .returns(false, EditorInspectorView::generated);
-        EditorInspectorView.Section component = inspection.sections().get(1);
+                .returns("Player", EditorDetails::title)
+                .returns("Local entity", EditorDetails::kind)
+                .returns("worlds/map01.world.json", EditorDetails::source);
+        assertThat(inspection.decorations()).containsExactly(new EditorIcon(EditorIcons.READ_ONLY, "Read-only"));
+        EditorDetails.Section component = inspection.sections().get(1);
         assertThat(component)
-                .returns("Movement", EditorInspectorView.Section::title)
-                .returns(true, EditorInspectorView.Section::metadataAvailable);
+                .returns("Movement", EditorDetails.Section::title)
+                .returns(true, EditorDetails.Section::metadataAvailable);
         assertThat(component.properties())
-                .extracting(EditorInspectorView.Property::displayName)
+                .extracting(EditorDetails.Property::displayName)
                 .containsExactly("Speed", "Shape");
         assertThat(component.properties().get(0))
-                .returns("2.5", EditorInspectorView.Property::value)
-                .returns(EditorInspectorView.ValueOrigin.DEFAULT, EditorInspectorView.Property::origin)
+                .returns("2.5", EditorDetails.Property::value)
+                .returns(EditorDetails.ValueOrigin.DEFAULT, EditorDetails.Property::origin)
                 .satisfies(property -> assertThat(property.constraints()).containsEntry("minimum", "0"));
         assertThat(component.properties().get(1))
-                .returns("asset:player-capsule", EditorInspectorView.Property::value)
-                .returns(EditorInspectorView.ValueOrigin.AUTHORED, EditorInspectorView.Property::origin)
+                .returns("asset:player-capsule", EditorDetails.Property::value)
+                .returns(EditorDetails.ValueOrigin.AUTHORED, EditorDetails.Property::origin)
                 .satisfies(
                         property -> assertThat(property.constraints()).containsEntry("Accepted references", "asset"));
     }
@@ -76,36 +80,37 @@ final class EditorInspectorProjectorTest {
     void projectsAuthoredValuesWhenMetadataIsUnavailable() {
         LocalEntity entity = entity(new ComponentTypeId("example.inspector/missing"));
 
-        EditorInspectorView inspection = EditorInspectorProjector.entity(
+        EditorDetails inspection = EditorInspectorProjector.entity(
                         entity,
                         Path.of("/project/worlds/map01.world.json"),
                         Path.of("/project"),
                         RegisteredTypeCatalog.of(List.of()),
                         true)
-                .inspector();
+                .details()
+                .orElseThrow();
 
-        EditorInspectorView.Section component = inspection.sections().get(1);
+        EditorDetails.Section component = inspection.sections().get(1);
         assertThat(component.metadataAvailable()).isFalse();
         assertThat(component.description())
                 .hasValueSatisfying(description -> assertThat(description).contains("metadata unavailable"));
         assertThat(component.properties())
                 .singleElement()
-                .returns("asset:player-capsule", EditorInspectorView.Property::value);
-        assertThat(inspection.generated()).isTrue();
+                .returns("asset:player-capsule", EditorDetails.Property::value);
+        assertThat(inspection.decorations())
+                .containsExactly(new EditorIcon(EditorIcons.READ_ONLY, "Generated content · read-only"));
     }
 
     /** Copies section and property collections so loaded state cannot be mutated through the Inspector. */
     @Test
     void producesImmutableInspectorData() {
-        List<EditorInspectorView.Section> sections = new ArrayList<>();
-        EditorInspectorView inspection =
-                new EditorInspectorView("Player", "Local entity", "world", ENTITY_ID, false, sections);
+        List<EditorDetails.Section> sections = new ArrayList<>();
+        EditorDetails inspection = new EditorDetails("Player", "Local entity", "world", ENTITY_ID, List.of(), sections);
 
-        sections.add(new EditorInspectorView.Section("Late", Optional.empty(), true, List.of()));
+        sections.add(new EditorDetails.Section("Late", Optional.empty(), true, List.of()));
 
         assertThat(inspection.sections()).isEmpty();
-        EditorInspectorView.Section lateSection = sections.getFirst();
-        List<EditorInspectorView.Section> immutableSections = inspection.sections();
+        EditorDetails.Section lateSection = sections.getFirst();
+        List<EditorDetails.Section> immutableSections = inspection.sections();
         assertThatThrownBy(() -> immutableSections.add(lateSection)).isInstanceOf(UnsupportedOperationException.class);
     }
 

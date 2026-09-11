@@ -4,12 +4,13 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.project;
 
-import io.github.glynch.jscene3d.editor.EditorSelection;
-import io.github.glynch.jscene3d.editor.EditorSelectionModel;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
+import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionCategory;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionDataProvider;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionItem;
@@ -47,12 +48,10 @@ public final class ProjectExtension implements EditorExtension {
             .thenComparing(item -> item.selection().identity());
 
     private final EditorProjectContext projects;
-    private final EditorSelectionModel editorSelection;
 
-    /** Creates the built-in extension over editor-owned project and selection state. */
-    public ProjectExtension(EditorProjectContext projects, EditorSelectionModel editorSelection) {
+    /** Creates the built-in extension over editor-owned project state. */
+    public ProjectExtension(EditorProjectContext projects) {
         this.projects = Objects.requireNonNull(projects, "projects");
-        this.editorSelection = Objects.requireNonNull(editorSelection, "editorSelection");
     }
 
     @Override
@@ -63,15 +62,20 @@ public final class ProjectExtension implements EditorExtension {
     @Override
     public void activate(EditorExtensionContext context) {
         EditorExtensionContext editor = Objects.requireNonNull(context, "context");
+        EditorSelections selections = editor.selections();
         editor.subscriptions()
                 .add(editor.views()
                         .register(new EditorViewContribution(
-                                new ProjectCollectionView(), EditorViewContainers.BOTTOM_PANEL, 10)));
+                                new ProjectCollectionView(selections), EditorViewContainers.BOTTOM_PANEL, 10)));
     }
 
     private final class ProjectCollectionView implements EditorCollectionView<ProjectAsset> {
         private final EditorCollectionDataProvider<ProjectAsset> dataProvider = new ProjectDataProvider();
-        private final EditorCollectionSelectionModel<ProjectAsset> selectionModel = new ProjectSelectionModel();
+        private final EditorCollectionSelectionModel<ProjectAsset> selectionModel;
+
+        private ProjectCollectionView(EditorSelections selections) {
+            selectionModel = new ProjectSelectionModel(selections);
+        }
 
         @Override
         public ViewId id() {
@@ -135,7 +139,7 @@ public final class ProjectExtension implements EditorExtension {
             return new EditorCollectionItem(
                     asset.label(),
                     Optional.of(asset.kind().label()),
-                    Optional.of(asset.selection().inspector().source()),
+                    asset.selection().details().map(details -> details.source()),
                     Optional.of(asset.source().toString()),
                     Optional.of(new EditorIcon(icon(asset.kind()), asset.kind().label())),
                     Optional.of(categoryId(asset.kind())),
@@ -151,35 +155,40 @@ public final class ProjectExtension implements EditorExtension {
     }
 
     private final class ProjectSelectionModel implements EditorCollectionSelectionModel<ProjectAsset> {
+        private final EditorSelections selections;
+
+        private ProjectSelectionModel(EditorSelections selections) {
+            this.selections = Objects.requireNonNull(selections, "selections");
+        }
+
         @Override
         public Optional<ProjectAsset> selection() {
-            return editorSelection.selection().flatMap(ProjectExtension.this::findSelection);
+            return selections.current().flatMap(ProjectExtension.this::findSelection);
         }
 
         @Override
         public void select(Optional<ProjectAsset> selection) {
             Optional<ProjectAsset> selected = Objects.requireNonNull(selection, "selection");
             if (selected.isPresent()) {
-                editorSelection.select(selected.orElseThrow().selection());
-            } else if (editorSelection
-                    .selection()
+                selections.select(selected.orElseThrow().selection());
+            } else if (selections
+                    .current()
                     .flatMap(ProjectExtension.this::findSelection)
                     .isPresent()) {
-                editorSelection.clear();
+                selections.clear();
             }
         }
 
         @Override
         public EditorRegistration observe(Consumer<Optional<ProjectAsset>> listener) {
             Consumer<Optional<ProjectAsset>> observer = Objects.requireNonNull(listener, "listener");
-            Runnable removal = editorSelection.subscribe(
+            return selections.observe(
                     selection -> observer.accept(selection.flatMap(ProjectExtension.this::findSelection)));
-            return removal::run;
         }
     }
 
     private Optional<ProjectAsset> findSelection(EditorSelection selection) {
-        if (selection.kind() != EditorSelection.Kind.ASSET) {
+        if (!selection.kind().equals(EditorSelectionKinds.ASSET)) {
             return Optional.empty();
         }
         return projects.assets().stream()

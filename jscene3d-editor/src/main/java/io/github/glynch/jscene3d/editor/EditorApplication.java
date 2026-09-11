@@ -10,10 +10,12 @@ import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
+import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
@@ -41,7 +43,7 @@ public final class EditorApplication extends Application {
     private final EditorProjectLoader projectLoader;
     private final ExecutorService projectLoadingExecutor;
     private final EditorProjectContext projectContext;
-    private final EditorSelectionModel selectionModel;
+    private final EditorSelectionContext selectionContext;
     private final EditorExtensionHost extensionHost;
 
     private @Nullable GLCanvas canvas;
@@ -59,8 +61,8 @@ public final class EditorApplication extends Application {
                 EditorExtensionPath.configured());
         projectLoadingExecutor = Executors.newSingleThreadExecutor();
         projectContext = new EditorProjectContext();
-        selectionModel = new EditorSelectionModel();
-        extensionHost = new EditorExtensionHost(projectContext);
+        selectionContext = new EditorSelectionContext();
+        extensionHost = new EditorExtensionHost(projectContext, selectionContext);
     }
 
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
@@ -72,10 +74,11 @@ public final class EditorApplication extends Application {
         EditorSplashScreen loadingScreen = new EditorSplashScreen(EditorBuildInfo.engineVersion(), splashTiming);
         GLCanvas viewportCanvas = createCanvas();
         EditorWorkspace editorWorkspace =
-                new EditorWorkspace(viewportCanvas, () -> chooseProject(stage), selectionModel, extensionHost);
+                new EditorWorkspace(viewportCanvas, () -> chooseProject(stage), selectionContext, extensionHost);
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
-        extensionHost.activate(new HierarchyExtension(projectContext, selectionModel));
-        extensionHost.activate(new ProjectExtension(projectContext, selectionModel));
+        extensionHost.activate(new HierarchyExtension(projectContext));
+        extensionHost.activate(new ProjectExtension(projectContext));
+        extensionHost.activate(new InspectorExtension());
         ViewportController controller = new ViewportController(
                 viewportCanvas,
                 editorWorkspace.viewportStatus(),

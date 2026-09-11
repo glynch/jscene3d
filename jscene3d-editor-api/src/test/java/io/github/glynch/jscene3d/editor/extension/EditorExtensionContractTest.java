@@ -11,6 +11,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
+import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
 import io.github.glynch.jscene3d.editor.view.EditorView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
@@ -106,6 +107,11 @@ final class EditorExtensionContractTest {
 
         @Override
         public EditorProjects projects() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EditorSelections selections() {
             throw new UnsupportedOperationException();
         }
 

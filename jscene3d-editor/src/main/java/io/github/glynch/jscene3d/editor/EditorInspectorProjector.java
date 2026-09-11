@@ -4,6 +4,12 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKindId;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -35,12 +41,12 @@ final class EditorInspectorProjector {
 
     /** Projects the opened world root. */
     static EditorSelection world(WorldDefinition world, Path source, Path projectRoot) {
-        List<EditorInspectorView.Property> properties = List.of(
+        List<EditorDetails.Property> properties = List.of(
                 textProperty("asset-id", "Asset ID", world.id().toString()),
                 numberProperty("root-count", "Root entities", world.roots().size()),
                 numberProperty(
                         "connection-count", "Connections", world.connections().size()));
-        EditorInspectorView view = view(
+        EditorDetails view = view(
                 world.name(),
                 "World definition",
                 source,
@@ -48,14 +54,14 @@ final class EditorInspectorProjector {
                 world.id().toString(),
                 false,
                 List.of(section("World", properties)));
-        return selection(EditorSelection.Kind.WORLD, source, world.id().toString(), view);
+        return selection(EditorSelectionKinds.WORLD, source, world.id().toString(), view);
     }
 
     /** Projects one local or generated entity and its descriptor-backed components. */
     static EditorSelection entity(
             LocalEntity entity, Path source, Path projectRoot, RegisteredTypeCatalog types, boolean generated) {
         String title = entity.name().orElse("Unnamed entity");
-        List<EditorInspectorView.Section> sections = new ArrayList<>();
+        List<EditorDetails.Section> sections = new ArrayList<>();
         sections.add(section(
                 "Entity",
                 List.of(
@@ -63,7 +69,7 @@ final class EditorInspectorProjector {
                         numberProperty(
                                 "child-count", "Children", entity.children().size()))));
         sections.addAll(componentSections(entity.components(), types));
-        EditorInspectorView view = view(
+        EditorDetails view = view(
                 title,
                 generated ? "Generated entity" : "Local entity",
                 source,
@@ -71,8 +77,8 @@ final class EditorInspectorProjector {
                 entity.id().toString(),
                 generated,
                 sections);
-        EditorSelection.Kind kind =
-                generated ? EditorSelection.Kind.GENERATED_ENTITY : EditorSelection.Kind.LOCAL_ENTITY;
+        EditorSelectionKindId kind =
+                generated ? EditorSelectionKinds.GENERATED_ENTITY : EditorSelectionKinds.LOCAL_ENTITY;
         return selection(kind, source, entity.id().toString(), view);
     }
 
@@ -87,16 +93,16 @@ final class EditorInspectorProjector {
         String title = placement
                 .name()
                 .orElseGet(() -> definition.map(EntityDefinition::name).orElse("Unavailable definition"));
-        List<EditorInspectorView.Property> placementProperties = new ArrayList<>();
+        List<EditorDetails.Property> placementProperties = new ArrayList<>();
         placementProperties.add(textProperty(
                 "definition", "Definition", placement.definition().id().toString()));
         placementProperties.add(booleanProperty("enabled", "Enabled", placement.isEnabled()));
         placement.arguments().forEach((id, value) -> placementProperties.add(authoredProperty(id, value)));
-        List<EditorInspectorView.Section> sections = new ArrayList<>();
+        List<EditorDetails.Section> sections = new ArrayList<>();
         sections.add(section("Placement", placementProperties));
         definition.ifPresent(
                 value -> sections.addAll(componentSections(value.root().components(), types)));
-        EditorInspectorView view = view(
+        EditorDetails view = view(
                 title,
                 generated ? "Generated placement" : "Entity-definition placement",
                 source,
@@ -104,13 +110,13 @@ final class EditorInspectorProjector {
                 placement.id().toString(),
                 generated,
                 sections);
-        return selection(EditorSelection.Kind.PLACEMENT, source, placement.id().toString(), view);
+        return selection(EditorSelectionKinds.PLACEMENT, source, placement.id().toString(), view);
     }
 
     /** Projects one reusable entity-definition asset. */
     static EditorSelection entityDefinition(
             EntityDefinition definition, Path source, Path projectRoot, RegisteredTypeCatalog types) {
-        List<EditorInspectorView.Section> sections = new ArrayList<>();
+        List<EditorDetails.Section> sections = new ArrayList<>();
         sections.add(section(
                 "Definition",
                 List.of(
@@ -124,7 +130,7 @@ final class EditorInspectorProjector {
                                 "Connections",
                                 definition.connections().size()))));
         sections.addAll(componentSections(definition.root().components(), types));
-        EditorInspectorView view = view(
+        EditorDetails view = view(
                 definition.name(),
                 "Entity definition",
                 source,
@@ -132,12 +138,12 @@ final class EditorInspectorProjector {
                 definition.id().toString(),
                 false,
                 sections);
-        return selection(EditorSelection.Kind.ASSET, source, definition.id().toString(), view);
+        return selection(EditorSelectionKinds.ASSET, source, definition.id().toString(), view);
     }
 
     /** Projects one world-definition asset. */
     static EditorSelection worldDefinition(WorldDefinition world, Path source, Path projectRoot) {
-        EditorInspectorView view = view(
+        EditorDetails view = view(
                 world.name(),
                 "World definition",
                 source,
@@ -156,16 +162,16 @@ final class EditorInspectorProjector {
                                         "connection-count",
                                         "Connections",
                                         world.connections().size())))));
-        return selection(EditorSelection.Kind.ASSET, source, world.id().toString(), view);
+        return selection(EditorSelectionKinds.ASSET, source, world.id().toString(), view);
     }
 
     /** Projects one authoritative source asset declared by the manifest. */
     static EditorSelection sourceAsset(GameProject.AssetSource asset, Path projectRoot) {
-        List<EditorInspectorView.Property> properties = new ArrayList<>();
+        List<EditorDetails.Property> properties = new ArrayList<>();
         properties.add(textProperty("identity", "Identity", asset.id()));
         properties.add(textProperty("type", "Type", asset.type()));
         asset.sha256().ifPresent(hash -> properties.add(textProperty("sha256", "SHA-256", hash)));
-        EditorInspectorView view = view(
+        EditorDetails view = view(
                 asset.id(),
                 "Source asset",
                 asset.path(),
@@ -173,19 +179,19 @@ final class EditorInspectorProjector {
                 asset.id(),
                 false,
                 List.of(section("Asset", properties)));
-        return selection(EditorSelection.Kind.ASSET, asset.path(), asset.id(), view);
+        return selection(EditorSelectionKinds.ASSET, asset.path(), asset.id(), view);
     }
 
     /** Projects one deterministic source-import definition and its authored settings. */
     static EditorSelection importDefinition(ImportDefinition definition, Path projectRoot) {
-        List<EditorInspectorView.Property> properties = new ArrayList<>();
+        List<EditorDetails.Property> properties = new ArrayList<>();
         properties.add(textProperty("identity", "Identity", definition.id()));
         properties.add(textProperty("importer", "Importer", definition.importer()));
         properties.add(textProperty("asset", "Source asset", definition.asset().id()));
         properties.add(numberProperty(
                 "selection-count", "Selected items", definition.selection().size()));
         definition.settings().forEach((id, value) -> properties.add(authoredProperty(new PropertyId(id), value)));
-        EditorInspectorView view = view(
+        EditorDetails view = view(
                 definition.id(),
                 "Import definition",
                 definition.source(),
@@ -193,11 +199,11 @@ final class EditorInspectorProjector {
                 definition.id(),
                 false,
                 List.of(section("Import", properties)));
-        return selection(EditorSelection.Kind.ASSET, definition.source(), definition.id(), view);
+        return selection(EditorSelectionKinds.ASSET, definition.source(), definition.id(), view);
     }
 
     /** Projects component definitions in authored order using exact descriptor versions. */
-    private static List<EditorInspectorView.Section> componentSections(
+    private static List<EditorDetails.Section> componentSections(
             List<ComponentDefinition> components, RegisteredTypeCatalog types) {
         return components.stream()
                 .map(component -> componentSection(component, types))
@@ -205,8 +211,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects one component while retaining authored values even if metadata is unavailable. */
-    private static EditorInspectorView.Section componentSection(
-            ComponentDefinition component, RegisteredTypeCatalog types) {
+    private static EditorDetails.Section componentSection(ComponentDefinition component, RegisteredTypeCatalog types) {
         ComponentType type = new ComponentType(component.type(), component.typeVersion());
         return types.findComponent(type)
                 .map(descriptor -> descriptorSection(component, descriptor.presentation(), descriptor.properties()))
@@ -214,29 +219,29 @@ final class EditorInspectorProjector {
     }
 
     /** Applies descriptor presentation, property order, defaults, and constraints. */
-    private static EditorInspectorView.Section descriptorSection(
+    private static EditorDetails.Section descriptorSection(
             ComponentDefinition component,
             DescriptorPresentation presentation,
             Map<PropertyId, PropertyDescriptor> descriptors) {
-        List<EditorInspectorView.Property> properties = new ArrayList<>();
+        List<EditorDetails.Property> properties = new ArrayList<>();
         for (Map.Entry<PropertyId, PropertyDescriptor> entry : descriptors.entrySet()) {
             PropertyId id = entry.getKey();
             PropertyDescriptor descriptor = entry.getValue();
             Optional<ProjectValue> authored =
                     Optional.ofNullable(component.properties().get(id));
             Optional<ProjectValue> displayed = authored.or(descriptor::defaultValue);
-            EditorInspectorView.ValueOrigin origin;
+            EditorDetails.ValueOrigin origin;
             if (authored.isPresent()) {
-                origin = EditorInspectorView.ValueOrigin.AUTHORED;
+                origin = EditorDetails.ValueOrigin.AUTHORED;
             } else if (displayed.isPresent()) {
-                origin = EditorInspectorView.ValueOrigin.DEFAULT;
+                origin = EditorDetails.ValueOrigin.DEFAULT;
             } else {
-                origin = EditorInspectorView.ValueOrigin.UNSET;
+                origin = EditorDetails.ValueOrigin.UNSET;
             }
-            properties.add(new EditorInspectorView.Property(
+            properties.add(new EditorDetails.Property(
                     id.value(),
                     descriptor.presentation().displayName(),
-                    descriptor.valueKind(),
+                    label(descriptor.valueKind()),
                     displayed.map(EditorInspectorProjector::format).orElse("Not set"),
                     origin,
                     descriptor.isRequired(),
@@ -248,16 +253,15 @@ final class EditorInspectorProjector {
                 properties.add(authoredProperty(id, value));
             }
         });
-        return new EditorInspectorView.Section(
-                presentation.displayName(), presentation.description(), true, properties);
+        return new EditorDetails.Section(presentation.displayName(), presentation.description(), true, properties);
     }
 
     /** Preserves authored values when exact safe descriptor metadata could not be resolved. */
-    private static EditorInspectorView.Section missingDescriptorSection(ComponentDefinition component) {
-        List<EditorInspectorView.Property> properties = component.properties().entrySet().stream()
+    private static EditorDetails.Section missingDescriptorSection(ComponentDefinition component) {
+        List<EditorDetails.Property> properties = component.properties().entrySet().stream()
                 .map(entry -> authoredProperty(entry.getKey(), entry.getValue()))
                 .toList();
-        return new EditorInspectorView.Section(
+        return new EditorDetails.Section(
                 component.type().value(),
                 Optional.of("Descriptor metadata unavailable for type version " + component.typeVersion()),
                 false,
@@ -280,61 +284,67 @@ final class EditorInspectorProjector {
     }
 
     /** Creates one ordinary authored property without descriptor presentation metadata. */
-    private static EditorInspectorView.Property authoredProperty(PropertyId id, ProjectValue value) {
-        return new EditorInspectorView.Property(
+    private static EditorDetails.Property authoredProperty(PropertyId id, ProjectValue value) {
+        return new EditorDetails.Property(
                 id.value(),
                 displayName(id.value()),
-                ProjectValueKind.of(value),
+                label(ProjectValueKind.of(value)),
                 format(value),
-                EditorInspectorView.ValueOrigin.AUTHORED,
+                EditorDetails.ValueOrigin.AUTHORED,
                 false,
                 Optional.empty(),
                 Map.of());
     }
 
     /** Creates one text-valued summary row. */
-    private static EditorInspectorView.Property textProperty(String id, String name, String value) {
+    private static EditorDetails.Property textProperty(String id, String name, String value) {
         return summaryProperty(id, name, ProjectValueKind.TEXT, value);
     }
 
     /** Creates one numeric summary row. */
-    private static EditorInspectorView.Property numberProperty(String id, String name, int value) {
+    private static EditorDetails.Property numberProperty(String id, String name, int value) {
         return summaryProperty(id, name, ProjectValueKind.NUMBER, Integer.toString(value));
     }
 
     /** Creates one boolean summary row. */
-    private static EditorInspectorView.Property booleanProperty(String id, String name, boolean value) {
+    private static EditorDetails.Property booleanProperty(String id, String name, boolean value) {
         return summaryProperty(id, name, ProjectValueKind.BOOLEAN, Boolean.toString(value));
     }
 
     /** Creates a projected summary row backed by immutable loaded data. */
-    private static EditorInspectorView.Property summaryProperty(
-            String id, String name, ProjectValueKind kind, String value) {
-        return new EditorInspectorView.Property(
-                id, name, kind, value, EditorInspectorView.ValueOrigin.AUTHORED, false, Optional.empty(), Map.of());
+    private static EditorDetails.Property summaryProperty(String id, String name, ProjectValueKind kind, String value) {
+        return new EditorDetails.Property(
+                id, name, label(kind), value, EditorDetails.ValueOrigin.AUTHORED, false, Optional.empty(), Map.of());
     }
 
     /** Creates one ordinary Inspector section. */
-    private static EditorInspectorView.Section section(String title, List<EditorInspectorView.Property> properties) {
-        return new EditorInspectorView.Section(title, Optional.empty(), true, properties);
+    private static EditorDetails.Section section(String title, List<EditorDetails.Property> properties) {
+        return new EditorDetails.Section(title, Optional.empty(), true, properties);
     }
 
     /** Creates the common immutable view header. */
-    private static EditorInspectorView view(
+    private static EditorDetails view(
             String title,
             String kind,
             Path source,
             Path projectRoot,
             String identity,
             boolean generated,
-            List<EditorInspectorView.Section> sections) {
-        return new EditorInspectorView(title, kind, displaySource(source, projectRoot), identity, generated, sections);
+            List<EditorDetails.Section> sections) {
+        String tooltip = generated ? "Generated content · read-only" : "Read-only";
+        return new EditorDetails(
+                title,
+                kind,
+                displaySource(source, projectRoot),
+                identity,
+                List.of(new EditorIcon(EditorIcons.READ_ONLY, tooltip)),
+                sections);
     }
 
     /** Creates a source-scoped stable selection key because entity IDs are asset-local. */
     private static EditorSelection selection(
-            EditorSelection.Kind kind, Path source, String identity, EditorInspectorView view) {
-        String key = kind.name() + ':' + source.toAbsolutePath().normalize() + ':' + identity;
+            EditorSelectionKindId kind, Path source, String identity, EditorDetails view) {
+        String key = kind.value() + ':' + source.toAbsolutePath().normalize() + ':' + identity;
         return new EditorSelection(kind, key, view);
     }
 

@@ -5,12 +5,12 @@
 package io.github.glynch.jscene3d.editor.builtin.hierarchy;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
-import io.github.glynch.jscene3d.editor.EditorSelection;
-import io.github.glynch.jscene3d.editor.EditorSelectionModel;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIconId;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
@@ -37,17 +37,14 @@ public final class HierarchyExtension implements EditorExtension {
     public static final ViewId VIEW_ID = new ViewId("io.github.glynch.jscene3d.editor.hierarchy");
 
     private final EditorProjectContext projects;
-    private final EditorSelectionModel editorSelection;
 
     /**
-     * Creates the built-in extension over editor-owned project and selection state.
+     * Creates the built-in extension over editor-owned project state.
      *
      * @param projects current-project lifecycle
-     * @param editorSelection selection shared across editor views
      */
-    public HierarchyExtension(EditorProjectContext projects, EditorSelectionModel editorSelection) {
+    public HierarchyExtension(EditorProjectContext projects) {
         this.projects = Objects.requireNonNull(projects, "projects");
-        this.editorSelection = Objects.requireNonNull(editorSelection, "editorSelection");
     }
 
     @Override
@@ -58,23 +55,28 @@ public final class HierarchyExtension implements EditorExtension {
     @Override
     public void activate(EditorExtensionContext context) {
         EditorExtensionContext editor = Objects.requireNonNull(context, "context");
-        editor.subscriptions().add(projects.observeHierarchy(this::selectInitialEntry));
+        EditorSelections selections = editor.selections();
+        editor.subscriptions().add(projects.observeHierarchy(hierarchy -> selectInitialEntry(selections, hierarchy)));
         editor.subscriptions()
                 .add(editor.views()
                         .register(new EditorViewContribution(
-                                new HierarchyTreeView(), EditorViewContainers.PRIMARY_SIDEBAR, 10)));
+                                new HierarchyTreeView(selections), EditorViewContainers.PRIMARY_SIDEBAR, 10)));
     }
 
-    private void selectInitialEntry(Optional<EditorHierarchyNode> hierarchy) {
+    private static void selectInitialEntry(EditorSelections selections, Optional<EditorHierarchyNode> hierarchy) {
         hierarchy.ifPresentOrElse(
-                root -> editorSelection.select(
+                root -> selections.select(
                         root.children().stream().findFirst().orElse(root).selection()),
-                editorSelection::clear);
+                selections::clear);
     }
 
     private final class HierarchyTreeView implements EditorTreeView<EditorHierarchyNode> {
         private final EditorTreeDataProvider<EditorHierarchyNode> dataProvider = new HierarchyDataProvider();
-        private final EditorTreeSelectionModel<EditorHierarchyNode> selectionModel = new HierarchySelectionModel();
+        private final EditorTreeSelectionModel<EditorHierarchyNode> selectionModel;
+
+        private HierarchyTreeView(EditorSelections selections) {
+            selectionModel = new HierarchySelectionModel(selections);
+        }
 
         @Override
         public ViewId id() {
@@ -137,30 +139,35 @@ public final class HierarchyExtension implements EditorExtension {
     }
 
     private final class HierarchySelectionModel implements EditorTreeSelectionModel<EditorHierarchyNode> {
+        private final EditorSelections selections;
+
+        private HierarchySelectionModel(EditorSelections selections) {
+            this.selections = Objects.requireNonNull(selections, "selections");
+        }
+
         @Override
         public Optional<EditorHierarchyNode> selection() {
-            return editorSelection.selection().flatMap(HierarchyExtension.this::findSelection);
+            return selections.current().flatMap(HierarchyExtension.this::findSelection);
         }
 
         @Override
         public void select(Optional<EditorHierarchyNode> selection) {
             Optional<EditorHierarchyNode> selected = Objects.requireNonNull(selection, "selection");
             if (selected.isPresent()) {
-                editorSelection.select(selected.orElseThrow().selection());
-            } else if (editorSelection
-                    .selection()
+                selections.select(selected.orElseThrow().selection());
+            } else if (selections
+                    .current()
                     .flatMap(HierarchyExtension.this::findSelection)
                     .isPresent()) {
-                editorSelection.clear();
+                selections.clear();
             }
         }
 
         @Override
         public EditorRegistration observe(Consumer<Optional<EditorHierarchyNode>> listener) {
             Consumer<Optional<EditorHierarchyNode>> observer = Objects.requireNonNull(listener, "listener");
-            Runnable removal = editorSelection.subscribe(
+            return selections.observe(
                     selection -> observer.accept(selection.flatMap(HierarchyExtension.this::findSelection)));
-            return removal::run;
         }
     }
 

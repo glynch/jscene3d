@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
+import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
 import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
@@ -63,6 +64,13 @@ public interface EditorExtensionContext {
      * @return current-project lifecycle
      */
     EditorProjects projects();
+
+    /**
+     * Returns the selection shared by editor views in this window.
+     *
+     * @return shared editor selection
+     */
+    EditorSelections selections();
 
     /**
      * Returns the registrations automatically closed when this extension is deactivated.

@@ -7,18 +7,19 @@ package io.github.glynch.jscene3d.editor.builtin.project;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
-import io.github.glynch.jscene3d.editor.EditorInspectorView;
-import io.github.glynch.jscene3d.editor.EditorSelection;
-import io.github.glynch.jscene3d.editor.EditorSelectionModel;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionSnapshot;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,12 +32,12 @@ final class ProjectExtensionTest {
     @Test
     void contributesAProjectDrivenCollectionAndSharesSelection() {
         EditorProjectContext projects = new EditorProjectContext();
-        EditorSelectionModel editorSelection = new EditorSelectionModel();
-        EditorExtensionHost host = new EditorExtensionHost(projects);
+        EditorSelectionContext editorSelection = new EditorSelectionContext();
+        EditorExtensionHost host = new EditorExtensionHost(projects, editorSelection);
         List<List<EditorViewContribution>> contributions = new ArrayList<>();
         host.observeViews(contributions::add);
 
-        host.activate(new ProjectExtension(projects, editorSelection));
+        host.activate(new ProjectExtension(projects));
 
         EditorViewContribution contribution = contributions.getLast().getFirst();
         assertThat(contribution.container()).isEqualTo(EditorViewContainers.BOTTOM_PANEL);
@@ -69,7 +70,7 @@ final class ProjectExtensionTest {
 
         view.selectionModel().orElseThrow().select(Optional.of(world));
 
-        assertThat(editorSelection.selection()).contains(world.selection());
+        assertThat(editorSelection.current()).contains(world.selection());
         editorSelection.select(hierarchy().selection());
         assertThat(view.selectionModel().orElseThrow().selection()).isEmpty();
         host.close();
@@ -81,15 +82,15 @@ final class ProjectExtensionTest {
 
     private static ProjectAsset item(String label, String identity, ProjectAsset.Kind kind) {
         Path source = Path.of("project", kind.name().toLowerCase(Locale.ROOT), identity);
-        EditorInspectorView inspector =
-                new EditorInspectorView(label, kind.label(), source.toString(), identity, false, List.of());
-        EditorSelection selection = new EditorSelection(EditorSelection.Kind.ASSET, "selection:" + identity, inspector);
+        EditorDetails details =
+                new EditorDetails(label, kind.label(), source.toString(), identity, List.of(), List.of());
+        EditorSelection selection = new EditorSelection(EditorSelectionKinds.ASSET, "selection:" + identity, details);
         return new ProjectAsset(label, identity, kind, source, selection);
     }
 
     private static EditorHierarchyNode hierarchy() {
-        EditorInspectorView inspector = new EditorInspectorView("MAP01", "World", "world", "world", false, List.of());
-        EditorSelection selection = new EditorSelection(EditorSelection.Kind.WORLD, "world", inspector);
+        EditorDetails details = new EditorDetails("MAP01", "World", "world", "world", List.of(), List.of());
+        EditorSelection selection = new EditorSelection(EditorSelectionKinds.WORLD, "world", details);
         return new EditorHierarchyNode(
                 EditorHierarchyNode.Kind.WORLD,
                 "MAP01",

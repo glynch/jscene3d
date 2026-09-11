@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.project;
 
-import io.github.glynch.jscene3d.editor.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import java.nio.file.Path;
 import java.util.Objects;
 

@@ -30,6 +30,7 @@ import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.view.ViewKindId;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
+import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,7 @@ final class EditorExtensionHostTest {
 
     @Test
     void activatesCapabilitiesAndRemovesOwnedContributionsAtShutdown() {
-        EditorExtensionHost host = new EditorExtensionHost(new EditorProjectContext());
+        EditorExtensionHost host = host();
         List<List<EditorViewContribution>> viewSnapshots = new ArrayList<>();
         List<EditorMessage> messages = new ArrayList<>();
         List<ViewId> viewRequests = new ArrayList<>();
@@ -90,7 +91,7 @@ final class EditorExtensionHostTest {
 
     @Test
     void rejectsDuplicateExtensionsAndRollsBackFailedActivation() {
-        EditorExtensionHost host = new EditorExtensionHost(new EditorProjectContext());
+        EditorExtensionHost host = host();
         EditorExtension first = extension(new AtomicReference<>(), new AtomicReference<>());
         host.activate(first);
 
@@ -99,7 +100,7 @@ final class EditorExtensionHostTest {
                 .hasMessageContaining("already active");
 
         host.close();
-        EditorExtensionHost failingHost = new EditorExtensionHost(new EditorProjectContext());
+        EditorExtensionHost failingHost = host();
         List<List<EditorViewContribution>> snapshots = new ArrayList<>();
         failingHost.observeViews(snapshots::add);
         EditorExtension failing = new EditorExtension() {
@@ -176,6 +177,10 @@ final class EditorExtensionHostTest {
                 assertThat(context.projects().current()).isEmpty();
             }
         };
+    }
+
+    private static EditorExtensionHost host() {
+        return new EditorExtensionHost(new EditorProjectContext(), new EditorSelectionContext());
     }
 
     private static final class TestView implements EditorView {

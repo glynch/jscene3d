@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
+import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemContribution;
@@ -47,6 +48,7 @@ public final class EditorExtensionHost implements AutoCloseable {
                     .log(System.Logger.Level.INFO, message.severity() + ": " + message.text());
 
     private final EditorProjectContext projects;
+    private final EditorSelections selections;
     private final Map<String, ExtensionSubscriptionsImpl> activeExtensions = new LinkedHashMap<>();
     private final Map<ViewId, EditorViewContribution> views = new LinkedHashMap<>();
     private final List<Consumer<List<EditorViewContribution>>> viewObservers = new ArrayList<>();
@@ -64,9 +66,11 @@ public final class EditorExtensionHost implements AutoCloseable {
      * Creates an empty host around the editor's current-project lifecycle.
      *
      * @param projects current-project lifecycle
+     * @param selections shared editor selection
      */
-    public EditorExtensionHost(EditorProjectContext projects) {
+    public EditorExtensionHost(EditorProjectContext projects, EditorSelections selections) {
         this.projects = Objects.requireNonNull(projects, "projects");
+        this.selections = Objects.requireNonNull(selections, "selections");
     }
 
     /**
@@ -292,6 +296,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         @Override
         public EditorProjects projects() {
             return projects;
+        }
+
+        @Override
+        public EditorSelections selections() {
+            return selections;
         }
 
         @Override

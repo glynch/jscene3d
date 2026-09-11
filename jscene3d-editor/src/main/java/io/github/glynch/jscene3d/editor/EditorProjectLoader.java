@@ -5,6 +5,11 @@
 package io.github.glynch.jscene3d.editor;
 
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.game.StandardGameDescriptors;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetCatalogLoadResult;
@@ -365,19 +370,19 @@ final class EditorProjectLoader {
     /** Preserves selection metadata for a definition whose complete data could not be loaded. */
     private static EditorSelection unavailableAssetSelection(AssetMetadata metadata, String label, Path projectRoot) {
         String source = projectRoot.relativize(metadata.path()).toString();
-        EditorInspectorView view = new EditorInspectorView(
+        EditorDetails view = new EditorDetails(
                 label,
                 metadata.kind() == AssetKind.ENTITY_DEFINITION ? "Entity definition" : "World definition",
                 source,
                 metadata.id().toString(),
-                false,
-                List.of(new EditorInspectorView.Section(
+                List.of(new EditorIcon(EditorIcons.READ_ONLY, "Unavailable definition · read-only")),
+                List.of(new EditorDetails.Section(
                         "Definition",
                         Optional.of("Complete definition data is unavailable; see Diagnostics"),
                         false,
                         List.of())));
-        String key = EditorSelection.Kind.ASSET + ":" + metadata.path() + ':' + metadata.id();
-        return new EditorSelection(EditorSelection.Kind.ASSET, key, view);
+        String key = EditorSelectionKinds.ASSET.value() + ":" + metadata.path() + ':' + metadata.id();
+        return new EditorSelection(EditorSelectionKinds.ASSET, key, view);
     }
 
     /** Resolves and validates the manifest's configured startup world by its stable asset identity. */

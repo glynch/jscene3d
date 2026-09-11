@@ -9,6 +9,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import io.github.glynch.jscene3d.telemetry.TelemetryMeasurement;
 import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
@@ -60,17 +62,22 @@ final class EditorProjectLoaderTest {
                     .singleElement()
                     .returns("Lamp", EditorHierarchyNode::label)
                     .returns(EditorHierarchyNode.Kind.GENERATED_ENTITY, EditorHierarchyNode::kind)
-                    .satisfies(child -> assertThat(child.selection().inspector())
-                            .returns("Lamp", EditorInspectorView::title)
-                            .returns(true, EditorInspectorView::generated)
+                    .satisfies(child -> assertThat(child.selection().details().orElseThrow())
+                            .returns("Lamp", EditorDetails::title)
+                            .satisfies(details -> assertThat(details.decorations())
+                                    .singleElement()
+                                    .satisfies(icon -> {
+                                        assertThat(icon.id()).isEqualTo(EditorIcons.READ_ONLY);
+                                        assertThat(icon.tooltip()).contains("Generated content");
+                                    }))
                             .satisfies(inspection -> assertThat(inspection.sections())
-                                    .extracting(EditorInspectorView.Section::title)
+                                    .extracting(EditorDetails.Section::title)
                                     .contains("Transform 3D", "Perspective Camera 3D")))
                     .satisfies(child -> assertThat(child.entityId())
                             .hasValueSatisfying(id -> assertThat(id.toString()).isEqualTo(CHILD_ID)));
         });
         assertThat(session.assets())
-                .extracting(item -> item.selection().inspector().kind())
+                .extracting(item -> item.selection().details().orElseThrow().kind())
                 .containsExactly("Entity definition", "World definition");
     }
 

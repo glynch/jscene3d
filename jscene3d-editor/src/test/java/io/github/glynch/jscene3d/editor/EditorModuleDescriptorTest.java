@@ -18,18 +18,19 @@ final class EditorModuleDescriptorTest {
     }
 
     @Test
-    void exposesItsApplicationClassOnlyToJavaFx() {
+    void opensItsApplicationPackageOnlyToJavaFx() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
 
         assertThat(descriptor.requires())
                 .filteredOn(requirement -> requirement.name().equals("javafx.graphics"))
                 .singleElement()
-                .satisfies(requirement ->
-                        assertThat(requirement.modifiers()).contains(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
-        assertThat(descriptor.exports())
+                .satisfies(requirement -> assertThat(requirement.modifiers())
+                        .doesNotContain(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
+        assertThat(descriptor.exports()).isEmpty();
+        assertThat(descriptor.opens())
                 .singleElement()
-                .returns("io.github.glynch.jscene3d.editor", ModuleDescriptor.Exports::source)
-                .returns(true, ModuleDescriptor.Exports::isQualified)
-                .satisfies(export -> assertThat(export.targets()).containsExactly("javafx.graphics"));
+                .returns("io.github.glynch.jscene3d.editor", ModuleDescriptor.Opens::source)
+                .returns(true, ModuleDescriptor.Opens::isQualified)
+                .satisfies(opening -> assertThat(opening.targets()).containsExactly("javafx.graphics"));
     }
 }

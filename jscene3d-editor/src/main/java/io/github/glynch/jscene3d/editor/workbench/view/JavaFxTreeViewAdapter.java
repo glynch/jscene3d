@@ -161,8 +161,8 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
     private void showFailure(Throwable failure) {
         withoutSelectionFeedback(() -> {
             renderedItems.clear();
-            @SuppressWarnings("NullAway")
-            TreeItem<T> failureRoot = new TreeItem<>(null, new Label("Unable to load view: " + failure.getMessage()));
+            TreeItem<T> failureRoot = new TreeItem<>();
+            failureRoot.setGraphic(new Label("Unable to load view: " + failure.getMessage()));
             tree.setRoot(failureRoot);
             tree.setShowRoot(true);
         });

@@ -14,7 +14,7 @@ module io.github.glynch.jscene3d.editor {
     requires grapl.natives.gl.macos;
     requires java.logging;
     requires javafx.controls;
-    requires transitive javafx.graphics;
+    requires javafx.graphics;
     requires openglfx;
     requires openglfx.lwjgl;
     requires openglfx.natives.core.macos;
@@ -23,6 +23,6 @@ module io.github.glynch.jscene3d.editor {
     requires org.lwjgl.opengl.natives;
     requires static org.jspecify;
 
-    exports io.github.glynch.jscene3d.editor to
+    opens io.github.glynch.jscene3d.editor to
             javafx.graphics;
 }

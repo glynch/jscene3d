@@ -12,7 +12,6 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Immutable read-only projection of one authored hierarchy entry. */
-@SuppressWarnings("exports") // Public only across this module's implementation packages; the package is not exported.
 public final class EditorHierarchyNode {
     private final Kind kind;
     private final String label;

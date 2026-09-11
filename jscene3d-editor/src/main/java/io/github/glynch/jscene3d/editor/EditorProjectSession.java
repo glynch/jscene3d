@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
@@ -21,7 +22,7 @@ final class EditorProjectSession {
     private final ProjectContent content;
     private final WorldDefinition startupWorld;
     private final EditorHierarchyNode hierarchy;
-    private final List<EditorAssetItem> assets;
+    private final List<ProjectAsset> assets;
 
     /** Stores the validated project data needed by the first authoring views. */
     EditorProjectSession(
@@ -31,7 +32,7 @@ final class EditorProjectSession {
             ProjectContent content,
             WorldDefinition startupWorld,
             EditorHierarchyNode hierarchy,
-            List<EditorAssetItem> assets) {
+            List<ProjectAsset> assets) {
         this.project = Objects.requireNonNull(project, "project");
         this.authoredAssets = Objects.requireNonNull(authoredAssets, "authoredAssets");
         this.types = Objects.requireNonNull(types, "types");
@@ -77,7 +78,7 @@ final class EditorProjectSession {
     }
 
     /** Returns asset-browser items in deterministic order. */
-    List<EditorAssetItem> assets() {
+    List<ProjectAsset> assets() {
         return assets;
     }
 }

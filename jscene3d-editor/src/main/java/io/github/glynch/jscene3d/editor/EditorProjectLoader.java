@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.game.StandardGameDescriptors;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetCatalogLoadResult;
@@ -131,7 +132,7 @@ final class EditorProjectLoader {
                 () -> loadContent(project, authored, types, imports, diagnostics));
         DefinitionResolver definitions = content.definitions();
         progress.phaseStarted(EditorLoadingPhase.VALIDATING_ASSETS);
-        List<EditorAssetItem> assets = operation.measure(
+        List<ProjectAsset> assets = operation.measure(
                 "project.assets.validate",
                 Map.of(),
                 () -> loadAssets(project, authored, definitions, types, imports, diagnostics));
@@ -301,30 +302,30 @@ final class EditorProjectLoader {
     }
 
     /** Validates authored definitions and builds deterministic asset-browser entries. */
-    private static List<EditorAssetItem> loadAssets(
+    private static List<ProjectAsset> loadAssets(
             GameProject project,
             AssetCatalog authored,
             DefinitionResolver definitions,
             RegisteredTypeCatalog types,
             List<ImportDefinition> imports,
             LinkedHashSet<ProjectDiagnostic> diagnostics) {
-        List<EditorAssetItem> assets = new ArrayList<>();
+        List<ProjectAsset> assets = new ArrayList<>();
         for (AssetMetadata metadata : authored.assets()) {
             assets.add(loadDefinitionAsset(metadata, project.root(), definitions, types, diagnostics));
         }
         for (GameProject.AssetSource source : project.assets()) {
-            assets.add(new EditorAssetItem(
+            assets.add(new ProjectAsset(
                     source.id(),
                     source.id(),
-                    EditorAssetItem.Kind.SOURCE_ASSET,
+                    ProjectAsset.Kind.SOURCE_ASSET,
                     source.path(),
                     EditorInspectorProjector.sourceAsset(source, project.root())));
         }
         for (ImportDefinition definition : imports) {
-            assets.add(new EditorAssetItem(
+            assets.add(new ProjectAsset(
                     definition.id(),
                     definition.id(),
-                    EditorAssetItem.Kind.IMPORT_DEFINITION,
+                    ProjectAsset.Kind.IMPORT_DEFINITION,
                     definition.source(),
                     EditorInspectorProjector.importDefinition(definition, project.root())));
         }
@@ -332,7 +333,7 @@ final class EditorProjectLoader {
     }
 
     /** Loads one authored definition for its label and records its complete validation diagnostics. */
-    private static EditorAssetItem loadDefinitionAsset(
+    private static ProjectAsset loadDefinitionAsset(
             AssetMetadata metadata,
             Path projectRoot,
             DefinitionResolver definitions,
@@ -347,12 +348,8 @@ final class EditorProjectLoader {
             EditorSelection selection = definition
                     .map(value -> EditorInspectorProjector.entityDefinition(value, metadata.path(), projectRoot, types))
                     .orElseGet(() -> unavailableAssetSelection(metadata, label, projectRoot));
-            return new EditorAssetItem(
-                    label,
-                    metadata.id().toString(),
-                    EditorAssetItem.Kind.ENTITY_DEFINITION,
-                    metadata.path(),
-                    selection);
+            return new ProjectAsset(
+                    label, metadata.id().toString(), ProjectAsset.Kind.ENTITY_DEFINITION, metadata.path(), selection);
         }
         DefinitionLoadResult<WorldDefinition> result = definitions.loadWorld(AssetRef.to(metadata.id()), types);
         diagnostics.addAll(result.diagnostics());
@@ -361,8 +358,8 @@ final class EditorProjectLoader {
         EditorSelection selection = definition
                 .map(value -> EditorInspectorProjector.worldDefinition(value, metadata.path(), projectRoot))
                 .orElseGet(() -> unavailableAssetSelection(metadata, label, projectRoot));
-        return new EditorAssetItem(
-                label, metadata.id().toString(), EditorAssetItem.Kind.WORLD_DEFINITION, metadata.path(), selection);
+        return new ProjectAsset(
+                label, metadata.id().toString(), ProjectAsset.Kind.WORLD_DEFINITION, metadata.path(), selection);
     }
 
     /** Preserves selection metadata for a definition whose complete data could not be loaded. */

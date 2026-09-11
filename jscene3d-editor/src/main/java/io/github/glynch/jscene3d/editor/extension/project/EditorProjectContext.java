@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.extension.project;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
@@ -18,15 +19,19 @@ import java.util.function.Consumer;
 public final class EditorProjectContext implements EditorProjects {
     private final List<Consumer<Optional<EditorProject>>> projectListeners;
     private final List<Consumer<Optional<EditorHierarchyNode>>> hierarchyListeners;
+    private final List<Runnable> assetListeners;
     private Optional<EditorProject> current;
     private Optional<EditorHierarchyNode> hierarchy;
+    private List<ProjectAsset> assets;
 
     /** Creates an initially empty project lifecycle. */
     public EditorProjectContext() {
         projectListeners = new ArrayList<>();
         hierarchyListeners = new ArrayList<>();
+        assetListeners = new ArrayList<>();
         current = Optional.empty();
         hierarchy = Optional.empty();
+        assets = List.of();
     }
 
     @Override
@@ -64,30 +69,49 @@ public final class EditorProjectContext implements EditorProjects {
         return once(() -> hierarchyListeners.remove(observer));
     }
 
+    /** Returns the editor-internal asset projection for the current project. */
+    public List<ProjectAsset> assets() {
+        return assets;
+    }
+
+    /** Observes complete changes to the editor-internal asset projection. */
+    public EditorRegistration observeAssets(Runnable listener) {
+        Runnable observer = Objects.requireNonNull(listener, "listener");
+        assetListeners.add(observer);
+        observer.run();
+        return once(() -> assetListeners.remove(observer));
+    }
+
     /**
      * Publishes one completely loaded project to every workbench observer.
      *
      * @param project opened project identity
      * @param hierarchyRoot editor-internal hierarchy projection
+     * @param projectAssets editor-internal asset projection
      */
-    public void showProject(EditorProject project, EditorHierarchyNode hierarchyRoot) {
+    public void showProject(
+            EditorProject project, EditorHierarchyNode hierarchyRoot, List<ProjectAsset> projectAssets) {
         EditorProject opened = Objects.requireNonNull(project, "project");
         EditorHierarchyNode root = Objects.requireNonNull(hierarchyRoot, "hierarchyRoot");
         current = Optional.of(opened);
         hierarchy = Optional.of(root);
+        assets = List.copyOf(projectAssets);
         notifyProjectListeners();
         notifyHierarchyListeners();
+        notifyAssetListeners();
     }
 
     /** Clears project-owned state before another project is loaded or after a failure. */
     public void clear() {
-        if (current.isEmpty() && hierarchy.isEmpty()) {
+        if (current.isEmpty() && hierarchy.isEmpty() && assets.isEmpty()) {
             return;
         }
         current = Optional.empty();
         hierarchy = Optional.empty();
+        assets = List.of();
         notifyProjectListeners();
         notifyHierarchyListeners();
+        notifyAssetListeners();
     }
 
     private void notifyProjectListeners() {
@@ -96,6 +120,10 @@ public final class EditorProjectContext implements EditorProjects {
 
     private void notifyHierarchyListeners() {
         List.copyOf(hierarchyListeners).forEach(listener -> listener.accept(hierarchy));
+    }
+
+    private void notifyAssetListeners() {
+        List.copyOf(assetListeners).forEach(Runnable::run);
     }
 
     private static EditorRegistration once(Runnable removal) {

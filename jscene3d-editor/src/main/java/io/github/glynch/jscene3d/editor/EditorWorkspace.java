@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
+import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -19,8 +20,6 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
@@ -28,38 +27,17 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
-import javafx.scene.control.TextField;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
-import javafx.scene.control.TreeCell;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.TilePane;
 import javafx.scene.layout.VBox;
-import org.jspecify.annotations.Nullable;
 
 /** Owns the editor's resizable JavaFX workspace and its visible read-only state. */
 final class EditorWorkspace extends BorderPane {
-    private final TreeView<ProjectBrowserNode> projectTree = new TreeView<>();
-    private final ListView<EditorAssetItem> assets = new ListView<>();
-    private final TilePane assetGrid = new TilePane();
-    private final ScrollPane assetGridScroll = new ScrollPane();
-    private final StackPane assetBrowserContent = new StackPane();
-    private final ToggleGroup assetCardGroup = new ToggleGroup();
-    private final ToggleGroup assetViewGroup = new ToggleGroup();
-    private final ToggleButton assetGridView = new ToggleButton("▦");
-    private final ToggleButton assetListView = new ToggleButton("☷");
-    private final TextField assetSearch = new TextField();
-    private final Label assetBreadcrumb = new Label("No project");
-    private final Label assetBrowserEmpty = new Label();
     private final EditorSelectionModel selectionModel;
-    private final EditorProjectBrowserModel projectBrowser = new EditorProjectBrowserModel();
     private final Label projectContext = new Label("No project");
     private final Label previewTitle = new Label("Empty Preview");
     private final Label projectStatus = createStatus("No project opened");
@@ -78,8 +56,8 @@ final class EditorWorkspace extends BorderPane {
     private final SplitPane leftWorkspaceSplit;
     private final EditorBottomDrawer bottomDrawer;
     private final JavaFxViewContainer primaryViewContainer;
-    private String projectBrowserProjectName = "No project";
-    private boolean showingAssetGrid = true;
+    private final JavaFxViewContainer bottomViewContainer;
+    private List<ProjectAsset> projectAssets = List.of();
 
     /** Creates the shell around an existing viewport and the real open-project command. */
     EditorWorkspace(
@@ -98,7 +76,8 @@ final class EditorWorkspace extends BorderPane {
         VBox inspectorPanel = createInspector();
         VBox previewPanel = createViewportPane(viewportCanvas);
         upperWorkspaceSplit = createUpperWorkspaceSplit(hierarchyPanel, previewPanel);
-        bottomDrawer = new EditorBottomDrawer(createProjectBrowser(), this::selectDiagnostic);
+        bottomViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.BOTTOM_PANEL, false);
+        bottomDrawer = new EditorBottomDrawer(bottomViewContainer.node(), this::selectDiagnostic);
         leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit, bottomDrawer);
         workspaceSplit = new SplitPane(leftWorkspaceSplit, inspectorPanel);
         workspaceSplit.setOrientation(Orientation.HORIZONTAL);
@@ -107,7 +86,6 @@ final class EditorWorkspace extends BorderPane {
         setCenter(workspaceSplit);
         setBottom(createStatusBar());
         getStyleClass().add("editor-shell");
-        installSelectionEvents();
         diagnosticStatus.setOnAction(ignored -> bottomDrawer.openDiagnostics());
     }
 
@@ -131,13 +109,7 @@ final class EditorWorkspace extends BorderPane {
         Path normalized = directory.toAbsolutePath().normalize();
         Path fileName = normalized.getFileName();
         String candidateName = fileName == null ? normalized.toString() : fileName.toString();
-        projectBrowser.clear();
-        projectBrowserProjectName = candidateName;
-        assetBrowserEmpty.setText("Loading project assets…");
-        assetSearch.clear();
-        assetSearch.setDisable(true);
-        showProjectTree();
-        refreshProjectBrowser();
+        projectAssets = List.of();
         projectContext.setText(candidateName);
         projectContext.setTooltip(new Tooltip(normalized.toString()));
         projectStatus.setText("Opening " + candidateName + "…");
@@ -147,13 +119,7 @@ final class EditorWorkspace extends BorderPane {
     void showProject(EditorProjectSession session) {
         clearSelection();
         String projectName = session.project().identity().name();
-        projectBrowser.showProject(session.assets());
-        projectBrowserProjectName = projectName;
-        assetBrowserEmpty.setText("No assets match this Project location or search.");
-        assetSearch.clear();
-        assetSearch.setDisable(false);
-        showProjectTree();
-        refreshProjectBrowser();
+        projectAssets = List.copyOf(session.assets());
         projectContext.setText(projectName);
         previewTitle.setText(session.hierarchy().label() + " Preview");
     }
@@ -161,13 +127,7 @@ final class EditorWorkspace extends BorderPane {
     /** Clears project-owned views after an unsuccessful open. */
     void clearProject() {
         clearSelection();
-        projectBrowser.clear();
-        projectTree.setRoot(null);
-        projectBrowserProjectName = "No project";
-        assetBrowserEmpty.setText("Open a project to browse Worlds, Entity Definitions, Source Assets, and Imports.");
-        assetSearch.clear();
-        assetSearch.setDisable(true);
-        refreshProjectBrowser();
+        projectAssets = List.of();
         projectContext.setText("No project");
         projectContext.setTooltip(null);
         previewTitle.setText("Empty Preview");
@@ -205,6 +165,7 @@ final class EditorWorkspace extends BorderPane {
 
     /** Releases workbench adapters before the extension host is closed. */
     void close() {
+        bottomViewContainer.close();
         primaryViewContainer.close();
     }
 
@@ -278,47 +239,14 @@ final class EditorWorkspace extends BorderPane {
         return inspector;
     }
 
-    /** Keeps project selection presentation and the Inspector synchronized with shared selection. */
+    /** Keeps the Inspector synchronized with the selection shared by contributed views. */
     private void selectionChanged(Optional<EditorSelection> selected) {
-        if (selected.isEmpty() || selected.orElseThrow().kind() != EditorSelection.Kind.ASSET) {
-            clearProjectSelection();
-        }
         showInspection(selected);
-    }
-
-    /** Routes Project selections through the shared selection model used by contributed views. */
-    private void installSelectionEvents() {
-        assets.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
-            if (selected != null) {
-                selectProjectItem(selected);
-            }
-        });
-        projectTree.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
-            if (selected != null) {
-                projectBrowser.showCategory(selected.getValue().category());
-                refreshProjectBrowser();
-            }
-        });
     }
 
     /** Clears UI and shared selection state before project-owned values are replaced. */
     private void clearSelection() {
-        clearProjectSelection();
         selectionModel.clear();
-    }
-
-    /** Clears both Project presentations and their retained stable selection. */
-    private void clearProjectSelection() {
-        assets.getSelectionModel().clearSelection();
-        assetCardGroup.selectToggle(null);
-        projectBrowser.clearSelection();
-    }
-
-    /** Routes a Project item through the browser and shared editor selection models. */
-    private void selectProjectItem(EditorAssetItem selected) {
-        projectBrowser.select(selected);
-        synchronizeProjectSelection();
-        selectionModel.select(selected.selection());
     }
 
     /** Selects the exact Project item named by a file-backed diagnostic when one exists. */
@@ -327,7 +255,11 @@ final class EditorWorkspace extends BorderPane {
             return;
         }
         try {
-            projectBrowser.findBySource(Path.of(diagnostic.source())).ifPresent(this::selectProjectItem);
+            Path source = Path.of(diagnostic.source()).toAbsolutePath().normalize();
+            projectAssets.stream()
+                    .filter(item -> item.source().toAbsolutePath().normalize().equals(source))
+                    .findFirst()
+                    .ifPresent(item -> selectionModel.select(item.selection()));
         } catch (IllegalArgumentException ignored) {
             // An unusual file URI remains inspectable in Diagnostics without false navigation.
         }
@@ -481,217 +413,6 @@ final class EditorWorkspace extends BorderPane {
         return panel;
     }
 
-    /** Creates the categorized Project browser backed by the existing asset projection. */
-    private VBox createProjectBrowser() {
-        projectTree.setCellFactory(ignored -> new ProjectBrowserCell());
-        projectTree.setShowRoot(true);
-        projectTree.setMinWidth(0.0);
-        projectTree.getStyleClass().add("editor-project-tree");
-        VBox.setVgrow(projectTree, Priority.ALWAYS);
-        Label categoriesHeading = new Label("Categories");
-        categoriesHeading.getStyleClass().add("editor-project-categories-heading");
-        VBox navigation = new VBox(categoriesHeading, projectTree);
-        navigation.setMinWidth(180.0);
-        navigation.setPrefWidth(230.0);
-        navigation.getStyleClass().add("editor-project-navigation");
-
-        assetBreadcrumb.setMinWidth(80.0);
-        assetBreadcrumb.setMaxWidth(240.0);
-        assetBreadcrumb.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
-        assetBreadcrumb.getStyleClass().add("editor-project-breadcrumb");
-        Region toolbarSpacer = new Region();
-        HBox.setHgrow(toolbarSpacer, Priority.ALWAYS);
-        assetGridView.setToggleGroup(assetViewGroup);
-        assetListView.setToggleGroup(assetViewGroup);
-        assetGridView.setAccessibleText("Grid view");
-        assetListView.setAccessibleText("List view");
-        assetGridView.setTooltip(new Tooltip("Grid view"));
-        assetListView.setTooltip(new Tooltip("List view"));
-        assetGridView.setSelected(true);
-        assetGridView.setOnAction(ignored -> showAssetView(true));
-        assetListView.setOnAction(ignored -> showAssetView(false));
-        assetGridView.getStyleClass().add("editor-project-view-toggle");
-        assetListView.getStyleClass().add("editor-project-view-toggle");
-        HBox viewButtons = new HBox(assetGridView, assetListView);
-        viewButtons.getStyleClass().add("editor-project-view-buttons");
-        assetSearch.setPromptText("Search assets…");
-        assetSearch.setMinWidth(100.0);
-        assetSearch.setPrefWidth(180.0);
-        assetSearch.setDisable(true);
-        assetSearch.getStyleClass().add("editor-project-search");
-        assetSearch.textProperty().addListener((ignored, previous, current) -> {
-            projectBrowser.search(current);
-            refreshProjectBrowser();
-        });
-        HBox toolbar = new HBox(8.0, assetBreadcrumb, toolbarSpacer, viewButtons, assetSearch);
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.getStyleClass().add("editor-project-toolbar");
-
-        assets.setCellFactory(ignored -> new AssetListCell());
-        assets.getStyleClass().add("editor-asset-list");
-        VBox.setVgrow(assets, Priority.ALWAYS);
-        assetGrid.setHgap(8.0);
-        assetGrid.setVgap(8.0);
-        assetGrid.setPrefTileWidth(156.0);
-        assetGrid.setPrefTileHeight(112.0);
-        assetGrid.getStyleClass().add("editor-asset-grid");
-        assetGridScroll.setContent(assetGrid);
-        assetGridScroll.setFitToWidth(true);
-        assetGridScroll.setPannable(true);
-        assetGridScroll.getStyleClass().add("editor-asset-grid-scroll");
-        assetBrowserEmpty.setText("Open a project to browse Worlds, Entity Definitions, Source Assets, and Imports.");
-        assetBrowserEmpty.setWrapText(true);
-        assetBrowserEmpty.getStyleClass().addAll("editor-empty-detail", "editor-project-empty");
-        assetBrowserContent.getChildren().setAll(assets, assetGridScroll, assetBrowserEmpty);
-        VBox.setVgrow(assetBrowserContent, Priority.ALWAYS);
-        showAssetView(true);
-
-        VBox content = new VBox(toolbar, assetBrowserContent);
-        VBox.setVgrow(assetBrowserContent, Priority.ALWAYS);
-        content.getStyleClass().add("editor-project-content");
-        SplitPane browser = new SplitPane(navigation, content);
-        browser.setOrientation(Orientation.HORIZONTAL);
-        browser.setDividerPositions(0.22);
-        browser.getStyleClass().add("editor-project-browser-split");
-        SplitPane.setResizableWithParent(navigation, false);
-        VBox.setVgrow(browser, Priority.ALWAYS);
-        VBox panel = new VBox(browser);
-        panel.getStyleClass().addAll("editor-panel", "editor-project-panel");
-        return panel;
-    }
-
-    /** Selects a Project presentation while preserving the browser's stable item selection. */
-    private void showAssetView(boolean showGrid) {
-        showingAssetGrid = showGrid;
-        assetGridView.setSelected(showGrid);
-        assetListView.setSelected(!showGrid);
-        refreshProjectBrowserVisibility();
-        synchronizeProjectSelection();
-    }
-
-    /** Rebuilds the category tree with truthful counts for the current project. */
-    private void showProjectTree() {
-        ProjectBrowserNode project = ProjectBrowserNode.project(
-                projectBrowserProjectName, projectBrowser.count(EditorProjectBrowserModel.Category.ALL));
-        TreeItem<ProjectBrowserNode> root = new TreeItem<>(project);
-        for (EditorProjectBrowserModel.Category category : EditorProjectBrowserModel.Category.values()) {
-            if (category != EditorProjectBrowserModel.Category.ALL) {
-                root.getChildren()
-                        .add(new TreeItem<>(ProjectBrowserNode.category(category, projectBrowser.count(category))));
-            }
-        }
-        root.setExpanded(true);
-        projectTree.setRoot(root);
-        projectTree.getSelectionModel().select(root);
-    }
-
-    /** Refreshes both Project presentations after navigation or search changes. */
-    private void refreshProjectBrowser() {
-        List<EditorAssetItem> visibleItems = projectBrowser.visibleItems();
-        assets.getItems().setAll(visibleItems);
-        assetCardGroup.getToggles().clear();
-        assetGrid
-                .getChildren()
-                .setAll(visibleItems.stream().map(this::createAssetCard).toList());
-        assetBreadcrumb.setText(
-                projectBrowserProjectName + "  ›  " + projectBrowser.category().label());
-        refreshProjectBrowserVisibility();
-        synchronizeProjectSelection();
-    }
-
-    /** Shows an intentional empty state or the active Grid/List presentation. */
-    private void refreshProjectBrowserVisibility() {
-        boolean empty = projectBrowser.visibleItems().isEmpty();
-        assetBrowserEmpty.setManaged(empty);
-        assetBrowserEmpty.setVisible(empty);
-        assets.setManaged(!empty && !showingAssetGrid);
-        assets.setVisible(!empty && !showingAssetGrid);
-        assetGridScroll.setManaged(!empty && showingAssetGrid);
-        assetGridScroll.setVisible(!empty && showingAssetGrid);
-    }
-
-    /** Creates one keyboard-focusable, selection-aware Project asset card. */
-    private ToggleButton createAssetCard(EditorAssetItem item) {
-        ToggleButton card = new ToggleButton();
-        card.setGraphic(createAssetPresentation(item));
-        card.setUserData(item);
-        card.setToggleGroup(assetCardGroup);
-        card.setMaxWidth(Double.MAX_VALUE);
-        card.setTooltip(new Tooltip(item.source().toString()));
-        card.setOnAction(ignored -> selectProjectItem(item));
-        card.getStyleClass().add("editor-asset-card");
-        return card;
-    }
-
-    /** Synchronizes visual Project selections from the source-scoped browser identity. */
-    private void synchronizeProjectSelection() {
-        Optional<EditorAssetItem> selected = projectBrowser.selectedItem();
-        Optional<EditorAssetItem> visibleSelection = selected.filter(assets.getItems()::contains);
-        if (visibleSelection.isPresent()) {
-            assets.getSelectionModel().select(visibleSelection.orElseThrow());
-        } else {
-            assets.getSelectionModel().clearSelection();
-        }
-        assetCardGroup.selectToggle(null);
-        if (visibleSelection.isPresent()) {
-            String identity = visibleSelection.orElseThrow().selection().identity();
-            assetCardGroup.getToggles().stream()
-                    .filter(toggle -> toggle.getUserData() instanceof EditorAssetItem item
-                            && item.selection().identity().equals(identity))
-                    .findFirst()
-                    .ifPresent(assetCardGroup::selectToggle);
-        }
-    }
-
-    /** Creates the shared author-facing content used by asset rows and cards. */
-    private static VBox createAssetPresentation(EditorAssetItem item) {
-        Label marker = new Label(assetMarker(item.kind()));
-        marker.setTooltip(new Tooltip(item.kind().label()));
-        marker.getStyleClass().add("editor-asset-marker");
-        Label name = new Label(item.label());
-        name.setMinWidth(0.0);
-        name.setMaxWidth(Double.MAX_VALUE);
-        name.setPrefWidth(1.0);
-        name.setTextOverrun(OverrunStyle.ELLIPSIS);
-        name.setTooltip(new Tooltip(item.label()));
-        name.getStyleClass().add("editor-asset-name");
-        HBox.setHgrow(name, Priority.ALWAYS);
-        HBox heading = new HBox(6.0, marker, name);
-        heading.setAlignment(Pos.CENTER_LEFT);
-        heading.setMaxWidth(Double.MAX_VALUE);
-        Label kind = new Label(item.kind().label());
-        kind.getStyleClass().add("editor-asset-kind");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Label readOnly = new Label("R/O");
-        readOnly.setTooltip(new Tooltip("The current editor opens project content read-only"));
-        readOnly.getStyleClass().add("editor-asset-read-only");
-        HBox metadata = new HBox(6.0, kind, spacer, readOnly);
-        metadata.setAlignment(Pos.CENTER_LEFT);
-        metadata.setMaxWidth(Double.MAX_VALUE);
-        Label source = new Label(item.selection().inspector().source());
-        source.setMinWidth(0.0);
-        source.setMaxWidth(Double.MAX_VALUE);
-        source.setPrefWidth(1.0);
-        source.setTextOverrun(OverrunStyle.ELLIPSIS);
-        source.setTooltip(new Tooltip(item.source().toString()));
-        source.getStyleClass().add("editor-asset-source");
-        VBox content = new VBox(4.0, heading, metadata, source);
-        content.setMaxWidth(Double.MAX_VALUE);
-        content.getStyleClass().add("editor-asset-presentation");
-        return content;
-    }
-
-    /** Returns a compact non-decorative marker for one JScene3D asset kind. */
-    private static String assetMarker(EditorAssetItem.Kind kind) {
-        return switch (kind) {
-            case WORLD_DEFINITION -> "W";
-            case ENTITY_DEFINITION -> "E";
-            case SOURCE_ASSET -> "S";
-            case IMPORT_DEFINITION -> "I";
-        };
-    }
-
     /** Creates the concise persistent project, preview, and diagnostic status line. */
     private HBox createStatusBar() {
         Region spacer = new Region();
@@ -722,86 +443,5 @@ final class EditorWorkspace extends BorderPane {
         Label heading = new Label(text);
         heading.getStyleClass().add("editor-panel-heading");
         return heading;
-    }
-
-    /** Renders one Project asset as a reusable, information-rich list row. */
-    private static final class AssetListCell extends ListCell<EditorAssetItem> {
-        /** Uses the editor's Project-row style. */
-        private AssetListCell() {
-            getStyleClass().add("editor-asset-list-cell");
-        }
-
-        @Override
-        protected void updateItem(@Nullable EditorAssetItem item, boolean empty) {
-            super.updateItem(item, empty);
-            setText(null);
-            setGraphic(empty || item == null ? null : createAssetPresentation(item));
-        }
-    }
-
-    /** Renders the project root and JScene3D categories with compact markers and counts. */
-    private static final class ProjectBrowserCell extends TreeCell<ProjectBrowserNode> {
-        /** Uses the editor's Project-navigation style. */
-        private ProjectBrowserCell() {
-            getStyleClass().add("editor-project-tree-cell");
-        }
-
-        @Override
-        protected void updateItem(@Nullable ProjectBrowserNode item, boolean empty) {
-            super.updateItem(item, empty);
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-                return;
-            }
-            Label marker = new Label(item.projectRoot() ? "P" : assetCategoryMarker(item.category()));
-            marker.getStyleClass().add("editor-project-tree-marker");
-            Label name = new Label(item.label());
-            name.setMinWidth(0.0);
-            name.setMaxWidth(Double.MAX_VALUE);
-            name.setPrefWidth(1.0);
-            name.setTextOverrun(OverrunStyle.ELLIPSIS);
-            name.setTooltip(new Tooltip(item.label()));
-            HBox.setHgrow(name, Priority.ALWAYS);
-            Label count = new Label(Long.toString(item.count()));
-            count.getStyleClass().add("editor-project-tree-count");
-            HBox row = new HBox(7.0, marker, name, count);
-            row.setAlignment(Pos.CENTER_LEFT);
-            row.setMaxWidth(Double.MAX_VALUE);
-            row.getStyleClass().add("editor-project-tree-row");
-            setText(null);
-            setAccessibleText(item.toString());
-            setGraphic(row);
-        }
-
-        /** Returns the marker for a Project-browser category. */
-        private static String assetCategoryMarker(EditorProjectBrowserModel.Category category) {
-            return switch (category) {
-                case WORLDS -> "W";
-                case ENTITY_DEFINITIONS -> "E";
-                case SOURCE_ASSETS -> "S";
-                case IMPORTS -> "I";
-                case ALL -> "P";
-            };
-        }
-    }
-
-    /** One typed location in the Project browser's navigation tree. */
-    private record ProjectBrowserNode(
-            String label, EditorProjectBrowserModel.Category category, long count, boolean projectRoot) {
-        /** Creates the project root location. */
-        private static ProjectBrowserNode project(String projectName, long count) {
-            return new ProjectBrowserNode(projectName, EditorProjectBrowserModel.Category.ALL, count, true);
-        }
-
-        /** Creates one JScene3D category location. */
-        private static ProjectBrowserNode category(EditorProjectBrowserModel.Category category, long count) {
-            return new ProjectBrowserNode(category.label(), category, count, false);
-        }
-
-        @Override
-        public String toString() {
-            return projectRoot ? label : label + " (" + count + ')';
-        }
     }
 }

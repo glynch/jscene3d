@@ -36,7 +36,7 @@ viewport coordination. Toolkit-independent extension contracts live in
 `jscene3d-editor-api`, preventing editor extensions from exposing JavaFX controls.
 The API separates executable commands from their workbench placements, describes
 views through stable kinds and editor-rendered models (including asynchronous
-trees), owns registrations through extension-scoped subscriptions, and provides
+trees and searchable collections), owns registrations through extension-scoped subscriptions, and provides
 portable status, window-message, and diagnostic publication facilities. The
 initial hierarchy, asset browser, and inspector do not introduce a second project
 document model; they project authored definitions through editor-owned views.
@@ -44,8 +44,10 @@ document model; they project authored definitions through editor-owned views.
 Built-in workbench features use the same extension path as future external
 extensions. The application activates them through an editor extension host,
 which owns contribution lifetimes and exposes project-open/project-close events.
-The Hierarchy is the first migrated built-in: it contributes an asynchronous,
-toolkit-independent tree model, while a workbench-owned adapter renders that
-model with JavaFX and bridges selection back to the shared editor selection
-model. JavaFX remains an implementation detail of the workbench rather than a
-requirement for view extensions.
+The Hierarchy contributes an asynchronous, toolkit-independent tree model. The
+Project browser contributes a toolkit-independent collection snapshot with
+optional categories and shared selection; its workbench adapter owns search and
+grid/list presentation. Workbench-owned JavaFX adapters render both view kinds
+and bridge selection back to the shared editor selection model. JavaFX remains
+an implementation detail of the workbench rather than a requirement for view
+extensions.

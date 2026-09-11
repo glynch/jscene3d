@@ -10,6 +10,7 @@ import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
+import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -74,6 +75,7 @@ public final class EditorApplication extends Application {
                 new EditorWorkspace(viewportCanvas, () -> chooseProject(stage), selectionModel, extensionHost);
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         extensionHost.activate(new HierarchyExtension(projectContext, selectionModel));
+        extensionHost.activate(new ProjectExtension(projectContext, selectionModel));
         ViewportController controller = new ViewportController(
                 viewportCanvas,
                 editorWorkspace.viewportStatus(),
@@ -203,7 +205,8 @@ public final class EditorApplication extends Application {
                         session.project().identity().id(),
                         session.project().identity().name(),
                         session.project().root().toUri()),
-                session.hierarchy());
+                session.hierarchy(),
+                session.assets());
         stage.setTitle(session.project().identity().name() + " — JScene3D Editor");
         EditorSplashScreen loadingScreen = requireSplashScreen();
         loadingScreen.projectIdentified(session.project().identity().name());

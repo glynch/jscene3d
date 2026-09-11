@@ -729,8 +729,8 @@ license notices, and exact selected filenames are recorded beside the assets in
   application directories from authored project data, completed import publications,
   and caller-resolved runtime JARs, plus macOS application-image and DMG packaging.
 - `jscene3d-editor-api`: toolkit-independent editor extension contracts for
-  commands and placements, lifetime-managed subscriptions, logical and tree
-  views, status items, window messages, and diagnostic publication.
+  commands and placements, lifetime-managed subscriptions, logical tree and
+  collection views, status items, window messages, and diagnostic publication.
 - `jscene3d-editor`: read-only JavaFX project loading, descriptor inspection,
   diagnostics, hierarchy and asset views, and an embedded JScene3D viewport.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,

@@ -2,15 +2,16 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.builtin.project;
 
+import io.github.glynch.jscene3d.editor.EditorSelection;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** One immutable asset-browser projection with retained stable identity and inspection data. */
-record EditorAssetItem(String label, String identity, Kind kind, Path source, EditorSelection selection) {
+/** One immutable Project-browser asset with retained stable identity and inspection data. */
+public record ProjectAsset(String label, String identity, Kind kind, Path source, EditorSelection selection) {
     /** Validates one asset projection. */
-    EditorAssetItem {
+    public ProjectAsset {
         Objects.requireNonNull(label, "label");
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(kind, "kind");
@@ -25,7 +26,7 @@ record EditorAssetItem(String label, String identity, Kind kind, Path source, Ed
     }
 
     /** Asset categories displayed by the initial editor browser. */
-    enum Kind {
+    public enum Kind {
         /** Reusable entity definition. */
         ENTITY_DEFINITION("Entity definition"),
         /** World definition. */
@@ -43,7 +44,7 @@ record EditorAssetItem(String label, String identity, Kind kind, Path source, Ed
         }
 
         /** Returns the author-facing kind label. */
-        String label() {
+        public String label() {
             return label;
         }
     }

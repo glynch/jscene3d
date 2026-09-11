@@ -44,7 +44,8 @@ final class HierarchyExtensionTest {
 
         EditorHierarchyNode child = node("Player", EditorSelection.Kind.LOCAL_ENTITY, List.of());
         EditorHierarchyNode root = node("MAP01", EditorSelection.Kind.WORLD, List.of(child));
-        projects.showProject(new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")), root);
+        projects.showProject(
+                new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")), root, List.of());
 
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).containsExactly(root);
         assertThat(view.dataProvider().children(root).toCompletableFuture().join())

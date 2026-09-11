@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
 import io.github.glynch.jscene3d.editor.view.EditorView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
@@ -28,6 +29,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
     private final ViewContainerId id;
     private final VBox root = new VBox();
     private final Map<ViewId, RenderedView> renderedViews = new LinkedHashMap<>();
+    private final boolean showSingleHeading;
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
 
@@ -38,8 +40,20 @@ public final class JavaFxViewContainer implements AutoCloseable {
      * @param id fixed workbench container identity
      */
     public JavaFxViewContainer(EditorExtensionHost extensions, ViewContainerId id) {
+        this(extensions, id, true);
+    }
+
+    /**
+     * Creates a container with configurable heading ownership for an enclosing workbench surface.
+     *
+     * @param extensions active extension host
+     * @param id fixed workbench container identity
+     * @param showSingleHeading whether this container should render the title of a lone contribution
+     */
+    public JavaFxViewContainer(EditorExtensionHost extensions, ViewContainerId id, boolean showSingleHeading) {
         this.extensions = Objects.requireNonNull(extensions, "extensions");
         this.id = Objects.requireNonNull(id, "id");
+        this.showSingleHeading = showSingleHeading;
         root.setSpacing(6.0);
         viewRegistration = extensions.observeViews(this::showContributions);
         requestRegistration = extensions.observeViewRequests(this::reveal);
@@ -80,10 +94,14 @@ public final class JavaFxViewContainer implements AutoCloseable {
     private void showSingle(EditorViewContribution contribution) {
         RenderedView rendered = render(contribution.view());
         renderedViews.put(contribution.view().id(), rendered);
-        Label heading = new Label(contribution.view().title());
-        heading.getStyleClass().add("editor-panel-heading");
         VBox.setVgrow(rendered.node(), Priority.ALWAYS);
-        root.getChildren().setAll(heading, rendered.node());
+        if (showSingleHeading) {
+            Label heading = new Label(contribution.view().title());
+            heading.getStyleClass().add("editor-panel-heading");
+            root.getChildren().setAll(heading, rendered.node());
+        } else {
+            root.getChildren().setAll(rendered.node());
+        }
     }
 
     private void showTabs(List<EditorViewContribution> contributions) {
@@ -104,12 +122,20 @@ public final class JavaFxViewContainer implements AutoCloseable {
     }
 
     private RenderedView render(EditorView view) {
+        if (view instanceof EditorCollectionView<?> collectionView) {
+            return renderCollection(collectionView);
+        }
         if (view instanceof EditorTreeView<?> treeView) {
             return renderTree(treeView);
         }
         Label unsupported = new Label("Unsupported view kind: " + view.kind());
         unsupported.getStyleClass().add("editor-empty-detail");
         return new RenderedView(unsupported, () -> {}, unsupported::requestFocus);
+    }
+
+    private <T> RenderedView renderCollection(EditorCollectionView<T> view) {
+        JavaFxCollectionViewAdapter<T> adapter = new JavaFxCollectionViewAdapter<>(view, extensions::execute);
+        return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
     }
 
     private <T> RenderedView renderTree(EditorTreeView<T> view) {

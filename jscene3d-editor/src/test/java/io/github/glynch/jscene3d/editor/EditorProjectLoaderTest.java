@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import io.github.glynch.jscene3d.telemetry.TelemetryMeasurement;
 import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
@@ -46,9 +47,7 @@ final class EditorProjectLoaderTest {
         assertThat(session.types().extensions())
                 .extracting(extension -> extension.id())
                 .contains("io.github.glynch.jscene3d.game3d", "io.github.glynch.jscene3d.presentation");
-        assertThat(session.assets())
-                .extracting(EditorAssetItem::label)
-                .containsExactly("Reusable Beacon", "Test World");
+        assertThat(session.assets()).extracting(ProjectAsset::label).containsExactly("Reusable Beacon", "Test World");
         assertThat(session.hierarchy().label()).isEqualTo("Test World");
         assertThat(session.hierarchy().children()).singleElement().satisfies(placement -> {
             assertThat(placement.kind()).isEqualTo(EditorHierarchyNode.Kind.PLACEMENT);

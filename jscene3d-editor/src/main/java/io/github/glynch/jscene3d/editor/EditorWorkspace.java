@@ -281,11 +281,4 @@ final class EditorWorkspace extends BorderPane {
         status.getStyleClass().addAll("editor-status", "editor-status-action");
         return status;
     }
-
-    /** Creates a consistently styled heading for one editor panel. */
-    private static Label createPanelHeading(String text) {
-        Label heading = new Label(text);
-        heading.getStyleClass().add("editor-panel-heading");
-        return heading;
-    }
 }

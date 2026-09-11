@@ -42,7 +42,11 @@ public final class EditorProjectSession {
         this.assets = List.copyOf(assets);
     }
 
-    /** Returns the validated project descriptor. */
+    /**
+     * Returns the validated project descriptor.
+     *
+     * @return validated project descriptor
+     */
     public GameProject project() {
         return project;
     }
@@ -72,12 +76,20 @@ public final class EditorProjectSession {
         return startupWorld;
     }
 
-    /** Returns the hierarchy projection for the configured startup world. */
+    /**
+     * Returns the hierarchy projection for the configured startup world.
+     *
+     * @return startup-world hierarchy projection
+     */
     public EditorHierarchyNode hierarchy() {
         return hierarchy;
     }
 
-    /** Returns asset-browser items in deterministic order. */
+    /**
+     * Returns asset-browser items in deterministic order.
+     *
+     * @return immutable asset-browser items
+     */
     public List<ProjectAsset> assets() {
         return assets;
     }

@@ -52,7 +52,16 @@ public final class JavaFxPanelPart implements AutoCloseable {
     private boolean closed;
     private double expandedHeight;
 
-    /** Creates a panel which follows contributions for one workbench container. */
+    /**
+     * Creates a panel which follows contributions for one workbench container.
+     *
+     * @param extensions active extension host
+     * @param id workbench view-container identity
+     * @param icons icon renderer
+     * @param minimumHeight minimum expanded height
+     * @param preferredHeight preferred expanded height
+     * @param dividerPosition function deriving the expanded divider position
+     */
     public JavaFxPanelPart(
             EditorExtensionHost extensions,
             ViewContainerId id,
@@ -75,12 +84,20 @@ public final class JavaFxPanelPart implements AutoCloseable {
         requestRegistration = host.observeViewRequests(this::reveal);
     }
 
-    /** Returns the workbench-owned JavaFX node installed in layout. */
+    /**
+     * Returns the workbench-owned JavaFX node installed in layout.
+     *
+     * @return panel node
+     */
     public VBox node() {
         return node;
     }
 
-    /** Attaches this lower panel to the vertical split pane which sizes it. */
+    /**
+     * Attaches this lower panel to the vertical split pane which sizes it.
+     *
+     * @param owner vertical split pane that owns the panel
+     */
     public void attach(SplitPane owner) {
         SplitPane candidate = Objects.requireNonNull(owner, "owner");
         if (splitPane != null) {

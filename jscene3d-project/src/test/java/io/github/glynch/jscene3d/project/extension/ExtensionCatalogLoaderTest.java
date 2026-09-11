@@ -162,7 +162,7 @@ final class ExtensionCatalogLoaderTest {
                 assertThat(diagnostic.code().code()).isEqualTo("extension.missing");
                 assertThat(diagnostic.location()).isEqualTo("/extensions/0");
                 assertThat(diagnostic.source())
-                        .isEqualTo(temporaryDirectory.resolve("project.json").toUri());
+                        .isEqualTo(temporaryDirectory.resolve("jscene3d.json").toUri());
             });
         }
     }

@@ -20,7 +20,13 @@ import java.util.function.Consumer;
 
 /** Built-in extension which presents details supplied by the shared editor selection. */
 public final class InspectorExtension implements EditorExtension {
+    /** Stable identity of the built-in Inspector view. */
     public static final ViewId VIEW_ID = new ViewId("io.github.glynch.jscene3d.editor.inspector");
+
+    /** Creates the built-in Inspector extension. */
+    public InspectorExtension() {
+        super();
+    }
 
     @Override
     public String id() {

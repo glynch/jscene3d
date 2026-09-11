@@ -22,30 +22,54 @@ public interface EditorCollectionView<T> extends EditorView {
         return COLLECTION_VIEW_KIND;
     }
 
-    /** Returns the provider for semantic elements and their presentations. */
+    /**
+     * Returns the provider for semantic elements and their presentations.
+     *
+     * @return collection data provider
+     */
     EditorCollectionDataProvider<T> dataProvider();
 
-    /** Returns categories in navigation order; an empty list suppresses category navigation. */
+    /**
+     * Returns categories in navigation order; an empty list suppresses category navigation.
+     *
+     * @return immutable category list
+     */
     default List<EditorCollectionCategory> categories() {
         return List.of();
     }
 
-    /** Returns the breadcrumb label for the unfiltered root location. */
+    /**
+     * Returns the breadcrumb label for the unfiltered root location.
+     *
+     * @return root breadcrumb label
+     */
     default String allItemsLabel() {
         return "All Items";
     }
 
-    /** Returns the optional editor icon presentation for the collection root. */
+    /**
+     * Returns the optional editor icon presentation for the collection root.
+     *
+     * @return root icon, or empty when the root has no icon
+     */
     default Optional<EditorIcon> rootIcon() {
         return Optional.empty();
     }
 
-    /** Returns the prompt shown by the workbench's local search field. */
+    /**
+     * Returns the prompt shown by the workbench's local search field.
+     *
+     * @return search-field prompt
+     */
     default String searchPlaceholder() {
         return "Search items…";
     }
 
-    /** Returns the optional shared selection model for this collection. */
+    /**
+     * Returns the optional shared selection model for this collection.
+     *
+     * @return shared selection model, or empty when selection is local to the view
+     */
     default Optional<EditorCollectionSelectionModel<T>> selectionModel() {
         return Optional.empty();
     }

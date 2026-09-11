@@ -14,10 +14,18 @@ import java.util.function.Consumer;
  * @param <T> semantic element type
  */
 public interface EditorCollectionSelectionModel<T> {
-    /** Returns the currently selected semantic element, when it belongs to this collection. */
+    /**
+     * Returns the currently selected semantic element, when it belongs to this collection.
+     *
+     * @return current selection, or empty when this collection has no selection
+     */
     Optional<T> selection();
 
-    /** Replaces the selection in response to user interaction in the rendered collection. */
+    /**
+     * Replaces the selection in response to user interaction in the rendered collection.
+     *
+     * @param selection new selection, or empty to clear it
+     */
     void select(Optional<T> selection);
 
     /**

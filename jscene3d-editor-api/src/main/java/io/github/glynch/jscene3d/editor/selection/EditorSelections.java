@@ -10,15 +10,28 @@ import java.util.function.Consumer;
 
 /** Shared selection facility available to every activated editor extension. */
 public interface EditorSelections {
-    /** Returns the current selection. */
+    /**
+     * Returns the current selection.
+     *
+     * @return current selection, or empty when nothing is selected
+     */
     Optional<EditorSelection> current();
 
-    /** Replaces the current selection. */
+    /**
+     * Replaces the current selection.
+     *
+     * @param selection new current selection
+     */
     void select(EditorSelection selection);
 
     /** Clears the current selection. */
     void clear();
 
-    /** Observes selection changes and immediately receives the current state. */
+    /**
+     * Observes selection changes and immediately receives the current state.
+     *
+     * @param listener synchronous selection-state listener
+     * @return removable listener registration
+     */
     EditorRegistration observe(Consumer<Optional<EditorSelection>> listener);
 }

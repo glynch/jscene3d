@@ -23,7 +23,7 @@ import java.util.Optional;
 /** Headless loader for a versioned {@value #MANIFEST_NAME} game-project manifest. */
 public final class ProjectLoader {
     /** Conventional manifest filename within a project directory. */
-    public static final String MANIFEST_NAME = "project.json";
+    public static final String MANIFEST_NAME = "jscene3d.json";
 
     private final SemanticVersion engineVersion;
     private final String engineVersionText;

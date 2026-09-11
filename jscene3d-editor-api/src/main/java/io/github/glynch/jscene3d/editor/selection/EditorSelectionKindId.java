@@ -6,7 +6,11 @@ package io.github.glynch.jscene3d.editor.selection;
 
 import static io.github.glynch.jscene3d.editor.internal.EditorIdentifiers.requireNamespacedId;
 
-/** Stable semantic kind of an editor selection. */
+/**
+ * Stable semantic kind of an editor selection.
+ *
+ * @param value namespaced selection-kind identity
+ */
 public record EditorSelectionKindId(String value) {
     /** Validates one selection-kind identity. */
     public EditorSelectionKindId {

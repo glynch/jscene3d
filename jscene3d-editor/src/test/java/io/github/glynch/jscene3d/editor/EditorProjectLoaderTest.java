@@ -170,7 +170,7 @@ final class EditorProjectLoaderTest {
     @Test
     void discoversInstalledExtensionMetadata() throws IOException {
         writeProject();
-        write("project.json", """
+        write("jscene3d.json", """
                 {
                   "$schema":"https://jscene3d.org/schemas/project-1.json",
                   "schemaVersion":1,
@@ -236,7 +236,7 @@ final class EditorProjectLoaderTest {
 
     /** Creates the complete valid source project used by the read-only loading test. */
     private void writeProject() throws IOException {
-        write("project.json", """
+        write("jscene3d.json", """
                 {
                   "$schema":"https://jscene3d.org/schemas/project-1.json",
                   "schemaVersion":1,

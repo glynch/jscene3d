@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -164,7 +165,7 @@ final class JavaFxDiagnosticTree extends TreeView<JavaFxDiagnosticTree.Diagnosti
         private static String label(EditorDiagnosticSeverity severity) {
             return severity == EditorDiagnosticSeverity.INFORMATION
                     ? "Information"
-                    : severity.name().toLowerCase();
+                    : severity.name().toLowerCase(Locale.ROOT);
         }
     }
 

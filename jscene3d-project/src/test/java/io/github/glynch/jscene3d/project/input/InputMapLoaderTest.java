@@ -142,7 +142,7 @@ class InputMapLoaderTest {
         Files.writeString(temporaryDirectory.resolve("application/main.scene.json"), "{}");
         Files.createDirectories(temporaryDirectory.resolve("schema"));
         Files.writeString(temporaryDirectory.resolve("schema/input-map-1.schema.json"), "{}");
-        Files.writeString(temporaryDirectory.resolve("project.json"), """
+        Files.writeString(temporaryDirectory.resolve("jscene3d.json"), """
                 {
                   "schemaVersion": 1,
                   "identity": {"id": "example.input", "name": "Input", "version": "1.0.0"},

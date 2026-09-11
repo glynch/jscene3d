@@ -23,6 +23,11 @@ public final class SelectionStatusExtension implements EditorExtension {
     /** Stable identity of the selection-context status item. */
     public static final StatusItemId STATUS_ID = new StatusItemId("io.github.glynch.jscene3d.editor.selection-status");
 
+    /** Creates the built-in selection-status extension. */
+    public SelectionStatusExtension() {
+        super();
+    }
+
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.selection-status";

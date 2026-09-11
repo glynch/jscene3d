@@ -16,8 +16,14 @@ import java.util.function.Consumer;
 
 /** Workbench-owned implementation of the selection shared by activated extensions. */
 public final class EditorSelectionContext implements EditorSelections {
-    private final List<Consumer<Optional<EditorSelection>>> listeners = new ArrayList<>();
-    private Optional<EditorSelection> selection = Optional.empty();
+    private final List<Consumer<Optional<EditorSelection>>> listeners;
+    private Optional<EditorSelection> selection;
+
+    /** Creates an initially empty workbench selection context. */
+    public EditorSelectionContext() {
+        listeners = new ArrayList<>();
+        selection = Optional.empty();
+    }
 
     @Override
     public Optional<EditorSelection> current() {

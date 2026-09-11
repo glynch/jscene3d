@@ -95,7 +95,13 @@ public final class ViewportController {
         }
     }
 
-    /** Requests composition of one editor-safe project preview on the OpenGL rendering thread. */
+    /**
+     * Requests composition of one editor-safe project preview on the OpenGL rendering thread.
+     *
+     * @param session completely loaded editor project session
+     * @param trace project-opening trace continued through first presentation
+     * @param completion preview completion receiver
+     */
     public void showProject(
             EditorProjectSession session, EditorProjectOpenTrace trace, Consumer<EditorPreviewResult> completion) {
         replacePendingPreview(new PreviewRequest(

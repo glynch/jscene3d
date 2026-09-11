@@ -34,7 +34,11 @@ public final class DiagnosticsExtension implements EditorExtension {
     private final EditorExtensionHost host;
     private final EditorDiagnosticsModel model = new EditorDiagnosticsModel();
 
-    /** Creates the extension over the host's aggregated diagnostic stream. */
+    /**
+     * Creates the extension over the host's aggregated diagnostic stream.
+     *
+     * @param host editor extension host
+     */
     public DiagnosticsExtension(EditorExtensionHost host) {
         this.host = Objects.requireNonNull(host, "host");
     }

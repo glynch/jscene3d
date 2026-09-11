@@ -79,7 +79,13 @@ public final class EditorProjectLoader {
         this(engineVersion, editorClassLoader, List.of());
     }
 
-    /** Creates a loader with installed extension artifacts used only for descriptor discovery. */
+    /**
+     * Creates a loader with installed extension artifacts used only for descriptor discovery.
+     *
+     * @param engineVersion running engine version
+     * @param editorClassLoader class loader used for built-in descriptor discovery
+     * @param installedExtensionPath installed extension artifacts and directories
+     */
     public EditorProjectLoader(String engineVersion, ClassLoader editorClassLoader, List<Path> installedExtensionPath) {
         projectLoader = new ProjectLoader(engineVersion);
         extensionLoader = new ExtensionCatalogLoader(engineVersion);

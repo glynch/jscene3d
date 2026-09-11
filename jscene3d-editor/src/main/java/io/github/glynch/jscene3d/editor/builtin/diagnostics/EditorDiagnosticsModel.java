@@ -21,24 +21,43 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Projects extension-published diagnostics into a deterministic filterable browser. */
 public final class EditorDiagnosticsModel {
-    private final List<Runnable> observers = new ArrayList<>();
-    private final EnumSet<EditorDiagnosticSeverity> visibleSeverities = EnumSet.allOf(EditorDiagnosticSeverity.class);
+    private final List<Runnable> observers;
+    private final EnumSet<EditorDiagnosticSeverity> visibleSeverities;
     private List<EditorDiagnosticSnapshot> diagnostics = List.of();
     private String query = "";
 
-    /** Replaces the complete ordered diagnostic set. */
+    /** Creates an empty model with every severity visible. */
+    public EditorDiagnosticsModel() {
+        observers = new ArrayList<>();
+        visibleSeverities = EnumSet.allOf(EditorDiagnosticSeverity.class);
+    }
+
+    /**
+     * Replaces the complete ordered diagnostic set.
+     *
+     * @param replacement complete ordered diagnostic set
+     */
     public void showDiagnostics(List<EditorDiagnosticSnapshot> replacement) {
         diagnostics = List.copyOf(Objects.requireNonNull(replacement, "replacement"));
         notifyObservers();
     }
 
-    /** Applies a case-insensitive filter across all author-facing diagnostic information. */
+    /**
+     * Applies a case-insensitive filter across all author-facing diagnostic information.
+     *
+     * @param text filter text
+     */
     public void filter(String text) {
         query = Objects.requireNonNull(text, "text").strip().toLowerCase(Locale.ROOT);
         notifyObservers();
     }
 
-    /** Includes or excludes one severity without discarding the underlying diagnostics. */
+    /**
+     * Includes or excludes one severity without discarding the underlying diagnostics.
+     *
+     * @param severity severity whose visibility changes
+     * @param visible whether the severity is visible
+     */
     public void showSeverity(EditorDiagnosticSeverity severity, boolean visible) {
         EditorDiagnosticSeverity validSeverity = Objects.requireNonNull(severity, "severity");
         if (visible) {
@@ -49,7 +68,12 @@ public final class EditorDiagnosticsModel {
         notifyObservers();
     }
 
-    /** Observes model changes until the returned registration is closed. */
+    /**
+     * Observes model changes until the returned registration is closed.
+     *
+     * @param observer synchronous model-change observer
+     * @return removable observer registration
+     */
     public EditorRegistration observe(Runnable observer) {
         Runnable listener = Objects.requireNonNull(observer, "observer");
         observers.add(listener);
@@ -61,7 +85,11 @@ public final class EditorDiagnosticsModel {
         };
     }
 
-    /** Returns one immutable snapshot for the Diagnostics view. */
+    /**
+     * Returns one immutable snapshot for the Diagnostics view.
+     *
+     * @return immutable view snapshot
+     */
     public View view() {
         Map<URI, List<Item>> grouped = new LinkedHashMap<>();
         diagnostics.stream()
@@ -139,27 +167,51 @@ public final class EditorDiagnosticsModel {
         return label.isBlank() ? source.toString() : label;
     }
 
-    /** Complete and filtered counts plus visible source groups. */
+    /**
+     * Complete and filtered counts plus visible source groups.
+     *
+     * @param errors complete error count
+     * @param warnings complete warning count
+     * @param information complete information count
+     * @param hints complete hint count
+     * @param visible visible diagnostic count after filtering
+     * @param groups visible diagnostics grouped by source
+     */
     public record View(long errors, long warnings, long information, long hints, long visible, List<Group> groups) {
         /** Copies the visible group list. */
         public View {
             groups = List.copyOf(groups);
         }
 
-        /** Returns the complete unfiltered diagnostic count. */
+        /**
+         * Returns the complete unfiltered diagnostic count.
+         *
+         * @return complete unfiltered diagnostic count
+         */
         public long total() {
             return errors + warnings + information + hints;
         }
     }
 
-    /** Diagnostics sharing one authoritative source URI. */
+    /**
+     * Diagnostics sharing one authoritative source URI.
+     *
+     * @param source authoritative source URI
+     * @param label concise source label
+     * @param items diagnostics belonging to the source
+     */
     public record Group(URI source, String label, List<Item> items) {
         /** Copies one group's ordered diagnostic items. */
         public Group {
             items = List.copyOf(items);
         }
 
-        /** Counts items of one severity in this visible group. */
+        /**
+         * Counts items of one severity in this visible group.
+         *
+         * @param severity severity to count
+         * @return number of matching visible items
+         */
         public long count(EditorDiagnosticSeverity severity) {
             return items.stream()
                     .filter(item -> item.diagnostic().severity() == severity)
@@ -167,24 +219,41 @@ public final class EditorDiagnosticsModel {
         }
     }
 
-    /** One concise diagnostic row with expandable structured details. */
+    /**
+     * One concise diagnostic row with expandable structured details.
+     *
+     * @param snapshot published diagnostic snapshot
+     * @param details ordered structured detail rows
+     */
     public record Item(EditorDiagnosticSnapshot snapshot, List<Detail> details) {
         /** Copies one diagnostic's detail rows. */
         public Item {
             details = List.copyOf(details);
         }
 
-        /** Returns the diagnostic source. */
+        /**
+         * Returns the diagnostic source.
+         *
+         * @return authoritative diagnostic source URI
+         */
         public URI source() {
             return snapshot.source();
         }
 
-        /** Returns the diagnostic occurrence. */
+        /**
+         * Returns the diagnostic occurrence.
+         *
+         * @return diagnostic occurrence
+         */
         public EditorDiagnostic diagnostic() {
             return snapshot.diagnostic();
         }
 
-        /** Returns one self-contained line suitable for copying outside the editor. */
+        /**
+         * Returns one self-contained line suitable for copying outside the editor.
+         *
+         * @return self-contained diagnostic line
+         */
         public String copyText() {
             String location =
                     diagnostic().location().isEmpty() ? "" : " " + diagnostic().location();
@@ -192,6 +261,11 @@ public final class EditorDiagnosticsModel {
         }
     }
 
-    /** One labelled value shown below an expanded diagnostic row. */
+    /**
+     * One labelled value shown below an expanded diagnostic row.
+     *
+     * @param label detail label
+     * @param value detail value
+     */
     public record Detail(String label, String value) {}
 }

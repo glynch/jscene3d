@@ -129,7 +129,7 @@ final class ProjectRuntimeHostTest {
     void reportsManifestDiagnostics() throws IOException {
         Path projectRoot = temporaryDirectory.resolve("invalid-project");
         Files.createDirectories(projectRoot);
-        Files.writeString(projectRoot.resolve("project.json"), "{}\n", StandardCharsets.UTF_8);
+        Files.writeString(projectRoot.resolve("jscene3d.json"), "{}\n", StandardCharsets.UTF_8);
         ProjectHost runtimeHost = host(getClass().getClassLoader(), emptyEnvironment());
 
         assertThatExceptionOfType(ProjectHostException.class)
@@ -263,7 +263,7 @@ final class ProjectRuntimeHostTest {
         Path projectRoot = temporaryDirectory.resolve("project");
         Files.createDirectories(projectRoot.resolve("worlds"));
         Files.writeString(
-                projectRoot.resolve("project.json"), manifest(entryScene, startupScene), StandardCharsets.UTF_8);
+                projectRoot.resolve("jscene3d.json"), manifest(entryScene, startupScene), StandardCharsets.UTF_8);
         Files.writeString(projectRoot.resolve("worlds/main.world.json"), worldDefinition(), StandardCharsets.UTF_8);
         return projectRoot;
     }

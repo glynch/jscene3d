@@ -25,12 +25,23 @@ public record EditorMessage(EditorMessageSeverity severity, String text, Optiona
         Objects.requireNonNull(command, "command");
     }
 
-    /** Creates a message without an associated command. */
+    /**
+     * Creates a message without an associated command.
+     *
+     * @param severity user-facing message severity
+     * @param text non-blank message text
+     */
     public EditorMessage(EditorMessageSeverity severity, String text) {
         this(severity, text, Optional.empty());
     }
 
-    /** Creates an actionable message backed by a registered editor command. */
+    /**
+     * Creates an actionable message backed by a registered editor command.
+     *
+     * @param severity user-facing message severity
+     * @param text non-blank message text
+     * @param command command invoked when the user activates the message
+     */
     public EditorMessage(EditorMessageSeverity severity, String text, CommandId command) {
         this(severity, text, Optional.of(Objects.requireNonNull(command, "command")));
     }

@@ -117,7 +117,7 @@ final class StandardProjectEnvironmentTest {
 
     @Test
     void combinesAuthoredDefinitionsWithPublishedProjectContent() throws IOException {
-        Files.writeString(temporaryDirectory.resolve("project.json"), MANIFEST, StandardCharsets.UTF_8);
+        Files.writeString(temporaryDirectory.resolve("jscene3d.json"), MANIFEST, StandardCharsets.UTF_8);
         Files.writeString(temporaryDirectory.resolve("main.scene.json"), "test", StandardCharsets.UTF_8);
         GameProject project = new ProjectLoader("0.1.0-SNAPSHOT")
                 .load(temporaryDirectory)

@@ -16,7 +16,14 @@ public final class EditorProjectLoadTask extends Task<EditorProjectLoadResult> {
     private final Path projectDirectory;
     private final EditorProjectLoadProgress progress;
 
-    /** Creates one background task for a normalized project directory. */
+    /**
+     * Creates one background task for a normalized project directory.
+     *
+     * @param loader project-session loader
+     * @param trace project-opening trace
+     * @param projectDirectory normalized project directory
+     * @param progress receiver for user-facing load progress
+     */
     public EditorProjectLoadTask(
             EditorProjectLoader loader,
             EditorProjectOpenTrace trace,

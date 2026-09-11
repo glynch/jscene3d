@@ -80,7 +80,11 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
         showPhase(EditorLoadingPhase.STARTING_EDITOR);
     }
 
-    /** Shows project context before its authored name is available from the manifest. */
+    /**
+     * Shows project context before its authored name is available from the manifest.
+     *
+     * @param directory project directory being opened
+     */
     public void showProject(Path directory) {
         Path normalized =
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();

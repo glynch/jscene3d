@@ -23,7 +23,12 @@ public final class EditorProjectOpenTrace {
     private Optional<Duration> firstPresentation = Optional.empty();
     private boolean complete;
 
-    /** Starts one trace with the normalized project location as local context. */
+    /**
+     * Starts one trace with the normalized project location as local context.
+     *
+     * @param telemetry telemetry sink
+     * @param projectDirectory project directory being opened
+     */
     public EditorProjectOpenTrace(Telemetry telemetry, Path projectDirectory) {
         Objects.requireNonNull(telemetry, "telemetry");
         Path normalized = Objects.requireNonNull(projectDirectory, "projectDirectory")
@@ -90,7 +95,12 @@ public final class EditorProjectOpenTrace {
         return durations();
     }
 
-    /** Completes a trace which cannot reach first presentation. */
+    /**
+     * Completes a trace which cannot reach first presentation.
+     *
+     * @param message failure description
+     * @return durations captured before the failure
+     */
     public synchronized EditorProjectOpenDurations fail(String message) {
         if (!complete) {
             root.fail(message);
@@ -99,7 +109,11 @@ public final class EditorProjectOpenTrace {
         return durations();
     }
 
-    /** Completes a trace after an unexpected failure. */
+    /**
+     * Completes a trace after an unexpected failure.
+     *
+     * @param failure unexpected failure
+     */
     public synchronized void fail(Throwable failure) {
         if (!complete) {
             root.fail(failure);

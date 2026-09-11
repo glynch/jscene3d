@@ -28,6 +28,11 @@ public final class ProjectDiagnosticsExtension implements EditorExtension {
 
     private @Nullable EditorDiagnosticCollection collection;
 
+    /** Creates the built-in project-diagnostics publisher. */
+    public ProjectDiagnosticsExtension() {
+        super();
+    }
+
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.project-diagnostics";
@@ -39,7 +44,11 @@ public final class ProjectDiagnosticsExtension implements EditorExtension {
         collection = editor.subscriptions().add(editor.diagnostics().createCollection(COLLECTION_ID));
     }
 
-    /** Replaces every project diagnostic currently published to the workbench. */
+    /**
+     * Replaces every project diagnostic currently published to the workbench.
+     *
+     * @param diagnostics complete project diagnostic set
+     */
     public void showDiagnostics(List<ProjectDiagnostic> diagnostics) {
         Map<URI, List<EditorDiagnostic>> grouped = new LinkedHashMap<>();
         Objects.requireNonNull(diagnostics, "diagnostics")

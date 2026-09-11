@@ -304,7 +304,7 @@ final class ProjectLoaderTest {
                 .isEqualTo("project.directory.missing");
     }
 
-    /** Returns a structured error when project.json is absent. */
+    /** Returns a structured error when jscene3d.json is absent. */
     @Test
     void reportsMissingManifest() {
         ProjectLoadResult result = loader().load(temporaryDirectory);

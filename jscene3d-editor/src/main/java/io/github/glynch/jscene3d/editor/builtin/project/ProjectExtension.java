@@ -49,7 +49,11 @@ public final class ProjectExtension implements EditorExtension {
 
     private final EditorProjectContext projects;
 
-    /** Creates the built-in extension over editor-owned project state. */
+    /**
+     * Creates the built-in extension over editor-owned project state.
+     *
+     * @param projects editor-owned current-project context
+     */
     public ProjectExtension(EditorProjectContext projects) {
         this.projects = Objects.requireNonNull(projects, "projects");
     }

@@ -8,7 +8,15 @@ import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** One immutable Project-browser asset with retained stable identity and inspection data. */
+/**
+ * One immutable Project-browser asset with retained stable identity and inspection data.
+ *
+ * @param label author-facing asset label
+ * @param identity stable asset identity
+ * @param kind asset category
+ * @param source authoritative source path
+ * @param selection selection published when the asset is chosen
+ */
 public record ProjectAsset(String label, String identity, Kind kind, Path source, EditorSelection selection) {
     /** Validates one asset projection. */
     public ProjectAsset {
@@ -43,7 +51,11 @@ public record ProjectAsset(String label, String identity, Kind kind, Path source
             this.label = label;
         }
 
-        /** Returns the author-facing kind label. */
+        /**
+         * Returns the author-facing kind label.
+         *
+         * @return author-facing kind label
+         */
         public String label() {
             return label;
         }

@@ -42,7 +42,7 @@ final class ApplicationImageExporterTest {
         Path desktopJar = jar(artifacts.resolve("jscene3d-project-desktop.jar"), LAUNCHER_CLASS);
         Files.createDirectories(projectRoot.resolve("branding"));
         Files.write(projectRoot.resolve("branding/sample-game.icns"), new byte[] {0, 1, 2, 3});
-        Files.writeString(projectRoot.resolve("project.json"), manifest(), UTF_8);
+        Files.writeString(projectRoot.resolve("jscene3d.json"), manifest(), UTF_8);
         Files.createDirectories(projectRoot.resolve("worlds"));
         Files.writeString(projectRoot.resolve("worlds/start.world.json"), worldDefinition(), UTF_8);
         applicationDirectory = temporaryDirectory.resolve("application-directory");
@@ -94,7 +94,7 @@ final class ApplicationImageExporterTest {
                         "application-image.properties",
                         "jscene3d-project-desktop.jar",
                         "project/branding/sample-game.icns",
-                        "project/project.json",
+                        "project/jscene3d.json",
                         "project/worlds/start.world.json",
                         "sample-game.jar");
         assertThat(ApplicationImageMetadata.read(image.root().resolve("Contents/app")))
@@ -145,7 +145,7 @@ final class ApplicationImageExporterTest {
     /** Omits jpackage icon configuration when the project does not declare one. */
     @Test
     void exportsWithoutOptionalApplicationIcon() throws IOException {
-        Files.writeString(applicationDirectory.resolve("project/project.json"), manifestWithoutIcon(), UTF_8);
+        Files.writeString(applicationDirectory.resolve("project/jscene3d.json"), manifestWithoutIcon(), UTF_8);
         RecordingJpackageTool tool = new RecordingJpackageTool();
 
         new ApplicationImageExporter(tool, "Mac OS X").export(request());
@@ -159,7 +159,7 @@ final class ApplicationImageExporterTest {
         Path projectRoot = applicationDirectory.resolve("project");
         Files.write(projectRoot.resolve("branding/sample-game.png"), new byte[] {0, 1, 2, 3});
         Files.writeString(
-                projectRoot.resolve("project.json"), manifest().replace("sample-game.icns", "sample-game.png"), UTF_8);
+                projectRoot.resolve("jscene3d.json"), manifest().replace("sample-game.icns", "sample-game.png"), UTF_8);
         ApplicationImageExporter exporter = new ApplicationImageExporter(new RecordingJpackageTool(), "Mac OS X");
         ApplicationImageRequest request = request();
 

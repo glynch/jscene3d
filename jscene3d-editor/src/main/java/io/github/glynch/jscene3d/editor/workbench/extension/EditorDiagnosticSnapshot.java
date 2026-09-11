@@ -9,7 +9,13 @@ import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostic;
 import java.net.URI;
 import java.util.Objects;
 
-/** One diagnostic occurrence published through the extension host. */
+/**
+ * One diagnostic occurrence published through the extension host.
+ *
+ * @param collection diagnostic collection that owns the occurrence
+ * @param source authoritative source URI
+ * @param diagnostic published diagnostic
+ */
 public record EditorDiagnosticSnapshot(DiagnosticCollectionId collection, URI source, EditorDiagnostic diagnostic) {
     /** Validates one immutable host snapshot entry. */
     public EditorDiagnosticSnapshot {

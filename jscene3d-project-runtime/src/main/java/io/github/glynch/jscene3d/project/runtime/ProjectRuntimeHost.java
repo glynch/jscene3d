@@ -57,7 +57,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     /**
      * Loads the manifest-selected startup world while reporting synchronous milestones.
      *
-     * @param projectRoot project directory containing {@code project.json}
+     * @param projectRoot project directory containing {@code jscene3d.json}
      * @param progress load-progress receiver
      * @return composed inactive project
      */
@@ -68,7 +68,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     /**
      * Loads an explicitly requested project scene and launch parameters.
      *
-     * @param projectRoot project directory containing {@code project.json}
+     * @param projectRoot project directory containing {@code jscene3d.json}
      * @param request scene selection and project-defined parameters
      * @return composed inactive project
      */
@@ -79,7 +79,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     /**
      * Loads an explicitly requested project scene while reporting synchronous milestones.
      *
-     * @param projectRoot project directory containing {@code project.json}
+     * @param projectRoot project directory containing {@code jscene3d.json}
      * @param request scene selection and project-defined parameters
      * @param progress load-progress receiver
      * @return composed inactive project
@@ -101,7 +101,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     /**
      * Loads the manifest-selected gameplay entry world rather than an optional startup world.
      *
-     * @param projectRoot project directory containing {@code project.json}
+     * @param projectRoot project directory containing {@code jscene3d.json}
      * @return composed inactive gameplay project
      */
     public HostedProject loadEntry(Path projectRoot) {
@@ -111,7 +111,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     /**
      * Loads the manifest-selected gameplay world while reporting synchronous milestones.
      *
-     * @param projectRoot project directory containing {@code project.json}
+     * @param projectRoot project directory containing {@code jscene3d.json}
      * @param progress load-progress receiver
      * @return composed inactive gameplay project
      */
@@ -122,7 +122,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     /**
      * Loads gameplay using an optional explicit scene and launch parameters.
      *
-     * @param projectRoot project directory containing {@code project.json}
+     * @param projectRoot project directory containing {@code jscene3d.json}
      * @param request scene selection and project-defined parameters
      * @return composed inactive gameplay project
      */
@@ -133,7 +133,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     /**
      * Loads gameplay using an optional explicit scene while reporting synchronous milestones.
      *
-     * @param projectRoot project directory containing {@code project.json}
+     * @param projectRoot project directory containing {@code jscene3d.json}
      * @param request scene selection and project-defined parameters
      * @param progress load-progress receiver
      * @return composed inactive gameplay project

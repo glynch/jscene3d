@@ -69,12 +69,21 @@ public final class EditorProjectContext implements EditorProjects {
         return once(() -> hierarchyListeners.remove(observer));
     }
 
-    /** Returns the editor-internal asset projection for the current project. */
+    /**
+     * Returns the editor-internal asset projection for the current project.
+     *
+     * @return immutable asset projection
+     */
     public List<ProjectAsset> assets() {
         return assets;
     }
 
-    /** Observes complete changes to the editor-internal asset projection. */
+    /**
+     * Observes complete changes to the editor-internal asset projection.
+     *
+     * @param listener synchronous asset listener
+     * @return removable listener registration
+     */
     public EditorRegistration observeAssets(Runnable listener) {
         Runnable observer = Objects.requireNonNull(listener, "listener");
         assetListeners.add(observer);

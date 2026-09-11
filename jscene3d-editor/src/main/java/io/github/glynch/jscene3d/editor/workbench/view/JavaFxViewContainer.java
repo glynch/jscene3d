@@ -36,6 +36,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
      *
      * @param extensions active extension host
      * @param id fixed workbench container identity
+     * @param icons icon renderer
      */
     public JavaFxViewContainer(EditorExtensionHost extensions, ViewContainerId id, JavaFxIconRenderer icons) {
         this(extensions, id, true, icons);
@@ -47,6 +48,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
      * @param extensions active extension host
      * @param id fixed workbench container identity
      * @param showSingleHeading whether this container should render the title of a lone contribution
+     * @param icons icon renderer
      */
     public JavaFxViewContainer(
             EditorExtensionHost extensions, ViewContainerId id, boolean showSingleHeading, JavaFxIconRenderer icons) {

@@ -8,7 +8,13 @@ import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Stable semantic selection shared between editor extensions. */
+/**
+ * Stable semantic selection shared between editor extensions.
+ *
+ * @param kind semantic kind of the selection
+ * @param identity stable identity of the selected item within its kind
+ * @param details optional details projection for inspection
+ */
 public record EditorSelection(EditorSelectionKindId kind, String identity, Optional<EditorDetails> details) {
     /** Copies and validates one selection. */
     public EditorSelection {
@@ -20,7 +26,13 @@ public record EditorSelection(EditorSelectionKindId kind, String identity, Optio
         Objects.requireNonNull(details, "details");
     }
 
-    /** Creates an inspectable selection. */
+    /**
+     * Creates an inspectable selection.
+     *
+     * @param kind semantic kind of the selection
+     * @param identity stable identity of the selected item within its kind
+     * @param details details projection for inspection
+     */
     public EditorSelection(EditorSelectionKindId kind, String identity, EditorDetails details) {
         this(kind, identity, Optional.of(Objects.requireNonNull(details, "details")));
     }

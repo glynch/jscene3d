@@ -15,15 +15,27 @@ public interface EditorDetailsView extends EditorView {
         return DETAILS_VIEW_KIND;
     }
 
-    /** Returns the provider for complete details states. */
+    /**
+     * Returns the provider for complete details states.
+     *
+     * @return details data provider
+     */
     EditorDetailsDataProvider dataProvider();
 
-    /** Returns the title shown when no details are available. */
+    /**
+     * Returns the title shown when no details are available.
+     *
+     * @return empty-state title
+     */
     default String emptyTitle() {
         return "Nothing selected";
     }
 
-    /** Returns the guidance shown when no details are available. */
+    /**
+     * Returns the guidance shown when no details are available.
+     *
+     * @return empty-state guidance
+     */
     default String emptyMessage() {
         return "Select an item to inspect it.";
     }

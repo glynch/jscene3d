@@ -21,12 +21,22 @@ public final class JavaFxIconRenderer {
         this.icons = Objects.requireNonNull(icons, "icons");
     }
 
-    /** Creates a renderer backed by the editor's built-in icon theme. */
+    /**
+     * Creates a renderer backed by the editor's built-in icon theme.
+     *
+     * @return built-in icon renderer
+     */
     public static JavaFxIconRenderer builtIn() {
         return new JavaFxIconRenderer(JavaFxIconRegistry.builtIn());
     }
 
-    /** Creates one tooltip-accessible icon node without exposing JavaFX through the extension interface. */
+    /**
+     * Creates one tooltip-accessible icon node without exposing JavaFX through the extension interface.
+     *
+     * @param presentation semantic icon presentation
+     * @param styleClasses additional CSS classes applied to the icon container
+     * @return tooltip-accessible JavaFX icon node
+     */
     public Node create(EditorIcon presentation, String... styleClasses) {
         EditorIcon icon = Objects.requireNonNull(presentation, "presentation");
         JavaFxIconGlyph glyph = icons.resolve(icon.id());

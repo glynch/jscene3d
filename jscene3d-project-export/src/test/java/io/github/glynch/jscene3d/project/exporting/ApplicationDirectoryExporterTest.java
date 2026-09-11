@@ -80,7 +80,7 @@ final class ApplicationDirectoryExporterTest {
                         "project/config/input-map.json",
                         "project/entities/item.entity.json",
                         "project/imports/model.import.json",
-                        "project/project.json",
+                        "project/jscene3d.json",
                         "project/resources/menu-background.resource.json",
                         "project/resources/runtime.bin",
                         "project/worlds/start.world.json");
@@ -153,7 +153,7 @@ final class ApplicationDirectoryExporterTest {
         exporter.export(request);
 
         assertThat(output.resolve("obsolete.txt")).doesNotExist();
-        assertThat(output.resolve("project/project.json")).isRegularFile();
+        assertThat(output.resolve("project/jscene3d.json")).isRegularFile();
     }
 
     /** Leaves an existing output untouched when validation rejects an incomplete runtime class path. */
@@ -198,7 +198,7 @@ final class ApplicationDirectoryExporterTest {
 
     /** Writes the manifest and every category of file used to test export selection. */
     private void writeProjectFixture() throws IOException {
-        write(projectRoot.resolve("project.json"), manifest());
+        write(projectRoot.resolve("jscene3d.json"), manifest());
         write(projectRoot.resolve("worlds/start.world.json"), definition("world-definition"));
         write(projectRoot.resolve("entities/item.entity.json"), definition("entity-definition"));
         write(projectRoot.resolve("config/input-map.json"), "{}");

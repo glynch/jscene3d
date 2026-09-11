@@ -17,7 +17,12 @@ public final class EditorProjectPublication {
     private final EditorProjectContext projects;
     private final Consumer<List<ProjectDiagnostic>> diagnostics;
 
-    /** Creates a publisher over the editor's project and diagnostic contexts. */
+    /**
+     * Creates a publisher over the editor's project and diagnostic contexts.
+     *
+     * @param projects extension-facing current-project context
+     * @param diagnostics diagnostic publication sink
+     */
     public EditorProjectPublication(EditorProjectContext projects, Consumer<List<ProjectDiagnostic>> diagnostics) {
         this.projects = Objects.requireNonNull(projects, "projects");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
@@ -28,7 +33,11 @@ public final class EditorProjectPublication {
         projects.clear();
     }
 
-    /** Publishes the loaded project, hierarchy, and assets atomically. */
+    /**
+     * Publishes the loaded project, hierarchy, and assets atomically.
+     *
+     * @param session completely loaded editor project session
+     */
     public void showProject(EditorProjectSession session) {
         EditorProjectSession loaded = Objects.requireNonNull(session, "session");
         projects.showProject(
@@ -40,7 +49,11 @@ public final class EditorProjectPublication {
                 loaded.assets());
     }
 
-    /** Replaces all project-owned diagnostics. */
+    /**
+     * Replaces all project-owned diagnostics.
+     *
+     * @param replacement complete diagnostic set
+     */
     public void showDiagnostics(List<ProjectDiagnostic> replacement) {
         diagnostics.accept(List.copyOf(Objects.requireNonNull(replacement, "replacement")));
     }

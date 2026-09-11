@@ -18,7 +18,11 @@ public final class DiagnosticsView implements EditorView {
 
     private final EditorDiagnosticsModel model;
 
-    /** Creates the view over the shared diagnostics model. */
+    /**
+     * Creates the view over the shared diagnostics model.
+     *
+     * @param model shared diagnostics model
+     */
     public DiagnosticsView(EditorDiagnosticsModel model) {
         this.model = Objects.requireNonNull(model, "model");
     }
@@ -38,7 +42,11 @@ public final class DiagnosticsView implements EditorView {
         return VIEW_KIND_ID;
     }
 
-    /** Returns the semantic model rendered by the active workbench toolkit. */
+    /**
+     * Returns the semantic model rendered by the active workbench toolkit.
+     *
+     * @return shared diagnostics model
+     */
     public EditorDiagnosticsModel model() {
         return model;
     }

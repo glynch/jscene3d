@@ -37,7 +37,12 @@ public final class EditorStatusBarPane implements AutoCloseable {
     private final StackPane projectStatusPresentation = new StackPane(projectStatus, projectStatusAction);
     private final HBox node;
 
-    /** Creates a status bar backed by the editor's command and status-item registries. */
+    /**
+     * Creates a status bar backed by the editor's command and status-item registries.
+     *
+     * @param extensions editor extension host
+     * @param icons icon renderer
+     */
     public EditorStatusBarPane(EditorExtensionHost extensions, JavaFxIconRenderer icons) {
         this.extensions = Objects.requireNonNull(extensions, "extensions");
         this.icons = Objects.requireNonNull(icons, "icons");
@@ -46,24 +51,40 @@ public final class EditorStatusBarPane implements AutoCloseable {
         node = createNode();
     }
 
-    /** Returns the JavaFX node installed at the bottom of the workbench. */
+    /**
+     * Returns the JavaFX node installed at the bottom of the workbench.
+     *
+     * @return status-bar node
+     */
     public HBox node() {
         return node;
     }
 
-    /** Shows neutral project status without an associated action. */
+    /**
+     * Shows neutral project status without an associated action.
+     *
+     * @param text project status text
+     */
     public void showProjectStatus(String text) {
         projectStatus.setText(Objects.requireNonNull(text, "text"));
         projectStatus.setGraphic(null);
         showProjectText();
     }
 
-    /** Updates the concise viewport state. */
+    /**
+     * Updates the concise viewport state.
+     *
+     * @param text viewport status text
+     */
     public void showViewportStatus(String text) {
         viewportStatus.setText(Objects.requireNonNull(text, "text"));
     }
 
-    /** Presents one message and exposes its optional command as an accessible status action. */
+    /**
+     * Presents one message and exposes its optional command as an accessible status action.
+     *
+     * @param message message to present
+     */
     public void showMessage(EditorMessage message) {
         EditorMessage shown = Objects.requireNonNull(message, "message");
         if (shown.command().isEmpty()) {

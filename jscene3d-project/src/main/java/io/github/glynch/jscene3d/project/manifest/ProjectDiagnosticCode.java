@@ -47,7 +47,7 @@ public enum ProjectDiagnosticCode implements DiagnosticCode {
     /** The project identity is invalid. */
     IDENTITY_ID_INVALID("project.identity.id", "The project identifier is invalid"),
     /** A project value is invalid JSON. */
-    JSON_INVALID("project.json", "The project value is not valid JSON"),
+    JSON_INVALID("jscene3d.json", "The project value is not valid JSON"),
     /** The manifest escapes the project directory. */
     MANIFEST_ESCAPES_PROJECT("project.manifest.escape", "The project manifest resolves outside the project directory"),
     /** The manifest is invalid JSON. */

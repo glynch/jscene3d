@@ -10,9 +10,18 @@ import java.util.function.Consumer;
 
 /** Supplies complete immutable states to a standard details view. */
 public interface EditorDetailsDataProvider {
-    /** Returns the current details, if the view has anything to present. */
+    /**
+     * Returns the current details, if the view has anything to present.
+     *
+     * @return current details, or empty when nothing can be presented
+     */
     Optional<EditorDetails> details();
 
-    /** Observes changes and immediately receives the current details state. */
+    /**
+     * Observes changes and immediately receives the current details state.
+     *
+     * @param listener synchronous details-state listener
+     * @return removable listener registration
+     */
     EditorRegistration observe(Consumer<Optional<EditorDetails>> listener);
 }

@@ -9,7 +9,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable, toolkit-independent details presented for an editor selection. */
+/**
+ * Immutable, toolkit-independent details presented for an editor selection.
+ *
+ * @param title user-facing title of the selected item
+ * @param kind user-facing kind of the selected item
+ * @param source source containing the selected item
+ * @param identity stable identity of the selected item
+ * @param decorations semantic icons decorating the details header
+ * @param sections property sections in presentation order
+ */
 public record EditorDetails(
         String title,
         String kind,
@@ -27,7 +36,14 @@ public record EditorDetails(
         sections = List.copyOf(sections);
     }
 
-    /** One collapsible group of related properties. */
+    /**
+     * One collapsible group of related properties.
+     *
+     * @param title user-facing section title
+     * @param description optional explanation of the section
+     * @param metadataAvailable whether metadata exists for the section
+     * @param properties property rows in presentation order
+     */
     public record Section(
             String title, Optional<String> description, boolean metadataAvailable, List<Property> properties) {
         /** Copies and validates one section. */
@@ -38,7 +54,18 @@ public record EditorDetails(
         }
     }
 
-    /** One typed read-only property row. */
+    /**
+     * One typed read-only property row.
+     *
+     * @param identity stable identity of the property
+     * @param displayName user-facing property name
+     * @param valueKind semantic type of the displayed value
+     * @param value formatted value displayed to the user
+     * @param origin origin of the displayed value
+     * @param required whether the property is required by its schema
+     * @param description optional explanation of the property
+     * @param constraints named constraints applying to the property
+     */
     public record Property(
             String identity,
             String displayName,
@@ -62,8 +89,11 @@ public record EditorDetails(
 
     /** Explains where a displayed property value originated. */
     public enum ValueOrigin {
+        /** The project explicitly supplies the value. */
         AUTHORED,
+        /** The schema or runtime supplies the value by default. */
         DEFAULT,
+        /** No value is currently supplied. */
         UNSET
     }
 }

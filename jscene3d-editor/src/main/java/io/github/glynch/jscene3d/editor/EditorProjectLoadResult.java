@@ -9,7 +9,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable outcome of assembling one read-only editor project session. */
+/**
+ * Immutable outcome of assembling one editor project session.
+ *
+ * @param session assembled session, or empty when loading failed
+ * @param diagnostics diagnostics produced during loading
+ */
 public record EditorProjectLoadResult(Optional<EditorProjectSession> session, List<ProjectDiagnostic> diagnostics) {
     /** Copies one editor loading outcome. */
     public EditorProjectLoadResult {

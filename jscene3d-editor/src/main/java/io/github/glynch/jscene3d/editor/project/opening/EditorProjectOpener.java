@@ -75,7 +75,11 @@ public final class EditorProjectOpener implements AutoCloseable {
         this.windowTitle = Objects.requireNonNull(windowTitle, "windowTitle");
     }
 
-    /** Opens one project without blocking JavaFX rendering or preview presentation. */
+    /**
+     * Opens one project without blocking JavaFX rendering or preview presentation.
+     *
+     * @param directory project directory to open
+     */
     public void openProject(Path directory) {
         Path normalized =
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();

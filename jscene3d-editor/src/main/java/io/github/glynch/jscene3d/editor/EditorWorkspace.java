@@ -104,7 +104,11 @@ public final class EditorWorkspace extends BorderPane {
         statusBar.showViewportStatus(text);
     }
 
-    /** Shows that a project directory is being opened without claiming it has loaded. */
+    /**
+     * Shows that a project directory is being opened without claiming it has loaded.
+     *
+     * @param directory project directory being opened
+     */
     public void beginOpening(Path directory) {
         clearSelection();
         Path normalized = directory.toAbsolutePath().normalize();
@@ -115,7 +119,11 @@ public final class EditorWorkspace extends BorderPane {
         setProjectStatus("Opening " + candidateName + "…");
     }
 
-    /** Replaces the visible hierarchy, Project content, and preview context atomically. */
+    /**
+     * Replaces the visible hierarchy, Project content, and preview context atomically.
+     *
+     * @param session completely loaded editor project session
+     */
     public void showProject(EditorProjectSession session) {
         clearSelection();
         String projectName = session.project().identity().name();
@@ -131,12 +139,20 @@ public final class EditorWorkspace extends BorderPane {
         previewTitle.setText("Empty Preview");
     }
 
-    /** Updates the concise project portion of the status bar. */
+    /**
+     * Updates the concise project portion of the status bar.
+     *
+     * @param text project status text
+     */
     public void setProjectStatus(String text) {
         statusBar.showProjectStatus(text);
     }
 
-    /** Shows an extension message without exposing JavaFX through the extension interface. */
+    /**
+     * Shows an extension message without exposing JavaFX through the extension interface.
+     *
+     * @param message extension message to show
+     */
     public void showMessage(EditorMessage message) {
         statusBar.showMessage(message);
     }

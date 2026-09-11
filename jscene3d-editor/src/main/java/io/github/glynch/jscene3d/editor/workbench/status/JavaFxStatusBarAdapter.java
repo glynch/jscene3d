@@ -29,19 +29,32 @@ public final class JavaFxStatusBarAdapter implements AutoCloseable {
     private final EditorRegistration registration;
     private boolean closed;
 
-    /** Creates an adapter which follows the host's complete status-item snapshot. */
+    /**
+     * Creates an adapter which follows the host's complete status-item snapshot.
+     *
+     * @param extensions active extension host
+     * @param icons icon renderer
+     */
     public JavaFxStatusBarAdapter(EditorExtensionHost extensions, JavaFxIconRenderer icons) {
         this.extensions = Objects.requireNonNull(extensions, "extensions");
         this.icons = Objects.requireNonNull(icons, "icons");
         registration = extensions.observeStatusItems(this::accept);
     }
 
-    /** Returns the node containing leading status contributions. */
+    /**
+     * Returns the node containing leading status contributions.
+     *
+     * @return leading status-item node
+     */
     public HBox leftNode() {
         return leftItems;
     }
 
-    /** Returns the node containing trailing status contributions. */
+    /**
+     * Returns the node containing trailing status contributions.
+     *
+     * @return trailing status-item node
+     */
     public HBox rightNode() {
         return rightItems;
     }

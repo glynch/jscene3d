@@ -887,7 +887,7 @@ insufficient.
 ## Project hosting and exported games
 
 Editor play and exported games enter the engine through the same `ProjectHost`
-contract. The host, rather than application source code, loads `project.json`,
+contract. The host, rather than application source code, loads `jscene3d.json`,
 discovers the runtime extensions present in the application, scans authored
 assets, selects the optional startup scene or the entry scene, composes that
 world, and returns a `HostedProject`. Applications therefore do not generate or

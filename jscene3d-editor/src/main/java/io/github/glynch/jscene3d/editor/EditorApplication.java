@@ -11,6 +11,7 @@ import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsExtension;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.ProjectDiagnosticsExtension;
+import io.github.glynch.jscene3d.editor.builtin.extensions.ExtensionsExtension;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
 import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
@@ -72,6 +73,7 @@ public final class EditorApplication extends Application {
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
         extensionHost.activate(projectDiagnostics);
         extensionHost.activate(new HierarchyExtension(projectContext));
+        extensionHost.activate(new ExtensionsExtension());
         extensionHost.activate(new ProjectExtension(projectContext));
         extensionHost.activate(new InspectorExtension());
         extensionHost.activate(new SelectionStatusExtension());
@@ -117,9 +119,7 @@ public final class EditorApplication extends Application {
     @Override
     public void stop() {
         closeProjectOpener();
-        if (workspace != null) {
-            workspace.close();
-        }
+        closeWorkspace();
         extensionHost.close();
         disposeCanvas();
     }
@@ -202,6 +202,15 @@ public final class EditorApplication extends Application {
         }
     }
 
+    /** Detaches workbench observers before bundled extensions are deactivated. */
+    private void closeWorkspace() {
+        EditorWorkspace current = workspace;
+        workspace = null;
+        if (current != null) {
+            current.close();
+        }
+    }
+
     /** Optionally closes automated smoke runs while leaving ordinary launches interactive. */
     private void scheduleAutomaticClose() {
         String commandLineSeconds = getParameters().getNamed().get("auto-close-seconds");
@@ -230,7 +239,7 @@ public final class EditorApplication extends Application {
     /** Closes JavaFX only after the render thread releases the renderer and surface. */
     private void completeDisposal(Stage stage) {
         canvas = null;
-        workspace = null;
+        closeWorkspace();
         projectOpener = null;
         stage.setOnCloseRequest(null);
         stage.close();

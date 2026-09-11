@@ -11,6 +11,7 @@ import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.StackPane;
+import javafx.scene.shape.FillRule;
 import javafx.scene.shape.SVGPath;
 
 /** Renders semantic editor icons using glyphs resolved by the active icon registry. */
@@ -42,6 +43,7 @@ public final class JavaFxIconRenderer {
         JavaFxIconGlyph glyph = icons.resolve(icon.id());
         SVGPath path = new SVGPath();
         path.setContent(glyph.path());
+        path.setFillRule(FillRule.EVEN_ODD);
         path.getStyleClass().add(EditorStyleClasses.EDITOR_ICON_SHAPE);
 
         StackPane container = new StackPane(path);

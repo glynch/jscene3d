@@ -5,11 +5,12 @@
 package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
-import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
+import io.github.glynch.jscene3d.editor.workbench.layout.EditorViewPlacement;
+import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +18,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.DoubleBinaryOperator;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.SplitPane;
@@ -44,9 +47,12 @@ public final class JavaFxPanelPart implements AutoCloseable {
     private final Button collapse = new Button("×");
     private final Map<ViewId, JavaFxRenderedView> renderedViews = new LinkedHashMap<>();
     private final Map<ViewId, Button> tabButtons = new LinkedHashMap<>();
+    private @Nullable SplitPane splitPane;
+    private SplitPane.@Nullable Divider observedDivider;
+    private final ChangeListener<Number> dividerPositionListener;
+    private final ListChangeListener<SplitPane.Divider> dividerListListener;
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
-    private @Nullable SplitPane splitPane;
     private @Nullable ViewId selected;
     private boolean expanded = true;
     private boolean closed;
@@ -56,6 +62,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
      * Creates a panel which follows contributions for one workbench container.
      *
      * @param extensions active extension host
+     * @param layout current workbench layout
      * @param id workbench view-container identity
      * @param icons icon renderer
      * @param minimumHeight minimum expanded height
@@ -64,12 +71,14 @@ public final class JavaFxPanelPart implements AutoCloseable {
      */
     public JavaFxPanelPart(
             EditorExtensionHost extensions,
+            EditorWorkbenchLayout layout,
             ViewContainerId id,
             JavaFxIconRenderer icons,
             double minimumHeight,
             double preferredHeight,
             DoubleBinaryOperator dividerPosition) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
+        EditorWorkbenchLayout workbenchLayout = Objects.requireNonNull(layout, "layout");
         this.id = Objects.requireNonNull(id, "id");
         renderer = new JavaFxViewRenderer(host, Objects.requireNonNull(icons, "icons"));
         if (minimumHeight < HEADER_HEIGHT || preferredHeight < minimumHeight) {
@@ -79,8 +88,10 @@ public final class JavaFxPanelPart implements AutoCloseable {
         this.preferredHeight = preferredHeight;
         this.dividerPosition = Objects.requireNonNull(dividerPosition, "dividerPosition");
         expandedHeight = preferredHeight;
+        dividerPositionListener = (ignored, previous, current) -> rememberExpandedHeight(current.doubleValue());
+        dividerListListener = ignored -> observeDivider();
         configureNode();
-        viewRegistration = host.observeViews(this::showContributions);
+        viewRegistration = workbenchLayout.observeViews(this::showPlacements);
         requestRegistration = host.observeViewRequests(this::reveal);
     }
 
@@ -104,14 +115,8 @@ public final class JavaFxPanelPart implements AutoCloseable {
             throw new IllegalStateException("panel is already attached");
         }
         splitPane = candidate;
-        candidate.getDividers().getFirst().positionProperty().addListener((ignored, previous, current) -> {
-            if (expanded && candidate.getHeight() > 0.0) {
-                double height = candidate.getHeight() * (1.0 - current.doubleValue());
-                if (height >= minimumHeight) {
-                    expandedHeight = height;
-                }
-            }
-        });
+        candidate.getDividers().addListener(dividerListListener);
+        observeDivider();
     }
 
     @Override
@@ -122,6 +127,11 @@ public final class JavaFxPanelPart implements AutoCloseable {
         closed = true;
         requestRegistration.close();
         viewRegistration.close();
+        SplitPane owner = splitPane;
+        if (owner != null) {
+            owner.getDividers().removeListener(dividerListListener);
+        }
+        replaceObservedDivider(null);
         closeRenderedViews();
         node.getChildren().clear();
     }
@@ -146,20 +156,20 @@ public final class JavaFxPanelPart implements AutoCloseable {
         node.getStyleClass().add(EditorStyleClasses.EDITOR_PANEL_PART);
     }
 
-    private void showContributions(List<EditorViewContribution> contributions) {
-        List<EditorViewContribution> matching = contributions.stream()
-                .filter(contribution -> contribution.container().equals(id))
+    private void showPlacements(List<EditorViewPlacement> placements) {
+        List<EditorViewPlacement> matching = placements.stream()
+                .filter(placement -> placement.container().equals(id))
                 .toList();
         ViewId previousSelection = selected;
         closeRenderedViews();
         tabs.getChildren().clear();
-        for (EditorViewContribution contribution : matching) {
-            ViewId viewId = contribution.view().id();
-            JavaFxRenderedView rendered = renderer.render(contribution.view());
+        for (EditorViewPlacement placement : matching) {
+            ViewId viewId = placement.view().id();
+            JavaFxRenderedView rendered = renderer.render(placement.view());
             renderedViews.put(viewId, rendered);
             Button tab = new Button();
             tab.setGraphic(rendered.titleGraphic());
-            tab.setAccessibleText(contribution.view().title());
+            tab.setAccessibleText(placement.view().title());
             tab.setOnAction(ignored -> select(viewId));
             tab.getStyleClass().add(EditorStyleClasses.EDITOR_PANEL_TAB);
             tabButtons.put(viewId, tab);
@@ -254,6 +264,37 @@ public final class JavaFxPanelPart implements AutoCloseable {
         SplitPane owner = splitPane;
         if (owner != null && owner.getHeight() > 0.0) {
             owner.setDividerPositions(dividerPosition.applyAsDouble(owner.getHeight(), panelHeight));
+        }
+    }
+
+    private void observeDivider() {
+        SplitPane owner = splitPane;
+        SplitPane.Divider divider = owner == null || owner.getDividers().isEmpty()
+                ? null
+                : owner.getDividers().getFirst();
+        replaceObservedDivider(divider);
+    }
+
+    private void rememberExpandedHeight(double dividerPositionValue) {
+        SplitPane owner = splitPane;
+        if (expanded && owner != null && owner.getHeight() > 0.0) {
+            double height = owner.getHeight() * (1.0 - dividerPositionValue);
+            if (height >= minimumHeight) {
+                expandedHeight = height;
+            }
+        }
+    }
+
+    private void replaceObservedDivider(SplitPane.@Nullable Divider replacement) {
+        if (observedDivider == replacement) {
+            return;
+        }
+        if (observedDivider != null) {
+            observedDivider.positionProperty().removeListener(dividerPositionListener);
+        }
+        observedDivider = replacement;
+        if (replacement != null) {
+            replacement.positionProperty().addListener(dividerPositionListener);
         }
     }
 }

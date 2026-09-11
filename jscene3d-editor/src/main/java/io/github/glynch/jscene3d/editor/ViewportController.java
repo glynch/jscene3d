@@ -72,7 +72,7 @@ public final class ViewportController {
             }
             canvas.setFps(0.0);
             LOGGER.log(System.Logger.Level.ERROR, "Editor viewport rendering failed", exception);
-            updateStatus("Preview: failed");
+            updateStatus("Scene preview failed");
         }
     }
 
@@ -173,7 +173,7 @@ public final class ViewportController {
             return;
         }
         firstFrameReported = true;
-        updateStatus("Preview: inert");
+        updateStatus("Scene preview ready");
         Platform.runLater(firstFramePresented);
     }
 
@@ -187,7 +187,7 @@ public final class ViewportController {
 
     /** Formats concise preview state for the persistent status bar. */
     private void updateStatus(GLRenderEvent event, RenderSurfaceSize size) {
-        String text = "Preview: inert · "
+        String text = "Scene preview · "
                 + size.framebufferWidth()
                 + "×"
                 + size.framebufferHeight()

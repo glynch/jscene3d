@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.builtin.inspector;
 
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
@@ -31,6 +32,17 @@ public final class InspectorExtension implements EditorExtension {
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.inspector";
+    }
+
+    @Override
+    public EditorExtensionDescriptor descriptor() {
+        return new EditorExtensionDescriptor(
+                id(),
+                "Inspector",
+                "Presents typed details for the current editor selection.",
+                "JScene3D",
+                Optional.empty(),
+                true);
     }
 
     @Override

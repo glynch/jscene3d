@@ -5,23 +5,25 @@
 package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
-import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
+import io.github.glynch.jscene3d.editor.workbench.layout.EditorViewPlacement;
+import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
-/** Fixed workbench container which renders registered logical views through JavaFX adapters. */
+/** Workbench container which renders the logical views currently placed within it. */
 public final class JavaFxViewContainer implements AutoCloseable {
     private final JavaFxViewRenderer renderer;
     private final ViewContainerId id;
@@ -30,35 +32,48 @@ public final class JavaFxViewContainer implements AutoCloseable {
     private final boolean showSingleHeading;
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
+    private List<EditorViewPlacement> placements = List.of();
+    private Optional<ViewId> shownView = Optional.empty();
 
     /**
-     * Creates a container which immediately observes contributions for one fixed location.
+     * Creates a container which immediately observes current placements for one location.
      *
      * @param extensions active extension host
-     * @param id fixed workbench container identity
+     * @param layout current workbench layout
+     * @param id workbench container identity
      * @param icons icon renderer
      */
-    public JavaFxViewContainer(EditorExtensionHost extensions, ViewContainerId id, JavaFxIconRenderer icons) {
-        this(extensions, id, true, icons);
+    public JavaFxViewContainer(
+            EditorExtensionHost extensions,
+            EditorWorkbenchLayout layout,
+            ViewContainerId id,
+            JavaFxIconRenderer icons) {
+        this(extensions, layout, id, true, icons);
     }
 
     /**
      * Creates a container with configurable heading ownership for an enclosing workbench surface.
      *
      * @param extensions active extension host
-     * @param id fixed workbench container identity
+     * @param layout current workbench layout
+     * @param id workbench container identity
      * @param showSingleHeading whether this container should render the title of a lone contribution
      * @param icons icon renderer
      */
     public JavaFxViewContainer(
-            EditorExtensionHost extensions, ViewContainerId id, boolean showSingleHeading, JavaFxIconRenderer icons) {
+            EditorExtensionHost extensions,
+            EditorWorkbenchLayout layout,
+            ViewContainerId id,
+            boolean showSingleHeading,
+            JavaFxIconRenderer icons) {
         Objects.requireNonNull(extensions, "extensions");
         Objects.requireNonNull(icons, "icons");
         renderer = new JavaFxViewRenderer(extensions, icons);
+        EditorWorkbenchLayout workbenchLayout = Objects.requireNonNull(layout, "layout");
         this.id = Objects.requireNonNull(id, "id");
         this.showSingleHeading = showSingleHeading;
         root.setSpacing(6.0);
-        viewRegistration = extensions.observeViews(this::showContributions);
+        viewRegistration = workbenchLayout.observeViews(this::showPlacements);
         requestRegistration = extensions.observeViewRequests(this::reveal);
     }
 
@@ -71,6 +86,19 @@ public final class JavaFxViewContainer implements AutoCloseable {
         return root;
     }
 
+    /**
+     * Prefers one view when it is currently placed in this container.
+     *
+     * <p>Activity Bar selections use this to replace the visible primary-side-bar content without changing the
+     * contributed or customized placement.
+     *
+     * @param view preferred view identity
+     */
+    public void showOnly(ViewId view) {
+        shownView = Optional.of(Objects.requireNonNull(view, "view"));
+        renderPlacements();
+    }
+
     @Override
     public void close() {
         requestRegistration.close();
@@ -80,10 +108,22 @@ public final class JavaFxViewContainer implements AutoCloseable {
         root.getChildren().clear();
     }
 
-    private void showContributions(List<EditorViewContribution> contributions) {
-        List<EditorViewContribution> matching = contributions.stream()
-                .filter(contribution -> contribution.container().equals(id))
+    private void showPlacements(List<EditorViewPlacement> placements) {
+        this.placements = List.copyOf(Objects.requireNonNull(placements, "placements"));
+        renderPlacements();
+    }
+
+    private void renderPlacements() {
+        List<EditorViewPlacement> matching = placements.stream()
+                .filter(placement -> placement.container().equals(id))
                 .toList();
+        List<EditorViewPlacement> available = matching;
+        Optional<EditorViewPlacement> preferred = shownView.flatMap(view -> available.stream()
+                .filter(placement -> placement.view().id().equals(view))
+                .findFirst());
+        if (preferred.isPresent()) {
+            matching = List.of(preferred.orElseThrow());
+        }
         renderedViews.values().forEach(rendered -> rendered.close().run());
         renderedViews.clear();
         root.getChildren().clear();
@@ -94,12 +134,12 @@ public final class JavaFxViewContainer implements AutoCloseable {
         }
     }
 
-    private void showSingle(EditorViewContribution contribution) {
-        JavaFxRenderedView rendered = renderer.render(contribution.view());
-        renderedViews.put(contribution.view().id(), rendered);
+    private void showSingle(EditorViewPlacement placement) {
+        JavaFxRenderedView rendered = renderer.render(placement.view());
+        renderedViews.put(placement.view().id(), rendered);
         VBox.setVgrow(rendered.node(), Priority.ALWAYS);
         if (showSingleHeading) {
-            Label heading = new Label(contribution.view().title());
+            Label heading = new Label(placement.view().title());
             heading.getStyleClass().add(EditorStyleClasses.EDITOR_PANEL_HEADING);
             root.getChildren().setAll(heading, rendered.node());
         } else {
@@ -107,16 +147,16 @@ public final class JavaFxViewContainer implements AutoCloseable {
         }
     }
 
-    private void showTabs(List<EditorViewContribution> contributions) {
+    private void showTabs(List<EditorViewPlacement> placements) {
         TabPane tabs = new TabPane();
-        for (EditorViewContribution contribution : contributions) {
-            JavaFxRenderedView rendered = renderer.render(contribution.view());
-            Tab tab = new Tab(contribution.view().title(), rendered.node());
+        for (EditorViewPlacement placement : placements) {
+            JavaFxRenderedView rendered = renderer.render(placement.view());
+            Tab tab = new Tab(placement.view().title(), rendered.node());
             tab.setClosable(false);
-            tab.setUserData(contribution.view().id());
+            tab.setUserData(placement.view().id());
             tabs.getTabs().add(tab);
             renderedViews.put(
-                    contribution.view().id(),
+                    placement.view().id(),
                     new JavaFxRenderedView(
                             rendered.node(), rendered.titleGraphic(), rendered.titleActions(), rendered.close(), () -> {
                                 tabs.getSelectionModel().select(tab);
@@ -129,6 +169,13 @@ public final class JavaFxViewContainer implements AutoCloseable {
 
     private void reveal(ViewId requested) {
         JavaFxRenderedView rendered = renderedViews.get(requested);
+        if (rendered == null
+                && placements.stream()
+                        .anyMatch(placement -> placement.container().equals(id)
+                                && placement.view().id().equals(requested))) {
+            showOnly(requested);
+            rendered = renderedViews.get(requested);
+        }
         if (rendered != null) {
             rendered.requestFocus().run();
         }

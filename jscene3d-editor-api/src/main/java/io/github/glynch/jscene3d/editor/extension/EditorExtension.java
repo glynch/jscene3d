@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.extension;
 
+import java.util.Optional;
+
 /** Trusted executable contribution discovered by the editor at startup. */
 public interface EditorExtension {
     /**
@@ -12,6 +14,19 @@ public interface EditorExtension {
      * @return stable extension identity
      */
     String id();
+
+    /**
+     * Returns safe descriptive metadata shown by the editor's extension browser.
+     *
+     * <p>Extensions distributed outside the editor should override this method with metadata loaded from their
+     * package descriptor.
+     *
+     * @return installed extension metadata
+     */
+    default EditorExtensionDescriptor descriptor() {
+        return new EditorExtensionDescriptor(
+                id(), id(), "Installed editor extension", "Unknown publisher", Optional.empty(), false);
+    }
 
     /**
      * Contributes editor facilities during startup.

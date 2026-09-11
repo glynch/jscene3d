@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.builtin.status;
 
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemContribution;
@@ -31,6 +32,17 @@ public final class SelectionStatusExtension implements EditorExtension {
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.selection-status";
+    }
+
+    @Override
+    public EditorExtensionDescriptor descriptor() {
+        return new EditorExtensionDescriptor(
+                id(),
+                "Selection Status",
+                "Shows contextual state for the current editor selection in the status bar.",
+                "JScene3D",
+                Optional.empty(),
+                true);
     }
 
     @Override

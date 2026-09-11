@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemContribution;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemState;
@@ -46,6 +47,17 @@ public final class DiagnosticsExtension implements EditorExtension {
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.diagnostics";
+    }
+
+    @Override
+    public EditorExtensionDescriptor descriptor() {
+        return new EditorExtensionDescriptor(
+                id(),
+                "Diagnostics",
+                "Collects editor diagnostics and presents their status and detail views.",
+                "JScene3D",
+                Optional.empty(),
+                true);
     }
 
     @Override

@@ -4,6 +4,9 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.extension;
 
+import io.github.glynch.jscene3d.editor.activity.ActivityId;
+import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
+import io.github.glynch.jscene3d.editor.activity.EditorActivityRegistry;
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.EditorCommand;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
@@ -16,6 +19,8 @@ import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensions;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
@@ -26,6 +31,7 @@ import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemContribution;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemState;
 import io.github.glynch.jscene3d.editor.status.StatusItemId;
+import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
 import io.github.glynch.jscene3d.editor.view.ViewId;
@@ -52,6 +58,10 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final EditorProjectContext projects;
     private final EditorSelections selections;
     private final Map<String, ExtensionSubscriptionsImpl> activeExtensions = new LinkedHashMap<>();
+    private final Map<String, EditorExtensionDescriptor> extensionDescriptors = new LinkedHashMap<>();
+    private final List<Consumer<List<EditorExtensionDescriptor>>> extensionObservers = new ArrayList<>();
+    private final Map<ActivityId, EditorActivityContribution> activities = new LinkedHashMap<>();
+    private final List<Consumer<List<EditorActivityContribution>>> activityObservers = new ArrayList<>();
     private final Map<ViewId, EditorViewContribution> views = new LinkedHashMap<>();
     private final List<Consumer<List<EditorViewContribution>>> viewObservers = new ArrayList<>();
     private final List<Consumer<ViewId>> viewRequestObservers = new ArrayList<>();
@@ -94,15 +104,38 @@ public final class EditorExtensionHost implements AutoCloseable {
         if (activeExtensions.containsKey(id)) {
             throw new IllegalArgumentException("extension identity is already active: " + id);
         }
+        EditorExtensionDescriptor descriptor = Objects.requireNonNull(candidate.descriptor(), "extension.descriptor()");
+        if (!descriptor.id().equals(id)) {
+            throw new IllegalArgumentException(
+                    "extension descriptor identity does not match extension identity: " + id);
+        }
         ExtensionSubscriptionsImpl subscriptions = new ExtensionSubscriptionsImpl();
         EditorExtensionContext context = new Context(subscriptions);
         try {
             candidate.activate(context);
             activeExtensions.put(id, subscriptions);
+            extensionDescriptors.put(id, descriptor);
+            notifyExtensionObservers();
         } catch (RuntimeException failure) {
             subscriptions.close();
             throw failure;
         }
+    }
+
+    /**
+     * Observes the complete ordered Activity Bar contribution snapshot.
+     *
+     * <p>The listener immediately receives the current snapshot.
+     *
+     * @param observer synchronous activity observer
+     * @return removable listener registration
+     */
+    public EditorRegistration observeActivities(Consumer<List<EditorActivityContribution>> observer) {
+        requireOpen();
+        Consumer<List<EditorActivityContribution>> listener = Objects.requireNonNull(observer, "observer");
+        activityObservers.add(listener);
+        listener.accept(activitySnapshot());
+        return once(() -> activityObservers.remove(listener));
     }
 
     /**
@@ -186,6 +219,15 @@ public final class EditorExtensionHost implements AutoCloseable {
         executeCommand(command);
     }
 
+    /**
+     * Requests that the workbench reveal one registered view.
+     *
+     * @param view registered view identity
+     */
+    public void showView(ViewId view) {
+        window.showView(view);
+    }
+
     /** Deactivates extensions in reverse order and removes every remaining contribution. */
     @Override
     public void close() {
@@ -195,18 +237,46 @@ public final class EditorExtensionHost implements AutoCloseable {
         closed = true;
         List.copyOf(activeExtensions.values()).reversed().forEach(ExtensionSubscriptionsImpl::close);
         activeExtensions.clear();
+        extensionDescriptors.clear();
+        activities.clear();
         views.clear();
         commands.clear();
         commandPlacements.clear();
         statusItems.clear();
         diagnosticCollections.clear();
+        notifyExtensionObservers();
+        notifyActivityObservers();
         notifyViewObservers();
         notifyStatusObservers();
         notifyDiagnosticObservers();
+        extensionObservers.clear();
+        activityObservers.clear();
         viewObservers.clear();
         viewRequestObservers.clear();
         statusObservers.clear();
         diagnosticObservers.clear();
+    }
+
+    private EditorRegistration registerActivity(EditorActivityContribution contribution) {
+        requireOpen();
+        EditorActivityContribution registered = Objects.requireNonNull(contribution, "contribution");
+        EditorViewContribution activityView = views.get(registered.view());
+        if (activityView == null) {
+            throw new IllegalArgumentException("activity view is not registered: " + registered.view());
+        }
+        if (!activityView.container().equals(EditorViewContainers.PRIMARY_SIDEBAR)) {
+            throw new IllegalArgumentException(
+                    "activity view must be contributed to the primary sidebar: " + registered.view());
+        }
+        if (activities.putIfAbsent(registered.id(), registered) != null) {
+            throw new IllegalArgumentException("activity identity is already registered: " + registered.id());
+        }
+        notifyActivityObservers();
+        return once(() -> {
+            if (activities.remove(registered.id(), registered)) {
+                notifyActivityObservers();
+            }
+        });
     }
 
     private EditorRegistration registerView(EditorViewContribution contribution) {
@@ -266,6 +336,26 @@ public final class EditorExtensionHost implements AutoCloseable {
         return views.values().stream()
                 .sorted((left, right) -> Integer.compare(left.order(), right.order()))
                 .toList();
+    }
+
+    private List<EditorActivityContribution> activitySnapshot() {
+        return activities.values().stream()
+                .sorted(Comparator.comparingInt(EditorActivityContribution::order))
+                .toList();
+    }
+
+    private void notifyActivityObservers() {
+        List<EditorActivityContribution> snapshot = activitySnapshot();
+        List.copyOf(activityObservers).forEach(observer -> observer.accept(snapshot));
+    }
+
+    private List<EditorExtensionDescriptor> extensionSnapshot() {
+        return List.copyOf(extensionDescriptors.values());
+    }
+
+    private void notifyExtensionObservers() {
+        List<EditorExtensionDescriptor> snapshot = extensionSnapshot();
+        List.copyOf(extensionObservers).forEach(observer -> observer.accept(snapshot));
     }
 
     private void notifyViewObservers() {
@@ -328,8 +418,33 @@ public final class EditorExtensionHost implements AutoCloseable {
         }
 
         @Override
+        public EditorActivityRegistry activities() {
+            return EditorExtensionHost.this::registerActivity;
+        }
+
+        @Override
         public EditorViewRegistry views() {
             return EditorExtensionHost.this::registerView;
+        }
+
+        @Override
+        public EditorExtensions extensions() {
+            return new EditorExtensions() {
+                @Override
+                public List<EditorExtensionDescriptor> installed() {
+                    requireOpen();
+                    return extensionSnapshot();
+                }
+
+                @Override
+                public EditorRegistration observe(Consumer<List<EditorExtensionDescriptor>> observer) {
+                    requireOpen();
+                    Consumer<List<EditorExtensionDescriptor>> listener = Objects.requireNonNull(observer, "observer");
+                    extensionObservers.add(listener);
+                    listener.accept(extensionSnapshot());
+                    return once(() -> extensionObservers.remove(listener));
+                }
+            };
         }
 
         @Override

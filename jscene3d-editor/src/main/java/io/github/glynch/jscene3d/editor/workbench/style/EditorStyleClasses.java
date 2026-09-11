@@ -7,6 +7,14 @@ package io.github.glynch.jscene3d.editor.workbench.style;
 /** Central vocabulary for CSS classes assigned by the JavaFX editor workbench. */
 public final class EditorStyleClasses {
     /** CSS class named {@value}. */
+    public static final String EDITOR_ACTIVITY_BAR = "editor-activity-bar";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_ACTIVITY_BUTTON = "editor-activity-button";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_ACTIVITY_BUTTON_ACTIVE = "editor-activity-button-active";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_ACTIVITY_ICON = "editor-activity-icon";
+    /** CSS class named {@value}. */
     public static final String DIAGNOSTIC_DETAIL = "diagnostic-detail";
     /** CSS class named {@value}. */
     public static final String DIAGNOSTIC_GROUP = "diagnostic-group";
@@ -119,6 +127,26 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_EMPTY_TITLE = "editor-empty-title";
     /** CSS class named {@value}. */
+    public static final String EDITOR_AREA_TABS = "editor-area-tabs";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSION_DESCRIPTION = "editor-extension-description";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSION_METADATA = "editor-extension-metadata";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSION_NAME = "editor-extension-name";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSION_ROW = "editor-extension-row";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSIONS_GROUP = "editor-extensions-group";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSIONS_GROUP_TITLE = "editor-extensions-group-title";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSIONS_LIST = "editor-extensions-list";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSIONS_SEARCH = "editor-extensions-search";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_EXTENSIONS_VIEW = "editor-extensions-view";
+    /** CSS class named {@value}. */
     public static final String EDITOR_HIERARCHY_PANEL = "editor-hierarchy-panel";
     /** CSS class named {@value}. */
     public static final String EDITOR_ICON = "editor-icon";
@@ -136,8 +164,6 @@ public final class EditorStyleClasses {
     public static final String EDITOR_ICON_SHAPE = "editor-icon-shape";
     /** CSS class named {@value}. */
     public static final String EDITOR_ICON_WARNING = "editor-icon-warning";
-    /** CSS class named {@value}. */
-    public static final String EDITOR_INERT_BADGE = "editor-inert-badge";
     /** CSS class named {@value}. */
     public static final String EDITOR_INSPECTOR_DEFAULT_VALUE = "editor-inspector-default-value";
     /** CSS class named {@value}. */
@@ -182,6 +208,16 @@ public final class EditorStyleClasses {
     public static final String EDITOR_ITEM_DECORATIONS = "editor-item-decorations";
     /** CSS class named {@value}. */
     public static final String EDITOR_LEFT_WORKSPACE_SPLIT = "editor-left-workspace-split";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_LAYOUT_BUTTON = "editor-layout-button";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_LAYOUT_MENU = "editor-layout-menu";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_LAYOUT_MENU_HEADING = "editor-layout-menu-heading";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_LAYOUT_MENU_ROW = "editor-layout-menu-row";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_LAYOUT_MENU_SECTION = "editor-layout-menu-section";
     /** CSS class named {@value}. */
     public static final String EDITOR_MENU_BAR = "editor-menu-bar";
     /** CSS class named {@value}. */

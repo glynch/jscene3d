@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.extension;
 
+import io.github.glynch.jscene3d.editor.activity.EditorActivityRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
@@ -17,11 +18,25 @@ import io.github.glynch.jscene3d.editor.window.EditorWindow;
 /** Lifetime-scoped editor facilities supplied to one activated extension. */
 public interface EditorExtensionContext {
     /**
+     * Returns the registry for Activity Bar contributions.
+     *
+     * @return Activity Bar contribution registry
+     */
+    EditorActivityRegistry activities();
+
+    /**
      * Returns the registry for logical editor views.
      *
      * @return view contribution registry
      */
     EditorViewRegistry views();
+
+    /**
+     * Returns the read-only catalogue of activated editor extensions.
+     *
+     * @return activated extension catalogue
+     */
+    EditorExtensions extensions();
 
     /**
      * Returns the registry for executable editor commands.

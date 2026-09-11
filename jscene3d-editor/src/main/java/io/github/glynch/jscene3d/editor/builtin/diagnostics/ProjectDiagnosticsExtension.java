@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticSeverity;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.net.URI;
 import java.util.ArrayList;
@@ -36,6 +37,17 @@ public final class ProjectDiagnosticsExtension implements EditorExtension {
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.project-diagnostics";
+    }
+
+    @Override
+    public EditorExtensionDescriptor descriptor() {
+        return new EditorExtensionDescriptor(
+                id(),
+                "Project Diagnostics",
+                "Publishes project-loading diagnostics to the editor workbench.",
+                "JScene3D",
+                Optional.empty(),
+                true);
     }
 
     @Override

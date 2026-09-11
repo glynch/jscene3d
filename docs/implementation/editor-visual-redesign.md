@@ -9,14 +9,8 @@ and preserves the editor's read-only, descriptor-driven architecture.
 
 Deliver a coherent near-black and indigo JScene3D editor whose viewport,
 Hierarchy, Project browser, Inspector, Diagnostics, status, and splash feel like
-one product. The first completed version remains a safe, inert project preview.
-
-## Non-goals
-
-The redesign does not add project mutation, saving, a running Game view,
-transport controls, transform gizmos, drag-and-drop authoring, docking, or a new
-project document model. Visual placeholders for unsupported behavior are not
-added.
+one product. The first completed version provides a safe scene preview while
+leaving room for an explicit Game mode.
 
 ## Implementation principles
 
@@ -60,7 +54,7 @@ domain behavior.
 Deliverables:
 
 - replace the current top toolbar with compact product, project, and menu chrome;
-- create a viewport header containing the world-preview title and `INERT` badge;
+- create a viewport header containing the world-preview title and local actions;
 - provide a home for actual viewport-local commands without implementing
   fictional tools;
 - place Hierarchy left, Inspector right, and Project plus Diagnostics below the
@@ -199,6 +193,73 @@ Verification commands begin with:
 Native packaging and render-integration checks remain part of platform
 qualification where their existing profiles apply.
 
+## Slice 8: Session workbench placement
+
+Separate extension-declared default locations from the current workbench
+layout, then make the current placement adjustable without coupling extensions
+to JavaFX.
+
+Deliverables:
+
+- retain a default container on each view contribution;
+- resolve current placements in a toolkit-independent workbench module;
+- expose one Customize Layout surface for region visibility, primary-side-bar
+  position, and movement of ordinary views among the primary side bar, secondary
+  side bar, and lower panel;
+- pin Activity Bar-owned views to the primary sidebar and omit them from movable
+  layout choices;
+- update every container from the same placement snapshot;
+- retain moves for the editor session without treating JavaFX nodes as layout
+  state.
+
+Verification:
+
+- unit-test default resolution, moves, invalid destinations, and removed views;
+- confirm Activity Bar-owned Hierarchy and Extensions views cannot be moved;
+- move Project, Inspector, and Diagnostics among the available containers in the
+  native editor;
+- confirm selection, diagnostic filters, and view commands still operate after
+  a move;
+- restart the editor and confirm defaults are restored until settings-backed
+  persistence is implemented as its own slice.
+
+## Slice 9: Activity Bar and bundled Extensions view
+
+Add the smallest workbench navigation and extension-catalogue slice which uses
+the same extension contracts intended for community contributions.
+
+Deliverables:
+
+- add toolkit-independent Activity Bar contributions backed by registered,
+  pinned primary-sidebar views;
+- contribute Scene and Extensions activities from bundled editor extensions;
+- allow the active activity to collapse and restore the primary side bar;
+- expose safe extension metadata through the editor extension context;
+- list activated bundled extensions in the Extensions view and open the selected
+  extension's metadata in a central editor tab;
+- keep marketplace and install actions absent until a real package, trust, and
+  registry design exists.
+
+Verification:
+
+- unit-test activity registration, extension metadata observation, layout
+  visibility, primary-side-bar position, and reset behavior;
+- switch repeatedly between Scene and Extensions and collapse the active view;
+- inspect installed extensions, search the list, and open more than one detail;
+- customize region visibility and view placement, restore defaults, then restart
+  and confirm changes remain session-only.
+
+## Recorded follow-up work
+
+- add `.jscene3d/settings.json` project settings before persisting layout or
+  extension settings;
+- design theme contributions for dark/light color themes and installable icon
+  themes without exposing JavaFX CSS names as the extension contract;
+- audit all non-test source files over 300 lines and split orchestration classes
+  where cohesive modules can own the extracted policy;
+- design the local extension package and community-registry lifecycle before
+  adding install, update, disable, trust, or removal controls.
+
 ## Suggested change sequence
 
 Keep commits small and behaviorally coherent:
@@ -210,6 +271,9 @@ Keep commits small and behaviorally coherent:
 5. Add the Diagnostics drawer and compact status.
 6. Add the accepted brand mark and production splash artwork.
 7. Perform native visual qualification and documentation updates.
+8. Add session workbench placement and validate the interaction before
+   persisting it.
+9. Add Activity Bar contributions and the installed bundled-extensions view.
 
 Each change should include its tests and leave the editor launchable. The
 selected mockups guide visual acceptance, while the project architecture and

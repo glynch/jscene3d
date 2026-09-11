@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.builtin.project;
 
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
@@ -61,6 +62,17 @@ public final class ProjectExtension implements EditorExtension {
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.project";
+    }
+
+    @Override
+    public EditorExtensionDescriptor descriptor() {
+        return new EditorExtensionDescriptor(
+                id(),
+                "Project",
+                "Browses worlds, entity definitions, source assets, and imports.",
+                "JScene3D",
+                Optional.empty(),
+                true);
     }
 
     @Override

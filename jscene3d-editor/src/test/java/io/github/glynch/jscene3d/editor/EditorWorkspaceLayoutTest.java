@@ -16,12 +16,12 @@ final class EditorWorkspaceLayoutTest {
     void usesReferenceSidePanelWidths() {
         double width = 1440.0;
         EditorWorkspaceLayout.HorizontalDividers dividers = EditorWorkspaceLayout.horizontal(width);
-        double leftWorkspaceWidth = dividers.inspectorStart() * width;
+        double leftWorkspaceWidth = dividers.secondarySidebarStart() * width;
 
-        assertThat(dividers.hierarchyEnd() * leftWorkspaceWidth)
-                .isCloseTo(EditorWorkspaceLayout.PREFERRED_HIERARCHY_WIDTH, within(0.000_001));
-        assertThat((1.0 - dividers.inspectorStart()) * width)
-                .isCloseTo(EditorWorkspaceLayout.PREFERRED_INSPECTOR_WIDTH, within(0.000_001));
+        assertThat(dividers.primarySidebarEnd() * leftWorkspaceWidth)
+                .isCloseTo(EditorWorkspaceLayout.PREFERRED_PRIMARY_SIDEBAR_WIDTH, within(0.000_001));
+        assertThat((1.0 - dividers.secondarySidebarStart()) * width)
+                .isCloseTo(EditorWorkspaceLayout.PREFERRED_SECONDARY_SIDEBAR_WIDTH, within(0.000_001));
     }
 
     /** Preserves all three column minimums when the shell reaches its minimum width. */
@@ -29,14 +29,14 @@ final class EditorWorkspaceLayoutTest {
     void preservesMinimumColumnWidths() {
         double width = EditorWorkspaceLayout.MINIMUM_WORKSPACE_WIDTH;
         EditorWorkspaceLayout.HorizontalDividers dividers = EditorWorkspaceLayout.horizontal(width);
-        double leftWorkspaceWidth = dividers.inspectorStart() * width;
-        double hierarchyWidth = dividers.hierarchyEnd() * leftWorkspaceWidth;
-        double centreWidth = (1.0 - dividers.hierarchyEnd()) * leftWorkspaceWidth;
-        double inspectorWidth = (1.0 - dividers.inspectorStart()) * width;
+        double leftWorkspaceWidth = dividers.secondarySidebarStart() * width;
+        double hierarchyWidth = dividers.primarySidebarEnd() * leftWorkspaceWidth;
+        double centreWidth = (1.0 - dividers.primarySidebarEnd()) * leftWorkspaceWidth;
+        double inspectorWidth = (1.0 - dividers.secondarySidebarStart()) * width;
 
-        assertThat(hierarchyWidth).isGreaterThanOrEqualTo(EditorWorkspaceLayout.MINIMUM_HIERARCHY_WIDTH);
+        assertThat(hierarchyWidth).isGreaterThanOrEqualTo(EditorWorkspaceLayout.MINIMUM_PRIMARY_SIDEBAR_WIDTH);
         assertThat(centreWidth).isGreaterThanOrEqualTo(EditorWorkspaceLayout.MINIMUM_CENTRE_WIDTH);
-        assertThat(inspectorWidth).isGreaterThanOrEqualTo(EditorWorkspaceLayout.MINIMUM_INSPECTOR_WIDTH);
+        assertThat(inspectorWidth).isGreaterThanOrEqualTo(EditorWorkspaceLayout.MINIMUM_SECONDARY_SIDEBAR_WIDTH);
     }
 
     /** Keeps the lower region near its target while protecting preview height. */

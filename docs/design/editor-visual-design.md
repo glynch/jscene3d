@@ -24,8 +24,8 @@ The visual design must communicate the editor that JScene3D actually owns:
 - OpenGLFX embeds the real JScene3D renderer in the central viewport.
 - The editor reads authored assets, safe extension descriptors, published
   imports, and the selected world without executing application behavior.
-- The preview is inert. It is not a running game and must not be labelled
-  `Game`.
+- The scene preview is distinct from a running Game view. The workbench must
+  make that distinction through the view name, not an unexplained status badge.
 - Hierarchy entries distinguish local authored entities, reusable definition
   placements, and generated read-only placements.
 - The inspector projects descriptor metadata and authored values. It does not
@@ -146,10 +146,10 @@ inspection or diagnostics.
 
 ### Preview
 
-The central tab uses the opened world name followed by `Preview`, for example
-`MAP01 Preview`. A compact `INERT` badge explains that application behavior is
-not executing. The viewport is the strongest visual region and must not be
-surrounded by heavy frames.
+The central region uses the opened world name followed by `Preview`, for example
+`MAP01 Preview`. The viewport is the strongest visual region and must not be
+surrounded by heavy frames. A future Game mode must be explicit rather than
+making the ordinary scene-preview heading carry an implementation label.
 
 Inspection overlays may use the indigo accent. Red, green, and blue remain
 reserved for conventional spatial axes where needed and must not become general
@@ -187,9 +187,40 @@ Diagnostics live in a collapsible bottom region. Its tab shows total and
 severity counts without permanently consuming viewport height. Each diagnostic
 retains severity, stable code, source, location, message, and structured detail.
 
-The status bar reports concise editor state such as `Ready`, `Preview: inert`,
+The status bar reports concise editor state such as `Ready`, `Scene preview`,
 and `0 errors`. Detailed project-open timings belong in diagnostics, telemetry,
 or an expandable detail view rather than a long persistent sentence.
+
+### Contributed view placement
+
+Views declare default workbench containers. The workbench owns their current
+placement and can move ordinary views among the primary side bar, secondary side
+bar, and lower panel. A view referenced by an Activity Bar contribution is pinned
+to its declared primary-sidebar location for the lifetime of that activity.
+JavaFX containers render the resolved layout; they do not define it.
+
+An editor-owned Customize Layout surface controls region visibility, primary
+side-bar position, and placement for movable contributed views. Activity-owned
+views are omitted because their Activity Bar registration is their stable
+navigation location. Views do not grow separate context-menu implementations of
+layout policy. Session movement is the first validation step. Project settings
+can later persist the same toolkit-independent placement data after the
+interaction has been accepted.
+
+### Activities and extensions
+
+The narrow Activity Bar switches between infrequently co-visible primary views
+without baking those views into the JavaFX shell. Each activity contributes an
+identity, title, semantic icon, order, and target view. Selecting the active
+activity again collapses or restores the primary side bar. Activity entries and
+their target views remain pinned until the owning extension is deactivated.
+
+Scene and Extensions are bundled contributions using the same contracts intended
+for future editor extensions. The Extensions view initially reports extensions
+activated in the current window and opens selected metadata in the central editor
+area. Installing local packages, discovering a community registry, dependency
+resolution, trust, signatures, permissions, and updates require a real extension
+distribution design before actionable controls are presented.
 
 ## Interaction states
 
@@ -265,19 +296,3 @@ truth for application icons and raster exports.
 Visual acceptance begins on the verified macOS ARM64 platform. Windows and Linux
 remain subject to the same rendering, scaling, font, focus, and packaging
 qualification required by the editor architecture.
-
-## Deliberate exclusions
-
-This visual direction does not authorize or imply:
-
-- mutable property editing or project saving;
-- a `Game` tab or in-editor application execution;
-- Play, Pause, or Step transport;
-- transform manipulation gizmos;
-- drag-and-drop placement authoring;
-- dockable or detachable panels;
-- tags, layers, static flags, prefabs, or script folders;
-- a second editor-only project document model.
-
-Those capabilities require their own product and architecture decisions before
-appearing as active controls.

@@ -6,6 +6,7 @@
 module io.github.glynch.jscene3d.editor.api {
     requires static org.jspecify;
 
+    exports io.github.glynch.jscene3d.editor.activity;
     exports io.github.glynch.jscene3d.editor.command;
     exports io.github.glynch.jscene3d.editor.diagnostic;
     exports io.github.glynch.jscene3d.editor.extension;

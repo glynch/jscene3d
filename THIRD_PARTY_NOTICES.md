@@ -1,5 +1,18 @@
 # Third-party notices
 
+## Visual Studio Code Codicons
+
+- Asset: Selected 16-pixel product icon vector paths
+- Creator: Microsoft Corporation and contributors
+- Source: [Microsoft/vscode-codicons](https://github.com/microsoft/vscode-codicons)
+- Source revision: `1c47ab36a4bb845c437866405c2fa67b8ca0fe36`
+- License: [CC BY 4.0](https://github.com/microsoft/vscode-codicons/blob/main/LICENSE)
+- Bundled file: `jscene3d-editor/src/main/resources/io/github/glynch/jscene3d/editor/workbench/icon/editor-icons.properties`
+
+JScene3D maps selected Codicon glyphs to its semantic editor icon identities.
+The semantic identities and resource-backed registry remain independent of the
+bundled icon theme so that another product icon theme can replace these glyphs.
+
 ## Morph Stress Test glTF model
 
 - Asset: Morph Stress Test binary glTF model

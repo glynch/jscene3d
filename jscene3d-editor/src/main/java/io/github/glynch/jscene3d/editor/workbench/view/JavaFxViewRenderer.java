@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsView;
+import io.github.glynch.jscene3d.editor.builtin.extensions.ExtensionsView;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
 import io.github.glynch.jscene3d.editor.view.EditorDetailsView;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
@@ -36,6 +37,10 @@ final class JavaFxViewRenderer {
                     Optional.of(adapter.titleActions()),
                     adapter::close,
                     adapter::requestFocus);
+        }
+        if (logicalView instanceof ExtensionsView extensionsView) {
+            JavaFxExtensionsViewAdapter adapter = new JavaFxExtensionsViewAdapter(extensionsView);
+            return standard(logicalView, adapter.node(), adapter::close, adapter::requestFocus);
         }
         if (logicalView instanceof EditorDetailsView detailsView) {
             JavaFxDetailsViewAdapter adapter = new JavaFxDetailsViewAdapter(detailsView, icons);

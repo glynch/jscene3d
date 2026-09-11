@@ -5,8 +5,11 @@
 package io.github.glynch.jscene3d.editor.builtin.hierarchy;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.activity.ActivityId;
+import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
+import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
@@ -36,6 +39,8 @@ public final class HierarchyExtension implements EditorExtension {
     /** Stable identity of the built-in Hierarchy view. */
     public static final ViewId VIEW_ID = new ViewId("io.github.glynch.jscene3d.editor.hierarchy");
 
+    private static final ActivityId ACTIVITY_ID = new ActivityId("io.github.glynch.jscene3d.editor.scene-activity");
+
     private final EditorProjectContext projects;
 
     /**
@@ -53,6 +58,17 @@ public final class HierarchyExtension implements EditorExtension {
     }
 
     @Override
+    public EditorExtensionDescriptor descriptor() {
+        return new EditorExtensionDescriptor(
+                id(),
+                "Scene Hierarchy",
+                "Presents the entities and generated content in the open world.",
+                "JScene3D",
+                Optional.empty(),
+                true);
+    }
+
+    @Override
     public void activate(EditorExtensionContext context) {
         EditorExtensionContext editor = Objects.requireNonNull(context, "context");
         EditorSelections selections = editor.selections();
@@ -61,6 +77,10 @@ public final class HierarchyExtension implements EditorExtension {
                 .add(editor.views()
                         .register(new EditorViewContribution(
                                 new HierarchyTreeView(selections), EditorViewContainers.PRIMARY_SIDEBAR, 10)));
+        editor.subscriptions()
+                .add(editor.activities()
+                        .register(new EditorActivityContribution(
+                                ACTIVITY_ID, "Scene", new EditorIcon(EditorIcons.SCENE, "Scene"), VIEW_ID, 10)));
     }
 
     private static void selectInitialEntry(EditorSelections selections, Optional<EditorHierarchyNode> hierarchy) {

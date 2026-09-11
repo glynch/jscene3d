@@ -50,6 +50,15 @@ public final class EditorIcons {
     /** Informational message. */
     public static final EditorIconId INFORMATION = icon("information");
 
+    /** Scene or hierarchy activity. */
+    public static final EditorIconId SCENE = icon("scene");
+
+    /** Installed and available editor extensions. */
+    public static final EditorIconId EXTENSIONS = icon("extensions");
+
+    /** Workbench layout customization. */
+    public static final EditorIconId LAYOUT = icon("layout");
+
     private EditorIcons() {}
 
     private static EditorIconId icon(String name) {

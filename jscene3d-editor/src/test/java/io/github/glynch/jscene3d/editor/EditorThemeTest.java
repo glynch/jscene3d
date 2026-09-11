@@ -48,6 +48,18 @@ final class EditorThemeTest {
         assertThat(stylesheet.substring(projectListRule)).contains("-fx-fixed-cell-size: 68px;");
     }
 
+    /** Keeps the three-line Extensions rows from inheriting the compact generic list height. */
+    @Test
+    void extensionsListOverridesTheGenericListRowHeight() throws IOException {
+        String stylesheet = stylesheet();
+        int genericListRule = stylesheet.indexOf(".tree-view,\n.list-view {");
+        int extensionsListRule = stylesheet.indexOf(".list-view.editor-extensions-list {");
+
+        assertThat(genericListRule).isGreaterThanOrEqualTo(0);
+        assertThat(extensionsListRule).isGreaterThan(genericListRule);
+        assertThat(stylesheet.substring(extensionsListRule)).contains("-fx-fixed-cell-size: 78px;");
+    }
+
     /** Loads the packaged editor stylesheet as UTF-8 text. */
     private static String stylesheet() throws IOException {
         try (InputStream input =

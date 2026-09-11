@@ -19,6 +19,7 @@ final class EditorApiModuleTest {
         assertThat(descriptor.exports())
                 .extracting(ModuleDescriptor.Exports::source)
                 .containsExactlyInAnyOrder(
+                        "io.github.glynch.jscene3d.editor.activity",
                         "io.github.glynch.jscene3d.editor.command",
                         "io.github.glynch.jscene3d.editor.diagnostic",
                         "io.github.glynch.jscene3d.editor.extension",

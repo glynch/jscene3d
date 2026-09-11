@@ -41,5 +41,10 @@ record EditorAssetItem(String label, String identity, Kind kind, Path source, Ed
         Kind(String label) {
             this.label = label;
         }
+
+        /** Returns the author-facing kind label. */
+        String label() {
+            return label;
+        }
     }
 }

@@ -439,9 +439,171 @@
     -fx-padding: 0;
 }
 
-.editor-project-panel,
+.editor-project-panel {
+    -fx-padding: 0;
+}
+
 .editor-diagnostics-panel {
     -fx-padding: 8px;
+}
+
+.editor-project-browser-split,
+.editor-project-content,
+.editor-project-browser-split > .split-pane-divider {
+    -fx-background-color: -jscene-panel;
+}
+
+.editor-project-navigation {
+    -fx-background-color: -jscene-panel;
+    -fx-border-color: transparent -jscene-divider transparent transparent;
+    -fx-border-width: 0 1px 0 0;
+}
+
+.editor-project-categories-heading {
+    -fx-background-color: -jscene-chrome;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+    -fx-max-width: infinity;
+    -fx-padding: 7px 10px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-project-tree-cell {
+    -fx-padding: 4px 8px;
+}
+
+.editor-project-tree-row {
+    -fx-max-width: infinity;
+}
+
+.editor-project-tree-marker,
+.editor-asset-marker {
+    -fx-alignment: center;
+    -fx-background-color: rgba(117, 98, 243, 0.14);
+    -fx-background-radius: 3px;
+    -fx-border-color: derive(-jscene-accent, -18%);
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+    -fx-min-height: 20px;
+    -fx-min-width: 20px;
+    -fx-text-fill: -jscene-focus;
+}
+
+.editor-project-tree-count {
+    -fx-font-size: 10px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-project-toolbar {
+    -fx-background-color: -jscene-chrome;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-min-height: 38px;
+    -fx-padding: 5px 8px;
+    -fx-pref-height: 38px;
+}
+
+.editor-project-breadcrumb {
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-project-view-buttons {
+    -fx-spacing: 2px;
+}
+
+.editor-project-view-toggle {
+    -fx-font-size: 11px;
+    -fx-max-width: 30px;
+    -fx-min-width: 30px;
+    -fx-padding: 4px;
+    -fx-pref-width: 30px;
+}
+
+.editor-project-search {
+    -fx-font-size: 11px;
+}
+
+.editor-asset-list-cell {
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 7px 9px;
+}
+
+.editor-asset-grid-scroll,
+.editor-asset-grid-scroll > .viewport {
+    -fx-background-color: -jscene-panel;
+    -fx-background-insets: 0;
+}
+
+.editor-asset-grid-scroll {
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.editor-asset-grid {
+    -fx-background-color: -jscene-panel;
+    -fx-padding: 8px;
+}
+
+.editor-asset-card {
+    -fx-alignment: top-left;
+    -fx-background-color: -jscene-panel-raised;
+    -fx-background-radius: 4px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 4px;
+    -fx-border-width: 1px;
+    -fx-max-height: 112px;
+    -fx-max-width: 156px;
+    -fx-min-height: 112px;
+    -fx-min-width: 156px;
+    -fx-padding: 9px;
+    -fx-pref-height: 112px;
+    -fx-pref-width: 156px;
+}
+
+.editor-asset-card:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-asset-card:selected {
+    -fx-background-color: derive(-jscene-selected, -20%);
+    -fx-border-color: -jscene-accent;
+}
+
+.editor-asset-presentation {
+    -fx-max-width: infinity;
+}
+
+.editor-asset-name {
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-asset-kind,
+.editor-asset-source {
+    -fx-font-size: 10px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-asset-read-only {
+    -fx-background-color: rgba(117, 98, 243, 0.12);
+    -fx-background-radius: 2px;
+    -fx-border-color: derive(-jscene-accent, -24%);
+    -fx-border-radius: 2px;
+    -fx-border-width: 1px;
+    -fx-font-size: 8px;
+    -fx-font-weight: 600;
+    -fx-padding: 2px 3px;
+    -fx-text-fill: -jscene-focus;
+}
+
+.editor-project-empty {
+    -fx-padding: 18px;
 }
 
 .tree-view,
@@ -452,6 +614,22 @@
     -fx-border-width: 1px;
     -fx-fixed-cell-size: 28px;
     -fx-padding: 0;
+}
+
+.tree-view.editor-project-tree {
+    -fx-border-color: transparent;
+    -fx-fixed-cell-size: 32px;
+}
+
+.list-view.editor-asset-list {
+    -fx-border-color: transparent;
+    -fx-fixed-cell-size: 68px;
+}
+
+.editor-project-tree .scroll-bar:horizontal {
+    -fx-max-height: 0;
+    -fx-opacity: 0;
+    -fx-pref-height: 0;
 }
 
 .tree-view:focused,

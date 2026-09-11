@@ -17,11 +17,7 @@ final class EditorThemeTest {
     /** Keeps the accepted semantic colour roles in the packaged stylesheet. */
     @Test
     void declaresSemanticColourRoles() throws IOException {
-        String stylesheet;
-        try (InputStream input =
-                Objects.requireNonNull(EditorTheme.class.getResourceAsStream("editor.css"), "editor.css")) {
-            stylesheet = new String(input.readAllBytes(), UTF_8);
-        }
+        String stylesheet = stylesheet();
 
         assertThat(stylesheet)
                 .contains(
@@ -38,5 +34,25 @@ final class EditorThemeTest {
                         "-jscene-success:",
                         "-jscene-warning:",
                         "-jscene-error:");
+    }
+
+    /** Keeps the richer Project-list rows from inheriting the compact generic list height. */
+    @Test
+    void projectAssetListOverridesTheGenericListRowHeight() throws IOException {
+        String stylesheet = stylesheet();
+        int genericListRule = stylesheet.indexOf(".tree-view,\n.list-view {");
+        int projectListRule = stylesheet.indexOf(".list-view.editor-asset-list {");
+
+        assertThat(genericListRule).isGreaterThanOrEqualTo(0);
+        assertThat(projectListRule).isGreaterThan(genericListRule);
+        assertThat(stylesheet.substring(projectListRule)).contains("-fx-fixed-cell-size: 68px;");
+    }
+
+    /** Loads the packaged editor stylesheet as UTF-8 text. */
+    private static String stylesheet() throws IOException {
+        try (InputStream input =
+                Objects.requireNonNull(EditorTheme.class.getResourceAsStream("editor.css"), "editor.css")) {
+            return new String(input.readAllBytes(), UTF_8);
+        }
     }
 }

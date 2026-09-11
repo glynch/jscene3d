@@ -6,18 +6,20 @@ package io.github.glynch.jscene3d.editor.workbench.status;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.EditorCommands;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIconId;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.Objects;
-import java.util.Optional;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.Labeled;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
@@ -28,18 +30,24 @@ import javafx.scene.layout.StackPane;
 /** Owns the editor's built-in and extension-contributed status presentation. */
 public final class EditorStatusBarPane implements AutoCloseable {
     private final EditorExtensionHost extensions;
+    private final JavaFxIconRenderer icons;
     private final JavaFxStatusBarAdapter extensionItems;
     private final Label projectStatus = createStatus("No project opened");
     private final Button projectStatusAction = createStatusAction("No project opened");
     private final Label viewportStatus = createStatus("Preview: starting");
-    private final Button diagnosticStatus = createStatusAction("✕ 0   △ 0");
+    private final Button diagnosticStatus = createStatusAction("");
+    private final Label diagnosticErrors = new Label("0");
+    private final Label diagnosticWarnings = new Label("0");
     private final StackPane projectStatusPresentation = new StackPane(projectStatus, projectStatusAction);
     private final HBox node;
 
     /** Creates a status bar backed by the editor's command and status-item registries. */
     public EditorStatusBarPane(EditorExtensionHost extensions, JavaFxIconRenderer icons) {
         this.extensions = Objects.requireNonNull(extensions, "extensions");
-        extensionItems = new JavaFxStatusBarAdapter(extensions, Objects.requireNonNull(icons, "icons"));
+        this.icons = Objects.requireNonNull(icons, "icons");
+        extensionItems = new JavaFxStatusBarAdapter(extensions, icons);
+        diagnosticStatus.setGraphic(createDiagnosticCounts());
+        diagnosticStatus.setTooltip(new Tooltip("Open Diagnostics"));
         diagnosticStatus.setOnAction(ignored -> extensions.execute(EditorCommands.OPEN_DIAGNOSTICS));
         showProjectText();
         node = createNode();
@@ -53,7 +61,7 @@ public final class EditorStatusBarPane implements AutoCloseable {
     /** Shows neutral project status without an associated action. */
     public void showProjectStatus(String text) {
         projectStatus.setText(Objects.requireNonNull(text, "text"));
-        applySeverity(projectStatus, Optional.empty());
+        projectStatus.setGraphic(null);
         showProjectText();
     }
 
@@ -67,14 +75,8 @@ public final class EditorStatusBarPane implements AutoCloseable {
         if (errors < 0L || warnings < 0L) {
             throw new IllegalArgumentException("diagnostic counts must not be negative");
         }
-        Optional<EditorMessageSeverity> severity = Optional.empty();
-        if (errors > 0L) {
-            severity = Optional.of(EditorMessageSeverity.ERROR);
-        } else if (warnings > 0L) {
-            severity = Optional.of(EditorMessageSeverity.WARNING);
-        }
-        applySeverity(diagnosticStatus, severity);
-        diagnosticStatus.setText("✕ " + errors + "   △ " + warnings);
+        diagnosticErrors.setText(Long.toString(errors));
+        diagnosticWarnings.setText(Long.toString(warnings));
         diagnosticStatus.setAccessibleText(errors + " errors and " + warnings + " warnings; open Diagnostics");
     }
 
@@ -83,7 +85,7 @@ public final class EditorStatusBarPane implements AutoCloseable {
         EditorMessage shown = Objects.requireNonNull(message, "message");
         if (shown.command().isEmpty()) {
             projectStatus.setText(shown.text());
-            applySeverity(projectStatus, Optional.of(shown.severity()));
+            projectStatus.setGraphic(createSeverityIcon(shown.severity()));
             showProjectText();
             return;
         }
@@ -92,7 +94,7 @@ public final class EditorStatusBarPane implements AutoCloseable {
         projectStatusAction.setTooltip(new Tooltip(shown.text()));
         projectStatusAction.setAccessibleText(shown.text());
         projectStatusAction.setOnAction(ignored -> extensions.execute(command));
-        applySeverity(projectStatusAction, Optional.of(shown.severity()));
+        projectStatusAction.setGraphic(createSeverityIcon(shown.severity()));
         showProjectAction();
     }
 
@@ -134,14 +136,27 @@ public final class EditorStatusBarPane implements AutoCloseable {
         projectStatusAction.setVisible(true);
     }
 
-    private static void applySeverity(Labeled status, Optional<EditorMessageSeverity> severity) {
-        status.getStyleClass().removeAll(EditorStyleClasses.EDITOR_ERROR, EditorStyleClasses.EDITOR_WARNING);
-        if (severity.filter(value -> value == EditorMessageSeverity.ERROR).isPresent()) {
-            status.getStyleClass().add(EditorStyleClasses.EDITOR_ERROR);
-        } else if (severity.filter(value -> value == EditorMessageSeverity.WARNING)
-                .isPresent()) {
-            status.getStyleClass().add(EditorStyleClasses.EDITOR_WARNING);
-        }
+    private HBox createDiagnosticCounts() {
+        HBox counts = new HBox(
+                3.0,
+                icon(EditorIcons.ERROR, "Errors"),
+                diagnosticErrors,
+                icon(EditorIcons.WARNING, "Warnings"),
+                diagnosticWarnings);
+        counts.getStyleClass().add(EditorStyleClasses.EDITOR_STATUS_DIAGNOSTIC_COUNTS);
+        return counts;
+    }
+
+    private Node createSeverityIcon(EditorMessageSeverity severity) {
+        return switch (severity) {
+            case ERROR -> icon(EditorIcons.ERROR, "Error");
+            case WARNING -> icon(EditorIcons.WARNING, "Warning");
+            case INFORMATION -> icon(EditorIcons.INFORMATION, "Information");
+        };
+    }
+
+    private Node icon(EditorIconId id, String tooltip) {
+        return icons.create(new EditorIcon(id, tooltip));
     }
 
     private static Label createStatus(String initialText) {

@@ -7,10 +7,8 @@ package io.github.glynch.jscene3d.editor.workbench.style;
 /** Central vocabulary for CSS classes assigned by the JavaFX editor workbench. */
 public final class EditorStyleClasses {
     public static final String DIAGNOSTIC_DETAIL = "diagnostic-detail";
-    public static final String DIAGNOSTIC_ERROR = "diagnostic-error";
     public static final String DIAGNOSTIC_GROUP = "diagnostic-group";
     public static final String DIAGNOSTIC_ITEM = "diagnostic-item";
-    public static final String DIAGNOSTIC_WARNING = "diagnostic-warning";
     public static final String EDITOR_ASSET_CARD = "editor-asset-card";
     public static final String EDITOR_ASSET_GRID = "editor-asset-grid";
     public static final String EDITOR_ASSET_GRID_SCROLL = "editor-asset-grid-scroll";
@@ -57,7 +55,6 @@ public final class EditorStyleClasses {
     public static final String EDITOR_DIAGNOSTIC_GROUP_COUNTS = "editor-diagnostic-group-counts";
     public static final String EDITOR_DIAGNOSTIC_LOCATION = "editor-diagnostic-location";
     public static final String EDITOR_DIAGNOSTIC_MESSAGE = "editor-diagnostic-message";
-    public static final String EDITOR_DIAGNOSTIC_SEVERITY = "editor-diagnostic-severity";
     public static final String EDITOR_DIAGNOSTIC_SEVERITY_FILTER = "editor-diagnostic-severity-filter";
     public static final String EDITOR_DIAGNOSTIC_SOURCE_NAME = "editor-diagnostic-source-name";
     public static final String EDITOR_DIAGNOSTIC_TOOLS = "editor-diagnostic-tools";
@@ -71,13 +68,15 @@ public final class EditorStyleClasses {
     public static final String EDITOR_DRAWER_TAB_LABEL = "editor-drawer-tab-label";
     public static final String EDITOR_EMPTY_DETAIL = "editor-empty-detail";
     public static final String EDITOR_EMPTY_TITLE = "editor-empty-title";
-    public static final String EDITOR_ERROR = "editor-error";
     public static final String EDITOR_HIERARCHY_PANEL = "editor-hierarchy-panel";
     public static final String EDITOR_ICON = "editor-icon";
     public static final String EDITOR_ICON_DISABLED = "editor-icon-disabled";
+    public static final String EDITOR_ICON_ERROR = "editor-icon-error";
+    public static final String EDITOR_ICON_INFORMATION = "editor-icon-information";
     public static final String EDITOR_ICON_PRIMARY = "editor-icon-primary";
     public static final String EDITOR_ICON_READ_ONLY = "editor-icon-read-only";
     public static final String EDITOR_ICON_SHAPE = "editor-icon-shape";
+    public static final String EDITOR_ICON_WARNING = "editor-icon-warning";
     public static final String EDITOR_INERT_BADGE = "editor-inert-badge";
     public static final String EDITOR_INSPECTOR_DEFAULT_VALUE = "editor-inspector-default-value";
     public static final String EDITOR_INSPECTOR_DESCRIPTION = "editor-inspector-description";
@@ -150,6 +149,7 @@ public final class EditorStyleClasses {
     public static final String EDITOR_STATUS = "editor-status";
     public static final String EDITOR_STATUS_ACTION = "editor-status-action";
     public static final String EDITOR_STATUS_BAR = "editor-status-bar";
+    public static final String EDITOR_STATUS_DIAGNOSTIC_COUNTS = "editor-status-diagnostic-counts";
     public static final String EDITOR_STATUS_ITEM = "editor-status-item";
     public static final String EDITOR_STATUS_ITEMS = "editor-status-items";
     public static final String EDITOR_TOP = "editor-top";
@@ -163,7 +163,6 @@ public final class EditorStyleClasses {
     public static final String EDITOR_VIEWPORT_COMMAND_SPACE = "editor-viewport-command-space";
     public static final String EDITOR_VIEWPORT_HEADER = "editor-viewport-header";
     public static final String EDITOR_VIEWPORT_PANEL = "editor-viewport-panel";
-    public static final String EDITOR_WARNING = "editor-warning";
     public static final String EDITOR_WORKSPACE_SPLIT = "editor-workspace-split";
 
     private EditorStyleClasses() {}

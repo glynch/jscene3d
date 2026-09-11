@@ -41,6 +41,15 @@ public final class EditorIcons {
     /** List presentation. */
     public static final EditorIconId LIST = icon("list");
 
+    /** Error diagnostic or message. */
+    public static final EditorIconId ERROR = icon("error");
+
+    /** Warning diagnostic or message. */
+    public static final EditorIconId WARNING = icon("warning");
+
+    /** Informational message. */
+    public static final EditorIconId INFORMATION = icon("information");
+
     private EditorIcons() {}
 
     private static EditorIconId icon(String name) {

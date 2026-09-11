@@ -77,7 +77,7 @@ public final class EditorWorkspace extends BorderPane {
         VBox previewPanel = createViewportPane(viewportCanvas);
         upperWorkspaceSplit = createUpperWorkspaceSplit(hierarchyPanel, previewPanel);
         bottomViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.BOTTOM_PANEL, false, icons);
-        bottomDrawer = new EditorBottomDrawer(bottomViewContainer.node(), this::selectDiagnostic);
+        bottomDrawer = new EditorBottomDrawer(bottomViewContainer.node(), icons, this::selectDiagnostic);
         leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit, bottomDrawer);
         workspaceSplit = new SplitPane(leftWorkspaceSplit, inspectorPanel);
         workspaceSplit.setOrientation(Orientation.HORIZONTAL);

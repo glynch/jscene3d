@@ -88,18 +88,12 @@ final class EditorDiagnosticsModel {
     /** Projects one diagnostic without losing the source value used for navigation. */
     private static Item project(ProjectDiagnostic diagnostic) {
         String summary = diagnostic.details().getOrDefault(TECHNICAL_DETAIL, diagnostic.message());
-        List<Detail> details = new ArrayList<>();
-        if (!summary.equals(diagnostic.message())) {
-            details.add(new Detail("Meaning", diagnostic.message()));
-        }
-        details.add(new Detail("Source", diagnostic.source().toString()));
-        details.add(new Detail("Location", diagnostic.location().isEmpty() ? "Whole source" : diagnostic.location()));
-        diagnostic.details().entrySet().stream()
+        List<Detail> details = diagnostic.details().entrySet().stream()
                 .filter(entry -> !entry.getKey().equals(TECHNICAL_DETAIL))
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> new Detail(entry.getKey(), entry.getValue()))
-                .forEach(details::add);
-        return new Item(diagnostic, summary, List.copyOf(details));
+                .toList();
+        return new Item(diagnostic, summary, details);
     }
 
     /** Creates one source group while retaining diagnostic arrival order. */
@@ -155,6 +149,12 @@ final class EditorDiagnosticsModel {
         /** Copies one diagnostic's detail rows. */
         Item {
             details = List.copyOf(details);
+        }
+
+        /** Returns one self-contained line suitable for copying outside the editor. */
+        String copyText() {
+            String location = diagnostic.location().isEmpty() ? "" : " " + diagnostic.location();
+            return summary + " [" + diagnostic.code().code() + "] " + diagnostic.source() + location;
         }
     }
 

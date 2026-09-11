@@ -49,6 +49,9 @@ public final class JavaFxIconRenderer {
             case PRIMARY -> EditorStyleClasses.EDITOR_ICON_PRIMARY;
             case READ_ONLY -> EditorStyleClasses.EDITOR_ICON_READ_ONLY;
             case DISABLED -> EditorStyleClasses.EDITOR_ICON_DISABLED;
+            case ERROR -> EditorStyleClasses.EDITOR_ICON_ERROR;
+            case WARNING -> EditorStyleClasses.EDITOR_ICON_WARNING;
+            case INFORMATION -> EditorStyleClasses.EDITOR_ICON_INFORMATION;
         };
     }
 }

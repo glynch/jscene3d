@@ -77,12 +77,17 @@ final class EditorDiagnosticsModelTest {
         assertThat(view.groups()).singleElement().returns(IMPORT, EditorDiagnosticsModel.Group::source);
     }
 
-    /** Keeps the fallback meaning and exact source available below the concise occurrence detail. */
+    /** Keeps only genuinely additional producer details below the concise occurrence. */
     @Test
-    void projectsExpandableDetails() {
+    void projectsOnlyAdditionalDetails() {
         EditorDiagnosticsModel model = new EditorDiagnosticsModel();
-        model.showDiagnostics(
-                List.of(diagnostic(ProjectDiagnostic.Severity.ERROR, WORLD, "/entities/0", "missing entity")));
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR,
+                TestCode.TEST,
+                WORLD,
+                "/entities/0",
+                Map.of("technicalDetail", "missing entity", "expectedType", "entity"));
+        model.showDiagnostics(List.of(diagnostic));
 
         EditorDiagnosticsModel.Item item =
                 model.view().groups().getFirst().items().getFirst();
@@ -90,10 +95,22 @@ final class EditorDiagnosticsModelTest {
         assertThat(item.summary()).isEqualTo("missing entity");
         assertThat(item.details())
                 .extracting(EditorDiagnosticsModel.Detail::label, EditorDiagnosticsModel.Detail::value)
-                .containsExactly(
-                        Tuple.tuple("Meaning", "Test diagnostic"),
-                        Tuple.tuple("Source", WORLD.toString()),
-                        Tuple.tuple("Location", "/entities/0"));
+                .containsExactly(Tuple.tuple("expectedType", "entity"));
+        assertThat(item.copyText())
+                .isEqualTo("missing entity [test.code] file:///project/worlds/map01.world.json /entities/0");
+    }
+
+    /** Omits empty locations and redundant fallback/source details from the compact row. */
+    @Test
+    void projectsWholeSourceDiagnosticWithoutRedundantDetails() {
+        EditorDiagnosticsModel model = new EditorDiagnosticsModel();
+        model.showDiagnostics(List.of(diagnostic(ProjectDiagnostic.Severity.ERROR, WORLD, "", "missing entity")));
+
+        EditorDiagnosticsModel.Item item =
+                model.view().groups().getFirst().items().getFirst();
+
+        assertThat(item.details()).isEmpty();
+        assertThat(item.copyText()).isEqualTo("missing entity [test.code] file:///project/worlds/map01.world.json");
     }
 
     /** Creates one representative structured project diagnostic. */

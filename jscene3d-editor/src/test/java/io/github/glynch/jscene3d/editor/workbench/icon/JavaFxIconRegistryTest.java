@@ -20,6 +20,9 @@ class JavaFxIconRegistryTest {
         assertThat(icons.resolve(EditorIcons.PROJECT).tone()).isEqualTo(JavaFxIconGlyph.Tone.PRIMARY);
         assertThat(icons.resolve(EditorIcons.READ_ONLY).tone()).isEqualTo(JavaFxIconGlyph.Tone.READ_ONLY);
         assertThat(icons.resolve(EditorIcons.DISABLED).tone()).isEqualTo(JavaFxIconGlyph.Tone.DISABLED);
+        assertThat(icons.resolve(EditorIcons.ERROR).tone()).isEqualTo(JavaFxIconGlyph.Tone.ERROR);
+        assertThat(icons.resolve(EditorIcons.WARNING).tone()).isEqualTo(JavaFxIconGlyph.Tone.WARNING);
+        assertThat(icons.resolve(EditorIcons.INFORMATION).tone()).isEqualTo(JavaFxIconGlyph.Tone.INFORMATION);
     }
 
     @Test

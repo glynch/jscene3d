@@ -14,6 +14,7 @@
     -jscene-text: #c9ced8;
     -jscene-text-muted: #8e97a8;
     -jscene-success: #62c9a5;
+    -jscene-information: #69aef8;
     -jscene-warning: #e2b45e;
     -jscene-error: #ff7182;
 
@@ -479,14 +480,6 @@
     -fx-border-color: -jscene-divider;
 }
 
-.editor-diagnostic-severity-filter.diagnostic-error {
-    -fx-text-fill: -jscene-error;
-}
-
-.editor-diagnostic-severity-filter.diagnostic-warning {
-    -fx-text-fill: -jscene-warning;
-}
-
 .editor-diagnostic-filter {
     -fx-font-size: 11px;
     -fx-min-height: 26px;
@@ -556,6 +549,18 @@
 
 .editor-icon-disabled .editor-icon-shape {
     -fx-stroke: -jscene-text-muted;
+}
+
+.editor-icon-error .editor-icon-shape {
+    -fx-stroke: -jscene-error;
+}
+
+.editor-icon-warning .editor-icon-shape {
+    -fx-stroke: -jscene-warning;
+}
+
+.editor-icon-information .editor-icon-shape {
+    -fx-stroke: -jscene-information;
 }
 
 .tree-cell:filled:selected .editor-icon-shape,
@@ -811,6 +816,15 @@
     -fx-graphic-text-gap: 4px;
 }
 
+.editor-status,
+.editor-status-action {
+    -fx-graphic-text-gap: 5px;
+}
+
+.editor-status-diagnostic-counts {
+    -fx-alignment: center-left;
+}
+
 .editor-status-action {
     -fx-background-insets: 0;
     -fx-background-radius: 3px;
@@ -876,21 +890,6 @@
     -fx-font-family: "Monospaced";
 }
 
-.editor-diagnostic-severity {
-    -fx-alignment: center;
-    -fx-font-size: 12px;
-    -fx-font-weight: 700;
-    -fx-min-width: 16px;
-}
-
-.editor-diagnostic-severity.diagnostic-error {
-    -fx-text-fill: -jscene-error;
-}
-
-.editor-diagnostic-severity.diagnostic-warning {
-    -fx-text-fill: -jscene-warning;
-}
-
 .editor-diagnostic-tree-cell.diagnostic-detail {
     -fx-background-color: -jscene-chrome;
     -fx-padding: 4px 10px;
@@ -919,14 +918,6 @@
 
 .editor-success {
     -fx-text-fill: -jscene-success;
-}
-
-.editor-warning {
-    -fx-text-fill: -jscene-warning;
-}
-
-.editor-error {
-    -fx-text-fill: -jscene-error;
 }
 
 .tooltip {

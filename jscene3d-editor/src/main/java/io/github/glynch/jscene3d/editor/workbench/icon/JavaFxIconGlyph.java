@@ -18,6 +18,9 @@ record JavaFxIconGlyph(String path, Tone tone) {
     enum Tone {
         PRIMARY,
         READ_ONLY,
-        DISABLED
+        DISABLED,
+        ERROR,
+        WARNING,
+        INFORMATION
     }
 }

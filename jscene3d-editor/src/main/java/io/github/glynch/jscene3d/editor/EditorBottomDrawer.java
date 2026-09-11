@@ -4,6 +4,9 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.util.List;
@@ -13,13 +16,17 @@ import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -32,6 +39,7 @@ final class EditorBottomDrawer extends VBox {
     private static final double HEADER_HEIGHT = 34.0;
 
     private final EditorDiagnosticsModel diagnosticsModel = new EditorDiagnosticsModel();
+    private final JavaFxIconRenderer icons;
     private final Consumer<ProjectDiagnostic> diagnosticSelection;
     private final Node projectContent;
     private final VBox diagnosticsContent;
@@ -54,8 +62,9 @@ final class EditorBottomDrawer extends VBox {
     private double expandedHeight = EditorWorkspaceLayout.PREFERRED_BOTTOM_HEIGHT;
 
     /** Creates a drawer around the existing Project browser and diagnostic navigation callback. */
-    EditorBottomDrawer(Node projectContent, Consumer<ProjectDiagnostic> diagnosticSelection) {
+    EditorBottomDrawer(Node projectContent, JavaFxIconRenderer icons, Consumer<ProjectDiagnostic> diagnosticSelection) {
         this.projectContent = Objects.requireNonNull(projectContent, "projectContent");
+        this.icons = Objects.requireNonNull(icons, "icons");
         this.diagnosticSelection = Objects.requireNonNull(diagnosticSelection, "diagnosticSelection");
         diagnosticsContent = createDiagnosticsContent();
         diagnosticTools = createDiagnosticTools();
@@ -131,14 +140,14 @@ final class EditorBottomDrawer extends VBox {
     private HBox createDiagnosticTools() {
         errors.setSelected(true);
         warnings.setSelected(true);
+        errors.setGraphic(icons.create(new EditorIcon(EditorIcons.ERROR, "Errors")));
+        warnings.setGraphic(icons.create(new EditorIcon(EditorIcons.WARNING, "Warnings")));
         errors.setTooltip(new Tooltip("Show errors"));
         warnings.setTooltip(new Tooltip("Show warnings"));
         errors.setAccessibleText("Show errors");
         warnings.setAccessibleText("Show warnings");
-        errors.getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY_FILTER, EditorStyleClasses.DIAGNOSTIC_ERROR);
-        warnings.getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY_FILTER, EditorStyleClasses.DIAGNOSTIC_WARNING);
+        errors.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY_FILTER);
+        warnings.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY_FILTER);
         errors.setOnAction(ignored -> {
             diagnosticsModel.showSeverity(ProjectDiagnostic.Severity.ERROR, errors.isSelected());
             refreshDiagnostics();
@@ -166,7 +175,7 @@ final class EditorBottomDrawer extends VBox {
                 .getStyleClass()
                 .addAll(EditorStyleClasses.EDITOR_EMPTY_DETAIL, EditorStyleClasses.EDITOR_DIAGNOSTIC_EMPTY);
         diagnosticTree.setShowRoot(false);
-        diagnosticTree.setCellFactory(ignored -> new DiagnosticTreeCell());
+        diagnosticTree.setCellFactory(ignored -> new DiagnosticTreeCell(icons));
         diagnosticTree.getSelectionModel().selectedItemProperty().addListener((ignored, previous, current) -> {
             if (current != null && current.getValue() instanceof DiagnosticItemNode(EditorDiagnosticsModel.Item item)) {
                 diagnosticSelection.accept(item.diagnostic());
@@ -255,8 +264,10 @@ final class EditorBottomDrawer extends VBox {
         diagnosticsBadge.setManaged(view.total() > 0L);
         diagnosticsBadge.setVisible(view.total() > 0L);
         diagnosticsTab.setAccessibleText("Diagnostics, " + view.total() + " issues");
-        errors.setText("✕ " + view.errors());
-        warnings.setText("△ " + view.warnings());
+        errors.setText(Long.toString(view.errors()));
+        warnings.setText(Long.toString(view.warnings()));
+        errors.setAccessibleText("Show " + view.errors() + " errors");
+        warnings.setAccessibleText("Show " + view.warnings() + " warnings");
         diagnosticEmpty.setText(
                 view.total() == 0L ? "No project diagnostics" : "No diagnostics match the current filter.");
         boolean empty = view.visible() == 0L;
@@ -290,8 +301,11 @@ final class EditorBottomDrawer extends VBox {
 
     /** Renders source groups, concise diagnostics, and nested details in one tree. */
     private static final class DiagnosticTreeCell extends TreeCell<DiagnosticNode> {
+        private final JavaFxIconRenderer icons;
+
         /** Creates a cell styled by node kind. */
-        private DiagnosticTreeCell() {
+        private DiagnosticTreeCell(JavaFxIconRenderer icons) {
+            this.icons = Objects.requireNonNull(icons, "icons");
             getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_TREE_CELL);
         }
 
@@ -304,6 +318,7 @@ final class EditorBottomDrawer extends VBox {
                             EditorStyleClasses.DIAGNOSTIC_ITEM,
                             EditorStyleClasses.DIAGNOSTIC_DETAIL);
             setText(null);
+            setContextMenu(null);
             if (empty || node == null) {
                 setGraphic(null);
                 return;
@@ -314,6 +329,7 @@ final class EditorBottomDrawer extends VBox {
             } else if (node instanceof DiagnosticItemNode(EditorDiagnosticsModel.Item item)) {
                 getStyleClass().add(EditorStyleClasses.DIAGNOSTIC_ITEM);
                 setGraphic(createItemGraphic(item));
+                setContextMenu(createContextMenu(item));
             } else if (node instanceof DiagnosticDetailNode(EditorDiagnosticsModel.Detail detail)) {
                 getStyleClass().add(EditorStyleClasses.DIAGNOSTIC_DETAIL);
                 setGraphic(createDetailGraphic(detail));
@@ -321,13 +337,14 @@ final class EditorBottomDrawer extends VBox {
         }
 
         /** Creates one compact source heading with severity totals. */
-        private static HBox createGroupGraphic(EditorDiagnosticsModel.Group group) {
+        private HBox createGroupGraphic(EditorDiagnosticsModel.Group group) {
             Label source = new Label(group.label());
             source.setTooltip(new Tooltip(group.source().toString()));
             source.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_SOURCE_NAME);
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
-            Label counts = new Label("✕ " + group.errors() + "   △ " + group.warnings());
+            Label counts = new Label(Long.toString(group.errors() + group.warnings()));
+            counts.setTooltip(new Tooltip(group.errors() + " errors, " + group.warnings() + " warnings"));
             counts.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_GROUP_COUNTS);
             HBox row = new HBox(8.0, source, spacer, counts);
             row.setAlignment(Pos.CENTER_LEFT);
@@ -336,12 +353,10 @@ final class EditorBottomDrawer extends VBox {
         }
 
         /** Creates one concise diagnostic row with code and JSON Pointer location. */
-        private static HBox createItemGraphic(EditorDiagnosticsModel.Item item) {
+        private HBox createItemGraphic(EditorDiagnosticsModel.Item item) {
             boolean error = item.diagnostic().severity() == ProjectDiagnostic.Severity.ERROR;
-            Label severity = new Label(error ? "✕" : "△");
-            String severityStyleClass =
-                    error ? EditorStyleClasses.DIAGNOSTIC_ERROR : EditorStyleClasses.DIAGNOSTIC_WARNING;
-            severity.getStyleClass().addAll(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY, severityStyleClass);
+            Node severity = icons.create(
+                    new EditorIcon(error ? EditorIcons.ERROR : EditorIcons.WARNING, error ? "Error" : "Warning"));
             Label message = new Label(item.summary());
             message.setMinWidth(0.0);
             message.setMaxWidth(Double.MAX_VALUE);
@@ -354,11 +369,28 @@ final class EditorBottomDrawer extends VBox {
             Label location = new Label(item.diagnostic().location());
             location.setManaged(!item.diagnostic().location().isEmpty());
             location.setVisible(!item.diagnostic().location().isEmpty());
+            location.setTooltip(
+                    new Tooltip("JSON location: " + item.diagnostic().location()));
             location.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_LOCATION);
             HBox row = new HBox(8.0, severity, message, code, location);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
             return row;
+        }
+
+        /** Creates standard copy actions for one diagnostic without implying it is navigable. */
+        private static ContextMenu createContextMenu(EditorDiagnosticsModel.Item item) {
+            MenuItem copy = new MenuItem("Copy");
+            copy.setOnAction(ignored -> copyToClipboard(item.copyText()));
+            MenuItem copyMessage = new MenuItem("Copy Message");
+            copyMessage.setOnAction(ignored -> copyToClipboard(item.summary()));
+            return new ContextMenu(copy, copyMessage);
+        }
+
+        private static void copyToClipboard(String text) {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(text);
+            Clipboard.getSystemClipboard().setContent(content);
         }
 
         /** Creates one indented labelled detail row. */

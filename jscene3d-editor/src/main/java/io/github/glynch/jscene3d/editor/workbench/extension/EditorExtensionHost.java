@@ -61,6 +61,7 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final List<Consumer<List<EditorStatusItemSnapshot>>> statusObservers = new ArrayList<>();
     private final Map<DiagnosticCollectionId, DiagnosticCollectionRegistration> diagnosticCollections =
             new LinkedHashMap<>();
+    private final List<Consumer<List<EditorDiagnosticSnapshot>>> diagnosticObservers = new ArrayList<>();
     private final EditorWindow window = new WindowFacade();
     private Consumer<EditorMessage> messageSink = DEFAULT_MESSAGE_SINK;
     private boolean closed;
@@ -151,6 +152,22 @@ public final class EditorExtensionHost implements AutoCloseable {
     }
 
     /**
+     * Observes the complete ordered diagnostic snapshot published by every extension.
+     *
+     * <p>The listener immediately receives the current snapshot and is notified after every collection change.
+     *
+     * @param observer synchronous diagnostic observer
+     * @return removable listener registration
+     */
+    public EditorRegistration observeDiagnostics(Consumer<List<EditorDiagnosticSnapshot>> observer) {
+        requireOpen();
+        Consumer<List<EditorDiagnosticSnapshot>> listener = Objects.requireNonNull(observer, "observer");
+        diagnosticObservers.add(listener);
+        listener.accept(diagnosticSnapshot());
+        return once(() -> diagnosticObservers.remove(listener));
+    }
+
+    /**
      * Routes extension window messages to the workbench presentation.
      *
      * @param sink workbench-owned message sink
@@ -185,9 +202,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         diagnosticCollections.clear();
         notifyViewObservers();
         notifyStatusObservers();
+        notifyDiagnosticObservers();
         viewObservers.clear();
         viewRequestObservers.clear();
         statusObservers.clear();
+        diagnosticObservers.clear();
     }
 
     private EditorRegistration registerView(EditorViewContribution contribution) {
@@ -270,6 +289,20 @@ public final class EditorExtensionHost implements AutoCloseable {
     private void notifyStatusObservers() {
         List<EditorStatusItemSnapshot> snapshot = statusSnapshot();
         List.copyOf(statusObservers).forEach(observer -> observer.accept(snapshot));
+    }
+
+    private List<EditorDiagnosticSnapshot> diagnosticSnapshot() {
+        return diagnosticCollections.values().stream()
+                .flatMap(collection -> collection.diagnostics.entrySet().stream()
+                        .flatMap(entry -> entry.getValue().stream()
+                                .map(diagnostic ->
+                                        new EditorDiagnosticSnapshot(collection.id(), entry.getKey(), diagnostic))))
+                .toList();
+    }
+
+    private void notifyDiagnosticObservers() {
+        List<EditorDiagnosticSnapshot> snapshot = diagnosticSnapshot();
+        List.copyOf(diagnosticObservers).forEach(observer -> observer.accept(snapshot));
     }
 
     private void requireOpen() {
@@ -437,19 +470,40 @@ public final class EditorExtensionHost implements AutoCloseable {
         @Override
         public void replace(URI source, List<EditorDiagnostic> replacement) {
             requireCollectionOpen();
-            diagnostics.put(Objects.requireNonNull(source, "source"), List.copyOf(replacement));
+            diagnostics.put(
+                    Objects.requireNonNull(source, "source"),
+                    List.copyOf(Objects.requireNonNull(replacement, "replacement")));
+            notifyDiagnosticObservers();
+        }
+
+        @Override
+        public void replaceAll(Map<URI, List<EditorDiagnostic>> replacement) {
+            requireCollectionOpen();
+            Map<URI, List<EditorDiagnostic>> copied = new LinkedHashMap<>();
+            Objects.requireNonNull(replacement, "replacement")
+                    .forEach((source, items) -> copied.put(
+                            Objects.requireNonNull(source, "source"),
+                            List.copyOf(Objects.requireNonNull(items, "diagnostics"))));
+            diagnostics.clear();
+            diagnostics.putAll(copied);
+            notifyDiagnosticObservers();
         }
 
         @Override
         public void clear(URI source) {
             requireCollectionOpen();
-            diagnostics.remove(Objects.requireNonNull(source, "source"));
+            if (diagnostics.remove(Objects.requireNonNull(source, "source")) != null) {
+                notifyDiagnosticObservers();
+            }
         }
 
         @Override
         public void clear() {
             requireCollectionOpen();
-            diagnostics.clear();
+            if (!diagnostics.isEmpty()) {
+                diagnostics.clear();
+                notifyDiagnosticObservers();
+            }
         }
 
         @Override
@@ -457,7 +511,9 @@ public final class EditorExtensionHost implements AutoCloseable {
             if (!collectionClosed) {
                 collectionClosed = true;
                 diagnostics.clear();
-                diagnosticCollections.remove(id, this);
+                if (diagnosticCollections.remove(id, this)) {
+                    notifyDiagnosticObservers();
+                }
             }
         }
 

@@ -19,8 +19,6 @@ import io.github.glynch.jscene3d.editor.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.EditorSplashScreen;
 import io.github.glynch.jscene3d.editor.EditorWorkspace;
 import io.github.glynch.jscene3d.editor.ViewportController;
-import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
-import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
@@ -42,7 +40,7 @@ public final class EditorProjectOpener implements AutoCloseable {
     private final Telemetry telemetry;
     private final EditorProjectLoader loader;
     private final ExecutorService executor;
-    private final EditorProjectContext projectContext;
+    private final EditorProjectPublication publication;
     private final EditorWorkspace workspace;
     private final ViewportController viewport;
     private final EditorSplashScreen splash;
@@ -53,7 +51,7 @@ public final class EditorProjectOpener implements AutoCloseable {
      *
      * @param telemetry project-opening telemetry sink
      * @param loader background project loader
-     * @param projectContext current-project context published to editor extensions
+     * @param publication extension-facing project and diagnostic publication
      * @param workspace visible editor workbench
      * @param viewport editor preview controller
      * @param splash project-loading presentation
@@ -62,7 +60,7 @@ public final class EditorProjectOpener implements AutoCloseable {
     public EditorProjectOpener(
             Telemetry telemetry,
             EditorProjectLoader loader,
-            EditorProjectContext projectContext,
+            EditorProjectPublication publication,
             EditorWorkspace workspace,
             ViewportController viewport,
             EditorSplashScreen splash,
@@ -70,7 +68,7 @@ public final class EditorProjectOpener implements AutoCloseable {
         this.telemetry = Objects.requireNonNull(telemetry, "telemetry");
         this.loader = Objects.requireNonNull(loader, "loader");
         executor = Executors.newSingleThreadExecutor();
-        this.projectContext = Objects.requireNonNull(projectContext, "projectContext");
+        this.publication = Objects.requireNonNull(publication, "publication");
         this.workspace = Objects.requireNonNull(workspace, "workspace");
         this.viewport = Objects.requireNonNull(viewport, "viewport");
         this.splash = Objects.requireNonNull(splash, "splash");
@@ -82,7 +80,7 @@ public final class EditorProjectOpener implements AutoCloseable {
         Path normalized =
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();
         EditorProjectOpenTrace trace = new EditorProjectOpenTrace(telemetry, normalized);
-        projectContext.clear();
+        publication.clearProject();
         workspace.beginOpening(normalized);
         splash.showProject(normalized);
         EditorProjectLoadTask task = new EditorProjectLoadTask(loader, trace, normalized, splash);
@@ -99,7 +97,7 @@ public final class EditorProjectOpener implements AutoCloseable {
 
     /** Applies background-loaded editor state and queues its preview on the OpenGL thread. */
     private void applyLoadedProject(EditorProjectOpenTrace trace, EditorProjectLoadResult result) {
-        workspace.showDiagnostics(result.diagnostics());
+        publication.showDiagnostics(result.diagnostics());
         if (result.session().isEmpty()) {
             trace.fail("project loading did not create an editor session");
             clearFailedProject("Unable to open project. See Diagnostics.");
@@ -107,13 +105,7 @@ public final class EditorProjectOpener implements AutoCloseable {
         }
         EditorProjectSession session = result.session().orElseThrow();
         workspace.showProject(session);
-        projectContext.showProject(
-                new EditorProject(
-                        session.project().identity().id(),
-                        session.project().identity().name(),
-                        session.project().root().toUri()),
-                session.hierarchy(),
-                session.assets());
+        publication.showProject(session);
         windowTitle.accept(session.project().identity().name() + " — JScene3D Editor");
         splash.projectIdentified(session.project().identity().name());
         splash.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
@@ -131,17 +123,17 @@ public final class EditorProjectOpener implements AutoCloseable {
                 projectRoot.toUri(),
                 "",
                 Map.of("technicalDetail", Objects.requireNonNullElse(failure.getMessage(), failure.toString())));
-        workspace.showDiagnostics(List.of(diagnostic));
+        publication.showDiagnostics(List.of(diagnostic));
         LOGGER.log(System.Logger.Level.ERROR, "Editor project loading failed", failure);
         clearFailedProject("Unable to open project. See Diagnostics.");
     }
 
     /** Applies preview diagnostics, reports completion, and dismisses the project-loading splash. */
     private void applyPreviewResult(
-            List<ProjectDiagnostic> projectDiagnostics, EditorProjectSession session, EditorPreviewResult result) {
-        List<ProjectDiagnostic> combined = new ArrayList<>(projectDiagnostics);
+            List<ProjectDiagnostic> loadDiagnostics, EditorProjectSession session, EditorPreviewResult result) {
+        List<ProjectDiagnostic> combined = new ArrayList<>(loadDiagnostics);
         combined.addAll(result.diagnostics());
-        workspace.showDiagnostics(combined);
+        publication.showDiagnostics(combined);
         boolean failed = result.diagnostics().stream()
                 .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         if (failed) {
@@ -166,7 +158,7 @@ public final class EditorProjectOpener implements AutoCloseable {
 
     /** Clears project-owned state while preserving diagnostics and a visible failure message. */
     private void clearFailedProject(String message) {
-        projectContext.clear();
+        publication.clearProject();
         workspace.clearProject();
         viewport.clearProject();
         workspace.showMessage(new EditorMessage(ERROR, message, OPEN_DIAGNOSTICS));

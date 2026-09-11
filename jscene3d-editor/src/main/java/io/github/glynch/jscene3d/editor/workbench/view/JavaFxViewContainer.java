@@ -5,10 +5,6 @@
 package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
-import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
-import io.github.glynch.jscene3d.editor.view.EditorDetailsView;
-import io.github.glynch.jscene3d.editor.view.EditorTreeView;
-import io.github.glynch.jscene3d.editor.view.EditorView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
@@ -19,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -28,11 +23,10 @@ import javafx.scene.layout.VBox;
 
 /** Fixed workbench container which renders registered logical views through JavaFX adapters. */
 public final class JavaFxViewContainer implements AutoCloseable {
-    private final EditorExtensionHost extensions;
-    private final JavaFxIconRenderer icons;
+    private final JavaFxViewRenderer renderer;
     private final ViewContainerId id;
     private final VBox root = new VBox();
-    private final Map<ViewId, RenderedView> renderedViews = new LinkedHashMap<>();
+    private final Map<ViewId, JavaFxRenderedView> renderedViews = new LinkedHashMap<>();
     private final boolean showSingleHeading;
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
@@ -56,8 +50,9 @@ public final class JavaFxViewContainer implements AutoCloseable {
      */
     public JavaFxViewContainer(
             EditorExtensionHost extensions, ViewContainerId id, boolean showSingleHeading, JavaFxIconRenderer icons) {
-        this.extensions = Objects.requireNonNull(extensions, "extensions");
-        this.icons = Objects.requireNonNull(icons, "icons");
+        Objects.requireNonNull(extensions, "extensions");
+        Objects.requireNonNull(icons, "icons");
+        renderer = new JavaFxViewRenderer(extensions, icons);
         this.id = Objects.requireNonNull(id, "id");
         this.showSingleHeading = showSingleHeading;
         root.setSpacing(6.0);
@@ -98,7 +93,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
     }
 
     private void showSingle(EditorViewContribution contribution) {
-        RenderedView rendered = render(contribution.view());
+        JavaFxRenderedView rendered = renderer.render(contribution.view());
         renderedViews.put(contribution.view().id(), rendered);
         VBox.setVgrow(rendered.node(), Priority.ALWAYS);
         if (showSingleHeading) {
@@ -113,62 +108,27 @@ public final class JavaFxViewContainer implements AutoCloseable {
     private void showTabs(List<EditorViewContribution> contributions) {
         TabPane tabs = new TabPane();
         for (EditorViewContribution contribution : contributions) {
-            RenderedView rendered = render(contribution.view());
+            JavaFxRenderedView rendered = renderer.render(contribution.view());
             Tab tab = new Tab(contribution.view().title(), rendered.node());
             tab.setClosable(false);
             tab.setUserData(contribution.view().id());
             tabs.getTabs().add(tab);
-            renderedViews.put(contribution.view().id(), new RenderedView(rendered.node(), rendered.close(), () -> {
-                tabs.getSelectionModel().select(tab);
-                rendered.requestFocus().run();
-            }));
+            renderedViews.put(
+                    contribution.view().id(),
+                    new JavaFxRenderedView(
+                            rendered.node(), rendered.titleGraphic(), rendered.titleActions(), rendered.close(), () -> {
+                                tabs.getSelectionModel().select(tab);
+                                rendered.requestFocus().run();
+                            }));
         }
         VBox.setVgrow(tabs, Priority.ALWAYS);
         root.getChildren().setAll(tabs);
     }
 
-    private RenderedView render(EditorView view) {
-        if (view instanceof EditorDetailsView detailsView) {
-            return renderDetails(detailsView);
-        }
-        if (view instanceof EditorCollectionView<?> collectionView) {
-            return renderCollection(collectionView);
-        }
-        if (view instanceof EditorTreeView<?> treeView) {
-            return renderTree(treeView);
-        }
-        Label unsupported = new Label("Unsupported view kind: " + view.kind());
-        unsupported.getStyleClass().add(EditorStyleClasses.EDITOR_EMPTY_DETAIL);
-        return new RenderedView(unsupported, () -> {}, unsupported::requestFocus);
-    }
-
-    private RenderedView renderDetails(EditorDetailsView view) {
-        JavaFxDetailsViewAdapter adapter = new JavaFxDetailsViewAdapter(view, icons);
-        return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
-    }
-
-    private <T> RenderedView renderCollection(EditorCollectionView<T> view) {
-        JavaFxCollectionViewAdapter<T> adapter = new JavaFxCollectionViewAdapter<>(view, extensions::execute, icons);
-        return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
-    }
-
-    private <T> RenderedView renderTree(EditorTreeView<T> view) {
-        JavaFxTreeViewAdapter<T> adapter = new JavaFxTreeViewAdapter<>(view, extensions::execute, icons);
-        return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
-    }
-
     private void reveal(ViewId requested) {
-        RenderedView rendered = renderedViews.get(requested);
+        JavaFxRenderedView rendered = renderedViews.get(requested);
         if (rendered != null) {
             rendered.requestFocus().run();
-        }
-    }
-
-    private record RenderedView(Node node, Runnable close, Runnable requestFocus) {
-        private RenderedView {
-            Objects.requireNonNull(node, "node");
-            Objects.requireNonNull(close, "close");
-            Objects.requireNonNull(requestFocus, "requestFocus");
         }
     }
 }

@@ -19,7 +19,6 @@ public final class EditorStyleClasses {
     public static final String EDITOR_ASSET_NAME = "editor-asset-name";
     public static final String EDITOR_ASSET_PRESENTATION = "editor-asset-presentation";
     public static final String EDITOR_ASSET_SOURCE = "editor-asset-source";
-    public static final String EDITOR_BOTTOM_DRAWER = "editor-bottom-drawer";
     public static final String EDITOR_COLLECTION_BREADCRUMB = "editor-collection-breadcrumb";
     public static final String EDITOR_COLLECTION_BROWSER_SPLIT = "editor-collection-browser-split";
     public static final String EDITOR_COLLECTION_CARD = "editor-collection-card";
@@ -61,11 +60,6 @@ public final class EditorStyleClasses {
     public static final String EDITOR_DIAGNOSTIC_TREE = "editor-diagnostic-tree";
     public static final String EDITOR_DIAGNOSTIC_TREE_CELL = "editor-diagnostic-tree-cell";
     public static final String EDITOR_DIAGNOSTICS_PANEL = "editor-diagnostics-panel";
-    public static final String EDITOR_DRAWER_CLOSE = "editor-drawer-close";
-    public static final String EDITOR_DRAWER_HEADER = "editor-drawer-header";
-    public static final String EDITOR_DRAWER_TAB = "editor-drawer-tab";
-    public static final String EDITOR_DRAWER_TAB_ACTIVE = "editor-drawer-tab-active";
-    public static final String EDITOR_DRAWER_TAB_LABEL = "editor-drawer-tab-label";
     public static final String EDITOR_EMPTY_DETAIL = "editor-empty-detail";
     public static final String EDITOR_EMPTY_TITLE = "editor-empty-title";
     public static final String EDITOR_HIERARCHY_PANEL = "editor-hierarchy-panel";
@@ -103,7 +97,13 @@ public final class EditorStyleClasses {
     public static final String EDITOR_MENU_BAR = "editor-menu-bar";
     public static final String EDITOR_OPEN_PROJECT_BUTTON = "editor-open-project-button";
     public static final String EDITOR_PANEL = "editor-panel";
+    public static final String EDITOR_PANEL_CLOSE = "editor-panel-close";
+    public static final String EDITOR_PANEL_HEADER = "editor-panel-header";
     public static final String EDITOR_PANEL_HEADING = "editor-panel-heading";
+    public static final String EDITOR_PANEL_PART = "editor-panel-part";
+    public static final String EDITOR_PANEL_TAB = "editor-panel-tab";
+    public static final String EDITOR_PANEL_TAB_ACTIVE = "editor-panel-tab-active";
+    public static final String EDITOR_PANEL_TAB_LABEL = "editor-panel-tab-label";
     public static final String EDITOR_PREVIEW_TITLE = "editor-preview-title";
     public static final String EDITOR_PRODUCT_KIND = "editor-product-kind";
     public static final String EDITOR_PRODUCT_NAME = "editor-product-name";
@@ -149,7 +149,6 @@ public final class EditorStyleClasses {
     public static final String EDITOR_STATUS = "editor-status";
     public static final String EDITOR_STATUS_ACTION = "editor-status-action";
     public static final String EDITOR_STATUS_BAR = "editor-status-bar";
-    public static final String EDITOR_STATUS_DIAGNOSTIC_COUNTS = "editor-status-diagnostic-counts";
     public static final String EDITOR_STATUS_ITEM = "editor-status-item";
     public static final String EDITOR_STATUS_ITEMS = "editor-status-items";
     public static final String EDITOR_TOP = "editor-top";

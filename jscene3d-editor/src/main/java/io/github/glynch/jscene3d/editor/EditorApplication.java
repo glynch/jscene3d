@@ -9,13 +9,15 @@ import static javafx.util.Duration.seconds;
 import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
-import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsCommandExtension;
+import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsExtension;
+import io.github.glynch.jscene3d.editor.builtin.diagnostics.ProjectDiagnosticsExtension;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
 import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
 import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
+import io.github.glynch.jscene3d.editor.project.opening.EditorProjectPublication;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
@@ -67,11 +69,13 @@ public final class EditorApplication extends Application {
         EditorWorkspace editorWorkspace =
                 new EditorWorkspace(viewportCanvas, () -> chooseProject(stage), selectionContext, extensionHost);
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
-        extensionHost.activate(new DiagnosticsCommandExtension(editorWorkspace::openDiagnostics));
+        ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
+        extensionHost.activate(projectDiagnostics);
         extensionHost.activate(new HierarchyExtension(projectContext));
         extensionHost.activate(new ProjectExtension(projectContext));
         extensionHost.activate(new InspectorExtension());
         extensionHost.activate(new SelectionStatusExtension());
+        extensionHost.activate(new DiagnosticsExtension(extensionHost));
         ViewportController controller = new ViewportController(
                 viewportCanvas,
                 editorWorkspace::setViewportStatus,
@@ -80,7 +84,13 @@ public final class EditorApplication extends Application {
         canvas = viewportCanvas;
         workspace = editorWorkspace;
         projectOpener = new EditorProjectOpener(
-                telemetry, projectLoader, projectContext, editorWorkspace, controller, loadingScreen, stage::setTitle);
+                telemetry,
+                projectLoader,
+                new EditorProjectPublication(projectContext, projectDiagnostics::showDiagnostics),
+                editorWorkspace,
+                controller,
+                loadingScreen,
+                stage::setTitle);
         installViewportEvents(viewportCanvas, controller);
 
         StackPane root = new StackPane(editorWorkspace, loadingScreen);

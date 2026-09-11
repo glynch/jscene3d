@@ -40,7 +40,7 @@ final class EditorWorkspaceLayout {
         return verticalForBottomHeight(contentHeight, PREFERRED_BOTTOM_HEIGHT);
     }
 
-    /** Returns the vertical divider position for one requested bottom-drawer height. */
+    /** Returns the vertical divider position for one requested lower-panel height. */
     static double verticalForBottomHeight(double contentHeight, double requestedBottomHeight) {
         double requested = Math.max(0.0, requestedBottomHeight);
         double minimumHeight = MINIMUM_PREVIEW_HEIGHT + Math.min(MINIMUM_BOTTOM_HEIGHT, requested);

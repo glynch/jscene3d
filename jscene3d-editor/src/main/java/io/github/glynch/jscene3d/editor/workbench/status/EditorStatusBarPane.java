@@ -5,7 +5,6 @@
 package io.github.glynch.jscene3d.editor.workbench.status;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
-import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIconId;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
@@ -35,9 +34,6 @@ public final class EditorStatusBarPane implements AutoCloseable {
     private final Label projectStatus = createStatus("No project opened");
     private final Button projectStatusAction = createStatusAction("No project opened");
     private final Label viewportStatus = createStatus("Preview: starting");
-    private final Button diagnosticStatus = createStatusAction("");
-    private final Label diagnosticErrors = new Label("0");
-    private final Label diagnosticWarnings = new Label("0");
     private final StackPane projectStatusPresentation = new StackPane(projectStatus, projectStatusAction);
     private final HBox node;
 
@@ -46,9 +42,6 @@ public final class EditorStatusBarPane implements AutoCloseable {
         this.extensions = Objects.requireNonNull(extensions, "extensions");
         this.icons = Objects.requireNonNull(icons, "icons");
         extensionItems = new JavaFxStatusBarAdapter(extensions, icons);
-        diagnosticStatus.setGraphic(createDiagnosticCounts());
-        diagnosticStatus.setTooltip(new Tooltip("Open Diagnostics"));
-        diagnosticStatus.setOnAction(ignored -> extensions.execute(EditorCommands.OPEN_DIAGNOSTICS));
         showProjectText();
         node = createNode();
     }
@@ -68,16 +61,6 @@ public final class EditorStatusBarPane implements AutoCloseable {
     /** Updates the concise viewport state. */
     public void showViewportStatus(String text) {
         viewportStatus.setText(Objects.requireNonNull(text, "text"));
-    }
-
-    /** Updates diagnostic totals and their semantic severity. */
-    public void showDiagnostics(long errors, long warnings) {
-        if (errors < 0L || warnings < 0L) {
-            throw new IllegalArgumentException("diagnostic counts must not be negative");
-        }
-        diagnosticErrors.setText(Long.toString(errors));
-        diagnosticWarnings.setText(Long.toString(warnings));
-        diagnosticStatus.setAccessibleText(errors + " errors and " + warnings + " warnings; open Diagnostics");
     }
 
     /** Presents one message and exposes its optional command as an accessible status action. */
@@ -113,10 +96,9 @@ public final class EditorStatusBarPane implements AutoCloseable {
                 projectStatusPresentation,
                 extensionItems.leftNode(),
                 spacer,
-                extensionItems.rightNode(),
                 viewportStatus,
                 separator,
-                diagnosticStatus);
+                extensionItems.rightNode());
         result.setAlignment(Pos.CENTER_LEFT);
         result.getStyleClass().add(EditorStyleClasses.EDITOR_STATUS_BAR);
         return result;
@@ -134,17 +116,6 @@ public final class EditorStatusBarPane implements AutoCloseable {
         projectStatus.setVisible(false);
         projectStatusAction.setManaged(true);
         projectStatusAction.setVisible(true);
-    }
-
-    private HBox createDiagnosticCounts() {
-        HBox counts = new HBox(
-                3.0,
-                icon(EditorIcons.ERROR, "Errors"),
-                diagnosticErrors,
-                icon(EditorIcons.WARNING, "Warnings"),
-                diagnosticWarnings);
-        counts.getStyleClass().add(EditorStyleClasses.EDITOR_STATUS_DIAGNOSTIC_COUNTS);
-        return counts;
     }
 
     private Node createSeverityIcon(EditorMessageSeverity severity) {

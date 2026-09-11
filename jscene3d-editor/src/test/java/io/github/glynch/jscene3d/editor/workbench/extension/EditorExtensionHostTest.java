@@ -52,11 +52,13 @@ final class EditorExtensionHostTest {
         List<EditorMessage> messages = new ArrayList<>();
         List<ViewId> viewRequests = new ArrayList<>();
         List<List<EditorStatusItemSnapshot>> statusSnapshots = new ArrayList<>();
+        List<List<EditorDiagnosticSnapshot>> diagnosticSnapshots = new ArrayList<>();
         AtomicReference<EditorStatusItem> status = new AtomicReference<>();
         AtomicReference<EditorDiagnosticCollection> diagnostics = new AtomicReference<>();
         host.observeViews(viewSnapshots::add);
         host.observeViewRequests(viewRequests::add);
         host.observeStatusItems(statusSnapshots::add);
+        host.observeDiagnostics(diagnosticSnapshots::add);
         host.showMessagesWith(messages::add);
 
         host.activate(extension(status, diagnostics));
@@ -73,6 +75,10 @@ final class EditorExtensionHostTest {
                 .singleElement()
                 .extracting(item -> item.state().text())
                 .isEqualTo("Ready");
+        assertThat(diagnosticSnapshots.getLast())
+                .singleElement()
+                .extracting(snapshot -> snapshot.diagnostic().message())
+                .isEqualTo("Test warning");
 
         host.close();
         host.close();
@@ -83,6 +89,7 @@ final class EditorExtensionHostTest {
         EditorDiagnosticCollection registeredDiagnostics = diagnostics.get();
         assertThat(viewSnapshots.getLast()).isEmpty();
         assertThat(statusSnapshots.getLast()).isEmpty();
+        assertThat(diagnosticSnapshots.getLast()).isEmpty();
         assertThatThrownBy(() -> registeredStatus.update(changedStatus))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("status item is closed");

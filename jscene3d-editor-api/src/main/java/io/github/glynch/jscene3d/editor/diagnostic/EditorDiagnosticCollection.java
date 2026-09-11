@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.diagnostic;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 /** Mutable extension-owned diagnostic publication grouped by source URI. */
 public interface EditorDiagnosticCollection extends EditorRegistration {
@@ -25,6 +26,14 @@ public interface EditorDiagnosticCollection extends EditorRegistration {
      * @throws IllegalStateException if this collection has been closed
      */
     void replace(URI source, List<EditorDiagnostic> diagnostics);
+
+    /**
+     * Atomically replaces every source and diagnostic owned by this collection.
+     *
+     * @param diagnostics complete replacement grouped by source
+     * @throws IllegalStateException if this collection has been closed
+     */
+    void replaceAll(Map<URI, List<EditorDiagnostic>> diagnostics);
 
     /**
      * Removes every diagnostic owned by this collection for one source.

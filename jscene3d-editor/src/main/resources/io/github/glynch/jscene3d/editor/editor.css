@@ -393,20 +393,20 @@
     -fx-min-width: 1px;
 }
 
-.editor-bottom-drawer {
+.editor-panel-part {
     -fx-background-color: -jscene-panel;
     -fx-background-insets: 0;
     -fx-padding: 0;
 }
 
-.editor-drawer-header {
+.editor-panel-header {
     -fx-background-color: -jscene-chrome;
     -fx-border-color: transparent transparent -jscene-divider transparent;
     -fx-border-width: 0 0 1px 0;
     -fx-padding: 0 6px 0 0;
 }
 
-.editor-drawer-tab {
+.editor-panel-tab {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 0;
@@ -419,21 +419,21 @@
     -fx-text-fill: -jscene-text-muted;
 }
 
-.editor-drawer-tab:hover {
+.editor-panel-tab:hover {
     -fx-background-color: -jscene-hover;
 }
 
-.editor-drawer-tab-active {
+.editor-panel-tab-active {
     -fx-background-color: -jscene-panel-raised;
     -fx-border-color: transparent transparent -jscene-accent transparent;
     -fx-text-fill: -jscene-text-strong;
 }
 
-.editor-drawer-tab .editor-drawer-tab-label {
+.editor-panel-tab .editor-panel-tab-label {
     -fx-text-fill: -jscene-text-muted;
 }
 
-.editor-drawer-tab-active .editor-drawer-tab-label {
+.editor-panel-tab-active .editor-panel-tab-label {
     -fx-text-fill: -jscene-text-strong;
 }
 
@@ -448,7 +448,7 @@
     -fx-text-fill: -jscene-focus;
 }
 
-.editor-drawer-close {
+.editor-panel-close {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-font-size: 16px;
@@ -458,7 +458,7 @@
     -fx-text-fill: -jscene-text-muted;
 }
 
-.editor-drawer-close:hover {
+.editor-panel-close:hover {
     -fx-background-color: -jscene-hover;
     -fx-text-fill: -jscene-text-strong;
 }
@@ -472,12 +472,14 @@
     -fx-border-color: transparent;
     -fx-font-size: 10px;
     -fx-min-height: 26px;
+    -fx-opacity: 0.42;
     -fx-padding: 3px 7px;
 }
 
 .editor-diagnostic-severity-filter:selected {
     -fx-background-color: -jscene-panel-raised;
     -fx-border-color: -jscene-divider;
+    -fx-opacity: 1;
 }
 
 .editor-diagnostic-filter {
@@ -819,10 +821,6 @@
 .editor-status,
 .editor-status-action {
     -fx-graphic-text-gap: 5px;
-}
-
-.editor-status-diagnostic-counts {
-    -fx-alignment: center-left;
 }
 
 .editor-status-action {

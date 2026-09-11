@@ -5,7 +5,6 @@
 package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
-import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
@@ -13,10 +12,9 @@ import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusBarPane;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import io.github.glynch.jscene3d.editor.workbench.view.JavaFxPanelPart;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxViewContainer;
-import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Objects;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -43,12 +41,10 @@ public final class EditorWorkspace extends BorderPane {
     private final SplitPane workspaceSplit;
     private final SplitPane upperWorkspaceSplit;
     private final SplitPane leftWorkspaceSplit;
-    private final EditorBottomDrawer bottomDrawer;
+    private final JavaFxPanelPart bottomPanel;
     private final JavaFxViewContainer primaryViewContainer;
-    private final JavaFxViewContainer bottomViewContainer;
     private final JavaFxViewContainer secondaryViewContainer;
     private final EditorStatusBarPane statusBar;
-    private List<ProjectAsset> projectAssets = List.of();
 
     /** Creates the shell around an existing viewport and the real open-project command. */
     EditorWorkspace(
@@ -76,9 +72,14 @@ public final class EditorWorkspace extends BorderPane {
                 .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_INSPECTOR_PANEL);
         VBox previewPanel = createViewportPane(viewportCanvas);
         upperWorkspaceSplit = createUpperWorkspaceSplit(hierarchyPanel, previewPanel);
-        bottomViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.BOTTOM_PANEL, false, icons);
-        bottomDrawer = new EditorBottomDrawer(bottomViewContainer.node(), icons, this::selectDiagnostic);
-        leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit, bottomDrawer);
+        bottomPanel = new JavaFxPanelPart(
+                extensions,
+                EditorViewContainers.BOTTOM_PANEL,
+                icons,
+                EditorWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT,
+                EditorWorkspaceLayout.PREFERRED_BOTTOM_HEIGHT,
+                EditorWorkspaceLayout::verticalForBottomHeight);
+        leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit, bottomPanel);
         workspaceSplit = new SplitPane(leftWorkspaceSplit, inspectorPanel);
         workspaceSplit.setOrientation(Orientation.HORIZONTAL);
         workspaceSplit.getStyleClass().add(EditorStyleClasses.EDITOR_WORKSPACE_SPLIT);
@@ -109,7 +110,6 @@ public final class EditorWorkspace extends BorderPane {
         Path normalized = directory.toAbsolutePath().normalize();
         Path fileName = normalized.getFileName();
         String candidateName = fileName == null ? normalized.toString() : fileName.toString();
-        projectAssets = List.of();
         projectContext.setText(candidateName);
         projectContext.setTooltip(new Tooltip(normalized.toString()));
         setProjectStatus("Opening " + candidateName + "…");
@@ -119,7 +119,6 @@ public final class EditorWorkspace extends BorderPane {
     public void showProject(EditorProjectSession session) {
         clearSelection();
         String projectName = session.project().identity().name();
-        projectAssets = List.copyOf(session.assets());
         projectContext.setText(projectName);
         previewTitle.setText(session.hierarchy().label() + " Preview");
     }
@@ -127,21 +126,9 @@ public final class EditorWorkspace extends BorderPane {
     /** Clears project-owned views after an unsuccessful open. */
     public void clearProject() {
         clearSelection();
-        projectAssets = List.of();
         projectContext.setText("No project");
         projectContext.setTooltip(null);
         previewTitle.setText("Empty Preview");
-    }
-
-    /** Replaces structured diagnostics and refreshes their concise count. */
-    public void showDiagnostics(List<ProjectDiagnostic> projectDiagnostics) {
-        EditorBottomDrawer.DiagnosticCounts counts = bottomDrawer.showDiagnostics(projectDiagnostics);
-        statusBar.showDiagnostics(counts.errors(), counts.warnings());
-    }
-
-    /** Opens the Diagnostics drawer in response to a failed project or preview operation. */
-    void openDiagnostics() {
-        bottomDrawer.openDiagnostics();
     }
 
     /** Updates the concise project portion of the status bar. */
@@ -158,7 +145,7 @@ public final class EditorWorkspace extends BorderPane {
     void close() {
         statusBar.close();
         secondaryViewContainer.close();
-        bottomViewContainer.close();
+        bottomPanel.close();
         primaryViewContainer.close();
     }
 
@@ -196,22 +183,6 @@ public final class EditorWorkspace extends BorderPane {
         selections.clear();
     }
 
-    /** Selects the exact Project item named by a file-backed diagnostic when one exists. */
-    private void selectDiagnostic(ProjectDiagnostic diagnostic) {
-        if (!"file".equalsIgnoreCase(diagnostic.source().getScheme())) {
-            return;
-        }
-        try {
-            Path source = Path.of(diagnostic.source()).toAbsolutePath().normalize();
-            projectAssets.stream()
-                    .filter(item -> item.source().toAbsolutePath().normalize().equals(source))
-                    .findFirst()
-                    .ifPresent(item -> selections.select(item.selection()));
-        } catch (IllegalArgumentException ignored) {
-            // An unusual file URI remains inspectable in Diagnostics without false navigation.
-        }
-    }
-
     /** Creates the Hierarchy and preview row above the shared lower browser. */
     private static SplitPane createUpperWorkspaceSplit(VBox hierarchyPanel, VBox previewPanel) {
         SplitPane split = new SplitPane(hierarchyPanel, previewPanel);
@@ -223,13 +194,13 @@ public final class EditorWorkspace extends BorderPane {
     }
 
     /** Creates the left workspace whose lower drawer spans Hierarchy and preview. */
-    private SplitPane createLeftWorkspaceSplit(SplitPane upperWorkspace, EditorBottomDrawer drawer) {
-        SplitPane split = new SplitPane(upperWorkspace, drawer);
+    private SplitPane createLeftWorkspaceSplit(SplitPane upperWorkspace, JavaFxPanelPart panel) {
+        SplitPane split = new SplitPane(upperWorkspace, panel.node());
         split.setOrientation(Orientation.VERTICAL);
         split.setMinWidth(EditorWorkspaceLayout.MINIMUM_LEFT_WORKSPACE_WIDTH);
         split.getStyleClass().add(EditorStyleClasses.EDITOR_LEFT_WORKSPACE_SPLIT);
-        SplitPane.setResizableWithParent(drawer, false);
-        drawer.attach(split);
+        SplitPane.setResizableWithParent(panel.node(), false);
+        panel.attach(split);
         return split;
     }
 

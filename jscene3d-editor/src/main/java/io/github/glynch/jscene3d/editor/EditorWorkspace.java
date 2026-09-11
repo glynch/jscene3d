@@ -37,7 +37,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 /** Owns the editor's resizable JavaFX workspace and its visible read-only state. */
-final class EditorWorkspace extends BorderPane {
+public final class EditorWorkspace extends BorderPane {
     private final EditorSelections selections;
     private final Label projectContext = new Label("No project");
     private final Label previewTitle = new Label("Empty Preview");
@@ -109,7 +109,7 @@ final class EditorWorkspace extends BorderPane {
     }
 
     /** Shows that a project directory is being opened without claiming it has loaded. */
-    void beginOpening(Path directory) {
+    public void beginOpening(Path directory) {
         clearSelection();
         Path normalized = directory.toAbsolutePath().normalize();
         Path fileName = normalized.getFileName();
@@ -121,7 +121,7 @@ final class EditorWorkspace extends BorderPane {
     }
 
     /** Replaces the visible hierarchy, Project content, and preview context atomically. */
-    void showProject(EditorProjectSession session) {
+    public void showProject(EditorProjectSession session) {
         clearSelection();
         String projectName = session.project().identity().name();
         projectAssets = List.copyOf(session.assets());
@@ -130,7 +130,7 @@ final class EditorWorkspace extends BorderPane {
     }
 
     /** Clears project-owned views after an unsuccessful open. */
-    void clearProject() {
+    public void clearProject() {
         clearSelection();
         projectAssets = List.of();
         projectContext.setText("No project");
@@ -139,7 +139,7 @@ final class EditorWorkspace extends BorderPane {
     }
 
     /** Replaces structured diagnostics and refreshes their concise count. */
-    void showDiagnostics(List<ProjectDiagnostic> projectDiagnostics) {
+    public void showDiagnostics(List<ProjectDiagnostic> projectDiagnostics) {
         EditorBottomDrawer.DiagnosticCounts counts = bottomDrawer.showDiagnostics(projectDiagnostics);
         diagnosticStatus.getStyleClass().removeAll(EditorStyleClasses.EDITOR_ERROR, EditorStyleClasses.EDITOR_WARNING);
         if (counts.errors() > 0L) {
@@ -158,13 +158,13 @@ final class EditorWorkspace extends BorderPane {
     }
 
     /** Updates the concise project portion of the status bar. */
-    void setProjectStatus(String text) {
+    public void setProjectStatus(String text) {
         projectStatus.getStyleClass().removeAll(EditorStyleClasses.EDITOR_ERROR, EditorStyleClasses.EDITOR_WARNING);
         projectStatus.setText(Objects.requireNonNull(text, "text"));
     }
 
     /** Shows an extension message without exposing JavaFX through the extension interface. */
-    void showMessage(EditorMessage message) {
+    public void showMessage(EditorMessage message) {
         EditorMessage shown = Objects.requireNonNull(message, "message");
         setProjectStatus(shown.text());
         switch (shown.severity()) {

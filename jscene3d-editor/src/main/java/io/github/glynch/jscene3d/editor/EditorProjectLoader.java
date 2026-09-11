@@ -59,7 +59,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /** Assembles editor state from project data without loading or executing application code. */
-final class EditorProjectLoader {
+public final class EditorProjectLoader {
     private static final String PROJECT_RESOURCES = "src/main/resources";
     private static final String IMPORT_CACHE = "target/import-cache";
     private static final RuntimeResourceProvider UNAVAILABLE_RESOURCES = new RuntimeResourceProvider() {
@@ -80,7 +80,7 @@ final class EditorProjectLoader {
     }
 
     /** Creates a loader with installed extension artifacts used only for descriptor discovery. */
-    EditorProjectLoader(String engineVersion, ClassLoader editorClassLoader, List<Path> installedExtensionPath) {
+    public EditorProjectLoader(String engineVersion, ClassLoader editorClassLoader, List<Path> installedExtensionPath) {
         projectLoader = new ProjectLoader(engineVersion);
         extensionLoader = new ExtensionCatalogLoader(engineVersion);
         this.editorClassLoader = Objects.requireNonNull(editorClassLoader, "editorClassLoader");

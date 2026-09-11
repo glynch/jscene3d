@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.editor;
 import java.util.Objects;
 
 /** Receives project identity and phase changes while editor-safe project data is loaded. */
-interface EditorProjectLoadProgress {
+public interface EditorProjectLoadProgress {
     EditorProjectLoadProgress NONE = new EditorProjectLoadProgress() {
         @Override
         public void projectIdentified(String projectName) {

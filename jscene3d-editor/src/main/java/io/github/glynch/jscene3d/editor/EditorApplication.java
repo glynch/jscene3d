@@ -4,7 +4,6 @@
  */
 package io.github.glynch.jscene3d.editor;
 
-import static io.github.glynch.jscene3d.editor.window.EditorMessageSeverity.ERROR;
 import static javafx.util.Duration.seconds;
 
 import com.huskerdev.grapl.gl.GLProfile;
@@ -15,23 +14,13 @@ import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
 import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
-import io.github.glynch.jscene3d.editor.project.EditorProject;
-import io.github.glynch.jscene3d.editor.window.EditorMessage;
+import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
-import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -43,19 +32,15 @@ import org.jspecify.annotations.Nullable;
 
 /** Production JavaFX shell for the JScene3D visual editor. */
 public final class EditorApplication extends Application {
-    private static final System.Logger LOGGER = System.getLogger(EditorApplication.class.getName());
-
     private final Telemetry telemetry;
     private final EditorProjectLoader projectLoader;
-    private final ExecutorService projectLoadingExecutor;
     private final EditorProjectContext projectContext;
     private final EditorSelectionContext selectionContext;
     private final EditorExtensionHost extensionHost;
 
     private @Nullable GLCanvas canvas;
-    private @Nullable ViewportController viewportController;
-    private @Nullable EditorSplashScreen splashScreen;
     private @Nullable EditorWorkspace workspace;
+    private @Nullable EditorProjectOpener projectOpener;
     private boolean disposalRequested;
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
@@ -65,7 +50,6 @@ public final class EditorApplication extends Application {
                 EditorBuildInfo.engineVersion(),
                 EditorApplication.class.getClassLoader(),
                 EditorExtensionPath.configured());
-        projectLoadingExecutor = Executors.newSingleThreadExecutor();
         projectContext = new EditorProjectContext();
         selectionContext = new EditorSelectionContext();
         extensionHost = new EditorExtensionHost(projectContext, selectionContext);
@@ -92,9 +76,9 @@ public final class EditorApplication extends Application {
                 () -> finishStartupSplash(loadingScreen, startupProjectRequested),
                 () -> completeDisposal(stage));
         canvas = viewportCanvas;
-        viewportController = controller;
-        splashScreen = loadingScreen;
         workspace = editorWorkspace;
+        projectOpener = new EditorProjectOpener(
+                telemetry, projectLoader, projectContext, editorWorkspace, controller, loadingScreen, stage::setTitle);
         installViewportEvents(viewportCanvas, controller);
 
         StackPane root = new StackPane(editorWorkspace, loadingScreen);
@@ -112,7 +96,7 @@ public final class EditorApplication extends Application {
         stage.show();
         Platform.runLater(editorWorkspace::applyInitialDividerPositions);
         loadingScreen.markDisplayed();
-        loadCommandLineProject(stage);
+        loadCommandLineProject();
         viewportCanvas.requestFocus();
         scheduleAutomaticClose();
     }
@@ -120,7 +104,7 @@ public final class EditorApplication extends Application {
     /** Releases the OpenGLFX peer if JavaFX stops without an ordinary close request. */
     @Override
     public void stop() {
-        projectLoadingExecutor.shutdownNow();
+        closeProjectOpener();
         if (workspace != null) {
             workspace.close();
         }
@@ -170,86 +154,16 @@ public final class EditorApplication extends Application {
         chooser.setTitle("Open JScene3D Project");
         @Nullable File directory = chooser.showDialog(stage);
         if (directory != null) {
-            openProject(stage, directory.toPath());
+            requireProjectOpener().openProject(directory.toPath());
         }
     }
 
     /** Loads the optional first unnamed command-line argument as a project directory. */
-    private void loadCommandLineProject(Stage stage) {
+    private void loadCommandLineProject() {
         if (!getParameters().getUnnamed().isEmpty()) {
-            openProject(stage, Path.of(getParameters().getUnnamed().getFirst()));
+            requireProjectOpener()
+                    .openProject(Path.of(getParameters().getUnnamed().getFirst()));
         }
-    }
-
-    /** Starts loading one directory without blocking JavaFX rendering or splash progress. */
-    private void openProject(Stage stage, Path directory) {
-        Path normalized = directory.toAbsolutePath().normalize();
-        EditorProjectOpenTrace trace = new EditorProjectOpenTrace(telemetry, normalized);
-        projectContext.clear();
-        requireWorkspace().beginOpening(normalized);
-        EditorSplashScreen loadingScreen = requireSplashScreen();
-        loadingScreen.showProject(normalized);
-        EditorProjectLoadTask task = new EditorProjectLoadTask(projectLoader, trace, normalized, loadingScreen);
-        task.setOnSucceeded(ignored -> applyLoadedProject(stage, trace, task.getValue()));
-        task.setOnFailed(ignored -> handleProjectLoadFailure(trace, normalized, task.getException()));
-        projectLoadingExecutor.execute(task);
-    }
-
-    /** Applies background-loaded editor state and queues its preview on the OpenGL thread. */
-    private void applyLoadedProject(Stage stage, EditorProjectOpenTrace trace, EditorProjectLoadResult result) {
-        EditorWorkspace editorWorkspace = requireWorkspace();
-        editorWorkspace.showDiagnostics(result.diagnostics());
-        if (result.session().isEmpty()) {
-            trace.fail("project loading did not create an editor session");
-            editorWorkspace.clearProject();
-            requireViewportController().clearProject();
-            editorWorkspace.showMessage(new EditorMessage(ERROR, "Unable to open project. See Diagnostics."));
-            requireSplashScreen().finish();
-            return;
-        }
-        EditorProjectSession session = result.session().orElseThrow();
-        editorWorkspace.showProject(session);
-        projectContext.showProject(
-                new EditorProject(
-                        session.project().identity().id(),
-                        session.project().identity().name(),
-                        session.project().root().toUri()),
-                session.hierarchy(),
-                session.assets());
-        stage.setTitle(session.project().identity().name() + " — JScene3D Editor");
-        EditorSplashScreen loadingScreen = requireSplashScreen();
-        loadingScreen.projectIdentified(session.project().identity().name());
-        loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
-        requireViewportController().showProject(session, trace, completion -> {
-            if (applyPreviewDiagnostics(result.diagnostics(), session, completion)) {
-                loadingScreen.finish();
-            } else {
-                editorWorkspace.showMessage(
-                        new EditorMessage(ERROR, "Unable to prepare the project preview. See Diagnostics."));
-                loadingScreen.finish();
-            }
-        });
-        editorWorkspace.setProjectStatus(
-                "Preparing " + session.project().identity().name() + "…");
-    }
-
-    /** Restores the editor after an unexpected background-loading failure. */
-    private void handleProjectLoadFailure(EditorProjectOpenTrace trace, Path projectRoot, Throwable failure) {
-        trace.fail(failure);
-        EditorWorkspace editorWorkspace = requireWorkspace();
-        projectContext.clear();
-        editorWorkspace.clearProject();
-        requireViewportController().clearProject();
-        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
-                ProjectDiagnostic.Severity.ERROR,
-                EditorDiagnosticCode.PROJECT_LOAD_FAILED,
-                projectRoot.toUri(),
-                "",
-                Map.of("technicalDetail", Objects.requireNonNullElse(failure.getMessage(), failure.toString())));
-        editorWorkspace.showDiagnostics(List.of(diagnostic));
-        editorWorkspace.showMessage(new EditorMessage(ERROR, "Unable to open project. See Diagnostics."));
-        LOGGER.log(System.Logger.Level.ERROR, "Editor project loading failed", failure);
-        requireSplashScreen().finish();
     }
 
     /** Dismisses startup branding after the empty viewport presents when no project was requested. */
@@ -259,64 +173,21 @@ public final class EditorApplication extends Application {
         }
     }
 
-    /** Combines project-loading and viewport-composition diagnostics after render-thread preparation. */
-    private boolean applyPreviewDiagnostics(
-            List<ProjectDiagnostic> projectDiagnostics, EditorProjectSession session, EditorPreviewResult result) {
-        List<ProjectDiagnostic> combined = new ArrayList<>(projectDiagnostics);
-        combined.addAll(result.diagnostics());
-        EditorWorkspace editorWorkspace = requireWorkspace();
-        editorWorkspace.showDiagnostics(combined);
-        boolean failed = result.diagnostics().stream()
-                .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
-        if (failed) {
-            editorWorkspace.setProjectStatus(session.project().identity().name() + " · preview failed");
-            return false;
-        }
-        EditorProjectOpenDurations durations = result.durations();
-        String firstFrame =
-                durations.firstPresentation().map(EditorApplication::format).orElse("not presented");
-        LOGGER.log(
-                System.Logger.Level.INFO,
-                "Opened " + session.project().identity().name() + " in "
-                        + format(durations.total())
-                        + " (project " + format(durations.projectLoad())
-                        + ", preview " + format(durations.previewComposition())
-                        + ", first frame " + firstFrame + ")");
-        editorWorkspace.setProjectStatus(session.project().identity().name() + " · ready");
-        return true;
-    }
-
-    /** Formats a measured duration in milliseconds with useful sub-millisecond precision. */
-    private static String format(Duration duration) {
-        double milliseconds = duration.toNanos() / 1_000_000.0;
-        return String.format(Locale.ROOT, "%.1f ms", milliseconds);
-    }
-
-    /** Returns the controller installed during JavaFX stage initialization. */
-    private ViewportController requireViewportController() {
-        ViewportController controller = viewportController;
-        if (controller == null) {
-            throw new IllegalStateException("editor viewport has not been initialized");
-        }
-        return controller;
-    }
-
-    /** Returns the splash view installed during JavaFX stage initialization. */
-    private EditorSplashScreen requireSplashScreen() {
-        EditorSplashScreen current = splashScreen;
+    /** Returns the project opener installed during JavaFX stage initialization. */
+    private EditorProjectOpener requireProjectOpener() {
+        EditorProjectOpener current = projectOpener;
         if (current == null) {
-            throw new IllegalStateException("editor splash screen has not been initialized");
+            throw new IllegalStateException("editor project opener has not been initialized");
         }
         return current;
     }
 
-    /** Returns the workspace installed during JavaFX stage initialization. */
-    private EditorWorkspace requireWorkspace() {
-        EditorWorkspace current = workspace;
-        if (current == null) {
-            throw new IllegalStateException("editor workspace has not been initialized");
+    /** Stops project loading after the project opener has been installed. */
+    private void closeProjectOpener() {
+        EditorProjectOpener current = projectOpener;
+        if (current != null) {
+            current.close();
         }
-        return current;
     }
 
     /** Optionally closes automated smoke runs while leaving ordinary launches interactive. */
@@ -340,16 +211,15 @@ public final class EditorApplication extends Application {
             return;
         }
         disposalRequested = true;
-        projectLoadingExecutor.shutdownNow();
+        closeProjectOpener();
         currentCanvas.dispose();
     }
 
     /** Closes JavaFX only after the render thread releases the renderer and surface. */
     private void completeDisposal(Stage stage) {
         canvas = null;
-        viewportController = null;
-        splashScreen = null;
         workspace = null;
+        projectOpener = null;
         stage.setOnCloseRequest(null);
         stage.close();
         Platform.exit();

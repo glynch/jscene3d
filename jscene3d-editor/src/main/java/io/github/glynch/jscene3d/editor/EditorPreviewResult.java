@@ -8,9 +8,9 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.util.List;
 
 /** Result delivered after preview composition and, when successful, its first presentation. */
-record EditorPreviewResult(List<ProjectDiagnostic> diagnostics, EditorProjectOpenDurations durations) {
+public record EditorPreviewResult(List<ProjectDiagnostic> diagnostics, EditorProjectOpenDurations durations) {
     /** Preserves immutable diagnostics in the cross-thread completion value. */
-    EditorPreviewResult {
+    public EditorPreviewResult {
         diagnostics = List.copyOf(diagnostics);
     }
 }

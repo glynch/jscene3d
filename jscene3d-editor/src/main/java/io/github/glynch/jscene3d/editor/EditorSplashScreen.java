@@ -33,7 +33,7 @@ import javafx.scene.layout.VBox;
 import org.jspecify.annotations.Nullable;
 
 /** JScene3D-branded startup and project-loading view shown above the editor shell. */
-final class EditorSplashScreen extends StackPane implements EditorProjectLoadProgress {
+public final class EditorSplashScreen extends StackPane implements EditorProjectLoadProgress {
     private static final javafx.util.Duration FADE_DURATION = javafx.util.Duration.millis(180.0);
     private static final String ARTWORK_RESOURCE = "splash/viewport-emergence-background.png";
     private static final String MARK_RESOURCE = "splash/jscene3d-mark.png";
@@ -81,7 +81,7 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
     }
 
     /** Shows project context before its authored name is available from the manifest. */
-    void showProject(Path directory) {
+    public void showProject(Path directory) {
         Path normalized =
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();
         showOverlay(!isVisible());
@@ -110,7 +110,7 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
     }
 
     /** Completes progress and dismisses the overlay after its configured minimum visibility. */
-    void finish() {
+    public void finish() {
         showPhase(EditorLoadingPhase.READY);
         stopDismissal();
         Duration visibleFor = displayedAtNanos < 0L

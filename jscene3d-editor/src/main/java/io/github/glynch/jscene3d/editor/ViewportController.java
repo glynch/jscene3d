@@ -18,7 +18,7 @@ import javafx.scene.control.Label;
 import org.jspecify.annotations.Nullable;
 
 /** Coordinates OpenGLFX callbacks, renderer lifecycle, and visible viewport status. */
-final class ViewportController {
+public final class ViewportController {
     private static final System.Logger LOGGER = System.getLogger(ViewportController.class.getName());
 
     private final GLCanvas canvas;
@@ -96,7 +96,7 @@ final class ViewportController {
     }
 
     /** Requests composition of one editor-safe project preview on the OpenGL rendering thread. */
-    void showProject(
+    public void showProject(
             EditorProjectSession session, EditorProjectOpenTrace trace, Consumer<EditorPreviewResult> completion) {
         replacePendingPreview(new PreviewRequest(
                 Optional.of(Objects.requireNonNull(session, "session")),
@@ -105,7 +105,7 @@ final class ViewportController {
     }
 
     /** Requests removal of the current project preview after an unsuccessful project open. */
-    void clearProject() {
+    public void clearProject() {
         replacePendingPreview(new PreviewRequest(Optional.empty(), Optional.empty(), ignored -> {}));
     }
 

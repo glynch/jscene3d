@@ -10,14 +10,14 @@ import javafx.application.Platform;
 import javafx.concurrent.Task;
 
 /** Loads one project away from the JavaFX Application Thread while forwarding visible progress. */
-final class EditorProjectLoadTask extends Task<EditorProjectLoadResult> {
+public final class EditorProjectLoadTask extends Task<EditorProjectLoadResult> {
     private final EditorProjectLoader loader;
     private final EditorProjectOpenTrace trace;
     private final Path projectDirectory;
     private final EditorProjectLoadProgress progress;
 
     /** Creates one background task for a normalized project directory. */
-    EditorProjectLoadTask(
+    public EditorProjectLoadTask(
             EditorProjectLoader loader,
             EditorProjectOpenTrace trace,
             Path projectDirectory,

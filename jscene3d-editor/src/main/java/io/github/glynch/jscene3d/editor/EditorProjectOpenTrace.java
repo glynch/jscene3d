@@ -15,7 +15,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /** Owns one project-open trace as it crosses from JavaFX loading to OpenGL presentation. */
-final class EditorProjectOpenTrace {
+public final class EditorProjectOpenTrace {
     private final TelemetryOperation root;
 
     private Duration projectLoad = Duration.ZERO;
@@ -24,7 +24,7 @@ final class EditorProjectOpenTrace {
     private boolean complete;
 
     /** Starts one trace with the normalized project location as local context. */
-    EditorProjectOpenTrace(Telemetry telemetry, Path projectDirectory) {
+    public EditorProjectOpenTrace(Telemetry telemetry, Path projectDirectory) {
         Objects.requireNonNull(telemetry, "telemetry");
         Path normalized = Objects.requireNonNull(projectDirectory, "projectDirectory")
                 .toAbsolutePath()
@@ -91,7 +91,7 @@ final class EditorProjectOpenTrace {
     }
 
     /** Completes a trace which cannot reach first presentation. */
-    synchronized EditorProjectOpenDurations fail(String message) {
+    public synchronized EditorProjectOpenDurations fail(String message) {
         if (!complete) {
             root.fail(message);
             closeRoot();
@@ -100,7 +100,7 @@ final class EditorProjectOpenTrace {
     }
 
     /** Completes a trace after an unexpected failure. */
-    synchronized void fail(Throwable failure) {
+    public synchronized void fail(Throwable failure) {
         if (!complete) {
             root.fail(failure);
             closeRoot();

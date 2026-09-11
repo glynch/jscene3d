@@ -5,7 +5,7 @@
 package io.github.glynch.jscene3d.editor;
 
 /** One truthful, user-facing phase in editor startup or project opening. */
-enum EditorLoadingPhase {
+public enum EditorLoadingPhase {
     STARTING_EDITOR("Starting JScene3D Editor", 0.04),
     PREPARING_VIEWPORT("Preparing the OpenGL viewport", 0.10),
     READING_MANIFEST("Reading the project manifest", 0.16),

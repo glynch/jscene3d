@@ -10,9 +10,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Immutable outcome of assembling one read-only editor project session. */
-record EditorProjectLoadResult(Optional<EditorProjectSession> session, List<ProjectDiagnostic> diagnostics) {
+public record EditorProjectLoadResult(Optional<EditorProjectSession> session, List<ProjectDiagnostic> diagnostics) {
     /** Copies one editor loading outcome. */
-    EditorProjectLoadResult {
+    public EditorProjectLoadResult {
         Objects.requireNonNull(session, "session");
         diagnostics = List.copyOf(diagnostics);
     }

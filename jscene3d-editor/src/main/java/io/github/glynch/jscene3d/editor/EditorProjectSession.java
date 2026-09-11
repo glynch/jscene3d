@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** Editor-owned read-only state assembled from one project directory. */
-final class EditorProjectSession {
+public final class EditorProjectSession {
     private final GameProject project;
     private final AssetCatalog authoredAssets;
     private final RegisteredTypeCatalog types;
@@ -43,7 +43,7 @@ final class EditorProjectSession {
     }
 
     /** Returns the validated project descriptor. */
-    GameProject project() {
+    public GameProject project() {
         return project;
     }
 
@@ -73,12 +73,12 @@ final class EditorProjectSession {
     }
 
     /** Returns the hierarchy projection for the configured startup world. */
-    EditorHierarchyNode hierarchy() {
+    public EditorHierarchyNode hierarchy() {
         return hierarchy;
     }
 
     /** Returns asset-browser items in deterministic order. */
-    List<ProjectAsset> assets() {
+    public List<ProjectAsset> assets() {
         return assets;
     }
 }

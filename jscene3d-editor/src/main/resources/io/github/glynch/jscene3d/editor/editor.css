@@ -802,6 +802,15 @@
     -fx-text-fill: -jscene-text-muted;
 }
 
+.editor-status-items {
+    -fx-alignment: center-left;
+    -fx-spacing: 4px;
+}
+
+.editor-status-item {
+    -fx-graphic-text-gap: 4px;
+}
+
 .editor-status-action {
     -fx-background-insets: 0;
     -fx-background-radius: 3px;

@@ -146,6 +146,8 @@ public final class EditorStyleClasses {
     public static final String EDITOR_STATUS = "editor-status";
     public static final String EDITOR_STATUS_ACTION = "editor-status-action";
     public static final String EDITOR_STATUS_BAR = "editor-status-bar";
+    public static final String EDITOR_STATUS_ITEM = "editor-status-item";
+    public static final String EDITOR_STATUS_ITEMS = "editor-status-items";
     public static final String EDITOR_TOP = "editor-top";
     public static final String EDITOR_TREE_ITEM_DECORATION = "editor-tree-item-decoration";
     public static final String EDITOR_TREE_ITEM_DESCRIPTION = "editor-tree-item-description";

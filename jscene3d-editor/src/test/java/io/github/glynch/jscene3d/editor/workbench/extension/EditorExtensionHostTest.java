@@ -31,6 +31,7 @@ import io.github.glynch.jscene3d.editor.view.ViewKindId;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
+import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,10 +51,12 @@ final class EditorExtensionHostTest {
         List<List<EditorViewContribution>> viewSnapshots = new ArrayList<>();
         List<EditorMessage> messages = new ArrayList<>();
         List<ViewId> viewRequests = new ArrayList<>();
+        List<List<EditorStatusItemSnapshot>> statusSnapshots = new ArrayList<>();
         AtomicReference<EditorStatusItem> status = new AtomicReference<>();
         AtomicReference<EditorDiagnosticCollection> diagnostics = new AtomicReference<>();
         host.observeViews(viewSnapshots::add);
         host.observeViewRequests(viewRequests::add);
+        host.observeStatusItems(statusSnapshots::add);
         host.showMessagesWith(messages::add);
 
         host.activate(extension(status, diagnostics));
@@ -66,8 +69,9 @@ final class EditorExtensionHostTest {
                 .isEqualTo(VIEW_ID);
         assertThat(messages).containsExactly(new EditorMessage(EditorMessageSeverity.INFORMATION, "Hello"));
         assertThat(viewRequests).containsExactly(VIEW_ID);
-        assertThat(host.statusState(new StatusItemId("io.github.glynch.test.status"))
-                        .text())
+        assertThat(statusSnapshots.getLast())
+                .singleElement()
+                .extracting(item -> item.state().text())
                 .isEqualTo("Ready");
 
         host.close();
@@ -75,9 +79,10 @@ final class EditorExtensionHostTest {
 
         EditorStatusItem registeredStatus = status.get();
         EditorStatusItemState changedStatus =
-                new EditorStatusItemState("Changed", Optional.empty(), Optional.empty(), true);
+                new EditorStatusItemState("Changed", Optional.empty(), Optional.empty(), Optional.empty(), true);
         EditorDiagnosticCollection registeredDiagnostics = diagnostics.get();
         assertThat(viewSnapshots.getLast()).isEmpty();
+        assertThat(statusSnapshots.getLast()).isEmpty();
         assertThatThrownBy(() -> registeredStatus.update(changedStatus))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("status item is closed");
@@ -125,6 +130,44 @@ final class EditorExtensionHostTest {
         failingHost.close();
     }
 
+    @Test
+    void ordersStatusItemsByRegionAndDescendingPriority() {
+        EditorExtensionHost host = host();
+        List<List<EditorStatusItemSnapshot>> snapshots = new ArrayList<>();
+        host.observeStatusItems(snapshots::add);
+        host.activate(new EditorExtension() {
+            @Override
+            public String id() {
+                return "io.github.glynch.test.status-order";
+            }
+
+            @Override
+            public void activate(EditorExtensionContext context) {
+                registerStatus(context, "right-low", StatusBarAlignment.RIGHT, 10);
+                registerStatus(context, "left-low", StatusBarAlignment.LEFT, 10);
+                registerStatus(context, "right-high", StatusBarAlignment.RIGHT, 20);
+                registerStatus(context, "left-high", StatusBarAlignment.LEFT, 20);
+            }
+        });
+
+        assertThat(snapshots.getLast())
+                .extracting(item -> item.contribution().id().value())
+                .containsExactly(
+                        "io.github.glynch.test.left-high",
+                        "io.github.glynch.test.left-low",
+                        "io.github.glynch.test.right-high",
+                        "io.github.glynch.test.right-low");
+        host.close();
+    }
+
+    private static void registerStatus(
+            EditorExtensionContext context, String name, StatusBarAlignment alignment, int priority) {
+        context.subscriptions()
+                .add(context.statusBar()
+                        .create(new EditorStatusItemContribution(
+                                new StatusItemId("io.github.glynch.test." + name), alignment, priority)));
+    }
+
     private static EditorExtension extension(
             AtomicReference<EditorStatusItem> status, AtomicReference<EditorDiagnosticCollection> diagnostics) {
         return new EditorExtension() {
@@ -160,7 +203,7 @@ final class EditorExtensionHostTest {
                         .create(new EditorStatusItemContribution(
                                 new StatusItemId("io.github.glynch.test.status"), StatusBarAlignment.LEFT, 10));
                 item.update(new EditorStatusItemState(
-                        "Ready", Optional.of("Test status"), Optional.of(MESSAGE_COMMAND), true));
+                        "Ready", Optional.empty(), Optional.of("Test status"), Optional.of(MESSAGE_COMMAND), true));
                 status.set(context.subscriptions().add(item));
                 EditorDiagnosticCollection collection = context.diagnostics()
                         .createCollection(new DiagnosticCollectionId("io.github.glynch.test.diagnostics"));

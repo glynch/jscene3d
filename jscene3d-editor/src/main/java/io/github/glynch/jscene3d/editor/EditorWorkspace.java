@@ -10,6 +10,8 @@ import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
+import io.github.glynch.jscene3d.editor.workbench.status.JavaFxStatusBarAdapter;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxViewContainer;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
@@ -49,6 +51,7 @@ final class EditorWorkspace extends BorderPane {
     private final JavaFxViewContainer primaryViewContainer;
     private final JavaFxViewContainer bottomViewContainer;
     private final JavaFxViewContainer secondaryViewContainer;
+    private final JavaFxStatusBarAdapter extensionStatusBar;
     private List<ProjectAsset> projectAssets = List.of();
 
     /** Creates the shell around an existing viewport and the real open-project command. */
@@ -60,14 +63,15 @@ final class EditorWorkspace extends BorderPane {
         this.selections = Objects.requireNonNull(selections, "selections");
         setTop(createTopChrome(openProject));
 
-        primaryViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.PRIMARY_SIDEBAR);
+        JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
+        primaryViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.PRIMARY_SIDEBAR, icons);
         VBox hierarchyPanel = primaryViewContainer.node();
         hierarchyPanel.setMinWidth(EditorWorkspaceLayout.MINIMUM_HIERARCHY_WIDTH);
         hierarchyPanel.setPrefWidth(EditorWorkspaceLayout.PREFERRED_HIERARCHY_WIDTH);
         hierarchyPanel
                 .getStyleClass()
                 .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_HIERARCHY_PANEL);
-        secondaryViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.SECONDARY_SIDEBAR);
+        secondaryViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.SECONDARY_SIDEBAR, icons);
         VBox inspectorPanel = secondaryViewContainer.node();
         inspectorPanel.setMinWidth(EditorWorkspaceLayout.MINIMUM_INSPECTOR_WIDTH);
         inspectorPanel.setPrefWidth(EditorWorkspaceLayout.PREFERRED_INSPECTOR_WIDTH);
@@ -76,7 +80,7 @@ final class EditorWorkspace extends BorderPane {
                 .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_INSPECTOR_PANEL);
         VBox previewPanel = createViewportPane(viewportCanvas);
         upperWorkspaceSplit = createUpperWorkspaceSplit(hierarchyPanel, previewPanel);
-        bottomViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.BOTTOM_PANEL, false);
+        bottomViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.BOTTOM_PANEL, false, icons);
         bottomDrawer = new EditorBottomDrawer(bottomViewContainer.node(), this::selectDiagnostic);
         leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit, bottomDrawer);
         workspaceSplit = new SplitPane(leftWorkspaceSplit, inspectorPanel);
@@ -84,6 +88,7 @@ final class EditorWorkspace extends BorderPane {
         workspaceSplit.getStyleClass().add(EditorStyleClasses.EDITOR_WORKSPACE_SPLIT);
         SplitPane.setResizableWithParent(inspectorPanel, false);
         setCenter(workspaceSplit);
+        extensionStatusBar = new JavaFxStatusBarAdapter(extensions, icons);
         setBottom(createStatusBar());
         getStyleClass().add(EditorStyleClasses.EDITOR_SHELL);
         diagnosticStatus.setOnAction(ignored -> bottomDrawer.openDiagnostics());
@@ -165,6 +170,7 @@ final class EditorWorkspace extends BorderPane {
 
     /** Releases workbench adapters before the extension host is closed. */
     void close() {
+        extensionStatusBar.close();
         secondaryViewContainer.close();
         bottomViewContainer.close();
         primaryViewContainer.close();
@@ -269,7 +275,15 @@ final class EditorWorkspace extends BorderPane {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Separator separator = new Separator(Orientation.VERTICAL);
-        HBox status = new HBox(10.0, projectStatus, spacer, viewportStatus, separator, diagnosticStatus);
+        HBox status = new HBox(
+                10.0,
+                projectStatus,
+                extensionStatusBar.leftNode(),
+                spacer,
+                extensionStatusBar.rightNode(),
+                viewportStatus,
+                separator,
+                diagnosticStatus);
         status.setAlignment(Pos.CENTER_LEFT);
         status.getStyleClass().add(EditorStyleClasses.EDITOR_STATUS_BAR);
         return status;

@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.editor.view.EditorCollectionSnapshot;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +55,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     private final List<EditorCollectionCategory> categories;
     private final Optional<EditorCollectionSelectionModel<T>> selectionModel;
     private final Consumer<CommandId> commandExecutor;
+    private final JavaFxIconRenderer icons;
     private final String allItemsLabel;
     private final Optional<EditorIcon> rootIcon;
     private final String searchPlaceholder;
@@ -82,12 +84,14 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     private long generation;
 
     /** Creates and begins observing one logical collection view. */
-    JavaFxCollectionViewAdapter(EditorCollectionView<T> view, Consumer<CommandId> commandExecutor) {
+    JavaFxCollectionViewAdapter(
+            EditorCollectionView<T> view, Consumer<CommandId> commandExecutor, JavaFxIconRenderer icons) {
         EditorCollectionView<T> logicalView = Objects.requireNonNull(view, "view");
         provider = Objects.requireNonNull(logicalView.dataProvider(), "view.dataProvider()");
         categories = List.copyOf(Objects.requireNonNull(logicalView.categories(), "view.categories()"));
         selectionModel = Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
         this.commandExecutor = Objects.requireNonNull(commandExecutor, "commandExecutor");
+        this.icons = Objects.requireNonNull(icons, "icons");
         allItemsLabel = requireText(logicalView.allItemsLabel(), "view.allItemsLabel()");
         rootIcon = Objects.requireNonNull(logicalView.rootIcon(), "view.rootIcon()");
         searchPlaceholder = requireText(logicalView.searchPlaceholder(), "view.searchPlaceholder()");
@@ -189,8 +193,8 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         listView.setToggleGroup(presentations);
         configurePresentationButton(gridView, "Grid view", true);
         configurePresentationButton(listView, "List view", false);
-        gridView.setGraphic(JavaFxIconRenderer.create(new EditorIcon(EditorIcons.GRID, "Grid view")));
-        listView.setGraphic(JavaFxIconRenderer.create(new EditorIcon(EditorIcons.LIST, "List view")));
+        gridView.setGraphic(icons.create(new EditorIcon(EditorIcons.GRID, "Grid view")));
+        listView.setGraphic(icons.create(new EditorIcon(EditorIcons.LIST, "List view")));
         HBox viewButtons = new HBox(gridView, listView);
         viewButtons
                 .getStyleClass()
@@ -397,7 +401,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         HBox.setHgrow(name, Priority.ALWAYS);
         HBox heading = new HBox(6.0);
         item.icon()
-                .map(icon -> JavaFxIconRenderer.create(
+                .map(icon -> icons.create(
                         icon, EditorStyleClasses.EDITOR_COLLECTION_MARKER, EditorStyleClasses.EDITOR_ASSET_MARKER))
                 .ifPresent(heading.getChildren()::add);
         heading.getChildren().add(name);
@@ -416,7 +420,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         for (EditorIcon decoration : item.decorations()) {
             decorations
                     .getChildren()
-                    .add(JavaFxIconRenderer.create(
+                    .add(icons.create(
                             decoration,
                             EditorStyleClasses.EDITOR_ITEM_DECORATION,
                             EditorStyleClasses.EDITOR_COLLECTION_DECORATION));
@@ -549,7 +553,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
             count.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_TREE_COUNT);
             HBox row = new HBox(7.0);
             item.icon()
-                    .map(icon -> JavaFxIconRenderer.create(
+                    .map(icon -> icons.create(
                             icon,
                             EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION_ICON,
                             EditorStyleClasses.EDITOR_PROJECT_TREE_MARKER))

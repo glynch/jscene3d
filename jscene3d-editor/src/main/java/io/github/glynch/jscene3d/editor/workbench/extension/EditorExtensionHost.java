@@ -31,8 +31,10 @@ import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
+import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +58,7 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final Map<CommandId, EditorCommand> commands = new LinkedHashMap<>();
     private final List<EditorCommandPlacement> commandPlacements = new ArrayList<>();
     private final Map<StatusItemId, StatusItemRegistration> statusItems = new LinkedHashMap<>();
+    private final List<Consumer<List<EditorStatusItemSnapshot>>> statusObservers = new ArrayList<>();
     private final Map<DiagnosticCollectionId, DiagnosticCollectionRegistration> diagnosticCollections =
             new LinkedHashMap<>();
     private final EditorWindow window = new WindowFacade();
@@ -131,6 +134,23 @@ public final class EditorExtensionHost implements AutoCloseable {
     }
 
     /**
+     * Observes the complete ordered status-item snapshot.
+     *
+     * <p>The listener immediately receives the current snapshot and is notified after every item
+     * creation, update, or removal.
+     *
+     * @param observer synchronous status-item observer
+     * @return removable listener registration
+     */
+    public EditorRegistration observeStatusItems(Consumer<List<EditorStatusItemSnapshot>> observer) {
+        requireOpen();
+        Consumer<List<EditorStatusItemSnapshot>> listener = Objects.requireNonNull(observer, "observer");
+        statusObservers.add(listener);
+        listener.accept(statusSnapshot());
+        return once(() -> statusObservers.remove(listener));
+    }
+
+    /**
      * Routes extension window messages to the workbench presentation.
      *
      * @param sink workbench-owned message sink
@@ -164,8 +184,10 @@ public final class EditorExtensionHost implements AutoCloseable {
         statusItems.clear();
         diagnosticCollections.clear();
         notifyViewObservers();
+        notifyStatusObservers();
         viewObservers.clear();
         viewRequestObservers.clear();
+        statusObservers.clear();
     }
 
     private EditorRegistration registerView(EditorViewContribution contribution) {
@@ -207,6 +229,7 @@ public final class EditorExtensionHost implements AutoCloseable {
         if (statusItems.putIfAbsent(metadata.id(), item) != null) {
             throw new IllegalArgumentException("status item identity is already registered: " + metadata.id());
         }
+        notifyStatusObservers();
         return item;
     }
 
@@ -229,6 +252,24 @@ public final class EditorExtensionHost implements AutoCloseable {
     private void notifyViewObservers() {
         List<EditorViewContribution> snapshot = viewSnapshot();
         List.copyOf(viewObservers).forEach(observer -> observer.accept(snapshot));
+    }
+
+    private List<EditorStatusItemSnapshot> statusSnapshot() {
+        Comparator<EditorStatusItemSnapshot> order = Comparator.comparing(
+                        (EditorStatusItemSnapshot item) -> item.contribution().alignment())
+                .thenComparing(Comparator.comparingInt((EditorStatusItemSnapshot item) ->
+                                item.contribution().priority())
+                        .reversed())
+                .thenComparing(item -> item.contribution().id().value());
+        return statusItems.values().stream()
+                .map(StatusItemRegistration::snapshot)
+                .sorted(order)
+                .toList();
+    }
+
+    private void notifyStatusObservers() {
+        List<EditorStatusItemSnapshot> snapshot = statusSnapshot();
+        List.copyOf(statusObservers).forEach(observer -> observer.accept(snapshot));
     }
 
     private void requireOpen() {
@@ -339,7 +380,7 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final class StatusItemRegistration implements EditorStatusItem {
         private final EditorStatusItemContribution contribution;
         private EditorStatusItemState state =
-                new EditorStatusItemState("Status", Optional.empty(), Optional.empty(), false);
+                new EditorStatusItemState("Status", Optional.empty(), Optional.empty(), Optional.empty(), false);
         private boolean itemClosed;
 
         private StatusItemRegistration(EditorStatusItemContribution contribution) {
@@ -355,13 +396,16 @@ public final class EditorExtensionHost implements AutoCloseable {
         public void update(EditorStatusItemState updated) {
             requireItemOpen();
             state = Objects.requireNonNull(updated, "state");
+            notifyStatusObservers();
         }
 
         @Override
         public void close() {
             if (!itemClosed) {
                 itemClosed = true;
-                statusItems.remove(id(), this);
+                if (statusItems.remove(id(), this)) {
+                    notifyStatusObservers();
+                }
             }
         }
 
@@ -371,8 +415,8 @@ public final class EditorExtensionHost implements AutoCloseable {
             }
         }
 
-        private EditorStatusItemState state() {
-            return state;
+        private EditorStatusItemSnapshot snapshot() {
+            return new EditorStatusItemSnapshot(contribution, state);
         }
     }
 
@@ -446,11 +490,5 @@ public final class EditorExtensionHost implements AutoCloseable {
             List.copyOf(registrations).reversed().forEach(EditorRegistration::close);
             registrations.clear();
         }
-    }
-
-    EditorStatusItemState statusState(StatusItemId id) {
-        return Optional.ofNullable(statusItems.get(Objects.requireNonNull(id, "id")))
-                .map(StatusItemRegistration::state)
-                .orElseThrow(() -> new IllegalArgumentException("status item identity is not registered: " + id));
     }
 }

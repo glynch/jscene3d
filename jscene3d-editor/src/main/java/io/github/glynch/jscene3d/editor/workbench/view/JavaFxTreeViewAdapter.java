@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.editor.view.EditorTreeItem;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItemCollapsibleState;
 import io.github.glynch.jscene3d.editor.view.EditorTreeSelectionModel;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
+import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import org.jspecify.annotations.Nullable;
 /** Workbench-owned JavaFX adapter for any toolkit-independent tree view contribution. */
 final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
     private final EditorTreeDataProvider<T> provider;
+    private final JavaFxIconRenderer icons;
     private final Optional<EditorTreeSelectionModel<T>> selectionModel;
     private final TreeView<T> tree = new TreeView<>();
     private final Map<T, TreeItem<T>> renderedItems = new HashMap<>();
@@ -48,11 +50,12 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
     private int selectionFeedbackSuppressionDepth;
 
     /** Creates and begins observing one logical tree view. */
-    JavaFxTreeViewAdapter(EditorTreeView<T> view, Consumer<CommandId> commandExecutor) {
+    JavaFxTreeViewAdapter(EditorTreeView<T> view, Consumer<CommandId> commandExecutor, JavaFxIconRenderer icons) {
         EditorTreeView<T> logicalView = Objects.requireNonNull(view, "view");
         this.provider = Objects.requireNonNull(logicalView.dataProvider(), "view.dataProvider()");
         this.selectionModel = Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
         Consumer<CommandId> commands = Objects.requireNonNull(commandExecutor, "commandExecutor");
+        this.icons = Objects.requireNonNull(icons, "icons");
         tree.setShowRoot(false);
         tree.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_VIEW);
         tree.setCellFactory(ignored -> new LogicalTreeCell());
@@ -238,7 +241,7 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             row.setMaxWidth(Double.MAX_VALUE);
             presentation
                     .icon()
-                    .map(icon -> JavaFxIconRenderer.create(icon, EditorStyleClasses.EDITOR_TREE_ITEM_ICON))
+                    .map(icon -> icons.create(icon, EditorStyleClasses.EDITOR_TREE_ITEM_ICON))
                     .ifPresent(row.getChildren()::add);
             row.getChildren().add(name);
             presentation.description().ifPresent(description -> {
@@ -251,7 +254,7 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             row.getChildren().add(spacer);
             for (EditorIcon decoration : presentation.decorations()) {
                 row.getChildren()
-                        .add(JavaFxIconRenderer.create(
+                        .add(icons.create(
                                 decoration,
                                 EditorStyleClasses.EDITOR_ITEM_DECORATION,
                                 EditorStyleClasses.EDITOR_TREE_ITEM_DECORATION));

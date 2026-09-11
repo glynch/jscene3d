@@ -60,4 +60,13 @@ both meanings to remain visible at once. Workbench-owned JavaFX adapters render
 the views and icons, expose icon explanations as tooltips and accessible text,
 and bridge toolkit selection to the public shared-selection interface. JavaFX remains
 an implementation detail of the workbench rather than a requirement for view
-extensions.
+extensions. Status contributions follow the same seam: extensions publish ordered,
+toolkit-independent text, semantic icons, tooltips, commands, and visibility state,
+while one workbench adapter renders them. The built-in selection-status extension
+uses Inspector details to expose read-only and generated selection context without
+depending on JavaFX. The JavaFX workbench resolves semantic icon identities through
+a validated, resource-backed icon registry shared by every view and status adapter.
+The renderer does not own an icon catalogue; the built-in theme supplies glyphs,
+semantic colour roles, and a fallback for extension-defined identities. This seam
+allows a selected icon theme to replace those resources later without changing view
+extensions or rendering adapters.

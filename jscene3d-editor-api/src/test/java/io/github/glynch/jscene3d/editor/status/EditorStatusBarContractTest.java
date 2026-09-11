@@ -9,6 +9,8 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -18,13 +20,15 @@ final class EditorStatusBarContractTest {
         StatusItemId id = new StatusItemId("io.github.glynch.jscene3d.editor.diagnostics-status");
         CommandId command = new CommandId("io.github.glynch.jscene3d.editor.diagnostics-show");
         EditorStatusItemContribution contribution = new EditorStatusItemContribution(id, StatusBarAlignment.RIGHT, 100);
-        EditorStatusItemState state =
-                new EditorStatusItemState("1 error", Optional.of("Open Diagnostics"), Optional.of(command), true);
+        EditorIcon icon = new EditorIcon(EditorIcons.READ_ONLY, "Read-only");
+        EditorStatusItemState state = new EditorStatusItemState(
+                "1 error", Optional.of(icon), Optional.of("Open Diagnostics"), Optional.of(command), true);
 
         assertThat(id).hasToString(id.value());
         assertThat(contribution.alignment()).isEqualTo(StatusBarAlignment.RIGHT);
         assertThat(contribution.priority()).isEqualTo(100);
         assertThat(state.text()).isEqualTo("1 error");
+        assertThat(state.icon()).contains(icon);
         assertThat(state.tooltip()).contains("Open Diagnostics");
         assertThat(state.command()).contains(command);
         assertThat(state.visible()).isTrue();
@@ -35,6 +39,7 @@ final class EditorStatusBarContractTest {
     void validatesStatusContributionsAndState() {
         StatusItemId id = new StatusItemId("io.github.glynch.test.status");
         Optional<String> emptyTooltip = Optional.empty();
+        Optional<EditorIcon> emptyIcon = Optional.empty();
         Optional<CommandId> emptyCommand = Optional.empty();
 
         assertThatNullPointerException()
@@ -43,14 +48,17 @@ final class EditorStatusBarContractTest {
         assertThatNullPointerException()
                 .isThrownBy(() -> new EditorStatusItemContribution(id, null, 0))
                 .withMessage("alignment");
-        assertThatThrownBy(() -> new EditorStatusItemState(" ", emptyTooltip, emptyCommand, false))
+        assertThatThrownBy(() -> new EditorStatusItemState(" ", emptyIcon, emptyTooltip, emptyCommand, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("text must not be blank");
         assertThatNullPointerException()
-                .isThrownBy(() -> new EditorStatusItemState("Ready", null, emptyCommand, true))
+                .isThrownBy(() -> new EditorStatusItemState("Ready", null, emptyTooltip, emptyCommand, true))
+                .withMessage("icon");
+        assertThatNullPointerException()
+                .isThrownBy(() -> new EditorStatusItemState("Ready", emptyIcon, null, emptyCommand, true))
                 .withMessage("tooltip");
         assertThatNullPointerException()
-                .isThrownBy(() -> new EditorStatusItemState("Ready", emptyTooltip, null, true))
+                .isThrownBy(() -> new EditorStatusItemState("Ready", emptyIcon, emptyTooltip, null, true))
                 .withMessage("command");
     }
 

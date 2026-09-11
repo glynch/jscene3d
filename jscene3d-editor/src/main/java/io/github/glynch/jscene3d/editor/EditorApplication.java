@@ -12,6 +12,7 @@ import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
 import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
+import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -80,6 +81,7 @@ public final class EditorApplication extends Application {
         extensionHost.activate(new HierarchyExtension(projectContext));
         extensionHost.activate(new ProjectExtension(projectContext));
         extensionHost.activate(new InspectorExtension());
+        extensionHost.activate(new SelectionStatusExtension());
         ViewportController controller = new ViewportController(
                 viewportCanvas,
                 editorWorkspace.viewportStatus(),

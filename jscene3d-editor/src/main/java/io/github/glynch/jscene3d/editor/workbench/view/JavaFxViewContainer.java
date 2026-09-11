@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +29,7 @@ import javafx.scene.layout.VBox;
 /** Fixed workbench container which renders registered logical views through JavaFX adapters. */
 public final class JavaFxViewContainer implements AutoCloseable {
     private final EditorExtensionHost extensions;
+    private final JavaFxIconRenderer icons;
     private final ViewContainerId id;
     private final VBox root = new VBox();
     private final Map<ViewId, RenderedView> renderedViews = new LinkedHashMap<>();
@@ -41,8 +43,8 @@ public final class JavaFxViewContainer implements AutoCloseable {
      * @param extensions active extension host
      * @param id fixed workbench container identity
      */
-    public JavaFxViewContainer(EditorExtensionHost extensions, ViewContainerId id) {
-        this(extensions, id, true);
+    public JavaFxViewContainer(EditorExtensionHost extensions, ViewContainerId id, JavaFxIconRenderer icons) {
+        this(extensions, id, true, icons);
     }
 
     /**
@@ -52,8 +54,10 @@ public final class JavaFxViewContainer implements AutoCloseable {
      * @param id fixed workbench container identity
      * @param showSingleHeading whether this container should render the title of a lone contribution
      */
-    public JavaFxViewContainer(EditorExtensionHost extensions, ViewContainerId id, boolean showSingleHeading) {
+    public JavaFxViewContainer(
+            EditorExtensionHost extensions, ViewContainerId id, boolean showSingleHeading, JavaFxIconRenderer icons) {
         this.extensions = Objects.requireNonNull(extensions, "extensions");
+        this.icons = Objects.requireNonNull(icons, "icons");
         this.id = Objects.requireNonNull(id, "id");
         this.showSingleHeading = showSingleHeading;
         root.setSpacing(6.0);
@@ -139,17 +143,17 @@ public final class JavaFxViewContainer implements AutoCloseable {
     }
 
     private RenderedView renderDetails(EditorDetailsView view) {
-        JavaFxDetailsViewAdapter adapter = new JavaFxDetailsViewAdapter(view);
+        JavaFxDetailsViewAdapter adapter = new JavaFxDetailsViewAdapter(view, icons);
         return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
     }
 
     private <T> RenderedView renderCollection(EditorCollectionView<T> view) {
-        JavaFxCollectionViewAdapter<T> adapter = new JavaFxCollectionViewAdapter<>(view, extensions::execute);
+        JavaFxCollectionViewAdapter<T> adapter = new JavaFxCollectionViewAdapter<>(view, extensions::execute, icons);
         return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
     }
 
     private <T> RenderedView renderTree(EditorTreeView<T> view) {
-        JavaFxTreeViewAdapter<T> adapter = new JavaFxTreeViewAdapter<>(view, extensions::execute);
+        JavaFxTreeViewAdapter<T> adapter = new JavaFxTreeViewAdapter<>(view, extensions::execute, icons);
         return new RenderedView(adapter.node(), adapter::close, adapter::requestFocus);
     }
 

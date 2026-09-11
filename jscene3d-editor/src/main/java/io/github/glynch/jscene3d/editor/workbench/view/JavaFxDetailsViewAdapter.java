@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorDetailsDataProvider;
 import io.github.glynch.jscene3d.editor.view.EditorDetailsView;
+import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.Map;
 import java.util.Objects;
@@ -27,6 +28,7 @@ import javafx.scene.layout.VBox;
 
 /** Workbench-owned JavaFX adapter for any toolkit-independent details view. */
 final class JavaFxDetailsViewAdapter implements AutoCloseable {
+    private final JavaFxIconRenderer icons;
     private final StackPane root = new StackPane();
     private final VBox empty = new VBox();
     private final VBox selected = new VBox();
@@ -38,8 +40,9 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
     private final ScrollPane scroll = new ScrollPane();
     private final EditorRegistration registration;
 
-    JavaFxDetailsViewAdapter(EditorDetailsView view) {
+    JavaFxDetailsViewAdapter(EditorDetailsView view, JavaFxIconRenderer icons) {
         EditorDetailsView logicalView = Objects.requireNonNull(view, "view");
+        this.icons = Objects.requireNonNull(icons, "icons");
         EditorDetailsDataProvider provider = Objects.requireNonNull(logicalView.dataProvider(), "view.dataProvider()");
         createEmptyState(logicalView);
         createDetailsState();
@@ -115,7 +118,7 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
         decorations
                 .getChildren()
                 .setAll(details.decorations().stream()
-                        .map(icon -> JavaFxIconRenderer.create(icon, EditorStyleClasses.EDITOR_DETAILS_DECORATION))
+                        .map(icon -> icons.create(icon, EditorStyleClasses.EDITOR_DETAILS_DECORATION))
                         .toList());
         sections.getChildren()
                 .setAll(details.sections().stream()

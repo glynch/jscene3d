@@ -41,15 +41,21 @@
 }
 
 .editor-top,
-.editor-menu-bar,
-.editor-toolbar {
+.editor-menu-bar {
     -fx-background-color: -jscene-chrome;
 }
 
-.editor-menu-bar {
+.editor-top {
     -fx-border-color: transparent transparent -jscene-divider transparent;
     -fx-border-width: 0 0 1px 0;
-    -fx-padding: 0 6px;
+    -fx-min-height: 38px;
+    -fx-padding: 4px 8px;
+    -fx-pref-height: 38px;
+}
+
+.editor-menu-bar {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
 }
 
 .editor-menu-bar > .container > .menu-button {
@@ -91,12 +97,24 @@
     -fx-text-fill: -jscene-text-strong;
 }
 
-.editor-toolbar {
-    -fx-border-color: transparent transparent -jscene-divider transparent;
-    -fx-border-width: 0 0 1px 0;
-    -fx-min-height: 36px;
-    -fx-padding: 4px 8px;
-    -fx-pref-height: 36px;
+.editor-product-name {
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-product-kind {
+    -fx-font-size: 10px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-accent;
+}
+
+.editor-project-context {
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-open-project-button {
+    -fx-padding: 4px 9px;
 }
 
 .button,
@@ -170,15 +188,7 @@
     -fx-padding: 8px;
 }
 
-.editor-hierarchy-panel,
-.editor-assets-panel {
-    -fx-border-color: transparent -jscene-divider transparent transparent;
-    -fx-border-width: 0 1px 0 0;
-}
-
 .editor-inspector-panel {
-    -fx-border-color: transparent transparent transparent -jscene-divider;
-    -fx-border-width: 0 0 0 1px;
     -fx-padding: 12px;
 }
 
@@ -198,7 +208,9 @@
     -fx-wrap-text: true;
 }
 
-.editor-navigation,
+.editor-workspace-split,
+.editor-upper-workspace-split,
+.editor-left-workspace-split,
 .split-pane {
     -fx-background-color: -jscene-canvas;
     -fx-background-insets: 0;
@@ -218,6 +230,85 @@
 .editor-viewport {
     -fx-background-color: -jscene-divider;
     -fx-padding: 1px;
+}
+
+.editor-viewport-panel {
+    -fx-background-color: -jscene-canvas;
+}
+
+.editor-viewport-header {
+    -fx-background-color: -jscene-chrome;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-min-height: 36px;
+    -fx-padding: 4px 10px;
+    -fx-pref-height: 36px;
+}
+
+.editor-preview-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-inert-badge {
+    -fx-padding: 2px 6px;
+}
+
+.editor-viewport-command-space {
+    -fx-min-width: 1px;
+}
+
+.editor-bottom-tabs {
+    -fx-background-color: -jscene-panel;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.editor-bottom-tabs > .tab-header-area {
+    -fx-padding: 0;
+}
+
+.editor-bottom-tabs > .tab-header-area > .tab-header-background {
+    -fx-background-color: -jscene-chrome;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.editor-bottom-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 2px 0;
+    -fx-padding: 6px 12px 5px 12px;
+}
+
+.editor-bottom-tabs > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-bottom-tabs > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-border-color: transparent transparent -jscene-accent transparent;
+}
+
+.editor-bottom-tabs > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-bottom-tabs > .tab-header-area > .headers-region > .tab:selected > .tab-container > .tab-label {
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-bottom-tabs > .tab-content-area {
+    -fx-background-color: -jscene-panel;
+    -fx-padding: 0;
+}
+
+.editor-project-panel,
+.editor-diagnostics-panel {
+    -fx-padding: 8px;
 }
 
 .tree-view,
@@ -304,19 +395,21 @@
 
 .editor-diagnostics-panel {
     -fx-background-color: -jscene-panel;
+}
+
+.editor-status-bar {
+    -fx-background-color: -jscene-chrome;
     -fx-border-color: -jscene-divider transparent transparent transparent;
     -fx-border-width: 1px 0 0 0;
-    -fx-padding: 0 8px 8px 8px;
+    -fx-min-height: 24px;
+    -fx-padding: 0 8px;
+    -fx-pref-height: 24px;
 }
 
 .editor-status {
-    -fx-background-color: -jscene-chrome;
-    -fx-padding: 5px 10px;
+    -fx-background-color: transparent;
+    -fx-font-size: 10px;
     -fx-text-fill: -jscene-text-muted;
-}
-
-.editor-project-status {
-    -fx-text-fill: -jscene-text;
 }
 
 .editor-diagnostic-cell.diagnostic-warning {

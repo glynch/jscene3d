@@ -64,7 +64,7 @@ final class ViewportController {
             }
             reportFirstFramePresented();
             if (currentPreview.frameCount() % 30L == 0L) {
-                updateStatus(event, size, currentPreview.frameCount());
+                updateStatus(event, size);
             }
         } catch (RuntimeException exception) {
             if (pendingPresentation != null) {
@@ -72,7 +72,7 @@ final class ViewportController {
             }
             canvas.setFps(0.0);
             LOGGER.log(System.Logger.Level.ERROR, "Editor viewport rendering failed", exception);
-            updateStatus("Rendering failed: " + exception.getMessage());
+            updateStatus("Preview: failed");
         }
     }
 
@@ -167,6 +167,7 @@ final class ViewportController {
             return;
         }
         firstFrameReported = true;
+        updateStatus("Preview: inert");
         Platform.runLater(firstFramePresented);
     }
 
@@ -178,22 +179,16 @@ final class ViewportController {
         }
     }
 
-    /** Formats physical, logical, frame-rate, focus, and frame-count diagnostics. */
-    private void updateStatus(GLRenderEvent event, RenderSurfaceSize size, long frameCount) {
-        String text = "JScene3D frames: "
-                + frameCount
-                + "   JavaFX: "
-                + size.logicalWidth()
-                + "×"
-                + size.logicalHeight()
-                + " logical   OpenGL: "
+    /** Formats concise preview state for the persistent status bar. */
+    private void updateStatus(GLRenderEvent event, RenderSurfaceSize size) {
+        String text = "Preview: inert · "
                 + size.framebufferWidth()
                 + "×"
                 + size.framebufferHeight()
-                + " pixels   FPS: "
+                + " · "
                 + event.fps
-                + "   Focus: "
-                + (focused ? "viewport" : "editor controls");
+                + " FPS"
+                + (focused ? " · focused" : "");
         updateStatus(text);
     }
 

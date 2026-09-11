@@ -17,30 +17,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.geometry.Orientation;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuBar;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.Separator;
-import javafx.scene.control.SplitPane;
-import javafx.scene.control.ToolBar;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeView;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import org.jspecify.annotations.Nullable;
@@ -52,13 +35,11 @@ public final class EditorApplication extends Application {
     private final Telemetry telemetry;
     private final EditorProjectLoader projectLoader;
     private final ExecutorService projectLoadingExecutor;
-    private final TreeView<EditorHierarchyNode> hierarchy;
-    private final ListView<EditorAssetItem> assets;
-    private final ListView<ProjectDiagnostic> diagnostics;
 
     private @Nullable GLCanvas canvas;
     private @Nullable ViewportController viewportController;
     private @Nullable EditorSplashScreen splashScreen;
+    private @Nullable EditorWorkspace workspace;
     private boolean disposalRequested;
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
@@ -69,41 +50,29 @@ public final class EditorApplication extends Application {
                 EditorApplication.class.getClassLoader(),
                 EditorExtensionPath.configured());
         projectLoadingExecutor = Executors.newSingleThreadExecutor();
-        hierarchy = new TreeView<>();
-        assets = new ListView<>();
-        diagnostics = new ListView<>();
     }
 
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
     @Override
     public void start(Stage stage) {
         boolean startupProjectRequested = !getParameters().getUnnamed().isEmpty();
-        Label projectStatus = createStatus("No project opened");
-        projectStatus.getStyleClass().add("editor-project-status");
-        Label viewportStatus = createStatus("Waiting for the first OpenGL frame");
-        viewportStatus.getStyleClass().add("editor-viewport-status");
         EditorSplashTiming splashTiming =
                 EditorSplashTiming.fromNamedArguments(getParameters().getNamed());
         EditorSplashScreen loadingScreen = new EditorSplashScreen(EditorBuildInfo.engineVersion(), splashTiming);
         GLCanvas viewportCanvas = createCanvas();
+        EditorWorkspace editorWorkspace = new EditorWorkspace(viewportCanvas, () -> chooseProject(stage));
         ViewportController controller = new ViewportController(
                 viewportCanvas,
-                viewportStatus,
+                editorWorkspace.viewportStatus(),
                 () -> finishStartupSplash(loadingScreen, startupProjectRequested),
                 () -> completeDisposal(stage));
         canvas = viewportCanvas;
         viewportController = controller;
         splashScreen = loadingScreen;
+        workspace = editorWorkspace;
         installViewportEvents(viewportCanvas, controller);
 
-        BorderPane editor = new BorderPane();
-        editor.setTop(createTopControls(stage, projectStatus));
-        editor.setLeft(createNavigation());
-        editor.setCenter(createViewportPane(viewportCanvas));
-        editor.setRight(createInspector());
-        editor.setBottom(createDiagnosticsPane(projectStatus, viewportStatus));
-        editor.getStyleClass().add("editor-shell");
-        StackPane root = new StackPane(editor, loadingScreen);
+        StackPane root = new StackPane(editorWorkspace, loadingScreen);
         root.getStyleClass().add("editor-root");
         loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_VIEWPORT);
 
@@ -116,8 +85,9 @@ public final class EditorApplication extends Application {
             disposeCanvas();
         });
         stage.show();
+        Platform.runLater(editorWorkspace::applyInitialDividerPositions);
         loadingScreen.markDisplayed();
-        loadCommandLineProject(stage, projectStatus);
+        loadCommandLineProject(stage);
         viewportCanvas.requestFocus();
         scheduleAutomaticClose();
     }
@@ -134,14 +104,6 @@ public final class EditorApplication extends Application {
         Scene scene = new Scene(root, 1280.0, 780.0);
         EditorTheme.install(scene);
         return scene;
-    }
-
-    /** Creates the status line shown below the viewport. */
-    private static Label createStatus(String initialText) {
-        Label status = new Label(initialText);
-        status.setMaxWidth(Double.MAX_VALUE);
-        status.getStyleClass().add("editor-status");
-        return status;
     }
 
     /** Creates a core-profile OpenGLFX canvas configured for the renderer baseline. */
@@ -173,163 +135,69 @@ public final class EditorApplication extends Application {
         viewportCanvas.setOnMousePressed(ignored -> viewportCanvas.requestFocus());
     }
 
-    /** Creates the application menu and project toolbar. */
-    private VBox createTopControls(Stage stage, Label status) {
-        MenuItem openProject = new MenuItem("Open Project…");
-        openProject.setOnAction(ignored -> chooseProject(stage, status));
-        Menu file = new Menu("File");
-        file.getItems().add(openProject);
-
-        Button openButton = new Button("Open Project…");
-        openButton.setOnAction(ignored -> chooseProject(stage, status));
-        ToolBar toolbar = new ToolBar(openButton);
-        toolbar.getStyleClass().add("editor-toolbar");
-        MenuBar menuBar = new MenuBar(file);
-        menuBar.getStyleClass().add("editor-menu-bar");
-        VBox top = new VBox(menuBar, toolbar);
-        top.getStyleClass().add("editor-top");
-        return top;
-    }
-
-    /** Creates hierarchy and asset-browser regions backed by the opened project session. */
-    private SplitPane createNavigation() {
-        SplitPane navigation = new SplitPane(createHierarchy(), createAssetBrowser());
-        navigation.setOrientation(Orientation.VERTICAL);
-        navigation.setDividerPositions(0.58);
-        navigation.setPrefWidth(250.0);
-        navigation.getStyleClass().add("editor-navigation");
-        return navigation;
-    }
-
-    /** Creates the initially empty authored hierarchy view. */
-    private VBox createHierarchy() {
-        hierarchy.getStyleClass().add("editor-hierarchy");
-        VBox.setVgrow(hierarchy, Priority.ALWAYS);
-        VBox panel = new VBox(6.0, createPanelHeading("Hierarchy"), hierarchy);
-        panel.getStyleClass().addAll("editor-panel", "editor-hierarchy-panel");
-        return panel;
-    }
-
-    /** Creates the initially empty asset browser. */
-    private VBox createAssetBrowser() {
-        Label placeholder = new Label("Open a project to browse its assets");
-        placeholder.getStyleClass().add("editor-empty-detail");
-        assets.setPlaceholder(placeholder);
-        assets.getStyleClass().add("editor-assets");
-        VBox.setVgrow(assets, Priority.ALWAYS);
-        VBox panel = new VBox(6.0, createPanelHeading("Assets"), assets);
-        panel.getStyleClass().addAll("editor-panel", "editor-assets-panel");
-        return panel;
-    }
-
-    /** Wraps the OpenGLFX node in an ordinary resizable JavaFX layout pane. */
-    private static StackPane createViewportPane(GLCanvas viewportCanvas) {
-        StackPane viewport = new StackPane(viewportCanvas);
-        viewport.getStyleClass().add("editor-viewport");
-        return viewport;
-    }
-
-    /** Creates the placeholder inspector for a future editor selection model. */
-    private static VBox createInspector() {
-        Label emptyTitle = new Label("Nothing selected");
-        emptyTitle.getStyleClass().add("editor-empty-title");
-        Label emptyDetail = new Label("Select an authored entity or asset to inspect it.");
-        emptyDetail.getStyleClass().add("editor-empty-detail");
-        VBox inspector = new VBox(10.0, createPanelHeading("Inspector"), new Separator(), emptyTitle, emptyDetail);
-        inspector.setPrefWidth(250.0);
-        VBox.setVgrow(inspector, Priority.ALWAYS);
-        inspector.getStyleClass().addAll("editor-panel", "editor-inspector-panel");
-        return inspector;
-    }
-
-    /** Creates a consistently styled heading for one editor panel. */
-    private static Label createPanelHeading(String text) {
-        Label heading = new Label(text);
-        heading.getStyleClass().add("editor-panel-heading");
-        return heading;
-    }
-
-    /** Creates a compact status and structured-diagnostics region. */
-    private VBox createDiagnosticsPane(Label projectStatus, Label viewportStatus) {
-        Label placeholder = new Label("No project diagnostics");
-        placeholder.getStyleClass().add("editor-empty-detail");
-        diagnostics.setPlaceholder(placeholder);
-        diagnostics.setCellFactory(ignored -> new DiagnosticCell());
-        diagnostics.setPrefHeight(105.0);
-        diagnostics.setMinHeight(72.0);
-        diagnostics.getStyleClass().add("editor-diagnostics");
-        VBox pane = new VBox(4.0, projectStatus, viewportStatus, createPanelHeading("Diagnostics"), diagnostics);
-        pane.getStyleClass().add("editor-diagnostics-panel");
-        return pane;
-    }
-
     /** Opens the directory chooser and loads the selected project without starting it. */
-    private void chooseProject(Stage stage, Label status) {
+    private void chooseProject(Stage stage) {
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Open JScene3D Project");
         @Nullable File directory = chooser.showDialog(stage);
         if (directory != null) {
-            openProject(stage, status, directory.toPath());
+            openProject(stage, directory.toPath());
         }
     }
 
     /** Loads the optional first unnamed command-line argument as a project directory. */
-    private void loadCommandLineProject(Stage stage, Label status) {
+    private void loadCommandLineProject(Stage stage) {
         if (!getParameters().getUnnamed().isEmpty()) {
-            openProject(stage, status, Path.of(getParameters().getUnnamed().getFirst()));
+            openProject(stage, Path.of(getParameters().getUnnamed().getFirst()));
         }
     }
 
     /** Starts loading one directory without blocking JavaFX rendering or splash progress. */
-    private void openProject(Stage stage, Label status, Path directory) {
+    private void openProject(Stage stage, Path directory) {
         Path normalized = directory.toAbsolutePath().normalize();
         EditorProjectOpenTrace trace = new EditorProjectOpenTrace(telemetry, normalized);
-        status.setText("Opening " + normalized);
+        requireWorkspace().beginOpening(normalized);
         EditorSplashScreen loadingScreen = requireSplashScreen();
         loadingScreen.showProject(normalized);
         EditorProjectLoadTask task = new EditorProjectLoadTask(projectLoader, trace, normalized, loadingScreen);
-        task.setOnSucceeded(ignored -> applyLoadedProject(stage, status, trace, task.getValue()));
-        task.setOnFailed(ignored -> handleProjectLoadFailure(status, trace, task.getException()));
+        task.setOnSucceeded(ignored -> applyLoadedProject(stage, trace, task.getValue()));
+        task.setOnFailed(ignored -> handleProjectLoadFailure(trace, task.getException()));
         projectLoadingExecutor.execute(task);
     }
 
     /** Applies background-loaded editor state and queues its preview on the OpenGL thread. */
-    private void applyLoadedProject(
-            Stage stage, Label status, EditorProjectOpenTrace trace, EditorProjectLoadResult result) {
-        diagnostics.getItems().setAll(result.diagnostics());
+    private void applyLoadedProject(Stage stage, EditorProjectOpenTrace trace, EditorProjectLoadResult result) {
+        EditorWorkspace editorWorkspace = requireWorkspace();
+        editorWorkspace.showDiagnostics(result.diagnostics());
         if (result.session().isEmpty()) {
-            EditorProjectOpenDurations durations = trace.fail("project loading did not create an editor session");
-            hierarchy.setRoot(null);
-            assets.getItems().clear();
+            trace.fail("project loading did not create an editor session");
+            editorWorkspace.clearProject();
             requireViewportController().clearProject();
-            status.setText("Project could not be opened after " + format(durations.total()) + " — see diagnostics");
+            editorWorkspace.setProjectStatus("Open failed — see Diagnostics");
             requireSplashScreen().finish();
             return;
         }
         EditorProjectSession session = result.session().orElseThrow();
-        TreeItem<EditorHierarchyNode> root = createTreeItem(session.hierarchy());
-        root.setExpanded(true);
-        hierarchy.setRoot(root);
-        assets.getItems().setAll(session.assets());
+        editorWorkspace.showProject(session);
         stage.setTitle(session.project().identity().name() + " — JScene3D Editor");
         EditorSplashScreen loadingScreen = requireSplashScreen();
         loadingScreen.projectIdentified(session.project().identity().name());
         loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
         requireViewportController().showProject(session, trace, completion -> {
-            applyPreviewDiagnostics(result.diagnostics(), session, completion, status);
+            applyPreviewDiagnostics(result.diagnostics(), session, completion);
             loadingScreen.finish();
         });
-        status.setText(
-                "Preparing viewport preview for " + session.project().identity().name());
+        editorWorkspace.setProjectStatus(
+                "Preparing " + session.project().identity().name() + "…");
     }
 
     /** Restores the editor after an unexpected background-loading failure. */
-    private void handleProjectLoadFailure(Label status, EditorProjectOpenTrace trace, Throwable failure) {
+    private void handleProjectLoadFailure(EditorProjectOpenTrace trace, Throwable failure) {
         trace.fail(failure);
-        hierarchy.setRoot(null);
-        assets.getItems().clear();
+        EditorWorkspace editorWorkspace = requireWorkspace();
+        editorWorkspace.clearProject();
         requireViewportController().clearProject();
-        status.setText("Project could not be opened — " + Objects.requireNonNullElse(failure.getMessage(), failure));
+        editorWorkspace.setProjectStatus("Open failed — see log");
         LOGGER.log(System.Logger.Level.ERROR, "Editor project loading failed", failure);
         requireSplashScreen().finish();
     }
@@ -343,32 +211,28 @@ public final class EditorApplication extends Application {
 
     /** Combines project-loading and viewport-composition diagnostics after render-thread preparation. */
     private void applyPreviewDiagnostics(
-            List<ProjectDiagnostic> projectDiagnostics,
-            EditorProjectSession session,
-            EditorPreviewResult result,
-            Label status) {
+            List<ProjectDiagnostic> projectDiagnostics, EditorProjectSession session, EditorPreviewResult result) {
         List<ProjectDiagnostic> combined = new ArrayList<>(projectDiagnostics);
         combined.addAll(result.diagnostics());
-        diagnostics.getItems().setAll(combined);
+        EditorWorkspace editorWorkspace = requireWorkspace();
+        editorWorkspace.showDiagnostics(combined);
         boolean failed = result.diagnostics().stream()
                 .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         if (failed) {
-            status.setText("Project opened in " + format(result.durations().total())
-                    + ", but its viewport preview could not be composed — see diagnostics");
+            editorWorkspace.setProjectStatus(session.project().identity().name() + " · preview failed");
             return;
         }
-        long errors = combined.stream()
-                .filter(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR)
-                .count();
         EditorProjectOpenDurations durations = result.durations();
         String firstFrame =
                 durations.firstPresentation().map(EditorApplication::format).orElse("not presented");
-        status.setText("Opened " + session.project().identity().name() + " in " + format(durations.total())
-                + " (project " + format(durations.projectLoad())
-                + ", preview " + format(durations.previewComposition())
-                + ", first frame " + firstFrame + ") — "
-                + session.hierarchy().children().size() + " root entities, "
-                + session.assets().size() + " assets, " + errors + " errors");
+        LOGGER.log(
+                System.Logger.Level.INFO,
+                "Opened " + session.project().identity().name() + " in "
+                        + format(durations.total())
+                        + " (project " + format(durations.projectLoad())
+                        + ", preview " + format(durations.previewComposition())
+                        + ", first frame " + firstFrame + ")");
+        editorWorkspace.setProjectStatus(session.project().identity().name() + " · ready");
     }
 
     /** Formats a measured duration in milliseconds with useful sub-millisecond precision. */
@@ -395,14 +259,13 @@ public final class EditorApplication extends Application {
         return current;
     }
 
-    /** Converts one immutable hierarchy projection into JavaFX tree items. */
-    private static TreeItem<EditorHierarchyNode> createTreeItem(EditorHierarchyNode node) {
-        TreeItem<EditorHierarchyNode> item = new TreeItem<>(node);
-        item.getChildren()
-                .setAll(node.children().stream()
-                        .map(EditorApplication::createTreeItem)
-                        .toList());
-        return item;
+    /** Returns the workspace installed during JavaFX stage initialization. */
+    private EditorWorkspace requireWorkspace() {
+        EditorWorkspace current = workspace;
+        if (current == null) {
+            throw new IllegalStateException("editor workspace has not been initialized");
+        }
+        return current;
     }
 
     /** Optionally closes automated smoke runs while leaving ordinary launches interactive. */
@@ -435,35 +298,9 @@ public final class EditorApplication extends Application {
         canvas = null;
         viewportController = null;
         splashScreen = null;
+        workspace = null;
         stage.setOnCloseRequest(null);
         stage.close();
         Platform.exit();
-    }
-
-    /** Formats structured project diagnostics without discarding their stable code or source. */
-    private static final class DiagnosticCell extends ListCell<ProjectDiagnostic> {
-        /** Creates a cell whose severity appearance is supplied by the editor theme. */
-        private DiagnosticCell() {
-            getStyleClass().add("editor-diagnostic-cell");
-        }
-
-        @Override
-        protected void updateItem(@Nullable ProjectDiagnostic diagnostic, boolean empty) {
-            super.updateItem(diagnostic, empty);
-            getStyleClass().removeAll("diagnostic-error", "diagnostic-warning");
-            if (empty || diagnostic == null) {
-                setText(null);
-                return;
-            }
-            String location = diagnostic.location().isEmpty() ? "" : diagnostic.location();
-            String detail = diagnostic.details().getOrDefault("technicalDetail", diagnostic.message());
-            setText(diagnostic.severity() + "  " + diagnostic.code().code() + "  " + detail + "  —  "
-                    + diagnostic.source() + location);
-            getStyleClass()
-                    .add(
-                            diagnostic.severity() == ProjectDiagnostic.Severity.ERROR
-                                    ? "diagnostic-error"
-                                    : "diagnostic-warning");
-        }
     }
 }

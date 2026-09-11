@@ -9,6 +9,7 @@ import static javafx.util.Duration.seconds;
 import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
+import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsCommandExtension;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
 import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
@@ -66,13 +67,14 @@ public final class EditorApplication extends Application {
         EditorWorkspace editorWorkspace =
                 new EditorWorkspace(viewportCanvas, () -> chooseProject(stage), selectionContext, extensionHost);
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
+        extensionHost.activate(new DiagnosticsCommandExtension(editorWorkspace::openDiagnostics));
         extensionHost.activate(new HierarchyExtension(projectContext));
         extensionHost.activate(new ProjectExtension(projectContext));
         extensionHost.activate(new InspectorExtension());
         extensionHost.activate(new SelectionStatusExtension());
         ViewportController controller = new ViewportController(
                 viewportCanvas,
-                editorWorkspace.viewportStatus(),
+                editorWorkspace::setViewportStatus,
                 () -> finishStartupSplash(loadingScreen, startupProjectRequested),
                 () -> completeDisposal(stage));
         canvas = viewportCanvas;

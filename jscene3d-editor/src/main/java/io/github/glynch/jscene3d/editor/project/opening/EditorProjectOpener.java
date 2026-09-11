@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.project.opening;
 
+import static io.github.glynch.jscene3d.editor.command.EditorCommands.OPEN_DIAGNOSTICS;
 import static io.github.glynch.jscene3d.editor.window.EditorMessageSeverity.ERROR;
 
 import io.github.glynch.jscene3d.editor.EditorDiagnosticCode;
@@ -144,7 +145,8 @@ public final class EditorProjectOpener implements AutoCloseable {
         boolean failed = result.diagnostics().stream()
                 .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         if (failed) {
-            workspace.showMessage(new EditorMessage(ERROR, "Unable to prepare the project preview. See Diagnostics."));
+            workspace.showMessage(new EditorMessage(
+                    ERROR, "Unable to prepare the project preview. See Diagnostics.", OPEN_DIAGNOSTICS));
             splash.finish();
             return;
         }
@@ -167,7 +169,7 @@ public final class EditorProjectOpener implements AutoCloseable {
         projectContext.clear();
         workspace.clearProject();
         viewport.clearProject();
-        workspace.showMessage(new EditorMessage(ERROR, message));
+        workspace.showMessage(new EditorMessage(ERROR, message, OPEN_DIAGNOSTICS));
         splash.finish();
     }
 

@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javafx.application.Platform;
-import javafx.scene.control.Label;
 import org.jspecify.annotations.Nullable;
 
 /** Coordinates OpenGLFX callbacks, renderer lifecycle, and visible viewport status. */
@@ -22,7 +21,7 @@ public final class ViewportController {
     private static final System.Logger LOGGER = System.getLogger(ViewportController.class.getName());
 
     private final GLCanvas canvas;
-    private final Label status;
+    private final Consumer<String> status;
     private final Runnable firstFramePresented;
     private final Runnable disposalComplete;
     private final OpenGlFxRenderSurface surface = new OpenGlFxRenderSurface();
@@ -34,9 +33,10 @@ public final class ViewportController {
     private boolean disposed;
 
     /** Stores the JavaFX controls and state used by rendering callbacks. */
-    ViewportController(GLCanvas canvas, Label status, Runnable firstFramePresented, Runnable disposalComplete) {
+    ViewportController(
+            GLCanvas canvas, Consumer<String> status, Runnable firstFramePresented, Runnable disposalComplete) {
         this.canvas = canvas;
-        this.status = status;
+        this.status = Objects.requireNonNull(status, "status");
         this.firstFramePresented = Objects.requireNonNull(firstFramePresented, "firstFramePresented");
         this.disposalComplete = Objects.requireNonNull(disposalComplete, "disposalComplete");
     }
@@ -195,9 +195,9 @@ public final class ViewportController {
     /** Applies a status update on the JavaFX Application Thread. */
     private void updateStatus(String text) {
         if (Platform.isFxApplicationThread()) {
-            status.setText(text);
+            status.accept(text);
         } else {
-            Platform.runLater(() -> status.setText(text));
+            Platform.runLater(() -> status.accept(text));
         }
     }
 

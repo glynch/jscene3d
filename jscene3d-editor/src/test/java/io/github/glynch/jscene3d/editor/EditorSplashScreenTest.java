@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.editor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -14,6 +16,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +49,7 @@ final class EditorSplashScreenTest {
             stage.setScene(scene);
             PauseTransition beforeStageIsShown = new PauseTransition(javafx.util.Duration.seconds(3.1));
             beforeStageIsShown.setOnFinished(
-                    ignored -> showAndObserve(stage, splash, visibleAfterObservation, completed));
+                    ignored -> showAndObserve(stage, splash, visibleAfterObservation, failure, completed));
             beforeStageIsShown.play();
         } catch (RuntimeException exception) {
             failure.set(exception);
@@ -55,19 +59,51 @@ final class EditorSplashScreenTest {
 
     /** Shows the stage, requests dismissal, and observes whether the splash was held visibly. */
     private static void showAndObserve(
-            Stage stage, EditorSplashScreen splash, AtomicBoolean visibleAfterObservation, CountDownLatch completed) {
+            Stage stage,
+            EditorSplashScreen splash,
+            AtomicBoolean visibleAfterObservation,
+            AtomicReference<Throwable> failure,
+            CountDownLatch completed) {
         stage.show();
         splash.markDisplayed();
         splash.finish();
         PauseTransition observation = new PauseTransition(javafx.util.Duration.millis(500.0));
         observation.setOnFinished(ignored -> {
-            visibleAfterObservation.set(splash.isVisible());
-            completed.countDown();
-            Platform.runLater(() -> {
-                stage.close();
-                Platform.exit();
-            });
+            try {
+                visibleAfterObservation.set(splash.isVisible());
+                assertProductionPresentation(splash);
+            } catch (RuntimeException | AssertionError exception) {
+                failure.set(exception);
+            } finally {
+                completed.countDown();
+                Platform.runLater(() -> {
+                    stage.close();
+                    Platform.exit();
+                });
+            }
         });
         observation.play();
+    }
+
+    /** Checks packaged artwork and live loading data. */
+    private static void assertProductionPresentation(EditorSplashScreen splash) {
+        Region artwork = (Region) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_ARTWORK));
+        assertThat(artwork.getBackground().getImages()).hasSize(1);
+        assertThat(splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_MARK)))
+                .isNotNull();
+
+        Path project = Path.of("/example/a-very-long-project-directory/Doomed Corridors");
+        splash.showProject(project);
+        splash.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
+        Label projectName = (Label) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_PROJECT_NAME));
+        Label projectPath = (Label) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_PROJECT_PATH));
+        Label percentage = (Label) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_PERCENTAGE));
+        assertThat(projectName.getText()).isEqualTo("Doomed Corridors");
+        assertThat(projectPath.getTooltip().getText()).isEqualTo(project.toString());
+        assertThat(percentage.getText()).isEqualTo("96%");
+    }
+
+    private static String selector(String styleClass) {
+        return "." + styleClass;
     }
 }

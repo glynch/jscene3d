@@ -940,65 +940,62 @@
 }
 
 .editor-splash {
+    -fx-background-color: -jscene-canvas;
+}
+
+.editor-splash-artwork {
+    -fx-opacity: 1;
+}
+
+.editor-splash-scrim {
     -fx-background-color:
-        radial-gradient(center 78% 78%, radius 68%, rgba(87, 66, 190, 0.30), transparent),
-        linear-gradient(to bottom right, -jscene-canvas 0%, -jscene-chrome 55%, -jscene-panel 100%);
-    -fx-padding: 48px;
+        linear-gradient(to bottom, rgba(6, 9, 15, 0.36) 0%, transparent 30%, transparent 68%, rgba(7, 10, 17, 0.55) 100%),
+        linear-gradient(to right, rgba(7, 10, 17, 0.30) 0%, transparent 47%);
 }
 
-.editor-splash-card {
-    -fx-background-color: rgba(13, 17, 24, 0.94);
-    -fx-background-radius: 8px;
-    -fx-border-color: -jscene-divider;
-    -fx-border-radius: 8px;
-    -fx-border-width: 1px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.65), 28, 0.25, 0, 12);
-    -fx-padding: 44px 52px 34px 52px;
+.editor-splash-content {
+    -fx-background-color: transparent;
 }
 
-.editor-splash-mark-top,
-.editor-splash-mark-left,
-.editor-splash-mark-right {
-    -fx-stroke: -jscene-canvas;
-    -fx-stroke-width: 2px;
+.editor-splash-identity {
+    -fx-padding: 0;
 }
 
-.editor-splash-mark-top {
-    -fx-fill: -jscene-text-strong;
-}
-
-.editor-splash-mark-left {
-    -fx-fill: -jscene-text-muted;
-}
-
-.editor-splash-mark-right {
-    -fx-fill: -jscene-accent;
+.editor-splash-mark {
+    -fx-opacity: 1;
 }
 
 .editor-splash-brand,
 .editor-splash-brand-accent {
     -fx-font-family: "System";
-    -fx-font-size: 48px;
-    -fx-font-weight: 800;
+    -fx-font-size: 42px;
+    -fx-font-weight: 700;
     -fx-text-fill: -jscene-text-strong;
 }
 
 .editor-splash-brand-accent {
-    -fx-text-fill: -jscene-accent;
+    -fx-font-weight: 300;
+    -fx-text-fill: -jscene-text;
 }
 
-.editor-splash-product {
-    -fx-font-size: 16px;
-    -fx-font-weight: 600;
-    -fx-text-fill: -jscene-text-muted;
+.editor-splash-information {
+    -fx-background-color: rgba(8, 12, 20, 0.90);
+    -fx-border-color: rgba(142, 151, 168, 0.36) transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+    -fx-min-height: 126px;
+    -fx-padding: 24px 42px;
 }
 
-.editor-splash-rule {
-    -fx-background-color: linear-gradient(to right, -jscene-accent, -jscene-focus 38%, transparent 100%);
+.editor-splash-divider {
+    -fx-background-color: rgba(142, 151, 168, 0.40);
+    -fx-min-height: 56px;
+    -fx-min-width: 1px;
+    -fx-pref-height: 56px;
+    -fx-pref-width: 1px;
 }
 
 .editor-splash-project-name {
-    -fx-font-size: 22px;
+    -fx-font-size: 18px;
     -fx-font-weight: 600;
     -fx-text-fill: -jscene-text-strong;
 }
@@ -1009,23 +1006,32 @@
 }
 
 .editor-splash-phase {
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-splash-percentage {
+    -fx-font-size: 13px;
+    -fx-min-width: 38px;
     -fx-text-fill: -jscene-text;
 }
 
 .editor-splash-progress {
     -fx-accent: -jscene-accent;
+    -fx-max-height: 7px;
+    -fx-min-height: 7px;
+    -fx-pref-height: 7px;
 }
 
 .editor-splash-progress > .track {
-    -fx-background-color: -jscene-panel-raised;
-    -fx-background-radius: 2px;
+    -fx-background-color: rgba(142, 151, 168, 0.28);
+    -fx-background-radius: 4px;
 }
 
 .editor-splash-progress > .bar {
     -fx-background-color: linear-gradient(to right, -jscene-accent, -jscene-focus);
     -fx-background-insets: 0;
-    -fx-background-radius: 2px;
+    -fx-background-radius: 4px;
 }
 
 .editor-splash-version {

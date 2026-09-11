@@ -117,7 +117,7 @@ final class EditorWorkspace extends BorderPane {
         projectAssets = List.of();
         projectContext.setText(candidateName);
         projectContext.setTooltip(new Tooltip(normalized.toString()));
-        projectStatus.setText("Opening " + candidateName + "…");
+        setProjectStatus("Opening " + candidateName + "…");
     }
 
     /** Replaces the visible hierarchy, Project content, and preview context atomically. */
@@ -159,13 +159,21 @@ final class EditorWorkspace extends BorderPane {
 
     /** Updates the concise project portion of the status bar. */
     void setProjectStatus(String text) {
-        projectStatus.setText(text);
+        projectStatus.getStyleClass().removeAll(EditorStyleClasses.EDITOR_ERROR, EditorStyleClasses.EDITOR_WARNING);
+        projectStatus.setText(Objects.requireNonNull(text, "text"));
     }
 
     /** Shows an extension message without exposing JavaFX through the extension interface. */
     void showMessage(EditorMessage message) {
         EditorMessage shown = Objects.requireNonNull(message, "message");
-        projectStatus.setText(shown.text());
+        setProjectStatus(shown.text());
+        switch (shown.severity()) {
+            case INFORMATION -> {
+                // Ordinary messages retain the neutral status treatment.
+            }
+            case WARNING -> projectStatus.getStyleClass().add(EditorStyleClasses.EDITOR_WARNING);
+            case ERROR -> projectStatus.getStyleClass().add(EditorStyleClasses.EDITOR_ERROR);
+        }
     }
 
     /** Releases workbench adapters before the extension host is closed. */

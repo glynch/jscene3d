@@ -10,6 +10,8 @@ The accepted workspace direction is
 [the near-black and indigo editor concept](images/jscene3d-editor-concept-indigo.png).
 The accepted splash direction is
 [Viewport Emergence](images/jscene3d-editor-splash-viewport-emergence.png).
+The derived production artwork and original vector mark are recorded in
+[the splash asset manifest](editor-splash-assets.md).
 The splash explorations remain available under
 [`images/editor-splash-concepts`](images/editor-splash-concepts/) as design
 history.

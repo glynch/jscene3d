@@ -8,6 +8,8 @@ import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 
 /** Stable diagnostic codes for assembling a read-only editor session. */
 enum EditorDiagnosticCode implements DiagnosticCode {
+    /** An unexpected failure stopped the editor from opening a project. */
+    PROJECT_LOAD_FAILED("editor.project.load", "The project could not be opened"),
     /** Project extension metadata could not be discovered. */
     EXTENSION_METADATA_UNAVAILABLE("editor.extension.metadata", "Project extension metadata could not be discovered"),
     /** Built-in and project type metadata could not be combined. */

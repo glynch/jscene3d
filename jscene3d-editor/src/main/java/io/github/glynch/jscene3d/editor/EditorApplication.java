@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import static io.github.glynch.jscene3d.editor.window.EditorMessageSeverity.ERROR;
 import static javafx.util.Duration.seconds;
 
 import com.huskerdev.grapl.gl.GLProfile;
@@ -15,6 +16,7 @@ import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
 import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
@@ -26,6 +28,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javafx.animation.PauseTransition;
@@ -187,7 +191,7 @@ public final class EditorApplication extends Application {
         loadingScreen.showProject(normalized);
         EditorProjectLoadTask task = new EditorProjectLoadTask(projectLoader, trace, normalized, loadingScreen);
         task.setOnSucceeded(ignored -> applyLoadedProject(stage, trace, task.getValue()));
-        task.setOnFailed(ignored -> handleProjectLoadFailure(trace, task.getException()));
+        task.setOnFailed(ignored -> handleProjectLoadFailure(trace, normalized, task.getException()));
         projectLoadingExecutor.execute(task);
     }
 
@@ -199,8 +203,7 @@ public final class EditorApplication extends Application {
             trace.fail("project loading did not create an editor session");
             editorWorkspace.clearProject();
             requireViewportController().clearProject();
-            editorWorkspace.setProjectStatus("Open failed — see Diagnostics");
-            editorWorkspace.openDiagnostics();
+            editorWorkspace.showMessage(new EditorMessage(ERROR, "Unable to open project. See Diagnostics."));
             requireSplashScreen().finish();
             return;
         }
@@ -218,21 +221,33 @@ public final class EditorApplication extends Application {
         loadingScreen.projectIdentified(session.project().identity().name());
         loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
         requireViewportController().showProject(session, trace, completion -> {
-            applyPreviewDiagnostics(result.diagnostics(), session, completion);
-            loadingScreen.finish();
+            if (applyPreviewDiagnostics(result.diagnostics(), session, completion)) {
+                loadingScreen.finish();
+            } else {
+                editorWorkspace.showMessage(
+                        new EditorMessage(ERROR, "Unable to prepare the project preview. See Diagnostics."));
+                loadingScreen.finish();
+            }
         });
         editorWorkspace.setProjectStatus(
                 "Preparing " + session.project().identity().name() + "…");
     }
 
     /** Restores the editor after an unexpected background-loading failure. */
-    private void handleProjectLoadFailure(EditorProjectOpenTrace trace, Throwable failure) {
+    private void handleProjectLoadFailure(EditorProjectOpenTrace trace, Path projectRoot, Throwable failure) {
         trace.fail(failure);
         EditorWorkspace editorWorkspace = requireWorkspace();
         projectContext.clear();
         editorWorkspace.clearProject();
         requireViewportController().clearProject();
-        editorWorkspace.setProjectStatus("Open failed — see log");
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR,
+                EditorDiagnosticCode.PROJECT_LOAD_FAILED,
+                projectRoot.toUri(),
+                "",
+                Map.of("technicalDetail", Objects.requireNonNullElse(failure.getMessage(), failure.toString())));
+        editorWorkspace.showDiagnostics(List.of(diagnostic));
+        editorWorkspace.showMessage(new EditorMessage(ERROR, "Unable to open project. See Diagnostics."));
         LOGGER.log(System.Logger.Level.ERROR, "Editor project loading failed", failure);
         requireSplashScreen().finish();
     }
@@ -245,7 +260,7 @@ public final class EditorApplication extends Application {
     }
 
     /** Combines project-loading and viewport-composition diagnostics after render-thread preparation. */
-    private void applyPreviewDiagnostics(
+    private boolean applyPreviewDiagnostics(
             List<ProjectDiagnostic> projectDiagnostics, EditorProjectSession session, EditorPreviewResult result) {
         List<ProjectDiagnostic> combined = new ArrayList<>(projectDiagnostics);
         combined.addAll(result.diagnostics());
@@ -255,8 +270,7 @@ public final class EditorApplication extends Application {
                 .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         if (failed) {
             editorWorkspace.setProjectStatus(session.project().identity().name() + " · preview failed");
-            editorWorkspace.openDiagnostics();
-            return;
+            return false;
         }
         EditorProjectOpenDurations durations = result.durations();
         String firstFrame =
@@ -269,6 +283,7 @@ public final class EditorApplication extends Application {
                         + ", preview " + format(durations.previewComposition())
                         + ", first frame " + firstFrame + ")");
         editorWorkspace.setProjectStatus(session.project().identity().name() + " · ready");
+        return true;
     }
 
     /** Formats a measured duration in milliseconds with useful sub-millisecond precision. */

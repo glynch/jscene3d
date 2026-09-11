@@ -161,7 +161,8 @@ Deliverables:
 - render product name, project name, path, loading phase, progress, and version
   as JavaFX nodes;
 - preserve the configured minimum visibility without delaying loading work;
-- add a persistent, readable failure state and path to diagnostic details.
+- dismiss the splash after a failed load, report the error through the
+  workbench message interface, and retain details in Diagnostics.
 
 Verification:
 

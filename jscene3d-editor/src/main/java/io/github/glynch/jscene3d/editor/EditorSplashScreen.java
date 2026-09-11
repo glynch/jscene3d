@@ -5,64 +5,78 @@
 package io.github.glynch.jscene3d.editor;
 
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import java.net.URL;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundImage;
+import javafx.scene.layout.BackgroundPosition;
+import javafx.scene.layout.BackgroundRepeat;
+import javafx.scene.layout.BackgroundSize;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.shape.Polygon;
 import org.jspecify.annotations.Nullable;
 
 /** JScene3D-branded startup and project-loading view shown above the editor shell. */
 final class EditorSplashScreen extends StackPane implements EditorProjectLoadProgress {
     private static final javafx.util.Duration FADE_DURATION = javafx.util.Duration.millis(180.0);
+    private static final String ARTWORK_RESOURCE = "splash/viewport-emergence-background.png";
+    private static final String MARK_RESOURCE = "splash/jscene3d-mark.png";
 
     private final EditorSplashTiming timing;
     private final Label projectName = new Label();
     private final Label projectPath = new Label();
     private final Label phase = new Label();
+    private final Label percentage = new Label();
     private final ProgressBar progress = new ProgressBar();
     private final VBox projectDetails = new VBox(4.0, projectName, projectPath);
+    private final Region projectDivider = createDivider();
+    private final HBox progressLine = new HBox(12.0, progress, percentage);
 
     private @Nullable FadeTransition fade;
     private @Nullable PauseTransition dismissalDelay;
     private long displayedAtNanos = -1L;
 
-    /** Creates the product splash with editor branding and the embedded engine version. */
+    /** Creates the full-frame product splash with live project and loading information. */
     EditorSplashScreen(String engineVersion, EditorSplashTiming timing) {
         this.timing = Objects.requireNonNull(timing, "timing");
         getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH);
-        setAlignment(Pos.CENTER);
 
-        VBox card = new VBox(
-                24.0, createBrand(), createRule(), projectDetails, createProgress(), createVersion(engineVersion));
-        card.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_CARD);
-        card.setMaxWidth(680.0);
-        card.setMaxHeight(Region.USE_PREF_SIZE);
-        getChildren().add(card);
+        Region artwork = new Region();
+        artwork.setBackground(coveringBackground(ARTWORK_RESOURCE));
+        artwork.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_ARTWORK);
+        Region scrim = new Region();
+        scrim.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_SCRIM);
 
-        projectName.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PROJECT_NAME);
-        projectPath.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PROJECT_PATH);
-        projectPath.setWrapText(true);
-        projectDetails.setVisible(false);
-        projectDetails.setManaged(false);
+        BorderPane composition = new BorderPane();
+        composition.setTop(createBrand());
+        composition.setBottom(createInformationBar(engineVersion));
+        composition.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_CONTENT);
+        getChildren().setAll(artwork, scrim, composition);
+
+        configureLiveInformation();
         showStartup();
     }
 
     /** Restores the initial product-startup presentation. */
     void showStartup() {
         showOverlay(false);
-        projectDetails.setVisible(false);
-        projectDetails.setManaged(false);
+        showProjectDetails(false);
         showPhase(EditorLoadingPhase.STARTING_EDITOR);
     }
 
@@ -71,11 +85,10 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
         Path normalized =
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();
         showOverlay(!isVisible());
-        projectDetails.setVisible(true);
-        projectDetails.setManaged(true);
+        showProjectDetails(true);
         Path fileName = normalized.getFileName();
-        projectName.setText(fileName == null ? normalized.toString() : fileName.toString());
-        projectPath.setText(normalized.toString());
+        setProjectName(fileName == null ? normalized.toString() : fileName.toString());
+        setProjectPath(normalized.toString());
         showPhase(EditorLoadingPhase.READING_MANIFEST);
     }
 
@@ -87,7 +100,7 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
     /** Replaces the directory-derived name once the project manifest supplies its identity. */
     @Override
     public void projectIdentified(String authoredProjectName) {
-        projectName.setText(Objects.requireNonNull(authoredProjectName, "authoredProjectName"));
+        setProjectName(Objects.requireNonNull(authoredProjectName, "authoredProjectName"));
     }
 
     /** Displays one actual phase and its cumulative phase progress. */
@@ -116,80 +129,87 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
         dismissalDelay.play();
     }
 
-    /** Starts the short visual transition that finally removes the overlay. */
-    private void startFade() {
-        fade = new FadeTransition(FADE_DURATION, this);
-        fade.setFromValue(getOpacity());
-        fade.setToValue(0.0);
-        fade.setOnFinished(ignored -> {
-            fade = null;
-            setVisible(false);
-            setManaged(false);
-            setMouseTransparent(true);
-        });
-        fade.play();
-    }
-
-    /** Creates the cube mark and two-part JScene3D product wordmark. */
+    /** Creates the original product mark and live JScene3D Editor wordmark. */
     private static HBox createBrand() {
+        ImageView mark = new ImageView(loadImage(MARK_RESOURCE));
+        mark.setFitWidth(72.0);
+        mark.setFitHeight(72.0);
+        mark.setPreserveRatio(true);
+        mark.setAccessibleText("JScene3D");
+        mark.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_MARK);
+
         HBox wordmark = new HBox(
-                0.0,
-                styledLabel("JSCENE", EditorStyleClasses.EDITOR_SPLASH_BRAND),
-                styledLabel("3D", EditorStyleClasses.EDITOR_SPLASH_BRAND_ACCENT));
+                12.0,
+                styledLabel("JScene3D", EditorStyleClasses.EDITOR_SPLASH_BRAND),
+                styledLabel("Editor", EditorStyleClasses.EDITOR_SPLASH_BRAND_ACCENT));
         wordmark.setAlignment(Pos.CENTER_LEFT);
-        VBox title = new VBox(0.0, wordmark, styledLabel("EDITOR", EditorStyleClasses.EDITOR_SPLASH_PRODUCT));
-        title.setAlignment(Pos.CENTER_LEFT);
-        HBox brand = new HBox(22.0, createCubeMark(), title);
+        wordmark.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_WORDMARK);
+
+        HBox brand = new HBox(22.0, mark, wordmark);
         brand.setAlignment(Pos.CENTER_LEFT);
+        brand.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        brand.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_IDENTITY);
+        BorderPane.setMargin(brand, new Insets(46.0, 48.0, 0.0, 48.0));
         return brand;
     }
 
-    /** Creates a compact isometric cube mark without requiring toolkit-specific image assets. */
-    private static Pane createCubeMark() {
-        Polygon top = polygon(EditorStyleClasses.EDITOR_SPLASH_MARK_TOP, 46.0, 0.0, 88.0, 22.0, 46.0, 44.0, 4.0, 22.0);
-        Polygon left =
-                polygon(EditorStyleClasses.EDITOR_SPLASH_MARK_LEFT, 4.0, 22.0, 46.0, 44.0, 46.0, 88.0, 4.0, 66.0);
-        Polygon right =
-                polygon(EditorStyleClasses.EDITOR_SPLASH_MARK_RIGHT, 46.0, 44.0, 88.0, 22.0, 88.0, 66.0, 46.0, 88.0);
-        Pane mark = new Pane(top, left, right);
-        mark.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_MARK);
-        mark.setMinSize(92.0, 92.0);
-        mark.setPrefSize(92.0, 92.0);
-        mark.setMaxSize(92.0, 92.0);
-        return mark;
+    /** Creates the full-width lower region containing only live JavaFX information. */
+    private HBox createInformationBar(String engineVersion) {
+        VBox loading = createProgress();
+        HBox.setHgrow(loading, Priority.ALWAYS);
+        Label version = createVersion(engineVersion);
+        HBox information = new HBox(30.0, projectDetails, projectDivider, loading, createDivider(), version);
+        information.setAlignment(Pos.CENTER_LEFT);
+        information.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_INFORMATION);
+        return information;
     }
 
-    /** Creates one filled polygon used by the product cube mark. */
-    private static Polygon polygon(String styleClass, double... coordinates) {
-        Polygon polygon = new Polygon(coordinates);
-        polygon.getStyleClass().add(styleClass);
-        return polygon;
+    /** Configures truncation, accessibility, and sizing for data that changes during loading. */
+    private void configureLiveInformation() {
+        projectName.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PROJECT_NAME);
+        projectName.setTextOverrun(OverrunStyle.ELLIPSIS);
+        projectName.setMaxWidth(Double.MAX_VALUE);
+        projectPath.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PROJECT_PATH);
+        projectPath.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
+        projectPath.setMaxWidth(Double.MAX_VALUE);
+        projectDetails.setMinWidth(180.0);
+        projectDetails.setPrefWidth(360.0);
+        projectDetails.setMaxWidth(420.0);
+        projectDetails.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PROJECT);
+
+        phase.setTextOverrun(OverrunStyle.ELLIPSIS);
+        phase.setMaxWidth(Double.MAX_VALUE);
+        progress.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(progress, Priority.ALWAYS);
+        progressLine.setAlignment(Pos.CENTER_LEFT);
     }
 
-    /** Creates the restrained accent rule beneath the product identity. */
-    private static Region createRule() {
-        Region rule = new Region();
-        rule.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_RULE);
-        rule.setMinHeight(2.0);
-        rule.setPrefHeight(2.0);
-        rule.setMaxHeight(2.0);
-        return rule;
-    }
-
-    /** Creates the phase label and progress indicator. */
+    /** Creates the phase label, percentage, and progress indicator. */
     private VBox createProgress() {
         phase.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PHASE);
         progress.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PROGRESS);
-        progress.setMaxWidth(Double.MAX_VALUE);
-        VBox.setVgrow(progress, Priority.NEVER);
-        return new VBox(10.0, phase, progress);
+        percentage.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_PERCENTAGE);
+        VBox loading = new VBox(9.0, phase, progressLine);
+        loading.setMinWidth(220.0);
+        loading.setMaxWidth(Double.MAX_VALUE);
+        loading.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_LOADING);
+        return loading;
     }
 
-    /** Creates the version line displayed at the bottom of the splash card. */
+    /** Creates the version line displayed in the lower information region. */
     private static Label createVersion(String engineVersion) {
         Label version = new Label("JScene3D " + Objects.requireNonNull(engineVersion, "engineVersion"));
+        version.setMinWidth(150.0);
+        version.setAlignment(Pos.CENTER_RIGHT);
         version.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_VERSION);
         return version;
+    }
+
+    /** Creates one structural separator used inside the lower information region. */
+    private static Region createDivider() {
+        Region divider = new Region();
+        divider.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_DIVIDER);
+        return divider;
     }
 
     /** Creates one label and assigns its splash-specific style class. */
@@ -197,6 +217,27 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
         Label label = new Label(text);
         label.getStyleClass().add(styleClass);
         return label;
+    }
+
+    /** Loads one required packaged image and fails startup clearly if packaging is incomplete. */
+    private static Image loadImage(String resourceName) {
+        URL resource = EditorSplashScreen.class.getResource(resourceName);
+        if (resource == null) {
+            throw new IllegalStateException("splash image resource was not found: " + resourceName);
+        }
+        return new Image(resource.toExternalForm(), false);
+    }
+
+    /** Creates a background that fills the frame while retaining the artwork's aspect ratio. */
+    private static Background coveringBackground(String resourceName) {
+        BackgroundSize cover = new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false, false, false, true);
+        BackgroundImage image = new BackgroundImage(
+                loadImage(resourceName),
+                BackgroundRepeat.NO_REPEAT,
+                BackgroundRepeat.NO_REPEAT,
+                BackgroundPosition.CENTER,
+                cover);
+        return new Background(image);
     }
 
     /** Makes the overlay modal and optionally starts a new minimum-visibility interval. */
@@ -216,6 +257,49 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
         EditorLoadingPhase validPhase = Objects.requireNonNull(loadingPhase, "loadingPhase");
         phase.setText(validPhase.description());
         progress.setProgress(validPhase.progress());
+        percentage.setText(Math.round(validPhase.progress() * 100.0) + "%");
+    }
+
+    /** Applies a project name while preserving the full value for pointer and assistive access. */
+    private void setProjectName(String name) {
+        projectName.setText(name);
+        projectName.setTooltip(new Tooltip(name));
+        projectName.setAccessibleText(name);
+    }
+
+    /** Applies a project path while preserving the full value for pointer and assistive access. */
+    private void setProjectPath(String path) {
+        projectPath.setText(path);
+        projectPath.setTooltip(new Tooltip(path));
+        projectPath.setAccessibleText(path);
+    }
+
+    /** Shows or removes the complete project-information column and its separator. */
+    private void showProjectDetails(boolean show) {
+        projectDetails.setManaged(show);
+        projectDetails.setVisible(show);
+        projectDivider.setManaged(show);
+        projectDivider.setVisible(show);
+    }
+
+    /** Starts the short visual transition that finally removes the overlay. */
+    private void startFade() {
+        fade = new FadeTransition(FADE_DURATION, this);
+        fade.setFromValue(getOpacity());
+        fade.setToValue(0.0);
+        fade.setOnFinished(ignored -> {
+            fade = null;
+            dismissImmediately();
+        });
+        fade.play();
+    }
+
+    /** Removes the modal overlay immediately after an explicit failure action or completed fade. */
+    private void dismissImmediately() {
+        setVisible(false);
+        setManaged(false);
+        setMouseTransparent(true);
+        setOpacity(0.0);
     }
 
     /** Stops and discards an in-progress fade before the overlay is reused. */

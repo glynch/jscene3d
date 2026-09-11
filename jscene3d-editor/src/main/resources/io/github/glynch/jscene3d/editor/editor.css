@@ -1,78 +1,456 @@
 .root {
-    -fx-base: #252a30;
+    -jscene-canvas: #0d1118;
+    -jscene-chrome: #121722;
+    -jscene-panel: #171d28;
+    -jscene-panel-raised: #1d2431;
+    -jscene-hover: #252d3b;
+    -jscene-selected: #45409a;
+    -jscene-accent: #7562f3;
+    -jscene-accent-hover: #8876ff;
+    -jscene-focus: #9a8bff;
+    -jscene-divider: #303746;
+    -jscene-field: #121821;
+    -jscene-text-strong: #edf0f6;
+    -jscene-text: #c9ced8;
+    -jscene-text-muted: #8e97a8;
+    -jscene-success: #62c9a5;
+    -jscene-warning: #e2b45e;
+    -jscene-error: #ff7182;
+
+    -fx-accent: -jscene-accent;
+    -fx-background: -jscene-canvas;
+    -fx-base: -jscene-panel;
+    -fx-control-inner-background: -jscene-panel;
+    -fx-focus-color: -jscene-focus;
+    -fx-faint-focus-color: rgba(154, 139, 255, 0.22);
+    -fx-font-family: "System";
+    -fx-font-size: 12px;
+    -fx-selection-bar: -jscene-selected;
+    -fx-selection-bar-non-focused: derive(-jscene-selected, -12%);
+    -fx-text-background-color: -jscene-text;
+    -fx-text-base-color: -jscene-text;
+}
+
+.editor-root,
+.editor-shell {
+    -fx-background-color: -jscene-canvas;
+}
+
+.label {
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-top,
+.editor-menu-bar,
+.editor-toolbar {
+    -fx-background-color: -jscene-chrome;
+}
+
+.editor-menu-bar {
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 0 6px;
+}
+
+.editor-menu-bar > .container > .menu-button {
+    -fx-background-color: transparent;
+    -fx-padding: 6px 9px;
+}
+
+.editor-menu-bar > .container > .menu-button:hover,
+.editor-menu-bar > .container > .menu-button:showing {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-menu-bar > .container > .menu-button > .label {
+    -fx-text-fill: -jscene-text;
+}
+
+.context-menu {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-background-insets: 0;
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-padding: 4px;
+}
+
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 2px;
+    -fx-padding: 6px 10px;
+}
+
+.menu-item:focused {
+    -fx-background-color: -jscene-selected;
+}
+
+.menu-item > .label,
+.menu-item:focused > .label {
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-toolbar {
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-min-height: 36px;
+    -fx-padding: 4px 8px;
+    -fx-pref-height: 36px;
+}
+
+.button,
+.toggle-button,
+.combo-box-base {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-background-insets: 0;
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-min-height: 28px;
+    -fx-padding: 5px 10px;
+    -fx-text-fill: -jscene-text;
+}
+
+.button:hover,
+.toggle-button:hover,
+.combo-box-base:hover {
+    -fx-background-color: -jscene-hover;
+    -fx-border-color: derive(-jscene-divider, 16%);
+}
+
+.button:armed,
+.toggle-button:armed,
+.toggle-button:selected {
+    -fx-background-color: -jscene-selected;
+    -fx-border-color: -jscene-accent;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.button:focused,
+.toggle-button:focused,
+.combo-box-base:focused,
+.text-input:focused {
+    -fx-border-color: -jscene-focus;
+    -fx-effect: dropshadow(gaussian, rgba(154, 139, 255, 0.28), 3, 0, 0, 0);
+}
+
+.button:disabled,
+.toggle-button:disabled,
+.combo-box-base:disabled,
+.text-input:disabled {
+    -fx-opacity: 0.48;
+}
+
+.text-input,
+.editor-read-only-field {
+    -fx-background-color: -jscene-field;
+    -fx-background-insets: 0;
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-highlight-fill: -jscene-selected;
+    -fx-highlight-text-fill: -jscene-text-strong;
+    -fx-min-height: 28px;
+    -fx-padding: 5px 8px;
+    -fx-prompt-text-fill: -jscene-text-muted;
+    -fx-text-fill: -jscene-text;
+}
+
+.text-input:readonly,
+.editor-read-only-field {
+    -fx-background-color: derive(-jscene-field, 3%);
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-panel {
+    -fx-background-color: -jscene-panel;
+    -fx-padding: 8px;
+}
+
+.editor-hierarchy-panel,
+.editor-assets-panel {
+    -fx-border-color: transparent -jscene-divider transparent transparent;
+    -fx-border-width: 0 1px 0 0;
+}
+
+.editor-inspector-panel {
+    -fx-border-color: transparent transparent transparent -jscene-divider;
+    -fx-border-width: 0 0 0 1px;
+    -fx-padding: 12px;
+}
+
+.editor-panel-heading {
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-empty-title {
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-empty-detail {
+    -fx-text-fill: -jscene-text-muted;
+    -fx-wrap-text: true;
+}
+
+.editor-navigation,
+.split-pane {
+    -fx-background-color: -jscene-canvas;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.split-pane:horizontal > .split-pane-divider {
+    -fx-background-color: -jscene-divider;
+    -fx-padding: 0 0 0 1px;
+}
+
+.split-pane:vertical > .split-pane-divider {
+    -fx-background-color: -jscene-divider;
+    -fx-padding: 0 0 1px 0;
+}
+
+.editor-viewport {
+    -fx-background-color: -jscene-divider;
+    -fx-padding: 1px;
+}
+
+.tree-view,
+.list-view {
+    -fx-background-color: -jscene-panel;
+    -fx-background-insets: 0;
+    -fx-border-color: -jscene-divider;
+    -fx-border-width: 1px;
+    -fx-fixed-cell-size: 28px;
+    -fx-padding: 0;
+}
+
+.tree-view:focused,
+.list-view:focused {
+    -fx-border-color: -jscene-focus;
+}
+
+.tree-cell,
+.list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 5px 8px;
+    -fx-text-fill: -jscene-text;
+}
+
+.tree-cell:filled:hover,
+.list-cell:filled:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.tree-cell:filled:selected,
+.list-cell:filled:selected {
+    -fx-background-color: -jscene-selected;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.tree-cell:empty,
+.list-cell:empty {
+    -fx-background-color: transparent;
+}
+
+.tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: -jscene-text-muted;
+}
+
+.scroll-bar:horizontal,
+.scroll-bar:vertical {
+    -fx-background-color: -jscene-panel;
+    -fx-padding: 1px;
+}
+
+.scroll-bar:horizontal .track,
+.scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+}
+
+.scroll-bar:horizontal .thumb,
+.scroll-bar:vertical .thumb {
+    -fx-background-color: derive(-jscene-divider, 18%);
+    -fx-background-insets: 2px;
+    -fx-background-radius: 4px;
+}
+
+.scroll-bar:horizontal .thumb:hover,
+.scroll-bar:vertical .thumb:hover {
+    -fx-background-color: -jscene-text-muted;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 2px;
+}
+
+.separator:horizontal .line {
+    -fx-border-color: -jscene-divider;
+    -fx-border-width: 1px 0 0 0;
+}
+
+.separator:vertical .line {
+    -fx-border-color: -jscene-divider;
+    -fx-border-width: 0 0 0 1px;
+}
+
+.editor-diagnostics-panel {
+    -fx-background-color: -jscene-panel;
+    -fx-border-color: -jscene-divider transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+    -fx-padding: 0 8px 8px 8px;
+}
+
+.editor-status {
+    -fx-background-color: -jscene-chrome;
+    -fx-padding: 5px 10px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-project-status {
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-diagnostic-cell.diagnostic-warning {
+    -fx-text-fill: -jscene-warning;
+}
+
+.editor-diagnostic-cell.diagnostic-error {
+    -fx-text-fill: -jscene-error;
+}
+
+.editor-read-only-badge {
+    -fx-background-color: rgba(117, 98, 243, 0.16);
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-accent;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-font-size: 10px;
+    -fx-font-weight: 600;
+    -fx-padding: 3px 6px;
+    -fx-text-fill: -jscene-focus;
+}
+
+.editor-success {
+    -fx-text-fill: -jscene-success;
+}
+
+.editor-warning {
+    -fx-text-fill: -jscene-warning;
+}
+
+.editor-error {
+    -fx-text-fill: -jscene-error;
+}
+
+.tooltip {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-padding: 6px 8px;
+    -fx-text-fill: -jscene-text;
 }
 
 .editor-splash {
     -fx-background-color:
-        radial-gradient(center 78% 78%, radius 68%, rgba(154, 53, 19, 0.34), transparent),
-        linear-gradient(to bottom right, #070a0d 0%, #111820 55%, #1b2025 100%);
+        radial-gradient(center 78% 78%, radius 68%, rgba(87, 66, 190, 0.30), transparent),
+        linear-gradient(to bottom right, -jscene-canvas 0%, -jscene-chrome 55%, -jscene-panel 100%);
     -fx-padding: 48px;
 }
 
 .editor-splash-card {
-    -fx-background-color: rgba(10, 14, 18, 0.94);
+    -fx-background-color: rgba(13, 17, 24, 0.94);
     -fx-background-radius: 8px;
-    -fx-border-color: rgba(156, 171, 181, 0.45);
+    -fx-border-color: -jscene-divider;
     -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.65), 28, 0.25, 0, 12);
     -fx-padding: 44px 52px 34px 52px;
 }
 
+.editor-splash-mark-top,
+.editor-splash-mark-left,
+.editor-splash-mark-right {
+    -fx-stroke: -jscene-canvas;
+    -fx-stroke-width: 2px;
+}
+
+.editor-splash-mark-top {
+    -fx-fill: -jscene-text-strong;
+}
+
+.editor-splash-mark-left {
+    -fx-fill: -jscene-text-muted;
+}
+
+.editor-splash-mark-right {
+    -fx-fill: -jscene-accent;
+}
+
 .editor-splash-brand,
 .editor-splash-brand-accent {
-    -fx-font-family: "Arial Black";
+    -fx-font-family: "System";
     -fx-font-size: 48px;
-    -fx-font-weight: 900;
-    -fx-text-fill: #eef3f5;
+    -fx-font-weight: 800;
+    -fx-text-fill: -jscene-text-strong;
 }
 
 .editor-splash-brand-accent {
-    -fx-text-fill: #ef642d;
+    -fx-text-fill: -jscene-accent;
 }
 
 .editor-splash-product {
-    -fx-font-family: "Arial";
     -fx-font-size: 16px;
-    -fx-font-weight: 700;
-    -fx-text-fill: #9eabb3;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-muted;
 }
 
 .editor-splash-rule {
-    -fx-background-color: linear-gradient(to right, #df4e20, #ff9b3d 38%, transparent 100%);
+    -fx-background-color: linear-gradient(to right, -jscene-accent, -jscene-focus 38%, transparent 100%);
 }
 
 .editor-splash-project-name {
     -fx-font-size: 22px;
-    -fx-font-weight: 700;
-    -fx-text-fill: #f0f3f4;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
 }
 
 .editor-splash-project-path {
     -fx-font-size: 12px;
-    -fx-text-fill: #7f8d96;
+    -fx-text-fill: -jscene-text-muted;
 }
 
 .editor-splash-phase {
     -fx-font-size: 14px;
-    -fx-text-fill: #c8d0d5;
+    -fx-text-fill: -jscene-text;
 }
 
 .editor-splash-progress {
-    -fx-accent: #e65b28;
+    -fx-accent: -jscene-accent;
 }
 
 .editor-splash-progress > .track {
-    -fx-background-color: #202a31;
+    -fx-background-color: -jscene-panel-raised;
     -fx-background-radius: 2px;
 }
 
 .editor-splash-progress > .bar {
+    -fx-background-color: linear-gradient(to right, -jscene-accent, -jscene-focus);
     -fx-background-insets: 0;
     -fx-background-radius: 2px;
 }
 
 .editor-splash-version {
     -fx-font-size: 11px;
-    -fx-text-fill: #69767e;
+    -fx-text-fill: -jscene-text-muted;
 }

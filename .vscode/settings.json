@@ -1,6 +1,8 @@
 {
     "java.checkstyle.configuration": "${workspaceFolder}/config/checkstyle/checkstyle.xml",
     "java.checkstyle.version": "13.8.0",
+    "css.lint.vendorPrefix": "ignore",
+    "sonarlint.analysisExcludesStandalone": "jscene3d-editor/src/main/resources/io/github/glynch/jscene3d/editor/editor.css",
     "json.schemas": [
         {
             "fileMatch": [

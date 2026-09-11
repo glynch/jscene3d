@@ -18,7 +18,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Polygon;
 import org.jspecify.annotations.Nullable;
 
@@ -144,10 +143,11 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
 
     /** Creates a compact isometric cube mark without requiring toolkit-specific image assets. */
     private static Pane createCubeMark() {
-        Polygon top = polygon(Color.web("#e8eef2"), 46.0, 0.0, 88.0, 22.0, 46.0, 44.0, 4.0, 22.0);
-        Polygon left = polygon(Color.web("#8998a2"), 4.0, 22.0, 46.0, 44.0, 46.0, 88.0, 4.0, 66.0);
-        Polygon right = polygon(Color.web("#e25822"), 46.0, 44.0, 88.0, 22.0, 88.0, 66.0, 46.0, 88.0);
+        Polygon top = polygon("editor-splash-mark-top", 46.0, 0.0, 88.0, 22.0, 46.0, 44.0, 4.0, 22.0);
+        Polygon left = polygon("editor-splash-mark-left", 4.0, 22.0, 46.0, 44.0, 46.0, 88.0, 4.0, 66.0);
+        Polygon right = polygon("editor-splash-mark-right", 46.0, 44.0, 88.0, 22.0, 88.0, 66.0, 46.0, 88.0);
         Pane mark = new Pane(top, left, right);
+        mark.getStyleClass().add("editor-splash-mark");
         mark.setMinSize(92.0, 92.0);
         mark.setPrefSize(92.0, 92.0);
         mark.setMaxSize(92.0, 92.0);
@@ -155,11 +155,9 @@ final class EditorSplashScreen extends StackPane implements EditorProjectLoadPro
     }
 
     /** Creates one filled polygon used by the product cube mark. */
-    private static Polygon polygon(Color fill, double... coordinates) {
+    private static Polygon polygon(String styleClass, double... coordinates) {
         Polygon polygon = new Polygon(coordinates);
-        polygon.setFill(fill);
-        polygon.setStroke(Color.web("#10161b"));
-        polygon.setStrokeWidth(2.0);
+        polygon.getStyleClass().add(styleClass);
         return polygon;
     }
 

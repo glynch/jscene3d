@@ -23,7 +23,6 @@ import java.util.concurrent.Executors;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -69,10 +68,7 @@ public final class EditorApplication extends Application {
                 EditorBuildInfo.engineVersion(),
                 EditorApplication.class.getClassLoader(),
                 EditorExtensionPath.configured());
-        projectLoadingExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
-                .daemon()
-                .name("jscene3d-editor-project-loader")
-                .factory());
+        projectLoadingExecutor = Executors.newSingleThreadExecutor();
         hierarchy = new TreeView<>();
         assets = new ListView<>();
         diagnostics = new ListView<>();
@@ -83,7 +79,9 @@ public final class EditorApplication extends Application {
     public void start(Stage stage) {
         boolean startupProjectRequested = !getParameters().getUnnamed().isEmpty();
         Label projectStatus = createStatus("No project opened");
+        projectStatus.getStyleClass().add("editor-project-status");
         Label viewportStatus = createStatus("Waiting for the first OpenGL frame");
+        viewportStatus.getStyleClass().add("editor-viewport-status");
         EditorSplashTiming splashTiming =
                 EditorSplashTiming.fromNamedArguments(getParameters().getNamed());
         EditorSplashScreen loadingScreen = new EditorSplashScreen(EditorBuildInfo.engineVersion(), splashTiming);
@@ -104,8 +102,9 @@ public final class EditorApplication extends Application {
         editor.setCenter(createViewportPane(viewportCanvas));
         editor.setRight(createInspector());
         editor.setBottom(createDiagnosticsPane(projectStatus, viewportStatus));
-        editor.setStyle("-fx-background-color: #1b2026;");
+        editor.getStyleClass().add("editor-shell");
         StackPane root = new StackPane(editor, loadingScreen);
+        root.getStyleClass().add("editor-root");
         loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_VIEWPORT);
 
         stage.setTitle("JScene3D Editor");
@@ -133,9 +132,7 @@ public final class EditorApplication extends Application {
     /** Creates the editor scene and installs its packaged visual theme. */
     private static Scene createScene(StackPane root) {
         Scene scene = new Scene(root, 1280.0, 780.0);
-        scene.getStylesheets()
-                .add(Objects.requireNonNull(EditorApplication.class.getResource("editor.css"), "editor.css")
-                        .toExternalForm());
+        EditorTheme.install(scene);
         return scene;
     }
 
@@ -143,7 +140,7 @@ public final class EditorApplication extends Application {
     private static Label createStatus(String initialText) {
         Label status = new Label(initialText);
         status.setMaxWidth(Double.MAX_VALUE);
-        status.setPadding(new Insets(6.0, 10.0, 6.0, 10.0));
+        status.getStyleClass().add("editor-status");
         return status;
     }
 
@@ -186,7 +183,12 @@ public final class EditorApplication extends Application {
         Button openButton = new Button("Open Project…");
         openButton.setOnAction(ignored -> chooseProject(stage, status));
         ToolBar toolbar = new ToolBar(openButton);
-        return new VBox(new MenuBar(file), toolbar);
+        toolbar.getStyleClass().add("editor-toolbar");
+        MenuBar menuBar = new MenuBar(file);
+        menuBar.getStyleClass().add("editor-menu-bar");
+        VBox top = new VBox(menuBar, toolbar);
+        top.getStyleClass().add("editor-top");
+        return top;
     }
 
     /** Creates hierarchy and asset-browser regions backed by the opened project session. */
@@ -195,54 +197,69 @@ public final class EditorApplication extends Application {
         navigation.setOrientation(Orientation.VERTICAL);
         navigation.setDividerPositions(0.58);
         navigation.setPrefWidth(250.0);
+        navigation.getStyleClass().add("editor-navigation");
         return navigation;
     }
 
     /** Creates the initially empty authored hierarchy view. */
     private VBox createHierarchy() {
+        hierarchy.getStyleClass().add("editor-hierarchy");
         VBox.setVgrow(hierarchy, Priority.ALWAYS);
-        return new VBox(6.0, new Label("Hierarchy"), hierarchy);
+        VBox panel = new VBox(6.0, createPanelHeading("Hierarchy"), hierarchy);
+        panel.getStyleClass().addAll("editor-panel", "editor-hierarchy-panel");
+        return panel;
     }
 
     /** Creates the initially empty asset browser. */
     private VBox createAssetBrowser() {
-        assets.setPlaceholder(new Label("Open a project to browse its assets"));
+        Label placeholder = new Label("Open a project to browse its assets");
+        placeholder.getStyleClass().add("editor-empty-detail");
+        assets.setPlaceholder(placeholder);
+        assets.getStyleClass().add("editor-assets");
         VBox.setVgrow(assets, Priority.ALWAYS);
-        return new VBox(6.0, new Label("Assets"), assets);
+        VBox panel = new VBox(6.0, createPanelHeading("Assets"), assets);
+        panel.getStyleClass().addAll("editor-panel", "editor-assets-panel");
+        return panel;
     }
 
     /** Wraps the OpenGLFX node in an ordinary resizable JavaFX layout pane. */
     private static StackPane createViewportPane(GLCanvas viewportCanvas) {
         StackPane viewport = new StackPane(viewportCanvas);
-        viewport.setPadding(new Insets(1.0));
-        viewport.setStyle("-fx-background-color: #59636e;");
+        viewport.getStyleClass().add("editor-viewport");
         return viewport;
     }
 
     /** Creates the placeholder inspector for a future editor selection model. */
     private static VBox createInspector() {
-        Label heading = new Label("Inspector");
-        heading.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        VBox inspector = new VBox(
-                10.0,
-                heading,
-                new Separator(),
-                new Label("Nothing selected"),
-                new Label("Select an authored entity or asset to inspect it."));
-        inspector.setPadding(new Insets(12.0));
+        Label emptyTitle = new Label("Nothing selected");
+        emptyTitle.getStyleClass().add("editor-empty-title");
+        Label emptyDetail = new Label("Select an authored entity or asset to inspect it.");
+        emptyDetail.getStyleClass().add("editor-empty-detail");
+        VBox inspector = new VBox(10.0, createPanelHeading("Inspector"), new Separator(), emptyTitle, emptyDetail);
         inspector.setPrefWidth(250.0);
         VBox.setVgrow(inspector, Priority.ALWAYS);
+        inspector.getStyleClass().addAll("editor-panel", "editor-inspector-panel");
         return inspector;
+    }
+
+    /** Creates a consistently styled heading for one editor panel. */
+    private static Label createPanelHeading(String text) {
+        Label heading = new Label(text);
+        heading.getStyleClass().add("editor-panel-heading");
+        return heading;
     }
 
     /** Creates a compact status and structured-diagnostics region. */
     private VBox createDiagnosticsPane(Label projectStatus, Label viewportStatus) {
-        diagnostics.setPlaceholder(new Label("No project diagnostics"));
+        Label placeholder = new Label("No project diagnostics");
+        placeholder.getStyleClass().add("editor-empty-detail");
+        diagnostics.setPlaceholder(placeholder);
         diagnostics.setCellFactory(ignored -> new DiagnosticCell());
         diagnostics.setPrefHeight(105.0);
         diagnostics.setMinHeight(72.0);
-        VBox pane = new VBox(4.0, projectStatus, viewportStatus, new Label("Diagnostics"), diagnostics);
-        pane.setPadding(new Insets(0.0, 8.0, 8.0, 8.0));
+        diagnostics.getStyleClass().add("editor-diagnostics");
+        VBox pane = new VBox(4.0, projectStatus, viewportStatus, createPanelHeading("Diagnostics"), diagnostics);
+        pane.getStyleClass().add("editor-diagnostics-panel");
         return pane;
     }
 
@@ -425,22 +442,28 @@ public final class EditorApplication extends Application {
 
     /** Formats structured project diagnostics without discarding their stable code or source. */
     private static final class DiagnosticCell extends ListCell<ProjectDiagnostic> {
+        /** Creates a cell whose severity appearance is supplied by the editor theme. */
+        private DiagnosticCell() {
+            getStyleClass().add("editor-diagnostic-cell");
+        }
+
         @Override
         protected void updateItem(@Nullable ProjectDiagnostic diagnostic, boolean empty) {
             super.updateItem(diagnostic, empty);
+            getStyleClass().removeAll("diagnostic-error", "diagnostic-warning");
             if (empty || diagnostic == null) {
                 setText(null);
-                setStyle("");
                 return;
             }
             String location = diagnostic.location().isEmpty() ? "" : diagnostic.location();
             String detail = diagnostic.details().getOrDefault("technicalDetail", diagnostic.message());
             setText(diagnostic.severity() + "  " + diagnostic.code().code() + "  " + detail + "  —  "
                     + diagnostic.source() + location);
-            setStyle(
-                    diagnostic.severity() == ProjectDiagnostic.Severity.ERROR
-                            ? "-fx-text-fill: #ff8a80;"
-                            : "-fx-text-fill: #ffd180;");
+            getStyleClass()
+                    .add(
+                            diagnostic.severity() == ProjectDiagnostic.Severity.ERROR
+                                    ? "diagnostic-error"
+                                    : "diagnostic-warning");
         }
     }
 }

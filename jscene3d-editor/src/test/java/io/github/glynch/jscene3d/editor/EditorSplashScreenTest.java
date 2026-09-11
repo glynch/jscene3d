@@ -40,7 +40,9 @@ final class EditorSplashScreenTest {
         try {
             EditorSplashScreen splash = new EditorSplashScreen("test", new EditorSplashTiming(Duration.ofSeconds(3)));
             Stage stage = new Stage();
-            stage.setScene(new Scene(splash, 640.0, 400.0));
+            Scene scene = new Scene(splash, 640.0, 400.0);
+            EditorTheme.install(scene);
+            stage.setScene(scene);
             PauseTransition beforeStageIsShown = new PauseTransition(javafx.util.Duration.seconds(3.1));
             beforeStageIsShown.setOnFinished(
                     ignored -> showAndObserve(stage, splash, visibleAfterObservation, completed));

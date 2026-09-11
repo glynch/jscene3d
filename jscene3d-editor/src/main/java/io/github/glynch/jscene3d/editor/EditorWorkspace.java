@@ -8,6 +8,8 @@ import com.huskerdev.openglfx.canvas.GLCanvas;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -18,6 +20,7 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
@@ -38,12 +41,21 @@ final class EditorWorkspace extends BorderPane {
     private final TreeView<EditorHierarchyNode> hierarchy = new TreeView<>();
     private final ListView<EditorAssetItem> assets = new ListView<>();
     private final ListView<ProjectDiagnostic> diagnostics = new ListView<>();
+    private final EditorSelectionModel selectionModel = new EditorSelectionModel();
     private final Label projectContext = new Label("No project");
     private final Label previewTitle = new Label("Empty Preview");
     private final Label projectStatus = createStatus("No project opened");
     private final Label viewportStatus = createStatus("Preview: starting");
     private final Label diagnosticStatus = createStatus("0 errors");
     private final Tab diagnosticsTab = new Tab("Diagnostics");
+    private final VBox inspectorEmpty = new VBox();
+    private final VBox inspectorSelected = new VBox();
+    private final VBox inspectorSections = new VBox();
+    private final Label inspectorTitle = new Label();
+    private final Label inspectorKind = new Label();
+    private final Label inspectorSource = new Label();
+    private final Label generatedBadge = new Label("GENERATED");
+    private final ScrollPane inspectorScroll = new ScrollPane();
     private final SplitPane workspaceSplit;
     private final SplitPane upperWorkspaceSplit;
     private final SplitPane leftWorkspaceSplit;
@@ -64,6 +76,7 @@ final class EditorWorkspace extends BorderPane {
         setCenter(workspaceSplit);
         setBottom(createStatusBar());
         getStyleClass().add("editor-shell");
+        installSelectionEvents();
     }
 
     /** Applies bounded initial divider positions after the stage has completed its first layout. */
@@ -82,6 +95,7 @@ final class EditorWorkspace extends BorderPane {
 
     /** Shows that a project directory is being opened without claiming it has loaded. */
     void beginOpening(Path directory) {
+        clearSelection();
         Path normalized = directory.toAbsolutePath().normalize();
         Path fileName = normalized.getFileName();
         String candidateName = fileName == null ? normalized.toString() : fileName.toString();
@@ -92,6 +106,7 @@ final class EditorWorkspace extends BorderPane {
 
     /** Replaces the visible hierarchy, Project content, and preview context atomically. */
     void showProject(EditorProjectSession session) {
+        clearSelection();
         TreeItem<EditorHierarchyNode> root = createTreeItem(session.hierarchy());
         root.setExpanded(true);
         hierarchy.setRoot(root);
@@ -99,10 +114,14 @@ final class EditorWorkspace extends BorderPane {
         String projectName = session.project().identity().name();
         projectContext.setText(projectName);
         previewTitle.setText(session.hierarchy().label() + " Preview");
+        TreeItem<EditorHierarchyNode> initialSelection =
+                root.getChildren().isEmpty() ? root : root.getChildren().getFirst();
+        hierarchy.getSelectionModel().select(initialSelection);
     }
 
     /** Clears project-owned views after an unsuccessful open. */
     void clearProject() {
+        clearSelection();
         hierarchy.setRoot(null);
         assets.getItems().clear();
         projectContext.setText("No project");
@@ -173,17 +192,174 @@ final class EditorWorkspace extends BorderPane {
         return panel;
     }
 
-    /** Creates the placeholder Inspector reserved for the selection slice. */
-    private static VBox createInspector() {
+    /** Creates the read-only Inspector driven by the shared editor selection. */
+    private VBox createInspector() {
         Label emptyTitle = new Label("Nothing selected");
         emptyTitle.getStyleClass().add("editor-empty-title");
         Label emptyDetail = new Label("Select an authored entity or asset to inspect it.");
         emptyDetail.getStyleClass().add("editor-empty-detail");
-        VBox inspector = new VBox(10.0, createPanelHeading("Inspector"), new Separator(), emptyTitle, emptyDetail);
+        inspectorEmpty.getChildren().setAll(emptyTitle, emptyDetail);
+        inspectorEmpty.setSpacing(10.0);
+        inspectorEmpty.getStyleClass().add("editor-inspector-empty");
+
+        inspectorTitle.getStyleClass().add("editor-inspector-title");
+        inspectorKind.getStyleClass().add("editor-inspector-kind");
+        inspectorSource.getStyleClass().add("editor-inspector-source");
+        inspectorSource.setWrapText(true);
+        Label readOnlyBadge = new Label("READ-ONLY");
+        readOnlyBadge.getStyleClass().add("editor-read-only-badge");
+        generatedBadge.getStyleClass().add("editor-generated-badge");
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        HBox titleLine = new HBox(6.0, inspectorTitle, headerSpacer, readOnlyBadge, generatedBadge);
+        titleLine.setAlignment(Pos.CENTER_LEFT);
+        VBox header = new VBox(4.0, titleLine, inspectorKind, inspectorSource);
+        header.getStyleClass().add("editor-inspector-header");
+        inspectorSections.setSpacing(4.0);
+        inspectorSections.getStyleClass().add("editor-inspector-sections");
+        inspectorSelected.getChildren().setAll(header, inspectorSections);
+        inspectorSelected.getStyleClass().add("editor-inspector-selected");
+
+        inspectorScroll.setContent(inspectorSelected);
+        inspectorScroll.setFitToWidth(true);
+        inspectorScroll.getStyleClass().add("editor-inspector-scroll");
+        StackPane body = new StackPane(inspectorEmpty, inspectorScroll);
+        VBox.setVgrow(body, Priority.ALWAYS);
+        VBox inspector = new VBox(createPanelHeading("Inspector"), body);
         inspector.setMinWidth(EditorWorkspaceLayout.MINIMUM_INSPECTOR_WIDTH);
         inspector.setPrefWidth(EditorWorkspaceLayout.PREFERRED_INSPECTOR_WIDTH);
         inspector.getStyleClass().addAll("editor-panel", "editor-inspector-panel");
+        selectionModel.subscribe(this::showInspection);
         return inspector;
+    }
+
+    /** Routes Hierarchy and Project selections through the same stable selection model. */
+    private void installSelectionEvents() {
+        hierarchy.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
+            if (selected != null) {
+                assets.getSelectionModel().clearSelection();
+                selectionModel.select(selected.getValue().selection());
+            }
+        });
+        assets.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
+            if (selected != null) {
+                hierarchy.getSelectionModel().clearSelection();
+                selectionModel.select(selected.selection());
+            }
+        });
+    }
+
+    /** Clears UI and shared selection state before project-owned values are replaced. */
+    private void clearSelection() {
+        hierarchy.getSelectionModel().clearSelection();
+        assets.getSelectionModel().clearSelection();
+        selectionModel.clear();
+    }
+
+    /** Replaces the complete Inspector atomically for one selection transition. */
+    private void showInspection(Optional<EditorSelection> selected) {
+        boolean present = selected.isPresent();
+        inspectorEmpty.setManaged(!present);
+        inspectorEmpty.setVisible(!present);
+        inspectorScroll.setManaged(present);
+        inspectorScroll.setVisible(present);
+        if (!present) {
+            inspectorSections.getChildren().clear();
+            return;
+        }
+        EditorInspectorView inspection = selected.orElseThrow().inspector();
+        inspectorTitle.setText(inspection.title());
+        inspectorTitle.setTooltip(new Tooltip(inspection.identity()));
+        inspectorKind.setText(inspection.kind());
+        inspectorSource.setText(inspection.source());
+        inspectorSource.setTooltip(new Tooltip(inspection.source()));
+        generatedBadge.setManaged(inspection.generated());
+        generatedBadge.setVisible(inspection.generated());
+        inspectorSections
+                .getChildren()
+                .setAll(inspection.sections().stream()
+                        .map(EditorWorkspace::createInspectorSection)
+                        .toList());
+        inspectorScroll.setVvalue(0.0);
+    }
+
+    /** Creates one collapsible component or summary section. */
+    private static javafx.scene.control.TitledPane createInspectorSection(EditorInspectorView.Section section) {
+        VBox content = new VBox(6.0);
+        content.getStyleClass().add("editor-inspector-section-content");
+        section.description().ifPresent(description -> {
+            Label detail = new Label(description);
+            detail.setWrapText(true);
+            detail.getStyleClass().add("editor-inspector-description");
+            content.getChildren().add(detail);
+        });
+        if (!section.metadataAvailable()) {
+            Label unavailable = new Label("Descriptor metadata unavailable");
+            unavailable.getStyleClass().add("editor-inspector-metadata-warning");
+            content.getChildren().add(unavailable);
+        }
+        section.properties().stream()
+                .map(EditorWorkspace::createInspectorProperty)
+                .forEach(content.getChildren()::add);
+        javafx.scene.control.TitledPane pane = new javafx.scene.control.TitledPane(section.title(), content);
+        pane.setAnimated(false);
+        pane.setExpanded(true);
+        pane.getStyleClass().add("editor-inspector-section");
+        return pane;
+    }
+
+    /** Creates one typed property row without exposing an editable control. */
+    private static VBox createInspectorProperty(EditorInspectorView.Property property) {
+        Label name = new Label(property.displayName());
+        name.getStyleClass().add("editor-inspector-property-name");
+        Label value = new Label(property.value());
+        value.setMaxWidth(Double.MAX_VALUE);
+        value.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
+        value.getStyleClass().add("editor-inspector-value");
+        if (property.origin() == EditorInspectorView.ValueOrigin.DEFAULT) {
+            value.getStyleClass().add("editor-inspector-default-value");
+        } else if (property.origin() == EditorInspectorView.ValueOrigin.UNSET) {
+            value.getStyleClass().add("editor-inspector-unset-value");
+        }
+        String metadata = propertyMetadata(property);
+        Label type = new Label(metadata);
+        type.getStyleClass().add("editor-inspector-property-metadata");
+        String tooltip = propertyTooltip(property);
+        if (!tooltip.isEmpty()) {
+            Tooltip help = new Tooltip(tooltip);
+            name.setTooltip(help);
+            value.setTooltip(help);
+        }
+        VBox row = new VBox(3.0, name, value, type);
+        row.getStyleClass().add("editor-inspector-property");
+        return row;
+    }
+
+    /** Formats compact value-kind and origin metadata. */
+    private static String propertyMetadata(EditorInspectorView.Property property) {
+        StringBuilder text = new StringBuilder(EditorInspectorProjector.label(property.valueKind()));
+        if (property.required()) {
+            text.append(" · required");
+        }
+        if (property.origin() == EditorInspectorView.ValueOrigin.DEFAULT) {
+            text.append(" · default");
+        } else if (property.origin() == EditorInspectorView.ValueOrigin.UNSET) {
+            text.append(" · not set");
+        }
+        return text.toString();
+    }
+
+    /** Formats descriptions and generic constraints for on-demand inspection. */
+    private static String propertyTooltip(EditorInspectorView.Property property) {
+        StringBuilder text = new StringBuilder();
+        property.description().ifPresent(text::append);
+        for (Map.Entry<String, String> constraint : property.constraints().entrySet()) {
+            if (!text.isEmpty()) {
+                text.append('\n');
+            }
+            text.append(constraint.getKey()).append(": ").append(constraint.getValue());
+        }
+        return text.toString();
     }
 
     /** Creates the Hierarchy and preview row above the shared lower browser. */

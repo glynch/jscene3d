@@ -60,10 +60,19 @@ final class EditorProjectLoaderTest {
             assertThat(placement.children())
                     .singleElement()
                     .returns("Lamp", EditorHierarchyNode::label)
-                    .returns(EditorHierarchyNode.Kind.LOCAL_ENTITY, EditorHierarchyNode::kind)
+                    .returns(EditorHierarchyNode.Kind.GENERATED_ENTITY, EditorHierarchyNode::kind)
+                    .satisfies(child -> assertThat(child.selection().inspector())
+                            .returns("Lamp", EditorInspectorView::title)
+                            .returns(true, EditorInspectorView::generated)
+                            .satisfies(inspection -> assertThat(inspection.sections())
+                                    .extracting(EditorInspectorView.Section::title)
+                                    .contains("Transform 3D", "Perspective Camera 3D")))
                     .satisfies(child -> assertThat(child.entityId())
                             .hasValueSatisfying(id -> assertThat(id.toString()).isEqualTo(CHILD_ID)));
         });
+        assertThat(session.assets())
+                .extracting(item -> item.selection().inspector().kind())
+                .containsExactly("Entity definition", "World definition");
     }
 
     /** Preserves manifest diagnostics when a directory cannot become an editor session. */

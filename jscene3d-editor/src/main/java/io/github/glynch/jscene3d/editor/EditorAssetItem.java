@@ -7,14 +7,15 @@ package io.github.glynch.jscene3d.editor;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** One immutable asset-browser projection with retained stable identity. */
-record EditorAssetItem(String label, String identity, Kind kind, Path source) {
+/** One immutable asset-browser projection with retained stable identity and inspection data. */
+record EditorAssetItem(String label, String identity, Kind kind, Path source, EditorSelection selection) {
     /** Validates one asset projection. */
     EditorAssetItem {
         Objects.requireNonNull(label, "label");
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(selection, "selection");
     }
 
     /** Shows only ordinary author-facing information in the asset browser. */

@@ -17,6 +17,7 @@ final class EditorHierarchyNode {
     private final Optional<EntityId> entityId;
     private final Optional<AssetId> definitionId;
     private final boolean enabled;
+    private final EditorSelection selection;
     private final List<EditorHierarchyNode> children;
 
     /** Stores one hierarchy projection while retaining its stable identities. */
@@ -26,12 +27,14 @@ final class EditorHierarchyNode {
             Optional<EntityId> entityId,
             Optional<AssetId> definitionId,
             boolean enabled,
+            EditorSelection selection,
             List<EditorHierarchyNode> children) {
         this.kind = Objects.requireNonNull(kind, "kind");
         this.label = Objects.requireNonNull(label, "label");
         this.entityId = Objects.requireNonNull(entityId, "entityId");
         this.definitionId = Objects.requireNonNull(definitionId, "definitionId");
         this.enabled = enabled;
+        this.selection = Objects.requireNonNull(selection, "selection");
         this.children = List.copyOf(children);
     }
 
@@ -60,6 +63,11 @@ final class EditorHierarchyNode {
         return enabled;
     }
 
+    /** Returns the stable shared selection represented by this hierarchy entry. */
+    EditorSelection selection() {
+        return selection;
+    }
+
     /** Returns projected child entries in authored order. */
     List<EditorHierarchyNode> children() {
         return children;
@@ -78,6 +86,8 @@ final class EditorHierarchyNode {
         /** Locally authored entity. */
         LOCAL_ENTITY,
         /** Reusable entity-definition placement. */
-        PLACEMENT
+        PLACEMENT,
+        /** Local entity projected from inside a placed reusable definition. */
+        GENERATED_ENTITY
     }
 }

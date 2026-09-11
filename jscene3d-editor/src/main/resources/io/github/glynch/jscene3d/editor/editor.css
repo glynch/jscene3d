@@ -189,7 +189,140 @@
 }
 
 .editor-inspector-panel {
+    -fx-padding: 0;
+}
+
+.editor-inspector-panel > .editor-panel-heading {
+    -fx-background-color: -jscene-chrome;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-max-width: infinity;
+    -fx-min-height: 34px;
+    -fx-padding: 7px 10px;
+    -fx-pref-height: 34px;
+}
+
+.editor-inspector-empty {
+    -fx-padding: 16px 12px;
+}
+
+.editor-inspector-scroll,
+.editor-inspector-scroll > .viewport,
+.editor-inspector-selected {
+    -fx-background-color: -jscene-panel;
+    -fx-background-insets: 0;
+}
+
+.editor-inspector-scroll {
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.editor-inspector-header {
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
     -fx-padding: 12px;
+}
+
+.editor-inspector-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-inspector-kind,
+.editor-inspector-source,
+.editor-inspector-description,
+.editor-inspector-property-metadata {
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-inspector-source,
+.editor-inspector-description {
+    -fx-font-size: 11px;
+}
+
+.editor-generated-badge {
+    -fx-background-color: rgba(142, 151, 168, 0.12);
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-text-muted;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-font-size: 10px;
+    -fx-font-weight: 600;
+    -fx-padding: 3px 6px;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-inspector-sections {
+    -fx-spacing: 1px;
+}
+
+.editor-inspector-section {
+    -fx-background-color: -jscene-panel;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-inspector-section > .title {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-font-weight: 600;
+    -fx-min-height: 34px;
+    -fx-padding: 7px 10px;
+}
+
+.editor-inspector-section > .title:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-inspector-section > .title > .arrow-button > .arrow {
+    -fx-background-color: -jscene-text-muted;
+}
+
+.editor-inspector-section > .content {
+    -fx-background-color: -jscene-panel;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.editor-inspector-section-content {
+    -fx-padding: 8px 10px 10px 10px;
+}
+
+.editor-inspector-property {
+    -fx-padding: 2px 0 4px 0;
+}
+
+.editor-inspector-property-name {
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-inspector-value {
+    -fx-background-color: -jscene-field;
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-min-height: 28px;
+    -fx-padding: 5px 8px;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-inspector-default-value {
+    -fx-text-fill: derive(-jscene-text, -8%);
+}
+
+.editor-inspector-unset-value,
+.editor-inspector-metadata-warning {
+    -fx-text-fill: -jscene-warning;
+}
+
+.editor-inspector-property-metadata {
+    -fx-font-size: 10px;
 }
 
 .editor-panel-heading {

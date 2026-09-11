@@ -145,9 +145,14 @@ final class EditorProjectLoader {
         }
 
         WorldDefinition world = startupWorld.orElseThrow();
+        Path worldSource = authored.find(world.id())
+                .map(AssetMetadata::path)
+                .orElse(project.runtime().entryScene());
         progress.phaseStarted(EditorLoadingPhase.BUILDING_HIERARCHY);
         EditorHierarchyNode hierarchy = operation.measure(
-                "project.hierarchy.project", Map.of(), () -> projectHierarchy(world, definitions, types, diagnostics));
+                "project.hierarchy.project",
+                Map.of(),
+                () -> projectHierarchy(world, worldSource, project.root(), authored, definitions, types, diagnostics));
         EditorProjectSession session =
                 new EditorProjectSession(project, authored, types, content, world, hierarchy, assets);
         return new EditorProjectLoadResult(Optional.of(session), List.copyOf(diagnostics));
@@ -305,14 +310,23 @@ final class EditorProjectLoader {
             LinkedHashSet<ProjectDiagnostic> diagnostics) {
         List<EditorAssetItem> assets = new ArrayList<>();
         for (AssetMetadata metadata : authored.assets()) {
-            assets.add(loadDefinitionAsset(metadata, definitions, types, diagnostics));
+            assets.add(loadDefinitionAsset(metadata, project.root(), definitions, types, diagnostics));
         }
         for (GameProject.AssetSource source : project.assets()) {
-            assets.add(new EditorAssetItem(source.id(), source.id(), EditorAssetItem.Kind.SOURCE_ASSET, source.path()));
+            assets.add(new EditorAssetItem(
+                    source.id(),
+                    source.id(),
+                    EditorAssetItem.Kind.SOURCE_ASSET,
+                    source.path(),
+                    EditorInspectorProjector.sourceAsset(source, project.root())));
         }
         for (ImportDefinition definition : imports) {
             assets.add(new EditorAssetItem(
-                    definition.id(), definition.id(), EditorAssetItem.Kind.IMPORT_DEFINITION, definition.source()));
+                    definition.id(),
+                    definition.id(),
+                    EditorAssetItem.Kind.IMPORT_DEFINITION,
+                    definition.source(),
+                    EditorInspectorProjector.importDefinition(definition, project.root())));
         }
         return List.copyOf(assets);
     }
@@ -320,6 +334,7 @@ final class EditorProjectLoader {
     /** Loads one authored definition for its label and records its complete validation diagnostics. */
     private static EditorAssetItem loadDefinitionAsset(
             AssetMetadata metadata,
+            Path projectRoot,
             DefinitionResolver definitions,
             RegisteredTypeCatalog types,
             LinkedHashSet<ProjectDiagnostic> diagnostics) {
@@ -327,15 +342,45 @@ final class EditorProjectLoader {
         if (metadata.kind() == AssetKind.ENTITY_DEFINITION) {
             DefinitionLoadResult<EntityDefinition> result = definitions.loadEntity(AssetRef.to(metadata.id()), types);
             diagnostics.addAll(result.diagnostics());
-            String label = result.definition().map(EntityDefinition::name).orElse(fallback);
+            Optional<EntityDefinition> definition = result.definition();
+            String label = definition.map(EntityDefinition::name).orElse(fallback);
+            EditorSelection selection = definition
+                    .map(value -> EditorInspectorProjector.entityDefinition(value, metadata.path(), projectRoot, types))
+                    .orElseGet(() -> unavailableAssetSelection(metadata, label, projectRoot));
             return new EditorAssetItem(
-                    label, metadata.id().toString(), EditorAssetItem.Kind.ENTITY_DEFINITION, metadata.path());
+                    label,
+                    metadata.id().toString(),
+                    EditorAssetItem.Kind.ENTITY_DEFINITION,
+                    metadata.path(),
+                    selection);
         }
         DefinitionLoadResult<WorldDefinition> result = definitions.loadWorld(AssetRef.to(metadata.id()), types);
         diagnostics.addAll(result.diagnostics());
-        String label = result.definition().map(WorldDefinition::name).orElse(fallback);
+        Optional<WorldDefinition> definition = result.definition();
+        String label = definition.map(WorldDefinition::name).orElse(fallback);
+        EditorSelection selection = definition
+                .map(value -> EditorInspectorProjector.worldDefinition(value, metadata.path(), projectRoot))
+                .orElseGet(() -> unavailableAssetSelection(metadata, label, projectRoot));
         return new EditorAssetItem(
-                label, metadata.id().toString(), EditorAssetItem.Kind.WORLD_DEFINITION, metadata.path());
+                label, metadata.id().toString(), EditorAssetItem.Kind.WORLD_DEFINITION, metadata.path(), selection);
+    }
+
+    /** Preserves selection metadata for a definition whose complete data could not be loaded. */
+    private static EditorSelection unavailableAssetSelection(AssetMetadata metadata, String label, Path projectRoot) {
+        String source = projectRoot.relativize(metadata.path()).toString();
+        EditorInspectorView view = new EditorInspectorView(
+                label,
+                metadata.kind() == AssetKind.ENTITY_DEFINITION ? "Entity definition" : "World definition",
+                source,
+                metadata.id().toString(),
+                false,
+                List.of(new EditorInspectorView.Section(
+                        "Definition",
+                        Optional.of("Complete definition data is unavailable; see Diagnostics"),
+                        false,
+                        List.of())));
+        String key = EditorSelection.Kind.ASSET + ":" + metadata.path() + ':' + metadata.id();
+        return new EditorSelection(EditorSelection.Kind.ASSET, key, view);
     }
 
     /** Resolves and validates the manifest's configured startup world by its stable asset identity. */
@@ -365,11 +410,16 @@ final class EditorProjectLoader {
     /** Projects a world and placed definition roots without introducing placement wrapper nodes. */
     private static EditorHierarchyNode projectHierarchy(
             WorldDefinition world,
+            Path source,
+            Path projectRoot,
+            AssetCatalog authored,
             DefinitionResolver definitions,
             RegisteredTypeCatalog types,
             LinkedHashSet<ProjectDiagnostic> diagnostics) {
+        HierarchyProjectionContext context =
+                new HierarchyProjectionContext(projectRoot, authored, definitions, types, diagnostics);
         List<EditorHierarchyNode> children = world.roots().stream()
-                .map(entry -> projectEntry(entry, definitions, types, diagnostics, new HashSet<>()))
+                .map(entry -> projectEntry(entry, source, context, new HashSet<>(), false))
                 .toList();
         return new EditorHierarchyNode(
                 EditorHierarchyNode.Kind.WORLD,
@@ -377,50 +427,53 @@ final class EditorProjectLoader {
                 Optional.empty(),
                 Optional.of(world.id()),
                 true,
+                EditorInspectorProjector.world(world, source, projectRoot),
                 children);
     }
 
     /** Projects one local entity or reusable-definition placement recursively. */
     private static EditorHierarchyNode projectEntry(
             EntityEntry entry,
-            DefinitionResolver definitions,
-            RegisteredTypeCatalog types,
-            LinkedHashSet<ProjectDiagnostic> diagnostics,
-            Set<AssetId> ancestors) {
+            Path source,
+            HierarchyProjectionContext context,
+            Set<AssetId> ancestors,
+            boolean generated) {
         return switch (entry) {
-            case LocalEntity local -> projectLocal(local, definitions, types, diagnostics, ancestors);
-            case EntityPlacement placement -> projectPlacement(placement, definitions, types, diagnostics, ancestors);
+            case LocalEntity local -> projectLocal(local, source, context, ancestors, generated);
+            case EntityPlacement placement -> projectPlacement(placement, source, context, ancestors, generated);
         };
     }
 
     /** Projects one locally authored entity and its children. */
     private static EditorHierarchyNode projectLocal(
             LocalEntity local,
-            DefinitionResolver definitions,
-            RegisteredTypeCatalog types,
-            LinkedHashSet<ProjectDiagnostic> diagnostics,
-            Set<AssetId> ancestors) {
+            Path source,
+            HierarchyProjectionContext context,
+            Set<AssetId> ancestors,
+            boolean generated) {
         List<EditorHierarchyNode> children = local.children().stream()
-                .map(child -> projectEntry(child, definitions, types, diagnostics, ancestors))
+                .map(child -> projectEntry(child, source, context, ancestors, generated))
                 .toList();
         return new EditorHierarchyNode(
-                EditorHierarchyNode.Kind.LOCAL_ENTITY,
+                generated ? EditorHierarchyNode.Kind.GENERATED_ENTITY : EditorHierarchyNode.Kind.LOCAL_ENTITY,
                 local.name().orElse("Unnamed entity"),
                 Optional.of(local.id()),
                 Optional.empty(),
                 local.isEnabled(),
+                EditorInspectorProjector.entity(local, source, context.projectRoot(), context.types(), generated),
                 children);
     }
 
     /** Projects one placement as its instantiated definition root. */
     private static EditorHierarchyNode projectPlacement(
             EntityPlacement placement,
-            DefinitionResolver definitions,
-            RegisteredTypeCatalog types,
-            LinkedHashSet<ProjectDiagnostic> diagnostics,
-            Set<AssetId> ancestors) {
-        DefinitionLoadResult<EntityDefinition> result = definitions.loadEntity(placement.definition(), types);
-        diagnostics.addAll(result.diagnostics());
+            Path source,
+            HierarchyProjectionContext context,
+            Set<AssetId> ancestors,
+            boolean generated) {
+        DefinitionLoadResult<EntityDefinition> result =
+                context.definitions().loadEntity(placement.definition(), context.types());
+        context.diagnostics().addAll(result.diagnostics());
         Optional<EntityDefinition> loaded = result.definition();
         if (loaded.isEmpty() || !ancestors.add(placement.definition().id())) {
             return new EditorHierarchyNode(
@@ -429,11 +482,17 @@ final class EditorProjectLoader {
                     Optional.of(placement.id()),
                     Optional.of(placement.definition().id()),
                     placement.isEnabled(),
+                    EditorInspectorProjector.placement(
+                            placement, loaded, source, context.projectRoot(), context.types(), generated),
                     List.of());
         }
         EntityDefinition definition = loaded.orElseThrow();
+        Path definitionSource = context.authored()
+                .find(definition.id())
+                .map(AssetMetadata::path)
+                .orElse(source);
         List<EditorHierarchyNode> children = definition.root().children().stream()
-                .map(child -> projectEntry(child, definitions, types, diagnostics, ancestors))
+                .map(child -> projectEntry(child, definitionSource, context, ancestors, true))
                 .toList();
         ancestors.remove(placement.definition().id());
         String label = placement.name().orElseGet(() -> definition.root().name().orElse(definition.name()));
@@ -443,8 +502,18 @@ final class EditorProjectLoader {
                 Optional.of(placement.id()),
                 Optional.of(definition.id()),
                 placement.isEnabled(),
+                EditorInspectorProjector.placement(
+                        placement, loaded, source, context.projectRoot(), context.types(), generated),
                 children);
     }
+
+    /** Shared immutable services and state for recursive hierarchy projection. */
+    private record HierarchyProjectionContext(
+            Path projectRoot,
+            AssetCatalog authored,
+            DefinitionResolver definitions,
+            RegisteredTypeCatalog types,
+            LinkedHashSet<ProjectDiagnostic> diagnostics) {}
 
     /** Returns a terminal editor result while preserving all collected diagnostics. */
     private static EditorProjectLoadResult failure(LinkedHashSet<ProjectDiagnostic> diagnostics) {

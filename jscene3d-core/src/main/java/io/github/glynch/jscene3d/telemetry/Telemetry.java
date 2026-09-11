@@ -14,17 +14,22 @@ import org.jspecify.annotations.Nullable;
 /** Creates hierarchical local measurements and publishes completed values to an application-owned observer. */
 public final class Telemetry {
     private static final System.Logger LOGGER = System.getLogger(Telemetry.class.getName());
-    private static final Telemetry DISABLED = new Telemetry(null, System::nanoTime);
+    private static final Telemetry DISABLED = new Telemetry(null, System::nanoTime, Telemetry::logObserverRejection);
 
     private final @Nullable Consumer<TelemetryMeasurement> observer;
     private final LongSupplier ticker;
+    private final Consumer<? super RuntimeException> rejectionHandler;
     private final AtomicLong traceIds = new AtomicLong();
     private final AtomicLong operationIds = new AtomicLong();
 
     /** Creates a recorder around an optional observer and monotonic ticker. */
-    private Telemetry(@Nullable Consumer<TelemetryMeasurement> observer, LongSupplier ticker) {
+    private Telemetry(
+            @Nullable Consumer<TelemetryMeasurement> observer,
+            LongSupplier ticker,
+            Consumer<? super RuntimeException> rejectionHandler) {
         this.observer = observer;
         this.ticker = Objects.requireNonNull(ticker, "ticker");
+        this.rejectionHandler = Objects.requireNonNull(rejectionHandler, "rejectionHandler");
     }
 
     /**
@@ -43,7 +48,8 @@ public final class Telemetry {
      * @return a local recorder using monotonic system time
      */
     public static Telemetry recording(Consumer<TelemetryMeasurement> observer) {
-        return new Telemetry(Objects.requireNonNull(observer, "observer"), System::nanoTime);
+        return new Telemetry(
+                Objects.requireNonNull(observer, "observer"), System::nanoTime, Telemetry::logObserverRejection);
     }
 
     /**
@@ -70,7 +76,15 @@ public final class Telemetry {
 
     /** Creates a recorder with a controllable ticker for deterministic package tests. */
     static Telemetry recording(Consumer<TelemetryMeasurement> observer, LongSupplier ticker) {
-        return new Telemetry(Objects.requireNonNull(observer, "observer"), ticker);
+        return recording(observer, ticker, Telemetry::logObserverRejection);
+    }
+
+    /** Creates a recorder whose observer rejection handling is visible to package tests. */
+    static Telemetry recording(
+            Consumer<TelemetryMeasurement> observer,
+            LongSupplier ticker,
+            Consumer<? super RuntimeException> rejectionHandler) {
+        return new Telemetry(Objects.requireNonNull(observer, "observer"), ticker, rejectionHandler);
     }
 
     /** Creates one child operation of an enabled parent. */
@@ -99,8 +113,13 @@ public final class Telemetry {
         try {
             currentObserver.accept(measurement);
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING, "Telemetry observer rejected a measurement", exception);
+            rejectionHandler.accept(exception);
         }
+    }
+
+    /** Reports one rejected measurement through the process logger. */
+    private static void logObserverRejection(RuntimeException exception) {
+        LOGGER.log(System.Logger.Level.WARNING, "Telemetry observer rejected a measurement", exception);
     }
 
     /** Validates one stable operation name. */

@@ -174,6 +174,7 @@ public final class EditorApplication extends Application {
             editorWorkspace.clearProject();
             requireViewportController().clearProject();
             editorWorkspace.setProjectStatus("Open failed — see Diagnostics");
+            editorWorkspace.openDiagnostics();
             requireSplashScreen().finish();
             return;
         }
@@ -220,6 +221,7 @@ public final class EditorApplication extends Application {
                 .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
         if (failed) {
             editorWorkspace.setProjectStatus(session.project().identity().name() + " · preview failed");
+            editorWorkspace.openDiagnostics();
             return;
         }
         EditorProjectOpenDurations durations = result.durations();

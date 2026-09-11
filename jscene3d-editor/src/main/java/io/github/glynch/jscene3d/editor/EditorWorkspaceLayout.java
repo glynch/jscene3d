@@ -37,9 +37,15 @@ final class EditorWorkspaceLayout {
 
     /** Returns the vertical divider position while retaining usable preview and lower regions. */
     static double vertical(double contentHeight) {
-        double minimumHeight = MINIMUM_PREVIEW_HEIGHT + MINIMUM_BOTTOM_HEIGHT;
+        return verticalForBottomHeight(contentHeight, PREFERRED_BOTTOM_HEIGHT);
+    }
+
+    /** Returns the vertical divider position for one requested bottom-drawer height. */
+    static double verticalForBottomHeight(double contentHeight, double requestedBottomHeight) {
+        double requested = Math.max(0.0, requestedBottomHeight);
+        double minimumHeight = MINIMUM_PREVIEW_HEIGHT + Math.min(MINIMUM_BOTTOM_HEIGHT, requested);
         double height = Math.max(minimumHeight, contentHeight);
-        double bottomHeight = Math.min(PREFERRED_BOTTOM_HEIGHT, height - MINIMUM_PREVIEW_HEIGHT);
+        double bottomHeight = Math.clamp(requested, 0.0, height - MINIMUM_PREVIEW_HEIGHT);
         return (height - bottomHeight) / height;
     }
 

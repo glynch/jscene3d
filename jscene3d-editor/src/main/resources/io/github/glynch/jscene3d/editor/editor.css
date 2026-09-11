@@ -392,51 +392,105 @@
     -fx-min-width: 1px;
 }
 
-.editor-bottom-tabs {
+.editor-bottom-drawer {
     -fx-background-color: -jscene-panel;
     -fx-background-insets: 0;
     -fx-padding: 0;
 }
 
-.editor-bottom-tabs > .tab-header-area {
-    -fx-padding: 0;
-}
-
-.editor-bottom-tabs > .tab-header-area > .tab-header-background {
+.editor-drawer-header {
     -fx-background-color: -jscene-chrome;
     -fx-border-color: transparent transparent -jscene-divider transparent;
     -fx-border-width: 0 0 1px 0;
+    -fx-padding: 0 6px 0 0;
 }
 
-.editor-bottom-tabs > .tab-header-area > .headers-region > .tab {
+.editor-drawer-tab {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 0;
     -fx-border-color: transparent;
+    -fx-border-radius: 0;
     -fx-border-width: 0 0 2px 0;
+    -fx-font-size: 12px;
+    -fx-min-height: 34px;
     -fx-padding: 6px 12px 5px 12px;
-}
-
-.editor-bottom-tabs > .tab-header-area > .headers-region > .tab:hover {
-    -fx-background-color: -jscene-hover;
-}
-
-.editor-bottom-tabs > .tab-header-area > .headers-region > .tab:selected {
-    -fx-background-color: -jscene-panel-raised;
-    -fx-border-color: transparent transparent -jscene-accent transparent;
-}
-
-.editor-bottom-tabs > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
     -fx-text-fill: -jscene-text-muted;
 }
 
-.editor-bottom-tabs > .tab-header-area > .headers-region > .tab:selected > .tab-container > .tab-label {
+.editor-drawer-tab:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-drawer-tab-active {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-border-color: transparent transparent -jscene-accent transparent;
     -fx-text-fill: -jscene-text-strong;
 }
 
-.editor-bottom-tabs > .tab-content-area {
-    -fx-background-color: -jscene-panel;
+.editor-drawer-tab .editor-drawer-tab-label {
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-drawer-tab-active .editor-drawer-tab-label {
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-diagnostic-badge {
+    -fx-alignment: center;
+    -fx-background-color: rgba(117, 98, 243, 0.22);
+    -fx-background-radius: 8px;
+    -fx-font-size: 10px;
+    -fx-min-height: 16px;
+    -fx-min-width: 18px;
+    -fx-padding: 1px 5px;
+    -fx-text-fill: -jscene-focus;
+}
+
+.editor-drawer-close {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-font-size: 16px;
+    -fx-min-height: 26px;
+    -fx-min-width: 28px;
     -fx-padding: 0;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-drawer-close:hover {
+    -fx-background-color: -jscene-hover;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-diagnostic-tools {
+    -fx-padding: 3px 4px;
+}
+
+.editor-diagnostic-severity-filter {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-font-size: 10px;
+    -fx-min-height: 26px;
+    -fx-padding: 3px 7px;
+}
+
+.editor-diagnostic-severity-filter:selected {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-border-color: -jscene-divider;
+}
+
+.editor-diagnostic-severity-filter.diagnostic-error {
+    -fx-text-fill: -jscene-error;
+}
+
+.editor-diagnostic-severity-filter.diagnostic-warning {
+    -fx-text-fill: -jscene-warning;
+}
+
+.editor-diagnostic-filter {
+    -fx-font-size: 11px;
+    -fx-min-height: 26px;
+    -fx-pref-height: 26px;
 }
 
 .editor-project-panel {
@@ -444,7 +498,7 @@
 }
 
 .editor-diagnostics-panel {
-    -fx-padding: 8px;
+    -fx-padding: 0;
 }
 
 .editor-project-browser-split,
@@ -723,12 +777,98 @@
     -fx-text-fill: -jscene-text-muted;
 }
 
-.editor-diagnostic-cell.diagnostic-warning {
+.editor-status-action {
+    -fx-background-insets: 0;
+    -fx-background-radius: 3px;
+    -fx-border-color: transparent;
+    -fx-padding: 2px 5px;
+}
+
+.editor-status-action:hover {
+    -fx-background-color: -jscene-hover;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-diagnostic-tree {
+    -fx-background-color: -jscene-panel;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.editor-diagnostic-tree-cell {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 4px 8px;
+}
+
+.editor-diagnostic-tree-cell:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-diagnostic-tree-cell:selected {
+    -fx-background-color: -jscene-selected;
+}
+
+.editor-diagnostic-tree-cell.diagnostic-group {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-font-weight: 600;
+    -fx-padding: 5px 8px;
+}
+
+.editor-diagnostic-source-name,
+.editor-diagnostic-message {
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-diagnostic-source-name {
+    -fx-font-weight: 600;
+}
+
+.editor-diagnostic-group-counts,
+.editor-diagnostic-code,
+.editor-diagnostic-location,
+.editor-diagnostic-detail-label,
+.editor-diagnostic-detail-value {
+    -fx-font-size: 10px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-diagnostic-code {
+    -fx-font-family: "Monospaced";
+}
+
+.editor-diagnostic-location {
+    -fx-font-family: "Monospaced";
+}
+
+.editor-diagnostic-severity {
+    -fx-alignment: center;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-min-width: 16px;
+}
+
+.editor-diagnostic-severity.diagnostic-error {
+    -fx-text-fill: -jscene-error;
+}
+
+.editor-diagnostic-severity.diagnostic-warning {
     -fx-text-fill: -jscene-warning;
 }
 
-.editor-diagnostic-cell.diagnostic-error {
-    -fx-text-fill: -jscene-error;
+.editor-diagnostic-tree-cell.diagnostic-detail {
+    -fx-background-color: -jscene-chrome;
+    -fx-padding: 4px 10px;
+}
+
+.editor-diagnostic-detail-label {
+    -fx-font-weight: 700;
+    -fx-min-width: 62px;
+}
+
+.editor-diagnostic-empty {
+    -fx-padding: 24px;
 }
 
 .editor-read-only-badge {

@@ -30,9 +30,13 @@ The prototype qualifies the initial macOS editor; Windows and Linux require
 their own render, input, high-DPI, disposal, and packaged-execution qualification
 before support is claimed.
 
-The production foundation lives in the single `jscene3d-editor` application
+The production JavaFX workbench lives in the `jscene3d-editor` application
 artifact. It owns the JavaFX shell, the OpenGLFX adapter, and editor-specific
-viewport coordination. Its initial hierarchy, asset browser, and inspector are
-explicit placeholders surrounding a temporary renderer scene; they do not
-introduce a second project document model. Project loading and projection of
-authored definitions are subsequent vertical slices.
+viewport coordination. Toolkit-independent extension contracts live in
+`jscene3d-editor-api`, preventing editor extensions from exposing JavaFX controls.
+The API separates executable commands from their workbench placements, describes
+views through stable kinds and editor-rendered models (including asynchronous
+trees), owns registrations through extension-scoped subscriptions, and provides
+portable status, window-message, and diagnostic publication facilities. The
+initial hierarchy, asset browser, and inspector do not introduce a second project
+document model; they project authored definitions through editor-owned views.

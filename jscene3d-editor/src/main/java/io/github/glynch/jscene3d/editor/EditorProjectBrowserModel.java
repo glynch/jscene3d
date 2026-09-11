@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -75,6 +76,15 @@ final class EditorProjectBrowserModel {
         return selectedIdentity.flatMap(identity -> assets.stream()
                 .filter(item -> item.selection().identity().equals(identity))
                 .findFirst());
+    }
+
+    /** Finds an asset only when a diagnostic names its exact authoritative source. */
+    Optional<EditorAssetItem> findBySource(Path source) {
+        Path normalized =
+                Objects.requireNonNull(source, "source").toAbsolutePath().normalize();
+        return assets.stream()
+                .filter(item -> item.source().toAbsolutePath().normalize().equals(normalized))
+                .findFirst();
     }
 
     /** Returns the active browser category. */

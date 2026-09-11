@@ -1,0 +1,65 @@
+/*
+ * Copyright 2026 Graham Lynch
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.glynch.jscene3d.editor.extension;
+
+import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
+import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
+import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
+import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
+import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
+import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
+import io.github.glynch.jscene3d.editor.window.EditorWindow;
+
+/** Lifetime-scoped editor facilities supplied to one activated extension. */
+public interface EditorExtensionContext {
+    /**
+     * Returns the registry for logical editor views.
+     *
+     * @return view contribution registry
+     */
+    EditorViewRegistry views();
+
+    /**
+     * Returns the registry for executable editor commands.
+     *
+     * @return command registry
+     */
+    EditorCommandRegistry commands();
+
+    /**
+     * Returns the registry which exposes commands on editor-owned interaction surfaces.
+     *
+     * @return command-placement registry
+     */
+    EditorCommandPlacementRegistry commandPlacements();
+
+    /**
+     * Returns the editor status-bar facility.
+     *
+     * @return status-bar facility
+     */
+    EditorStatusBar statusBar();
+
+    /**
+     * Returns safe interaction with the containing editor window.
+     *
+     * @return editor window facility
+     */
+    EditorWindow window();
+
+    /**
+     * Returns the facility for publishing extension-owned diagnostics.
+     *
+     * @return diagnostic collection factory
+     */
+    EditorDiagnostics diagnostics();
+
+    /**
+     * Returns the registrations automatically closed when this extension is deactivated.
+     *
+     * @return extension-owned subscriptions
+     */
+    ExtensionSubscriptions subscriptions();
+}

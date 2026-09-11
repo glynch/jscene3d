@@ -55,4 +55,15 @@ final class EditorWorkspaceLayoutTest {
         assertThat((1.0 - minimumDivider) * minimumHeight)
                 .isCloseTo(EditorWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT, within(0.000_001));
     }
+
+    /** Allows a collapsed drawer header to return its space to the preview. */
+    @Test
+    void positionsARequestedCollapsedDrawerHeight() {
+        double height = 822.0;
+        double drawerHeight = 34.0;
+
+        double divider = EditorWorkspaceLayout.verticalForBottomHeight(height, drawerHeight);
+
+        assertThat((1.0 - divider) * height).isCloseTo(drawerHeight, within(0.000_001));
+    }
 }

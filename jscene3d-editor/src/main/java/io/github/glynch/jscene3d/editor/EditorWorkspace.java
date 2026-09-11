@@ -23,8 +23,6 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -56,15 +54,13 @@ final class EditorWorkspace extends BorderPane {
     private final TextField assetSearch = new TextField();
     private final Label assetBreadcrumb = new Label("No project");
     private final Label assetBrowserEmpty = new Label();
-    private final ListView<ProjectDiagnostic> diagnostics = new ListView<>();
     private final EditorSelectionModel selectionModel = new EditorSelectionModel();
     private final EditorProjectBrowserModel projectBrowser = new EditorProjectBrowserModel();
     private final Label projectContext = new Label("No project");
     private final Label previewTitle = new Label("Empty Preview");
     private final Label projectStatus = createStatus("No project opened");
     private final Label viewportStatus = createStatus("Preview: starting");
-    private final Label diagnosticStatus = createStatus("0 errors");
-    private final Tab diagnosticsTab = new Tab("Diagnostics");
+    private final Button diagnosticStatus = createStatusAction("✕ 0   △ 0");
     private final VBox inspectorEmpty = new VBox();
     private final VBox inspectorSelected = new VBox();
     private final VBox inspectorSections = new VBox();
@@ -76,6 +72,7 @@ final class EditorWorkspace extends BorderPane {
     private final SplitPane workspaceSplit;
     private final SplitPane upperWorkspaceSplit;
     private final SplitPane leftWorkspaceSplit;
+    private final EditorBottomDrawer bottomDrawer;
     private String projectBrowserProjectName = "No project";
     private boolean showingAssetGrid = true;
 
@@ -87,7 +84,8 @@ final class EditorWorkspace extends BorderPane {
         VBox inspectorPanel = createInspector();
         VBox previewPanel = createViewportPane(viewportCanvas);
         upperWorkspaceSplit = createUpperWorkspaceSplit(hierarchyPanel, previewPanel);
-        leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit);
+        bottomDrawer = new EditorBottomDrawer(createProjectBrowser(), this::selectDiagnostic);
+        leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit, bottomDrawer);
         workspaceSplit = new SplitPane(leftWorkspaceSplit, inspectorPanel);
         workspaceSplit.setOrientation(Orientation.HORIZONTAL);
         workspaceSplit.getStyleClass().add("editor-workspace-split");
@@ -96,6 +94,7 @@ final class EditorWorkspace extends BorderPane {
         setBottom(createStatusBar());
         getStyleClass().add("editor-shell");
         installSelectionEvents();
+        diagnosticStatus.setOnAction(ignored -> bottomDrawer.openDiagnostics());
     }
 
     /** Applies bounded initial divider positions after the stage has completed its first layout. */
@@ -169,20 +168,21 @@ final class EditorWorkspace extends BorderPane {
 
     /** Replaces structured diagnostics and refreshes their concise count. */
     void showDiagnostics(List<ProjectDiagnostic> projectDiagnostics) {
-        diagnostics.getItems().setAll(projectDiagnostics);
-        long errors = projectDiagnostics.stream()
-                .filter(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR)
-                .count();
-        long warnings = projectDiagnostics.size() - errors;
+        EditorBottomDrawer.DiagnosticCounts counts = bottomDrawer.showDiagnostics(projectDiagnostics);
         diagnosticStatus.getStyleClass().removeAll("editor-error", "editor-warning");
-        if (errors > 0L) {
+        if (counts.errors() > 0L) {
             diagnosticStatus.getStyleClass().add("editor-error");
-        } else if (warnings > 0L) {
+        } else if (counts.warnings() > 0L) {
             diagnosticStatus.getStyleClass().add("editor-warning");
         }
-        diagnosticStatus.setText(errors + " errors · " + warnings + " warnings");
-        diagnosticsTab.setText(
-                projectDiagnostics.isEmpty() ? "Diagnostics" : "Diagnostics (" + projectDiagnostics.size() + ")");
+        diagnosticStatus.setText("✕ " + counts.errors() + "   △ " + counts.warnings());
+        diagnosticStatus.setAccessibleText(
+                counts.errors() + " errors and " + counts.warnings() + " warnings; open Diagnostics");
+    }
+
+    /** Opens the Diagnostics drawer in response to a failed project or preview operation. */
+    void openDiagnostics() {
+        bottomDrawer.openDiagnostics();
     }
 
     /** Updates the concise project portion of the status bar. */
@@ -314,6 +314,18 @@ final class EditorWorkspace extends BorderPane {
         selectionModel.select(selected.selection());
     }
 
+    /** Selects the exact Project item named by a file-backed diagnostic when one exists. */
+    private void selectDiagnostic(ProjectDiagnostic diagnostic) {
+        if (!"file".equalsIgnoreCase(diagnostic.source().getScheme())) {
+            return;
+        }
+        try {
+            projectBrowser.findBySource(Path.of(diagnostic.source())).ifPresent(this::selectProjectItem);
+        } catch (IllegalArgumentException ignored) {
+            // An unusual file URI remains inspectable in Diagnostics without false navigation.
+        }
+    }
+
     /** Replaces the complete Inspector atomically for one selection transition. */
     private void showInspection(Optional<EditorSelection> selected) {
         boolean present = selected.isPresent();
@@ -430,14 +442,14 @@ final class EditorWorkspace extends BorderPane {
         return split;
     }
 
-    /** Creates the left workspace whose lower browser spans Hierarchy and preview. */
-    private SplitPane createLeftWorkspaceSplit(SplitPane upperWorkspace) {
-        TabPane lowerRegion = createLowerRegion();
-        SplitPane split = new SplitPane(upperWorkspace, lowerRegion);
+    /** Creates the left workspace whose lower drawer spans Hierarchy and preview. */
+    private SplitPane createLeftWorkspaceSplit(SplitPane upperWorkspace, EditorBottomDrawer drawer) {
+        SplitPane split = new SplitPane(upperWorkspace, drawer);
         split.setOrientation(Orientation.VERTICAL);
         split.setMinWidth(EditorWorkspaceLayout.MINIMUM_LEFT_WORKSPACE_WIDTH);
         split.getStyleClass().add("editor-left-workspace-split");
-        SplitPane.setResizableWithParent(lowerRegion, false);
+        SplitPane.setResizableWithParent(drawer, false);
+        drawer.attach(split);
         return split;
     }
 
@@ -460,20 +472,6 @@ final class EditorWorkspace extends BorderPane {
         VBox panel = new VBox(header, viewport);
         panel.getStyleClass().add("editor-viewport-panel");
         return panel;
-    }
-
-    /** Creates the tabbed lower region without inventing unsupported editor behavior. */
-    private TabPane createLowerRegion() {
-        Tab projectTab = new Tab("Project", createProjectBrowser());
-        projectTab.setClosable(false);
-        diagnosticsTab.setContent(createDiagnostics());
-        diagnosticsTab.setClosable(false);
-        TabPane tabs = new TabPane(projectTab, diagnosticsTab);
-        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.setMinHeight(EditorWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT);
-        tabs.setPrefHeight(EditorWorkspaceLayout.PREFERRED_BOTTOM_HEIGHT);
-        tabs.getStyleClass().add("editor-bottom-tabs");
-        return tabs;
     }
 
     /** Creates the categorized Project browser backed by the existing asset projection. */
@@ -687,19 +685,6 @@ final class EditorWorkspace extends BorderPane {
         };
     }
 
-    /** Creates the current structured diagnostic list in its new lower-region home. */
-    private VBox createDiagnostics() {
-        Label placeholder = new Label("No project diagnostics");
-        placeholder.getStyleClass().add("editor-empty-detail");
-        diagnostics.setPlaceholder(placeholder);
-        diagnostics.setCellFactory(ignored -> new DiagnosticCell());
-        diagnostics.getStyleClass().add("editor-diagnostics");
-        VBox.setVgrow(diagnostics, Priority.ALWAYS);
-        VBox panel = new VBox(diagnostics);
-        panel.getStyleClass().addAll("editor-panel", "editor-diagnostics-panel");
-        return panel;
-    }
-
     /** Creates the concise persistent project, preview, and diagnostic status line. */
     private HBox createStatusBar() {
         Region spacer = new Region();
@@ -715,6 +700,13 @@ final class EditorWorkspace extends BorderPane {
     private static Label createStatus(String initialText) {
         Label status = new Label(initialText);
         status.getStyleClass().add("editor-status");
+        return status;
+    }
+
+    /** Creates an unobtrusive status action whose purpose remains keyboard accessible. */
+    private static Button createStatusAction(String initialText) {
+        Button status = new Button(initialText);
+        status.getStyleClass().addAll("editor-status", "editor-status-action");
         return status;
     }
 
@@ -813,33 +805,6 @@ final class EditorWorkspace extends BorderPane {
         @Override
         public String toString() {
             return projectRoot ? label : label + " (" + count + ')';
-        }
-    }
-
-    /** Formats structured diagnostics without discarding their stable code or source. */
-    private static final class DiagnosticCell extends ListCell<ProjectDiagnostic> {
-        /** Creates a cell whose severity appearance is supplied by the editor theme. */
-        private DiagnosticCell() {
-            getStyleClass().add("editor-diagnostic-cell");
-        }
-
-        @Override
-        protected void updateItem(@Nullable ProjectDiagnostic diagnostic, boolean empty) {
-            super.updateItem(diagnostic, empty);
-            getStyleClass().removeAll("diagnostic-error", "diagnostic-warning");
-            if (empty || diagnostic == null) {
-                setText(null);
-                return;
-            }
-            String location = diagnostic.location().isEmpty() ? "" : diagnostic.location();
-            String detail = diagnostic.details().getOrDefault("technicalDetail", diagnostic.message());
-            setText(diagnostic.severity() + "  " + diagnostic.code().code() + "  " + detail + "  —  "
-                    + diagnostic.source() + location);
-            getStyleClass()
-                    .add(
-                            diagnostic.severity() == ProjectDiagnostic.Severity.ERROR
-                                    ? "diagnostic-error"
-                                    : "diagnostic-warning");
         }
     }
 }

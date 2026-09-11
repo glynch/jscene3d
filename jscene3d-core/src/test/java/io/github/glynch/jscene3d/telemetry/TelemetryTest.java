@@ -69,9 +69,14 @@ final class TelemetryTest {
     /** Prevents observer defects from changing the result of an instrumented operation. */
     @Test
     void isolatesObserverFailure() {
-        Telemetry telemetry = Telemetry.recording(measurement -> {
-            throw new IllegalArgumentException("observer defect");
-        });
+        IllegalArgumentException failure = new IllegalArgumentException("observer defect");
+        List<RuntimeException> rejected = new ArrayList<>();
+        Telemetry telemetry = Telemetry.recording(
+                measurement -> {
+                    throw failure;
+                },
+                System::nanoTime,
+                rejected::add);
 
         assertThatCode(() -> {
                     try (TelemetryOperation ignored = telemetry.begin("project.open", Map.of())) {
@@ -79,6 +84,7 @@ final class TelemetryTest {
                     }
                 })
                 .doesNotThrowAnyException();
+        assertThat(rejected).singleElement().isSameAs(failure);
     }
 
     /** Executes measured work normally when telemetry is disabled. */

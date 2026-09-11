@@ -77,6 +77,17 @@ final class EditorProjectBrowserModelTest {
         assertThat(model.selectedItem()).isEmpty();
     }
 
+    /** Resolves diagnostic navigation only for an exact normalized asset source. */
+    @Test
+    void findsAnAssetByItsAuthoritativeSource() {
+        EditorProjectBrowserModel model = new EditorProjectBrowserModel();
+        EditorAssetItem world = item("MAP01", "world-a", EditorAssetItem.Kind.WORLD_DEFINITION);
+        model.showProject(List.of(world));
+
+        assertThat(model.findBySource(world.source())).contains(world);
+        assertThat(model.findBySource(Path.of("project", "missing.json"))).isEmpty();
+    }
+
     /** Creates the minimum truthful asset projection needed by browser-model tests. */
     private static EditorAssetItem item(String label, String identity, EditorAssetItem.Kind kind) {
         Path source = Path.of("project", kind.name().toLowerCase(Locale.ROOT), identity);

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.util.List;
 import java.util.Objects;
@@ -62,7 +63,7 @@ final class EditorBottomDrawer extends VBox {
         VBox.setVgrow(content, Priority.ALWAYS);
         setMinHeight(EditorWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT);
         setPrefHeight(EditorWorkspaceLayout.PREFERRED_BOTTOM_HEIGHT);
-        getStyleClass().add("editor-bottom-drawer");
+        getStyleClass().add(EditorStyleClasses.EDITOR_BOTTOM_DRAWER);
         showSection(Section.PROJECT);
         refreshDiagnostics();
     }
@@ -101,28 +102,28 @@ final class EditorBottomDrawer extends VBox {
     /** Creates the VS Code-inspired drawer header without introducing generic docking. */
     private HBox createHeader() {
         projectTab.setOnAction(ignored -> selectOrToggle(Section.PROJECT));
-        projectTab.getStyleClass().add("editor-drawer-tab");
+        projectTab.getStyleClass().add(EditorStyleClasses.EDITOR_DRAWER_TAB);
 
-        diagnosticsTabText.getStyleClass().add("editor-drawer-tab-label");
-        diagnosticsBadge.getStyleClass().add("editor-diagnostic-badge");
+        diagnosticsTabText.getStyleClass().add(EditorStyleClasses.EDITOR_DRAWER_TAB_LABEL);
+        diagnosticsBadge.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_BADGE);
         HBox diagnosticsGraphic = new HBox(6.0, diagnosticsTabText, diagnosticsBadge);
         diagnosticsGraphic.setAlignment(Pos.CENTER_LEFT);
         diagnosticsTab.setGraphic(diagnosticsGraphic);
         diagnosticsTab.setOnAction(ignored -> selectOrToggle(Section.DIAGNOSTICS));
-        diagnosticsTab.getStyleClass().add("editor-drawer-tab");
+        diagnosticsTab.getStyleClass().add(EditorStyleClasses.EDITOR_DRAWER_TAB);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         collapse.setAccessibleText("Collapse bottom drawer");
         collapse.setTooltip(new Tooltip("Collapse panel"));
         collapse.setOnAction(ignored -> collapse());
-        collapse.getStyleClass().add("editor-drawer-close");
+        collapse.getStyleClass().add(EditorStyleClasses.EDITOR_DRAWER_CLOSE);
         HBox header = new HBox(projectTab, diagnosticsTab, spacer, diagnosticTools, collapse);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setMinHeight(HEADER_HEIGHT);
         header.setPrefHeight(HEADER_HEIGHT);
         header.setMaxHeight(HEADER_HEIGHT);
-        header.getStyleClass().add("editor-drawer-header");
+        header.getStyleClass().add(EditorStyleClasses.EDITOR_DRAWER_HEADER);
         return header;
     }
 
@@ -134,8 +135,10 @@ final class EditorBottomDrawer extends VBox {
         warnings.setTooltip(new Tooltip("Show warnings"));
         errors.setAccessibleText("Show errors");
         warnings.setAccessibleText("Show warnings");
-        errors.getStyleClass().addAll("editor-diagnostic-severity-filter", "diagnostic-error");
-        warnings.getStyleClass().addAll("editor-diagnostic-severity-filter", "diagnostic-warning");
+        errors.getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY_FILTER, EditorStyleClasses.DIAGNOSTIC_ERROR);
+        warnings.getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY_FILTER, EditorStyleClasses.DIAGNOSTIC_WARNING);
         errors.setOnAction(ignored -> {
             diagnosticsModel.showSeverity(ProjectDiagnostic.Severity.ERROR, errors.isSelected());
             refreshDiagnostics();
@@ -146,20 +149,22 @@ final class EditorBottomDrawer extends VBox {
         });
         filter.setPromptText("Filter diagnostics…");
         filter.setPrefWidth(210.0);
-        filter.getStyleClass().add("editor-diagnostic-filter");
+        filter.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_FILTER);
         filter.textProperty().addListener((ignored, previous, current) -> {
             diagnosticsModel.filter(current);
             refreshDiagnostics();
         });
         HBox tools = new HBox(5.0, errors, warnings, filter);
         tools.setAlignment(Pos.CENTER_RIGHT);
-        tools.getStyleClass().add("editor-diagnostic-tools");
+        tools.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_TOOLS);
         return tools;
     }
 
     /** Creates the grouped diagnostic tree and its intentional empty state. */
     private VBox createDiagnosticsContent() {
-        diagnosticEmpty.getStyleClass().addAll("editor-empty-detail", "editor-diagnostic-empty");
+        diagnosticEmpty
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_EMPTY_DETAIL, EditorStyleClasses.EDITOR_DIAGNOSTIC_EMPTY);
         diagnosticTree.setShowRoot(false);
         diagnosticTree.setCellFactory(ignored -> new DiagnosticTreeCell());
         diagnosticTree.getSelectionModel().selectedItemProperty().addListener((ignored, previous, current) -> {
@@ -167,11 +172,11 @@ final class EditorBottomDrawer extends VBox {
                 diagnosticSelection.accept(item.diagnostic());
             }
         });
-        diagnosticTree.getStyleClass().add("editor-diagnostic-tree");
+        diagnosticTree.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_TREE);
         StackPane body = new StackPane(diagnosticTree, diagnosticEmpty);
         VBox.setVgrow(body, Priority.ALWAYS);
         VBox panel = new VBox(body);
-        panel.getStyleClass().addAll("editor-panel", "editor-diagnostics-panel");
+        panel.getStyleClass().addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_DIAGNOSTICS_PANEL);
         return panel;
     }
 
@@ -277,36 +282,40 @@ final class EditorBottomDrawer extends VBox {
 
     /** Applies explicit active style classes without relying on undocumented tab internals. */
     private void updateTabs() {
-        projectTab.getStyleClass().remove("editor-drawer-tab-active");
-        diagnosticsTab.getStyleClass().remove("editor-drawer-tab-active");
+        projectTab.getStyleClass().remove(EditorStyleClasses.EDITOR_DRAWER_TAB_ACTIVE);
+        diagnosticsTab.getStyleClass().remove(EditorStyleClasses.EDITOR_DRAWER_TAB_ACTIVE);
         Button active = selected == Section.PROJECT ? projectTab : diagnosticsTab;
-        active.getStyleClass().add("editor-drawer-tab-active");
+        active.getStyleClass().add(EditorStyleClasses.EDITOR_DRAWER_TAB_ACTIVE);
     }
 
     /** Renders source groups, concise diagnostics, and nested details in one tree. */
     private static final class DiagnosticTreeCell extends TreeCell<DiagnosticNode> {
         /** Creates a cell styled by node kind. */
         private DiagnosticTreeCell() {
-            getStyleClass().add("editor-diagnostic-tree-cell");
+            getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_TREE_CELL);
         }
 
         @Override
         protected void updateItem(@Nullable DiagnosticNode node, boolean empty) {
             super.updateItem(node, empty);
-            getStyleClass().removeAll("diagnostic-group", "diagnostic-item", "diagnostic-detail");
+            getStyleClass()
+                    .removeAll(
+                            EditorStyleClasses.DIAGNOSTIC_GROUP,
+                            EditorStyleClasses.DIAGNOSTIC_ITEM,
+                            EditorStyleClasses.DIAGNOSTIC_DETAIL);
             setText(null);
             if (empty || node == null) {
                 setGraphic(null);
                 return;
             }
             if (node instanceof DiagnosticGroupNode(EditorDiagnosticsModel.Group group)) {
-                getStyleClass().add("diagnostic-group");
+                getStyleClass().add(EditorStyleClasses.DIAGNOSTIC_GROUP);
                 setGraphic(createGroupGraphic(group));
             } else if (node instanceof DiagnosticItemNode(EditorDiagnosticsModel.Item item)) {
-                getStyleClass().add("diagnostic-item");
+                getStyleClass().add(EditorStyleClasses.DIAGNOSTIC_ITEM);
                 setGraphic(createItemGraphic(item));
             } else if (node instanceof DiagnosticDetailNode(EditorDiagnosticsModel.Detail detail)) {
-                getStyleClass().add("diagnostic-detail");
+                getStyleClass().add(EditorStyleClasses.DIAGNOSTIC_DETAIL);
                 setGraphic(createDetailGraphic(detail));
             }
         }
@@ -315,11 +324,11 @@ final class EditorBottomDrawer extends VBox {
         private static HBox createGroupGraphic(EditorDiagnosticsModel.Group group) {
             Label source = new Label(group.label());
             source.setTooltip(new Tooltip(group.source().toString()));
-            source.getStyleClass().add("editor-diagnostic-source-name");
+            source.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_SOURCE_NAME);
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             Label counts = new Label("✕ " + group.errors() + "   △ " + group.warnings());
-            counts.getStyleClass().add("editor-diagnostic-group-counts");
+            counts.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_GROUP_COUNTS);
             HBox row = new HBox(8.0, source, spacer, counts);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
@@ -330,21 +339,22 @@ final class EditorBottomDrawer extends VBox {
         private static HBox createItemGraphic(EditorDiagnosticsModel.Item item) {
             boolean error = item.diagnostic().severity() == ProjectDiagnostic.Severity.ERROR;
             Label severity = new Label(error ? "✕" : "△");
-            severity.getStyleClass()
-                    .addAll("editor-diagnostic-severity", error ? "diagnostic-error" : "diagnostic-warning");
+            String severityStyleClass =
+                    error ? EditorStyleClasses.DIAGNOSTIC_ERROR : EditorStyleClasses.DIAGNOSTIC_WARNING;
+            severity.getStyleClass().addAll(EditorStyleClasses.EDITOR_DIAGNOSTIC_SEVERITY, severityStyleClass);
             Label message = new Label(item.summary());
             message.setMinWidth(0.0);
             message.setMaxWidth(Double.MAX_VALUE);
             message.setPrefWidth(1.0);
             message.setTooltip(new Tooltip(item.summary()));
-            message.getStyleClass().add("editor-diagnostic-message");
+            message.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_MESSAGE);
             HBox.setHgrow(message, Priority.ALWAYS);
             Label code = new Label(item.diagnostic().code().code());
-            code.getStyleClass().add("editor-diagnostic-code");
+            code.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_CODE);
             Label location = new Label(item.diagnostic().location());
             location.setManaged(!item.diagnostic().location().isEmpty());
             location.setVisible(!item.diagnostic().location().isEmpty());
-            location.getStyleClass().add("editor-diagnostic-location");
+            location.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_LOCATION);
             HBox row = new HBox(8.0, severity, message, code, location);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
@@ -354,13 +364,13 @@ final class EditorBottomDrawer extends VBox {
         /** Creates one indented labelled detail row. */
         private static HBox createDetailGraphic(EditorDiagnosticsModel.Detail detail) {
             Label label = new Label(detail.label());
-            label.getStyleClass().add("editor-diagnostic-detail-label");
+            label.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_DETAIL_LABEL);
             Label value = new Label(detail.value());
             value.setMinWidth(0.0);
             value.setMaxWidth(Double.MAX_VALUE);
             value.setPrefWidth(1.0);
             value.setTooltip(new Tooltip(detail.value()));
-            value.getStyleClass().add("editor-diagnostic-detail-value");
+            value.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_DETAIL_VALUE);
             HBox.setHgrow(value, Priority.ALWAYS);
             HBox row = new HBox(8.0, label, value);
             row.setAlignment(Pos.CENTER_LEFT);

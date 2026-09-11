@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,7 +99,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
         VBox.setVgrow(rendered.node(), Priority.ALWAYS);
         if (showSingleHeading) {
             Label heading = new Label(contribution.view().title());
-            heading.getStyleClass().add("editor-panel-heading");
+            heading.getStyleClass().add(EditorStyleClasses.EDITOR_PANEL_HEADING);
             root.getChildren().setAll(heading, rendered.node());
         } else {
             root.getChildren().setAll(rendered.node());
@@ -133,7 +134,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
             return renderTree(treeView);
         }
         Label unsupported = new Label("Unsupported view kind: " + view.kind());
-        unsupported.getStyleClass().add("editor-empty-detail");
+        unsupported.getStyleClass().add(EditorStyleClasses.EDITOR_EMPTY_DETAIL);
         return new RenderedView(unsupported, () -> {}, unsupported::requestFocus);
     }
 

@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.editor.view.EditorTreeItem;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItemCollapsibleState;
 import io.github.glynch.jscene3d.editor.view.EditorTreeSelectionModel;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,7 +54,7 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
         this.selectionModel = Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
         Consumer<CommandId> commands = Objects.requireNonNull(commandExecutor, "commandExecutor");
         tree.setShowRoot(false);
-        tree.getStyleClass().add("editor-tree-view");
+        tree.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_VIEW);
         tree.setCellFactory(ignored -> new LogicalTreeCell());
         tree.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
             if (selectionFeedbackSuppressionDepth == 0) {
@@ -237,12 +238,12 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             row.setMaxWidth(Double.MAX_VALUE);
             presentation
                     .icon()
-                    .map(icon -> JavaFxIconRenderer.create(icon, "editor-tree-item-icon"))
+                    .map(icon -> JavaFxIconRenderer.create(icon, EditorStyleClasses.EDITOR_TREE_ITEM_ICON))
                     .ifPresent(row.getChildren()::add);
             row.getChildren().add(name);
             presentation.description().ifPresent(description -> {
                 Label detail = new Label(description);
-                detail.getStyleClass().add("editor-tree-item-description");
+                detail.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_ITEM_DESCRIPTION);
                 row.getChildren().add(detail);
             });
             Region spacer = new Region();
@@ -251,9 +252,11 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             for (EditorIcon decoration : presentation.decorations()) {
                 row.getChildren()
                         .add(JavaFxIconRenderer.create(
-                                decoration, "editor-item-decoration", "editor-tree-item-decoration"));
+                                decoration,
+                                EditorStyleClasses.EDITOR_ITEM_DECORATION,
+                                EditorStyleClasses.EDITOR_TREE_ITEM_DECORATION));
             }
-            row.getStyleClass().add("editor-tree-item-row");
+            row.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_ITEM_ROW);
             setText(null);
             setGraphic(row);
             setTooltip(presentation.tooltip().map(Tooltip::new).orElse(null));

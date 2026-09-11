@@ -16,6 +16,7 @@ import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
@@ -91,7 +92,7 @@ public final class EditorApplication extends Application {
         installViewportEvents(viewportCanvas, controller);
 
         StackPane root = new StackPane(editorWorkspace, loadingScreen);
-        root.getStyleClass().add("editor-root");
+        root.getStyleClass().add(EditorStyleClasses.EDITOR_ROOT);
         loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_VIEWPORT);
 
         stage.setTitle("JScene3D Editor");

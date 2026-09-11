@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxViewContainer;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.nio.file.Path;
@@ -63,12 +64,16 @@ final class EditorWorkspace extends BorderPane {
         VBox hierarchyPanel = primaryViewContainer.node();
         hierarchyPanel.setMinWidth(EditorWorkspaceLayout.MINIMUM_HIERARCHY_WIDTH);
         hierarchyPanel.setPrefWidth(EditorWorkspaceLayout.PREFERRED_HIERARCHY_WIDTH);
-        hierarchyPanel.getStyleClass().addAll("editor-panel", "editor-hierarchy-panel");
+        hierarchyPanel
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_HIERARCHY_PANEL);
         secondaryViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.SECONDARY_SIDEBAR);
         VBox inspectorPanel = secondaryViewContainer.node();
         inspectorPanel.setMinWidth(EditorWorkspaceLayout.MINIMUM_INSPECTOR_WIDTH);
         inspectorPanel.setPrefWidth(EditorWorkspaceLayout.PREFERRED_INSPECTOR_WIDTH);
-        inspectorPanel.getStyleClass().addAll("editor-panel", "editor-inspector-panel");
+        inspectorPanel
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_INSPECTOR_PANEL);
         VBox previewPanel = createViewportPane(viewportCanvas);
         upperWorkspaceSplit = createUpperWorkspaceSplit(hierarchyPanel, previewPanel);
         bottomViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.BOTTOM_PANEL, false);
@@ -76,11 +81,11 @@ final class EditorWorkspace extends BorderPane {
         leftWorkspaceSplit = createLeftWorkspaceSplit(upperWorkspaceSplit, bottomDrawer);
         workspaceSplit = new SplitPane(leftWorkspaceSplit, inspectorPanel);
         workspaceSplit.setOrientation(Orientation.HORIZONTAL);
-        workspaceSplit.getStyleClass().add("editor-workspace-split");
+        workspaceSplit.getStyleClass().add(EditorStyleClasses.EDITOR_WORKSPACE_SPLIT);
         SplitPane.setResizableWithParent(inspectorPanel, false);
         setCenter(workspaceSplit);
         setBottom(createStatusBar());
-        getStyleClass().add("editor-shell");
+        getStyleClass().add(EditorStyleClasses.EDITOR_SHELL);
         diagnosticStatus.setOnAction(ignored -> bottomDrawer.openDiagnostics());
     }
 
@@ -131,11 +136,11 @@ final class EditorWorkspace extends BorderPane {
     /** Replaces structured diagnostics and refreshes their concise count. */
     void showDiagnostics(List<ProjectDiagnostic> projectDiagnostics) {
         EditorBottomDrawer.DiagnosticCounts counts = bottomDrawer.showDiagnostics(projectDiagnostics);
-        diagnosticStatus.getStyleClass().removeAll("editor-error", "editor-warning");
+        diagnosticStatus.getStyleClass().removeAll(EditorStyleClasses.EDITOR_ERROR, EditorStyleClasses.EDITOR_WARNING);
         if (counts.errors() > 0L) {
-            diagnosticStatus.getStyleClass().add("editor-error");
+            diagnosticStatus.getStyleClass().add(EditorStyleClasses.EDITOR_ERROR);
         } else if (counts.warnings() > 0L) {
-            diagnosticStatus.getStyleClass().add("editor-warning");
+            diagnosticStatus.getStyleClass().add(EditorStyleClasses.EDITOR_WARNING);
         }
         diagnosticStatus.setText("✕ " + counts.errors() + "   △ " + counts.warnings());
         diagnosticStatus.setAccessibleText(
@@ -168,29 +173,29 @@ final class EditorWorkspace extends BorderPane {
     /** Creates compact product, menu, project-context, and command chrome. */
     private HBox createTopChrome(Runnable openProject) {
         Label productName = new Label("JScene3D");
-        productName.getStyleClass().add("editor-product-name");
+        productName.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_NAME);
         Label productKind = new Label("EDITOR");
-        productKind.getStyleClass().add("editor-product-kind");
+        productKind.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_KIND);
 
         MenuItem openProjectItem = new MenuItem("Open Project…");
         openProjectItem.setOnAction(ignored -> openProject.run());
         Menu file = new Menu("File");
         file.getItems().add(openProjectItem);
         MenuBar menuBar = new MenuBar(file);
-        menuBar.getStyleClass().add("editor-menu-bar");
+        menuBar.getStyleClass().add(EditorStyleClasses.EDITOR_MENU_BAR);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         projectContext.setMaxWidth(300.0);
         projectContext.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
-        projectContext.getStyleClass().add("editor-project-context");
+        projectContext.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_CONTEXT);
         Button openButton = new Button("Open Project…");
         openButton.setOnAction(ignored -> openProject.run());
-        openButton.getStyleClass().add("editor-open-project-button");
+        openButton.getStyleClass().add(EditorStyleClasses.EDITOR_OPEN_PROJECT_BUTTON);
 
         HBox chrome = new HBox(8.0, productName, productKind, menuBar, spacer, projectContext, openButton);
         chrome.setAlignment(Pos.CENTER_LEFT);
-        chrome.getStyleClass().add("editor-top");
+        chrome.getStyleClass().add(EditorStyleClasses.EDITOR_TOP);
         return chrome;
     }
 
@@ -220,7 +225,7 @@ final class EditorWorkspace extends BorderPane {
         SplitPane split = new SplitPane(hierarchyPanel, previewPanel);
         split.setOrientation(Orientation.HORIZONTAL);
         split.setMinWidth(EditorWorkspaceLayout.MINIMUM_LEFT_WORKSPACE_WIDTH);
-        split.getStyleClass().add("editor-upper-workspace-split");
+        split.getStyleClass().add(EditorStyleClasses.EDITOR_UPPER_WORKSPACE_SPLIT);
         SplitPane.setResizableWithParent(hierarchyPanel, false);
         return split;
     }
@@ -230,7 +235,7 @@ final class EditorWorkspace extends BorderPane {
         SplitPane split = new SplitPane(upperWorkspace, drawer);
         split.setOrientation(Orientation.VERTICAL);
         split.setMinWidth(EditorWorkspaceLayout.MINIMUM_LEFT_WORKSPACE_WIDTH);
-        split.getStyleClass().add("editor-left-workspace-split");
+        split.getStyleClass().add(EditorStyleClasses.EDITOR_LEFT_WORKSPACE_SPLIT);
         SplitPane.setResizableWithParent(drawer, false);
         drawer.attach(split);
         return split;
@@ -238,22 +243,24 @@ final class EditorWorkspace extends BorderPane {
 
     /** Adds truthful preview context and leaves command space empty until commands exist. */
     private VBox createViewportPane(GLCanvas viewportCanvas) {
-        previewTitle.getStyleClass().add("editor-preview-title");
+        previewTitle.getStyleClass().add(EditorStyleClasses.EDITOR_PREVIEW_TITLE);
         Label inertBadge = new Label("INERT");
-        inertBadge.getStyleClass().addAll("editor-read-only-badge", "editor-inert-badge");
+        inertBadge
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_READ_ONLY_BADGE, EditorStyleClasses.EDITOR_INERT_BADGE);
         Region commandSpace = new Region();
         HBox.setHgrow(commandSpace, Priority.ALWAYS);
-        commandSpace.getStyleClass().add("editor-viewport-command-space");
+        commandSpace.getStyleClass().add(EditorStyleClasses.EDITOR_VIEWPORT_COMMAND_SPACE);
         HBox header = new HBox(8.0, previewTitle, inertBadge, commandSpace);
         header.setAlignment(Pos.CENTER_LEFT);
-        header.getStyleClass().add("editor-viewport-header");
+        header.getStyleClass().add(EditorStyleClasses.EDITOR_VIEWPORT_HEADER);
 
         StackPane viewport = new StackPane(viewportCanvas);
         viewport.setMinHeight(EditorWorkspaceLayout.MINIMUM_PREVIEW_HEIGHT);
-        viewport.getStyleClass().add("editor-viewport");
+        viewport.getStyleClass().add(EditorStyleClasses.EDITOR_VIEWPORT);
         VBox.setVgrow(viewport, Priority.ALWAYS);
         VBox panel = new VBox(header, viewport);
-        panel.getStyleClass().add("editor-viewport-panel");
+        panel.getStyleClass().add(EditorStyleClasses.EDITOR_VIEWPORT_PANEL);
         return panel;
     }
 
@@ -264,21 +271,21 @@ final class EditorWorkspace extends BorderPane {
         Separator separator = new Separator(Orientation.VERTICAL);
         HBox status = new HBox(10.0, projectStatus, spacer, viewportStatus, separator, diagnosticStatus);
         status.setAlignment(Pos.CENTER_LEFT);
-        status.getStyleClass().add("editor-status-bar");
+        status.getStyleClass().add(EditorStyleClasses.EDITOR_STATUS_BAR);
         return status;
     }
 
     /** Creates one status label. */
     private static Label createStatus(String initialText) {
         Label status = new Label(initialText);
-        status.getStyleClass().add("editor-status");
+        status.getStyleClass().add(EditorStyleClasses.EDITOR_STATUS);
         return status;
     }
 
     /** Creates an unobtrusive status action whose purpose remains keyboard accessible. */
     private static Button createStatusAction(String initialText) {
         Button status = new Button(initialText);
-        status.getStyleClass().addAll("editor-status", "editor-status-action");
+        status.getStyleClass().addAll(EditorStyleClasses.EDITOR_STATUS, EditorStyleClasses.EDITOR_STATUS_ACTION);
         return status;
     }
 }

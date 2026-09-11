@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.editor.view.EditorCollectionSnapshot;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -126,10 +127,12 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     private void configureView() {
         VBox browserContent = new VBox(createToolbar(), content);
         VBox.setVgrow(content, Priority.ALWAYS);
-        browserContent.getStyleClass().addAll("editor-collection-content", "editor-project-content");
+        browserContent
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_CONTENT, EditorStyleClasses.EDITOR_PROJECT_CONTENT);
 
         list.setCellFactory(ignored -> new CollectionListCell());
-        list.getStyleClass().addAll("editor-collection-list", "editor-asset-list");
+        list.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_LIST, EditorStyleClasses.EDITOR_ASSET_LIST);
         list.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
             if (selectionFeedbackSuppressionDepth == 0 && selected != null) {
                 selectionModel.ifPresent(model -> model.select(Optional.of(selected)));
@@ -145,19 +148,29 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         grid.setVgap(8.0);
         grid.setPrefTileWidth(156.0);
         grid.setPrefTileHeight(112.0);
-        grid.getStyleClass().addAll("editor-collection-grid", "editor-asset-grid");
+        grid.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_GRID, EditorStyleClasses.EDITOR_ASSET_GRID);
         gridScroll.setContent(grid);
         gridScroll.setFitToWidth(true);
         gridScroll.setPannable(true);
-        gridScroll.getStyleClass().addAll("editor-collection-grid-scroll", "editor-asset-grid-scroll");
+        gridScroll
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_GRID_SCROLL, EditorStyleClasses.EDITOR_ASSET_GRID_SCROLL);
         empty.setWrapText(true);
-        empty.getStyleClass().addAll("editor-empty-detail", "editor-collection-empty", "editor-project-empty");
+        empty.getStyleClass()
+                .addAll(
+                        EditorStyleClasses.EDITOR_EMPTY_DETAIL,
+                        EditorStyleClasses.EDITOR_COLLECTION_EMPTY,
+                        EditorStyleClasses.EDITOR_PROJECT_EMPTY);
         content.getChildren().setAll(list, gridScroll, empty);
 
         Node browser = categories.isEmpty() ? browserContent : createCategorizedBrowser(browserContent);
         VBox.setVgrow(browser, Priority.ALWAYS);
         root.getChildren().setAll(browser);
-        root.getStyleClass().addAll("editor-panel", "editor-collection-panel", "editor-project-panel");
+        root.getStyleClass()
+                .addAll(
+                        EditorStyleClasses.EDITOR_PANEL,
+                        EditorStyleClasses.EDITOR_COLLECTION_PANEL,
+                        EditorStyleClasses.EDITOR_PROJECT_PANEL);
         showPresentation(true);
     }
 
@@ -165,7 +178,9 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         breadcrumb.setMinWidth(80.0);
         breadcrumb.setMaxWidth(240.0);
         breadcrumb.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
-        breadcrumb.getStyleClass().addAll("editor-collection-breadcrumb", "editor-project-breadcrumb");
+        breadcrumb
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_BREADCRUMB, EditorStyleClasses.EDITOR_PROJECT_BREADCRUMB);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
@@ -177,17 +192,23 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         gridView.setGraphic(JavaFxIconRenderer.create(new EditorIcon(EditorIcons.GRID, "Grid view")));
         listView.setGraphic(JavaFxIconRenderer.create(new EditorIcon(EditorIcons.LIST, "List view")));
         HBox viewButtons = new HBox(gridView, listView);
-        viewButtons.getStyleClass().addAll("editor-collection-view-buttons", "editor-project-view-buttons");
+        viewButtons
+                .getStyleClass()
+                .addAll(
+                        EditorStyleClasses.EDITOR_COLLECTION_VIEW_BUTTONS,
+                        EditorStyleClasses.EDITOR_PROJECT_VIEW_BUTTONS);
 
         search.setPromptText(searchPlaceholder);
         search.setMinWidth(100.0);
         search.setPrefWidth(180.0);
         search.setDisable(true);
-        search.getStyleClass().addAll("editor-collection-search", "editor-project-search");
+        search.getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_SEARCH, EditorStyleClasses.EDITOR_PROJECT_SEARCH);
         search.textProperty().addListener((ignored, previous, current) -> refreshItems());
         HBox toolbar = new HBox(8.0, breadcrumb, spacer, viewButtons, search);
         toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.getStyleClass().addAll("editor-collection-toolbar", "editor-project-toolbar");
+        toolbar.getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_TOOLBAR, EditorStyleClasses.EDITOR_PROJECT_TOOLBAR);
         return toolbar;
     }
 
@@ -195,14 +216,19 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         button.setAccessibleText(name);
         button.setTooltip(new Tooltip(name));
         button.setOnAction(ignored -> showPresentation(gridPresentation));
-        button.getStyleClass().addAll("editor-collection-view-toggle", "editor-project-view-toggle");
+        button.getStyleClass()
+                .addAll(
+                        EditorStyleClasses.EDITOR_COLLECTION_VIEW_TOGGLE,
+                        EditorStyleClasses.EDITOR_PROJECT_VIEW_TOGGLE);
     }
 
     private SplitPane createCategorizedBrowser(VBox browserContent) {
         navigation.setCellFactory(ignored -> new CategoryCell());
         navigation.setShowRoot(true);
         navigation.setMinWidth(0.0);
-        navigation.getStyleClass().addAll("editor-collection-navigation-tree", "editor-project-tree");
+        navigation
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION_TREE, EditorStyleClasses.EDITOR_PROJECT_TREE);
         navigation.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
             if (selectionFeedbackSuppressionDepth == 0 && selected != null) {
                 selectedCategory = selected.getValue().categoryId();
@@ -211,16 +237,24 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         });
         VBox.setVgrow(navigation, Priority.ALWAYS);
         Label heading = new Label("Categories");
-        heading.getStyleClass().addAll("editor-collection-categories-heading", "editor-project-categories-heading");
+        heading.getStyleClass()
+                .addAll(
+                        EditorStyleClasses.EDITOR_COLLECTION_CATEGORIES_HEADING,
+                        EditorStyleClasses.EDITOR_PROJECT_CATEGORIES_HEADING);
         VBox categoryPane = new VBox(heading, navigation);
         categoryPane.setMinWidth(180.0);
         categoryPane.setPrefWidth(230.0);
-        categoryPane.getStyleClass().addAll("editor-collection-navigation", "editor-project-navigation");
+        categoryPane
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION, EditorStyleClasses.EDITOR_PROJECT_NAVIGATION);
 
         SplitPane browser = new SplitPane(categoryPane, browserContent);
         browser.setOrientation(Orientation.HORIZONTAL);
         browser.setDividerPositions(0.22);
-        browser.getStyleClass().addAll("editor-collection-browser-split", "editor-project-browser-split");
+        browser.getStyleClass()
+                .addAll(
+                        EditorStyleClasses.EDITOR_COLLECTION_BROWSER_SPLIT,
+                        EditorStyleClasses.EDITOR_PROJECT_BROWSER_SPLIT);
         SplitPane.setResizableWithParent(categoryPane, false);
         return browser;
     }
@@ -348,7 +382,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
                 executeItemCommand(element);
             }
         });
-        card.getStyleClass().addAll("editor-collection-card", "editor-asset-card");
+        card.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_CARD, EditorStyleClasses.EDITOR_ASSET_CARD);
         return card;
     }
 
@@ -359,28 +393,33 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         name.setPrefWidth(1.0);
         name.setTextOverrun(OverrunStyle.ELLIPSIS);
         name.setTooltip(new Tooltip(item.label()));
-        name.getStyleClass().addAll("editor-collection-name", "editor-asset-name");
+        name.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_NAME, EditorStyleClasses.EDITOR_ASSET_NAME);
         HBox.setHgrow(name, Priority.ALWAYS);
         HBox heading = new HBox(6.0);
         item.icon()
-                .map(icon -> JavaFxIconRenderer.create(icon, "editor-collection-marker", "editor-asset-marker"))
+                .map(icon -> JavaFxIconRenderer.create(
+                        icon, EditorStyleClasses.EDITOR_COLLECTION_MARKER, EditorStyleClasses.EDITOR_ASSET_MARKER))
                 .ifPresent(heading.getChildren()::add);
         heading.getChildren().add(name);
         heading.setAlignment(Pos.CENTER_LEFT);
         heading.setMaxWidth(Double.MAX_VALUE);
 
         Label description = new Label(item.description().orElse(""));
-        description.getStyleClass().addAll("editor-collection-description", "editor-asset-kind");
+        description
+                .getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_DESCRIPTION, EditorStyleClasses.EDITOR_ASSET_KIND);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox decorations = new HBox(3.0);
         decorations.setAlignment(Pos.CENTER_RIGHT);
-        decorations.getStyleClass().add("editor-item-decorations");
+        decorations.getStyleClass().add(EditorStyleClasses.EDITOR_ITEM_DECORATIONS);
         for (EditorIcon decoration : item.decorations()) {
             decorations
                     .getChildren()
                     .add(JavaFxIconRenderer.create(
-                            decoration, "editor-item-decoration", "editor-collection-decoration"));
+                            decoration,
+                            EditorStyleClasses.EDITOR_ITEM_DECORATION,
+                            EditorStyleClasses.EDITOR_COLLECTION_DECORATION));
         }
         HBox metadata = new HBox(6.0, description, spacer, decorations);
         metadata.setAlignment(Pos.CENTER_LEFT);
@@ -392,10 +431,15 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         detail.setPrefWidth(1.0);
         detail.setTextOverrun(OverrunStyle.ELLIPSIS);
         detail.setTooltip(item.tooltip().map(Tooltip::new).orElse(null));
-        detail.getStyleClass().addAll("editor-collection-detail", "editor-asset-source");
+        detail.getStyleClass()
+                .addAll(EditorStyleClasses.EDITOR_COLLECTION_DETAIL, EditorStyleClasses.EDITOR_ASSET_SOURCE);
         VBox presentation = new VBox(4.0, heading, metadata, detail);
         presentation.setMaxWidth(Double.MAX_VALUE);
-        presentation.getStyleClass().addAll("editor-collection-presentation", "editor-asset-presentation");
+        presentation
+                .getStyleClass()
+                .addAll(
+                        EditorStyleClasses.EDITOR_COLLECTION_PRESENTATION,
+                        EditorStyleClasses.EDITOR_ASSET_PRESENTATION);
         return presentation;
     }
 
@@ -466,7 +510,8 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
 
     private final class CollectionListCell extends ListCell<T> {
         private CollectionListCell() {
-            getStyleClass().addAll("editor-collection-list-cell", "editor-asset-list-cell");
+            getStyleClass()
+                    .addAll(EditorStyleClasses.EDITOR_COLLECTION_LIST_CELL, EditorStyleClasses.EDITOR_ASSET_LIST_CELL);
         }
 
         @Override
@@ -479,7 +524,10 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
 
     private final class CategoryCell extends TreeCell<CategoryLocation> {
         private CategoryCell() {
-            getStyleClass().addAll("editor-collection-navigation-cell", "editor-project-tree-cell");
+            getStyleClass()
+                    .addAll(
+                            EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION_CELL,
+                            EditorStyleClasses.EDITOR_PROJECT_TREE_CELL);
         }
 
         @Override
@@ -498,16 +546,18 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
             name.setTooltip(new Tooltip(item.label()));
             HBox.setHgrow(name, Priority.ALWAYS);
             Label count = new Label(Long.toString(item.count()));
-            count.getStyleClass().add("editor-project-tree-count");
+            count.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_TREE_COUNT);
             HBox row = new HBox(7.0);
             item.icon()
                     .map(icon -> JavaFxIconRenderer.create(
-                            icon, "editor-collection-navigation-icon", "editor-project-tree-marker"))
+                            icon,
+                            EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION_ICON,
+                            EditorStyleClasses.EDITOR_PROJECT_TREE_MARKER))
                     .ifPresent(row.getChildren()::add);
             row.getChildren().addAll(name, count);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
-            row.getStyleClass().add("editor-project-tree-row");
+            row.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_TREE_ROW);
             setText(null);
             setAccessibleText(item.label() + ", " + item.count() + " items");
             setGraphic(row);

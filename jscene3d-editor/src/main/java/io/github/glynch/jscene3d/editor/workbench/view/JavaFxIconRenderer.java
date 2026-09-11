@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIconId;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.Objects;
 import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
@@ -25,13 +26,13 @@ final class JavaFxIconRenderer {
         EditorIcon icon = Objects.requireNonNull(presentation, "presentation");
         SVGPath path = new SVGPath();
         path.setContent(path(icon.id()));
-        path.getStyleClass().add("editor-icon-shape");
+        path.getStyleClass().add(EditorStyleClasses.EDITOR_ICON_SHAPE);
 
         StackPane container = new StackPane(path);
         container.setAccessibleRole(AccessibleRole.TEXT);
         container.setAccessibleText(icon.tooltip());
         container.setFocusTraversable(false);
-        container.getStyleClass().addAll("editor-icon", styleClass(icon.id()));
+        container.getStyleClass().addAll(EditorStyleClasses.EDITOR_ICON, styleClass(icon.id()));
         container.getStyleClass().addAll(styleClasses);
         Tooltip.install(container, new Tooltip(icon.tooltip()));
         return container;
@@ -78,11 +79,11 @@ final class JavaFxIconRenderer {
 
     private static String styleClass(EditorIconId id) {
         if (id.equals(EditorIcons.READ_ONLY)) {
-            return "editor-icon-read-only";
+            return EditorStyleClasses.EDITOR_ICON_READ_ONLY;
         }
         if (id.equals(EditorIcons.DISABLED)) {
-            return "editor-icon-disabled";
+            return EditorStyleClasses.EDITOR_ICON_DISABLED;
         }
-        return "editor-icon-primary";
+        return EditorStyleClasses.EDITOR_ICON_PRIMARY;
     }
 }

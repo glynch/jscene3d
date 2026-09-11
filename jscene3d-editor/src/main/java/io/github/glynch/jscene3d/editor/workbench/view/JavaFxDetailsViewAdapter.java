@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorDetailsDataProvider;
 import io.github.glynch.jscene3d.editor.view.EditorDetailsView;
+import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,31 +68,31 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
 
     private void createEmptyState(EditorDetailsView view) {
         Label emptyTitle = new Label(view.emptyTitle());
-        emptyTitle.getStyleClass().add("editor-empty-title");
+        emptyTitle.getStyleClass().add(EditorStyleClasses.EDITOR_EMPTY_TITLE);
         Label emptyMessage = new Label(view.emptyMessage());
-        emptyMessage.getStyleClass().add("editor-empty-detail");
+        emptyMessage.getStyleClass().add(EditorStyleClasses.EDITOR_EMPTY_DETAIL);
         empty.getChildren().setAll(emptyTitle, emptyMessage);
         empty.setSpacing(10.0);
-        empty.getStyleClass().add("editor-inspector-empty");
+        empty.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_EMPTY);
     }
 
     private void createDetailsState() {
-        title.getStyleClass().add("editor-inspector-title");
-        kind.getStyleClass().add("editor-inspector-kind");
-        source.getStyleClass().add("editor-inspector-source");
+        title.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_TITLE);
+        kind.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_KIND);
+        source.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_SOURCE);
         source.setWrapText(true);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox titleLine = new HBox(6.0, title, spacer, decorations);
         titleLine.setAlignment(Pos.CENTER_LEFT);
         VBox header = new VBox(4.0, titleLine, kind, source);
-        header.getStyleClass().add("editor-inspector-header");
-        sections.getStyleClass().add("editor-inspector-sections");
+        header.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_HEADER);
+        sections.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_SECTIONS);
         selected.getChildren().setAll(header, sections);
-        selected.getStyleClass().add("editor-inspector-selected");
+        selected.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_SELECTED);
         scroll.setContent(selected);
         scroll.setFitToWidth(true);
-        scroll.getStyleClass().add("editor-inspector-scroll");
+        scroll.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_SCROLL);
     }
 
     private void show(Optional<EditorDetails> updated) {
@@ -114,7 +115,7 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
         decorations
                 .getChildren()
                 .setAll(details.decorations().stream()
-                        .map(icon -> JavaFxIconRenderer.create(icon, "editor-details-decoration"))
+                        .map(icon -> JavaFxIconRenderer.create(icon, EditorStyleClasses.EDITOR_DETAILS_DECORATION))
                         .toList());
         sections.getChildren()
                 .setAll(details.sections().stream()
@@ -125,16 +126,16 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
 
     private static TitledPane createSection(EditorDetails.Section section) {
         VBox content = new VBox(6.0);
-        content.getStyleClass().add("editor-inspector-section-content");
+        content.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_SECTION_CONTENT);
         section.description().ifPresent(description -> {
             Label detail = new Label(description);
             detail.setWrapText(true);
-            detail.getStyleClass().add("editor-inspector-description");
+            detail.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_DESCRIPTION);
             content.getChildren().add(detail);
         });
         if (!section.metadataAvailable()) {
             Label unavailable = new Label("Descriptor metadata unavailable");
-            unavailable.getStyleClass().add("editor-inspector-metadata-warning");
+            unavailable.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_METADATA_WARNING);
             content.getChildren().add(unavailable);
         }
         section.properties().stream()
@@ -143,24 +144,24 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
         TitledPane pane = new TitledPane(section.title(), content);
         pane.setAnimated(false);
         pane.setExpanded(true);
-        pane.getStyleClass().add("editor-inspector-section");
+        pane.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_SECTION);
         return pane;
     }
 
     private static VBox createProperty(EditorDetails.Property property) {
         Label name = new Label(property.displayName());
-        name.getStyleClass().add("editor-inspector-property-name");
+        name.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_PROPERTY_NAME);
         Label value = new Label(property.value());
         value.setMaxWidth(Double.MAX_VALUE);
         value.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
-        value.getStyleClass().add("editor-inspector-value");
+        value.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_VALUE);
         if (property.origin() == EditorDetails.ValueOrigin.DEFAULT) {
-            value.getStyleClass().add("editor-inspector-default-value");
+            value.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_DEFAULT_VALUE);
         } else if (property.origin() == EditorDetails.ValueOrigin.UNSET) {
-            value.getStyleClass().add("editor-inspector-unset-value");
+            value.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_UNSET_VALUE);
         }
         Label metadata = new Label(propertyMetadata(property));
-        metadata.getStyleClass().add("editor-inspector-property-metadata");
+        metadata.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_PROPERTY_METADATA);
         String tooltip = propertyTooltip(property);
         if (!tooltip.isEmpty()) {
             Tooltip help = new Tooltip(tooltip);
@@ -168,7 +169,7 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
             value.setTooltip(help);
         }
         VBox row = new VBox(3.0, name, value, metadata);
-        row.getStyleClass().add("editor-inspector-property");
+        row.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_PROPERTY);
         return row;
     }
 

@@ -9,6 +9,10 @@ import static javafx.util.Duration.seconds;
 import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
+import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
+import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
@@ -35,6 +39,9 @@ public final class EditorApplication extends Application {
     private final Telemetry telemetry;
     private final EditorProjectLoader projectLoader;
     private final ExecutorService projectLoadingExecutor;
+    private final EditorProjectContext projectContext;
+    private final EditorSelectionModel selectionModel;
+    private final EditorExtensionHost extensionHost;
 
     private @Nullable GLCanvas canvas;
     private @Nullable ViewportController viewportController;
@@ -50,6 +57,9 @@ public final class EditorApplication extends Application {
                 EditorApplication.class.getClassLoader(),
                 EditorExtensionPath.configured());
         projectLoadingExecutor = Executors.newSingleThreadExecutor();
+        projectContext = new EditorProjectContext();
+        selectionModel = new EditorSelectionModel();
+        extensionHost = new EditorExtensionHost(projectContext);
     }
 
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
@@ -60,7 +70,10 @@ public final class EditorApplication extends Application {
                 EditorSplashTiming.fromNamedArguments(getParameters().getNamed());
         EditorSplashScreen loadingScreen = new EditorSplashScreen(EditorBuildInfo.engineVersion(), splashTiming);
         GLCanvas viewportCanvas = createCanvas();
-        EditorWorkspace editorWorkspace = new EditorWorkspace(viewportCanvas, () -> chooseProject(stage));
+        EditorWorkspace editorWorkspace =
+                new EditorWorkspace(viewportCanvas, () -> chooseProject(stage), selectionModel, extensionHost);
+        extensionHost.showMessagesWith(editorWorkspace::showMessage);
+        extensionHost.activate(new HierarchyExtension(projectContext, selectionModel));
         ViewportController controller = new ViewportController(
                 viewportCanvas,
                 editorWorkspace.viewportStatus(),
@@ -96,6 +109,10 @@ public final class EditorApplication extends Application {
     @Override
     public void stop() {
         projectLoadingExecutor.shutdownNow();
+        if (workspace != null) {
+            workspace.close();
+        }
+        extensionHost.close();
         disposeCanvas();
     }
 
@@ -156,6 +173,7 @@ public final class EditorApplication extends Application {
     private void openProject(Stage stage, Path directory) {
         Path normalized = directory.toAbsolutePath().normalize();
         EditorProjectOpenTrace trace = new EditorProjectOpenTrace(telemetry, normalized);
+        projectContext.clear();
         requireWorkspace().beginOpening(normalized);
         EditorSplashScreen loadingScreen = requireSplashScreen();
         loadingScreen.showProject(normalized);
@@ -180,6 +198,12 @@ public final class EditorApplication extends Application {
         }
         EditorProjectSession session = result.session().orElseThrow();
         editorWorkspace.showProject(session);
+        projectContext.showProject(
+                new EditorProject(
+                        session.project().identity().id(),
+                        session.project().identity().name(),
+                        session.project().root().toUri()),
+                session.hierarchy());
         stage.setTitle(session.project().identity().name() + " — JScene3D Editor");
         EditorSplashScreen loadingScreen = requireSplashScreen();
         loadingScreen.projectIdentified(session.project().identity().name());
@@ -196,6 +220,7 @@ public final class EditorApplication extends Application {
     private void handleProjectLoadFailure(EditorProjectOpenTrace trace, Throwable failure) {
         trace.fail(failure);
         EditorWorkspace editorWorkspace = requireWorkspace();
+        projectContext.clear();
         editorWorkspace.clearProject();
         requireViewportController().clearProject();
         editorWorkspace.setProjectStatus("Open failed — see log");

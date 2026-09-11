@@ -40,3 +40,12 @@ trees), owns registrations through extension-scoped subscriptions, and provides
 portable status, window-message, and diagnostic publication facilities. The
 initial hierarchy, asset browser, and inspector do not introduce a second project
 document model; they project authored definitions through editor-owned views.
+
+Built-in workbench features use the same extension path as future external
+extensions. The application activates them through an editor extension host,
+which owns contribution lifetimes and exposes project-open/project-close events.
+The Hierarchy is the first migrated built-in: it contributes an asynchronous,
+toolkit-independent tree model, while a workbench-owned adapter renders that
+model with JavaFX and bridges selection back to the shared editor selection
+model. JavaFX remains an implementation detail of the workbench rather than a
+requirement for view extensions.

@@ -6,17 +6,23 @@ package io.github.glynch.jscene3d.editor;
 
 import java.util.Objects;
 
-/** Stable editor selection and the immutable Inspector data associated with it. */
-record EditorSelection(Kind kind, String identity, EditorInspectorView inspector) {
+/**
+ * Stable editor selection and the immutable Inspector data associated with it.
+ *
+ * @param kind selection category
+ * @param identity stable selection identity
+ * @param inspector immutable Inspector projection
+ */
+public record EditorSelection(Kind kind, String identity, EditorInspectorView inspector) {
     /** Validates one selection. */
-    EditorSelection {
+    public EditorSelection {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(inspector, "inspector");
     }
 
     /** Selection categories shared by Hierarchy and Project surfaces. */
-    enum Kind {
+    public enum Kind {
         /** Opened world root. */
         WORLD,
         /** Entity authored directly in the containing definition. */

@@ -11,7 +11,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Immutable read-only projection of one authored hierarchy entry. */
-final class EditorHierarchyNode {
+@SuppressWarnings("exports") // Public only across this module's implementation packages; the package is not exported.
+public final class EditorHierarchyNode {
     private final Kind kind;
     private final String label;
     private final Optional<EntityId> entityId;
@@ -20,8 +21,18 @@ final class EditorHierarchyNode {
     private final EditorSelection selection;
     private final List<EditorHierarchyNode> children;
 
-    /** Stores one hierarchy projection while retaining its stable identities. */
-    EditorHierarchyNode(
+    /**
+     * Stores one hierarchy projection while retaining its stable identities.
+     *
+     * @param kind hierarchy entry kind
+     * @param label human-readable label
+     * @param entityId optional entity identity
+     * @param definitionId optional referenced definition identity
+     * @param enabled whether the entry starts locally enabled
+     * @param selection shared editor selection
+     * @param children ordered child entries
+     */
+    public EditorHierarchyNode(
             Kind kind,
             String label,
             Optional<EntityId> entityId,
@@ -38,38 +49,66 @@ final class EditorHierarchyNode {
         this.children = List.copyOf(children);
     }
 
-    /** Returns the projected hierarchy kind. */
-    Kind kind() {
+    /**
+     * Returns the projected hierarchy kind.
+     *
+     * @return hierarchy kind
+     */
+    public Kind kind() {
         return kind;
     }
 
-    /** Returns the editor label. */
-    String label() {
+    /**
+     * Returns the editor label.
+     *
+     * @return human-readable label
+     */
+    public String label() {
         return label;
     }
 
-    /** Returns the stable entity identity when this is an entity entry. */
-    Optional<EntityId> entityId() {
+    /**
+     * Returns the stable entity identity when this is an entity entry.
+     *
+     * @return optional entity identity
+     */
+    public Optional<EntityId> entityId() {
         return entityId;
     }
 
-    /** Returns the referenced definition identity for a world or placement. */
-    Optional<AssetId> definitionId() {
+    /**
+     * Returns the referenced definition identity for a world or placement.
+     *
+     * @return optional definition identity
+     */
+    public Optional<AssetId> definitionId() {
         return definitionId;
     }
 
-    /** Returns whether the authored entry starts locally enabled. */
-    boolean isEnabled() {
+    /**
+     * Returns whether the authored entry starts locally enabled.
+     *
+     * @return whether the entry is enabled
+     */
+    public boolean isEnabled() {
         return enabled;
     }
 
-    /** Returns the stable shared selection represented by this hierarchy entry. */
-    EditorSelection selection() {
+    /**
+     * Returns the stable shared selection represented by this hierarchy entry.
+     *
+     * @return shared selection
+     */
+    public EditorSelection selection() {
         return selection;
     }
 
-    /** Returns projected child entries in authored order. */
-    List<EditorHierarchyNode> children() {
+    /**
+     * Returns projected child entries in authored order.
+     *
+     * @return immutable child entries
+     */
+    public List<EditorHierarchyNode> children() {
         return children;
     }
 
@@ -80,7 +119,7 @@ final class EditorHierarchyNode {
     }
 
     /** Kinds displayed by the editor hierarchy. */
-    enum Kind {
+    public enum Kind {
         /** Opened world definition. */
         WORLD,
         /** Locally authored entity. */

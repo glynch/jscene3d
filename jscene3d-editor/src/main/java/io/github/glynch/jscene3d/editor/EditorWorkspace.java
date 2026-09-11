@@ -5,10 +5,15 @@
 package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
+import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
+import io.github.glynch.jscene3d.editor.window.EditorMessage;
+import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.view.JavaFxViewContainer;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -41,7 +46,6 @@ import org.jspecify.annotations.Nullable;
 
 /** Owns the editor's resizable JavaFX workspace and its visible read-only state. */
 final class EditorWorkspace extends BorderPane {
-    private final TreeView<EditorHierarchyNode> hierarchy = new TreeView<>();
     private final TreeView<ProjectBrowserNode> projectTree = new TreeView<>();
     private final ListView<EditorAssetItem> assets = new ListView<>();
     private final TilePane assetGrid = new TilePane();
@@ -54,7 +58,7 @@ final class EditorWorkspace extends BorderPane {
     private final TextField assetSearch = new TextField();
     private final Label assetBreadcrumb = new Label("No project");
     private final Label assetBrowserEmpty = new Label();
-    private final EditorSelectionModel selectionModel = new EditorSelectionModel();
+    private final EditorSelectionModel selectionModel;
     private final EditorProjectBrowserModel projectBrowser = new EditorProjectBrowserModel();
     private final Label projectContext = new Label("No project");
     private final Label previewTitle = new Label("Empty Preview");
@@ -73,14 +77,24 @@ final class EditorWorkspace extends BorderPane {
     private final SplitPane upperWorkspaceSplit;
     private final SplitPane leftWorkspaceSplit;
     private final EditorBottomDrawer bottomDrawer;
+    private final JavaFxViewContainer primaryViewContainer;
     private String projectBrowserProjectName = "No project";
     private boolean showingAssetGrid = true;
 
     /** Creates the shell around an existing viewport and the real open-project command. */
-    EditorWorkspace(GLCanvas viewportCanvas, Runnable openProject) {
+    EditorWorkspace(
+            GLCanvas viewportCanvas,
+            Runnable openProject,
+            EditorSelectionModel selectionModel,
+            EditorExtensionHost extensions) {
+        this.selectionModel = Objects.requireNonNull(selectionModel, "selectionModel");
         setTop(createTopChrome(openProject));
 
-        VBox hierarchyPanel = createHierarchy();
+        primaryViewContainer = new JavaFxViewContainer(extensions, EditorViewContainers.PRIMARY_SIDEBAR);
+        VBox hierarchyPanel = primaryViewContainer.node();
+        hierarchyPanel.setMinWidth(EditorWorkspaceLayout.MINIMUM_HIERARCHY_WIDTH);
+        hierarchyPanel.setPrefWidth(EditorWorkspaceLayout.PREFERRED_HIERARCHY_WIDTH);
+        hierarchyPanel.getStyleClass().addAll("editor-panel", "editor-hierarchy-panel");
         VBox inspectorPanel = createInspector();
         VBox previewPanel = createViewportPane(viewportCanvas);
         upperWorkspaceSplit = createUpperWorkspaceSplit(hierarchyPanel, previewPanel);
@@ -132,9 +146,6 @@ final class EditorWorkspace extends BorderPane {
     /** Replaces the visible hierarchy, Project content, and preview context atomically. */
     void showProject(EditorProjectSession session) {
         clearSelection();
-        TreeItem<EditorHierarchyNode> root = createTreeItem(session.hierarchy());
-        root.setExpanded(true);
-        hierarchy.setRoot(root);
         String projectName = session.project().identity().name();
         projectBrowser.showProject(session.assets());
         projectBrowserProjectName = projectName;
@@ -145,15 +156,11 @@ final class EditorWorkspace extends BorderPane {
         refreshProjectBrowser();
         projectContext.setText(projectName);
         previewTitle.setText(session.hierarchy().label() + " Preview");
-        TreeItem<EditorHierarchyNode> initialSelection =
-                root.getChildren().isEmpty() ? root : root.getChildren().getFirst();
-        hierarchy.getSelectionModel().select(initialSelection);
     }
 
     /** Clears project-owned views after an unsuccessful open. */
     void clearProject() {
         clearSelection();
-        hierarchy.setRoot(null);
         projectBrowser.clear();
         projectTree.setRoot(null);
         projectBrowserProjectName = "No project";
@@ -190,6 +197,17 @@ final class EditorWorkspace extends BorderPane {
         projectStatus.setText(text);
     }
 
+    /** Shows an extension message without exposing JavaFX through the extension interface. */
+    void showMessage(EditorMessage message) {
+        EditorMessage shown = Objects.requireNonNull(message, "message");
+        projectStatus.setText(shown.text());
+    }
+
+    /** Releases workbench adapters before the extension host is closed. */
+    void close() {
+        primaryViewContainer.close();
+    }
+
     /** Creates compact product, menu, project-context, and command chrome. */
     private HBox createTopChrome(Runnable openProject) {
         Label productName = new Label("JScene3D");
@@ -217,17 +235,6 @@ final class EditorWorkspace extends BorderPane {
         chrome.setAlignment(Pos.CENTER_LEFT);
         chrome.getStyleClass().add("editor-top");
         return chrome;
-    }
-
-    /** Creates the authored-world hierarchy region. */
-    private VBox createHierarchy() {
-        hierarchy.getStyleClass().add("editor-hierarchy");
-        VBox.setVgrow(hierarchy, Priority.ALWAYS);
-        VBox panel = new VBox(6.0, createPanelHeading("Hierarchy"), hierarchy);
-        panel.setMinWidth(EditorWorkspaceLayout.MINIMUM_HIERARCHY_WIDTH);
-        panel.setPrefWidth(EditorWorkspaceLayout.PREFERRED_HIERARCHY_WIDTH);
-        panel.getStyleClass().addAll("editor-panel", "editor-hierarchy-panel");
-        return panel;
     }
 
     /** Creates the read-only Inspector driven by the shared editor selection. */
@@ -267,18 +274,20 @@ final class EditorWorkspace extends BorderPane {
         inspector.setMinWidth(EditorWorkspaceLayout.MINIMUM_INSPECTOR_WIDTH);
         inspector.setPrefWidth(EditorWorkspaceLayout.PREFERRED_INSPECTOR_WIDTH);
         inspector.getStyleClass().addAll("editor-panel", "editor-inspector-panel");
-        selectionModel.subscribe(this::showInspection);
+        selectionModel.subscribe(this::selectionChanged);
         return inspector;
     }
 
-    /** Routes Hierarchy and Project selections through the same stable selection model. */
+    /** Keeps project selection presentation and the Inspector synchronized with shared selection. */
+    private void selectionChanged(Optional<EditorSelection> selected) {
+        if (selected.isEmpty() || selected.orElseThrow().kind() != EditorSelection.Kind.ASSET) {
+            clearProjectSelection();
+        }
+        showInspection(selected);
+    }
+
+    /** Routes Project selections through the shared selection model used by contributed views. */
     private void installSelectionEvents() {
-        hierarchy.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
-            if (selected != null) {
-                clearProjectSelection();
-                selectionModel.select(selected.getValue().selection());
-            }
-        });
         assets.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
             if (selected != null) {
                 selectProjectItem(selected);
@@ -294,7 +303,6 @@ final class EditorWorkspace extends BorderPane {
 
     /** Clears UI and shared selection state before project-owned values are replaced. */
     private void clearSelection() {
-        hierarchy.getSelectionModel().clearSelection();
         clearProjectSelection();
         selectionModel.clear();
     }
@@ -309,7 +317,6 @@ final class EditorWorkspace extends BorderPane {
     /** Routes a Project item through the browser and shared editor selection models. */
     private void selectProjectItem(EditorAssetItem selected) {
         projectBrowser.select(selected);
-        hierarchy.getSelectionModel().clearSelection();
         synchronizeProjectSelection();
         selectionModel.select(selected.selection());
     }
@@ -715,16 +722,6 @@ final class EditorWorkspace extends BorderPane {
         Label heading = new Label(text);
         heading.getStyleClass().add("editor-panel-heading");
         return heading;
-    }
-
-    /** Converts one immutable hierarchy projection into JavaFX tree items. */
-    private static TreeItem<EditorHierarchyNode> createTreeItem(EditorHierarchyNode node) {
-        TreeItem<EditorHierarchyNode> item = new TreeItem<>(node);
-        item.getChildren()
-                .setAll(node.children().stream()
-                        .map(EditorWorkspace::createTreeItem)
-                        .toList());
-        return item;
     }
 
     /** Renders one Project asset as a reusable, information-rich list row. */

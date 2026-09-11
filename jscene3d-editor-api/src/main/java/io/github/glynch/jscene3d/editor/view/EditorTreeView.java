@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.view;
 
+import java.util.Optional;
+
 /**
  * A logical editor view presented as a lazily populated tree.
  *
@@ -25,4 +27,16 @@ public interface EditorTreeView<T> extends EditorView {
      * @return tree data provider
      */
     EditorTreeDataProvider<T> dataProvider();
+
+    /**
+     * Returns the optional shared selection model for this tree.
+     *
+     * <p>The workbench uses this model in both directions: user selection is published to the model, while selection
+     * changes originating elsewhere are reflected in the rendered tree.
+     *
+     * @return shared selection model, or empty when the view does not expose selection
+     */
+    default Optional<EditorTreeSelectionModel<T>> selectionModel() {
+        return Optional.empty();
+    }
 }

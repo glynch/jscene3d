@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
+import io.github.glynch.jscene3d.editor.project.EditorProjects;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
 import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
@@ -55,6 +56,13 @@ public interface EditorExtensionContext {
      * @return diagnostic collection factory
      */
     EditorDiagnostics diagnostics();
+
+    /**
+     * Returns the read-only lifecycle of the project opened in this editor window.
+     *
+     * @return current-project lifecycle
+     */
+    EditorProjects projects();
 
     /**
      * Returns the registrations automatically closed when this extension is deactivated.

@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
+import io.github.glynch.jscene3d.editor.project.EditorProjects;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
 import io.github.glynch.jscene3d.editor.view.EditorView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
@@ -26,7 +27,11 @@ final class EditorExtensionContractTest {
     @Test
     void extensionContributesLogicalViewsThroughTheBoundedContext() {
         List<EditorViewContribution> contributions = new ArrayList<>();
-        EditorExtensionContext context = new TestContext(contributions::add);
+        EditorViewRegistry views = contribution -> {
+            contributions.add(contribution);
+            return () -> contributions.remove(contribution);
+        };
+        EditorExtensionContext context = new TestContext(views);
         EditorExtension extension = new TestExtension();
 
         extension.activate(context);
@@ -96,6 +101,11 @@ final class EditorExtensionContractTest {
 
         @Override
         public EditorDiagnostics diagnostics() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EditorProjects projects() {
             throw new UnsupportedOperationException();
         }
 

@@ -11,27 +11,46 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /** Owns the single selection shared by all editor browsing surfaces. */
-final class EditorSelectionModel {
-    private final List<Consumer<Optional<EditorSelection>>> listeners = new ArrayList<>();
-    private Optional<EditorSelection> selection = Optional.empty();
+public final class EditorSelectionModel {
+    private final List<Consumer<Optional<EditorSelection>>> listeners;
+    private Optional<EditorSelection> selection;
 
-    /** Returns the current selection. */
-    Optional<EditorSelection> selection() {
+    /** Creates an initially empty editor selection. */
+    public EditorSelectionModel() {
+        listeners = new ArrayList<>();
+        selection = Optional.empty();
+    }
+
+    /**
+     * Returns the current selection.
+     *
+     * @return current selection
+     */
+    public Optional<EditorSelection> selection() {
         return selection;
     }
 
-    /** Replaces the current selection and notifies observers when its stable value changed. */
-    void select(EditorSelection selected) {
+    /**
+     * Replaces the current selection and notifies observers when its stable value changed.
+     *
+     * @param selected new selection
+     */
+    public void select(EditorSelection selected) {
         update(Optional.of(Objects.requireNonNull(selected, "selected")));
     }
 
     /** Clears any selection before project-owned data is replaced. */
-    void clear() {
+    public void clear() {
         update(Optional.empty());
     }
 
-    /** Observes selection changes and immediately receives the current state. */
-    Runnable subscribe(Consumer<Optional<EditorSelection>> listener) {
+    /**
+     * Observes selection changes and immediately receives the current state.
+     *
+     * @param listener synchronous selection listener
+     * @return removal action
+     */
+    public Runnable subscribe(Consumer<Optional<EditorSelection>> listener) {
         Consumer<Optional<EditorSelection>> validListener = Objects.requireNonNull(listener, "listener");
         listeners.add(validListener);
         validListener.accept(selection);

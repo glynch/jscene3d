@@ -25,6 +25,7 @@ final class EditorTreeViewContractTest {
         EditorTreeView<String> view = new TestTreeView(provider);
 
         assertThat(view.kind()).isEqualTo(EditorTreeView.TREE_VIEW_KIND);
+        assertThat(view.selectionModel()).isEmpty();
         assertThat(view.dataProvider()).isSameAs(provider);
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).containsExactly("root");
         assertThat(view.dataProvider().children("root").toCompletableFuture().join())
@@ -43,6 +44,21 @@ final class EditorTreeViewContractTest {
         provider.invalidate("ignored");
 
         assertThat(invalidations).containsExactly(Optional.of("root"));
+    }
+
+    @Test
+    void sharesTreeSelectionWithoutToolkitEvents() {
+        TestTreeSelectionModel selection = new TestTreeSelectionModel();
+        TestTreeView view = new TestTreeView(new TestTreeProvider(), selection);
+        List<Optional<String>> selections = new ArrayList<>();
+        EditorRegistration registration = view.selectionModel().orElseThrow().observe(selections::add);
+
+        view.selectionModel().orElseThrow().select(Optional.of("child"));
+        registration.close();
+        view.selectionModel().orElseThrow().select(Optional.empty());
+
+        assertThat(selections).containsExactly(Optional.empty(), Optional.of("child"));
+        assertThat(selection.selection()).isEmpty();
     }
 
     @Test
@@ -131,9 +147,16 @@ final class EditorTreeViewContractTest {
 
     private static final class TestTreeView implements EditorTreeView<String> {
         private final EditorTreeDataProvider<String> provider;
+        private final Optional<EditorTreeSelectionModel<String>> selection;
 
         private TestTreeView(EditorTreeDataProvider<String> provider) {
             this.provider = provider;
+            this.selection = Optional.empty();
+        }
+
+        private TestTreeView(EditorTreeDataProvider<String> provider, EditorTreeSelectionModel<String> selection) {
+            this.provider = provider;
+            this.selection = Optional.of(selection);
         }
 
         @Override
@@ -149,6 +172,34 @@ final class EditorTreeViewContractTest {
         @Override
         public EditorTreeDataProvider<String> dataProvider() {
             return provider;
+        }
+
+        @Override
+        public Optional<EditorTreeSelectionModel<String>> selectionModel() {
+            return selection;
+        }
+    }
+
+    private static final class TestTreeSelectionModel implements EditorTreeSelectionModel<String> {
+        private Optional<String> selection = Optional.empty();
+        private Consumer<Optional<String>> listener = ignored -> {};
+
+        @Override
+        public Optional<String> selection() {
+            return selection;
+        }
+
+        @Override
+        public void select(Optional<String> updated) {
+            selection = updated;
+            listener.accept(updated);
+        }
+
+        @Override
+        public EditorRegistration observe(Consumer<Optional<String>> newListener) {
+            listener = newListener;
+            listener.accept(selection);
+            return () -> listener = ignored -> {};
         }
     }
 

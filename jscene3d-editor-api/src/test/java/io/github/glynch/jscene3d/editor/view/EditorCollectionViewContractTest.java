@@ -25,7 +25,8 @@ final class EditorCollectionViewContractTest {
         assertThat(view.kind()).isEqualTo(EditorCollectionView.COLLECTION_VIEW_KIND);
         assertThat(view.selectionModel()).isEmpty();
         assertThat(view.categories())
-                .containsExactly(new EditorCollectionCategory("worlds", "Worlds", Optional.of("W")));
+                .containsExactly(new EditorCollectionCategory(
+                        "worlds", "Worlds", Optional.of(new EditorIcon(EditorIcons.WORLD, "Worlds"))));
         assertThat(view.allItemsLabel()).isEqualTo("All Items");
         assertThat(view.rootIcon()).isEmpty();
         assertThat(view.searchPlaceholder()).isEqualTo("Search items…");
@@ -61,7 +62,8 @@ final class EditorCollectionViewContractTest {
 
         @Override
         public List<EditorCollectionCategory> categories() {
-            return List.of(new EditorCollectionCategory("worlds", "Worlds", Optional.of("W")));
+            return List.of(new EditorCollectionCategory(
+                    "worlds", "Worlds", Optional.of(new EditorIcon(EditorIcons.WORLD, "Worlds"))));
         }
     }
 
@@ -81,9 +83,9 @@ final class EditorCollectionViewContractTest {
                     Optional.of("World definition"),
                     Optional.of("worlds/map01.world.json"),
                     Optional.empty(),
-                    Optional.of("W"),
+                    Optional.of(new EditorIcon(EditorIcons.WORLD, "World definition")),
                     Optional.of("worlds"),
-                    Optional.of("R/O"),
+                    List.of(new EditorIcon(EditorIcons.READ_ONLY, "Read-only")),
                     Optional.empty(),
                     Optional.of("world"));
         }

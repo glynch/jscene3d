@@ -12,9 +12,9 @@ import java.util.Optional;
  *
  * @param id stable non-blank category identity
  * @param label non-blank human-readable label
- * @param icon optional editor icon identity
+ * @param icon optional editor icon presentation
  */
-public record EditorCollectionCategory(String id, String label, Optional<String> icon) {
+public record EditorCollectionCategory(String id, String label, Optional<EditorIcon> icon) {
     /** Copies and validates category metadata. */
     public EditorCollectionCategory {
         if (Objects.requireNonNull(id, "id").isBlank()) {

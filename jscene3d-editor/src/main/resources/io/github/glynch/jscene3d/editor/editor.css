@@ -532,19 +532,56 @@
     -fx-max-width: infinity;
 }
 
+.editor-icon {
+    -fx-alignment: center;
+    -fx-max-height: 16px;
+    -fx-max-width: 16px;
+    -fx-min-height: 16px;
+    -fx-min-width: 16px;
+    -fx-pref-height: 16px;
+    -fx-pref-width: 16px;
+}
+
+.editor-icon-shape {
+    -fx-fill: transparent;
+    -fx-stroke: -jscene-text-muted;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+    -fx-stroke-width: 1.25px;
+}
+
+.editor-icon-read-only .editor-icon-shape {
+    -fx-stroke: -jscene-focus;
+}
+
+.editor-icon-disabled .editor-icon-shape {
+    -fx-stroke: -jscene-text-muted;
+}
+
+.tree-cell:filled:selected .editor-icon-shape,
+.list-cell:filled:selected .editor-icon-shape,
+.editor-asset-card:selected .editor-icon-shape {
+    -fx-stroke: -jscene-text-strong;
+}
+
+.editor-tree-item-row,
+.editor-item-decorations {
+    -fx-alignment: center-left;
+}
+
+.editor-tree-item-description {
+    -fx-font-size: 10px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-item-decoration {
+    -fx-opacity: 0.9;
+}
+
 .editor-project-tree-marker,
 .editor-asset-marker {
-    -fx-alignment: center;
-    -fx-background-color: rgba(117, 98, 243, 0.14);
-    -fx-background-radius: 3px;
-    -fx-border-color: derive(-jscene-accent, -18%);
-    -fx-border-radius: 3px;
-    -fx-border-width: 1px;
-    -fx-font-size: 10px;
-    -fx-font-weight: 700;
-    -fx-min-height: 20px;
-    -fx-min-width: 20px;
-    -fx-text-fill: -jscene-focus;
+    -fx-min-height: 18px;
+    -fx-min-width: 18px;
 }
 
 .editor-project-tree-count {
@@ -642,18 +679,6 @@
 .editor-asset-source {
     -fx-font-size: 10px;
     -fx-text-fill: -jscene-text-muted;
-}
-
-.editor-asset-read-only {
-    -fx-background-color: rgba(117, 98, 243, 0.12);
-    -fx-background-radius: 2px;
-    -fx-border-color: derive(-jscene-accent, -24%);
-    -fx-border-radius: 2px;
-    -fx-border-width: 1px;
-    -fx-font-size: 8px;
-    -fx-font-weight: 600;
-    -fx-padding: 2px 3px;
-    -fx-text-fill: -jscene-focus;
 }
 
 .editor-project-empty {

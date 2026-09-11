@@ -12,6 +12,8 @@ import io.github.glynch.jscene3d.editor.EditorSelection;
 import io.github.glynch.jscene3d.editor.EditorSelectionModel;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItemCollapsibleState;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
@@ -43,16 +45,32 @@ final class HierarchyExtensionTest {
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).isEmpty();
 
         EditorHierarchyNode child = node("Player", EditorSelection.Kind.LOCAL_ENTITY, List.of());
-        EditorHierarchyNode root = node("MAP01", EditorSelection.Kind.WORLD, List.of(child));
+        EditorHierarchyNode generated = new EditorHierarchyNode(
+                EditorHierarchyNode.Kind.GENERATED_ENTITY,
+                "Generated Door",
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                selection("Generated Door", EditorSelection.Kind.GENERATED_ENTITY),
+                List.of());
+        EditorHierarchyNode root = node("MAP01", EditorSelection.Kind.WORLD, List.of(child, generated));
         projects.showProject(
                 new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")), root, List.of());
 
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).containsExactly(root);
         assertThat(view.dataProvider().children(root).toCompletableFuture().join())
-                .containsExactly(child);
+                .containsExactly(child, generated);
         assertThat(view.dataProvider().item(root).collapsibleState())
                 .isEqualTo(EditorTreeItemCollapsibleState.EXPANDED);
         assertThat(view.dataProvider().item(child).collapsibleState()).isEqualTo(EditorTreeItemCollapsibleState.NONE);
+        assertThat(view.dataProvider().item(root).icon()).contains(new EditorIcon(EditorIcons.WORLD, "World"));
+        assertThat(view.dataProvider().item(child).icon()).contains(new EditorIcon(EditorIcons.ENTITY, "Local entity"));
+        assertThat(view.dataProvider().item(generated).decorations())
+                .containsExactly(
+                        new EditorIcon(EditorIcons.READ_ONLY, "Generated read-only entity"),
+                        new EditorIcon(EditorIcons.DISABLED, "Initially disabled"));
+        assertThat(view.dataProvider().item(generated).tooltip())
+                .contains("Generated entity · read-only · initially disabled");
         assertThat(editorSelection.selection()).contains(child.selection());
 
         view.selectionModel().orElseThrow().select(Optional.of(root));
@@ -68,10 +86,19 @@ final class HierarchyExtensionTest {
 
     private static EditorHierarchyNode node(
             String label, EditorSelection.Kind selectionKind, List<EditorHierarchyNode> children) {
-        EditorInspectorView inspector = new EditorInspectorView(label, "Test", "test", label, false, List.of());
-        EditorSelection selection = new EditorSelection(selectionKind, label, inspector);
         return new EditorHierarchyNode(
-                kind(selectionKind), label, Optional.empty(), Optional.empty(), true, selection, children);
+                kind(selectionKind),
+                label,
+                Optional.empty(),
+                Optional.empty(),
+                true,
+                selection(label, selectionKind),
+                children);
+    }
+
+    private static EditorSelection selection(String label, EditorSelection.Kind selectionKind) {
+        EditorInspectorView inspector = new EditorInspectorView(label, "Test", "test", label, false, List.of());
+        return new EditorSelection(selectionKind, label, inspector);
     }
 
     private static EditorHierarchyNode.Kind kind(EditorSelection.Kind selectionKind) {

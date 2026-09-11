@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.view;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -14,7 +15,8 @@ import java.util.Optional;
  * @param label non-blank primary label
  * @param description optional secondary description
  * @param tooltip optional accessible detail
- * @param icon optional editor icon identity
+ * @param icon optional primary icon presentation
+ * @param decorations state icons rendered after the item label
  * @param command optional command invoked when the item is opened
  * @param contextValue optional semantic value used to select item actions
  * @param collapsibleState initial child-expansion capability and state
@@ -23,7 +25,8 @@ public record EditorTreeItem(
         String label,
         Optional<String> description,
         Optional<String> tooltip,
-        Optional<String> icon,
+        Optional<EditorIcon> icon,
+        List<EditorIcon> decorations,
         Optional<CommandId> command,
         Optional<String> contextValue,
         EditorTreeItemCollapsibleState collapsibleState) {
@@ -35,6 +38,7 @@ public record EditorTreeItem(
         Objects.requireNonNull(description, "description");
         Objects.requireNonNull(tooltip, "tooltip");
         Objects.requireNonNull(icon, "icon");
+        decorations = List.copyOf(Objects.requireNonNull(decorations, "decorations"));
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(contextValue, "contextValue");
         Objects.requireNonNull(collapsibleState, "collapsibleState");
@@ -52,6 +56,7 @@ public record EditorTreeItem(
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                List.of(),
                 Optional.empty(),
                 Optional.empty(),
                 EditorTreeItemCollapsibleState.NONE);

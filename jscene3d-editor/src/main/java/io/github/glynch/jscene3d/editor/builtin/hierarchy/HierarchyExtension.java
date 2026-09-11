@@ -11,6 +11,9 @@ import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIconId;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorTreeDataProvider;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItem;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItemCollapsibleState;
@@ -19,6 +22,7 @@ import io.github.glynch.jscene3d.editor.view.EditorTreeView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -107,6 +111,7 @@ public final class HierarchyExtension implements EditorExtension {
 
         @Override
         public EditorTreeItem item(EditorHierarchyNode element) {
+            String kindLabel = kindLabel(element.kind());
             EditorTreeItemCollapsibleState collapsible = EditorTreeItemCollapsibleState.NONE;
             if (!element.children().isEmpty()) {
                 collapsible = element.kind() == EditorHierarchyNode.Kind.WORLD
@@ -114,10 +119,11 @@ public final class HierarchyExtension implements EditorExtension {
                         : EditorTreeItemCollapsibleState.COLLAPSED;
             }
             return new EditorTreeItem(
-                    element.toString(),
+                    element.label(),
                     Optional.empty(),
-                    Optional.of(element.kind().name().toLowerCase(Locale.ROOT).replace('_', ' ')),
-                    Optional.empty(),
+                    Optional.of(itemTooltip(element, kindLabel)),
+                    Optional.of(new EditorIcon(icon(element.kind()), kindLabel)),
+                    decorations(element),
                     Optional.empty(),
                     Optional.of(element.kind().name().toLowerCase(Locale.ROOT)),
                     collapsible);
@@ -170,5 +176,44 @@ public final class HierarchyExtension implements EditorExtension {
                 .map(child -> findSelection(child, selection))
                 .flatMap(Optional::stream)
                 .findFirst();
+    }
+
+    private static EditorIconId icon(EditorHierarchyNode.Kind kind) {
+        return switch (kind) {
+            case WORLD -> EditorIcons.WORLD;
+            case LOCAL_ENTITY, GENERATED_ENTITY -> EditorIcons.ENTITY;
+            case PLACEMENT -> EditorIcons.PLACEMENT;
+        };
+    }
+
+    private static String kindLabel(EditorHierarchyNode.Kind kind) {
+        return switch (kind) {
+            case WORLD -> "World";
+            case LOCAL_ENTITY -> "Local entity";
+            case PLACEMENT -> "Entity definition placement";
+            case GENERATED_ENTITY -> "Generated entity";
+        };
+    }
+
+    private static List<EditorIcon> decorations(EditorHierarchyNode element) {
+        ArrayList<EditorIcon> decorations = new ArrayList<>();
+        if (element.kind() == EditorHierarchyNode.Kind.GENERATED_ENTITY) {
+            decorations.add(new EditorIcon(EditorIcons.READ_ONLY, "Generated read-only entity"));
+        }
+        if (!element.isEnabled()) {
+            decorations.add(new EditorIcon(EditorIcons.DISABLED, "Initially disabled"));
+        }
+        return List.copyOf(decorations);
+    }
+
+    private static String itemTooltip(EditorHierarchyNode element, String kindLabel) {
+        StringBuilder tooltip = new StringBuilder(kindLabel);
+        if (element.kind() == EditorHierarchyNode.Kind.GENERATED_ENTITY) {
+            tooltip.append(" · read-only");
+        }
+        if (!element.isEnabled()) {
+            tooltip.append(" · initially disabled");
+        }
+        return tooltip.toString();
     }
 }

@@ -14,6 +14,8 @@ import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionSnapshot;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -47,7 +49,7 @@ final class ProjectExtensionTest {
                 .extracting(category -> category.label())
                 .containsExactly("Worlds", "Entity Definitions", "Source Assets", "Imports");
         assertThat(view.allItemsLabel()).isEqualTo("Project Assets");
-        assertThat(view.rootIcon()).contains("P");
+        assertThat(view.rootIcon()).contains(new EditorIcon(EditorIcons.PROJECT, "Project"));
         assertThat(view.searchPlaceholder()).isEqualTo("Search assets…");
 
         ProjectAsset source = item("actors", "source-z", ProjectAsset.Kind.SOURCE_ASSET);
@@ -60,7 +62,10 @@ final class ProjectExtensionTest {
         assertThat(snapshot(view).rootLabel()).isEqualTo("Test");
         assertThat(snapshot(view).elements()).containsExactly(world, source);
         assertThat(view.dataProvider().item(world).categoryId()).contains("world_definition");
-        assertThat(view.dataProvider().item(world).badge()).contains("R/O");
+        assertThat(view.dataProvider().item(world).icon())
+                .contains(new EditorIcon(EditorIcons.WORLD, "World definition"));
+        assertThat(view.dataProvider().item(world).decorations())
+                .containsExactly(new EditorIcon(EditorIcons.READ_ONLY, "Read-only"));
 
         view.selectionModel().orElseThrow().select(Optional.of(world));
 

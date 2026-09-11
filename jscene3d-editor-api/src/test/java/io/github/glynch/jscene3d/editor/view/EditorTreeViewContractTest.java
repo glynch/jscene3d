@@ -68,14 +68,16 @@ final class EditorTreeViewContractTest {
                 "Child",
                 Optional.of("Source asset"),
                 Optional.of("Open Child"),
-                Optional.of("asset"),
+                Optional.of(new EditorIcon(EditorIcons.SOURCE_ASSET, "Source asset")),
+                List.of(new EditorIcon(EditorIcons.READ_ONLY, "Read-only")),
                 Optional.of(command),
                 Optional.of("source-asset"),
                 EditorTreeItemCollapsibleState.COLLAPSED);
 
         assertThat(item.description()).contains("Source asset");
         assertThat(item.tooltip()).contains("Open Child");
-        assertThat(item.icon()).contains("asset");
+        assertThat(item.icon()).contains(new EditorIcon(EditorIcons.SOURCE_ASSET, "Source asset"));
+        assertThat(item.decorations()).containsExactly(new EditorIcon(EditorIcons.READ_ONLY, "Read-only"));
         assertThat(item.command()).contains(command);
         assertThat(item.contextValue()).contains("source-asset");
         assertThat(item.collapsibleState()).isEqualTo(EditorTreeItemCollapsibleState.COLLAPSED);
@@ -90,6 +92,8 @@ final class EditorTreeViewContractTest {
     @SuppressWarnings("NullAway") // Deliberate nulls verify public boundary validation.
     void validatesTreePresentation() {
         Optional<String> emptyText = Optional.empty();
+        Optional<EditorIcon> emptyIcon = Optional.empty();
+        List<EditorIcon> emptyIcons = List.of();
         Optional<CommandId> emptyCommand = Optional.empty();
 
         assertThatThrownBy(() -> EditorTreeItem.leaf(" "))
@@ -100,7 +104,8 @@ final class EditorTreeViewContractTest {
                         "Item",
                         null,
                         emptyText,
-                        emptyText,
+                        emptyIcon,
+                        emptyIcons,
                         emptyCommand,
                         emptyText,
                         EditorTreeItemCollapsibleState.NONE))
@@ -110,7 +115,8 @@ final class EditorTreeViewContractTest {
                         "Item",
                         emptyText,
                         null,
-                        emptyText,
+                        emptyIcon,
+                        emptyIcons,
                         emptyCommand,
                         emptyText,
                         EditorTreeItemCollapsibleState.NONE))
@@ -121,27 +127,47 @@ final class EditorTreeViewContractTest {
                         emptyText,
                         emptyText,
                         null,
+                        emptyIcons,
                         emptyCommand,
                         emptyText,
                         EditorTreeItemCollapsibleState.NONE))
                 .withMessage("icon");
         assertThatNullPointerException()
                 .isThrownBy(() -> new EditorTreeItem(
-                        "Item", emptyText, emptyText, emptyText, null, emptyText, EditorTreeItemCollapsibleState.NONE))
+                        "Item",
+                        emptyText,
+                        emptyText,
+                        emptyIcon,
+                        null,
+                        emptyCommand,
+                        emptyText,
+                        EditorTreeItemCollapsibleState.NONE))
+                .withMessage("decorations");
+        assertThatNullPointerException()
+                .isThrownBy(() -> new EditorTreeItem(
+                        "Item",
+                        emptyText,
+                        emptyText,
+                        emptyIcon,
+                        emptyIcons,
+                        null,
+                        emptyText,
+                        EditorTreeItemCollapsibleState.NONE))
                 .withMessage("command");
         assertThatNullPointerException()
                 .isThrownBy(() -> new EditorTreeItem(
                         "Item",
                         emptyText,
                         emptyText,
-                        emptyText,
+                        emptyIcon,
+                        emptyIcons,
                         emptyCommand,
                         null,
                         EditorTreeItemCollapsibleState.NONE))
                 .withMessage("contextValue");
         assertThatNullPointerException()
-                .isThrownBy(() ->
-                        new EditorTreeItem("Item", emptyText, emptyText, emptyText, emptyCommand, emptyText, null))
+                .isThrownBy(() -> new EditorTreeItem(
+                        "Item", emptyText, emptyText, emptyIcon, emptyIcons, emptyCommand, emptyText, null))
                 .withMessage("collapsibleState");
     }
 

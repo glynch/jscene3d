@@ -6,11 +6,13 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorTreeDataProvider;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItem;
 import io.github.glynch.jscene3d.editor.view.EditorTreeItemCollapsibleState;
 import io.github.glynch.jscene3d.editor.view.EditorTreeSelectionModel;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,12 +21,16 @@ import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import org.jspecify.annotations.Nullable;
 
 /** Workbench-owned JavaFX adapter for any toolkit-independent tree view contribution. */
@@ -217,16 +223,50 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             super.updateItem(element, empty);
             if (empty || element == null) {
                 setText(null);
+                setGraphic(null);
                 setTooltip(null);
+                setAccessibleText(null);
                 return;
             }
             EditorTreeItem presentation = provider.item(element);
-            String text = presentation
-                    .description()
-                    .map(description -> presentation.label() + "  " + description)
-                    .orElseGet(presentation::label);
-            setText(text);
+            Label name = new Label(presentation.label());
+            name.setMinWidth(0.0);
+            HBox.setHgrow(name, Priority.ALWAYS);
+            HBox row = new HBox(7.0);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setMaxWidth(Double.MAX_VALUE);
+            presentation
+                    .icon()
+                    .map(icon -> JavaFxIconRenderer.create(icon, "editor-tree-item-icon"))
+                    .ifPresent(row.getChildren()::add);
+            row.getChildren().add(name);
+            presentation.description().ifPresent(description -> {
+                Label detail = new Label(description);
+                detail.getStyleClass().add("editor-tree-item-description");
+                row.getChildren().add(detail);
+            });
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            row.getChildren().add(spacer);
+            for (EditorIcon decoration : presentation.decorations()) {
+                row.getChildren()
+                        .add(JavaFxIconRenderer.create(
+                                decoration, "editor-item-decoration", "editor-tree-item-decoration"));
+            }
+            row.getStyleClass().add("editor-tree-item-row");
+            setText(null);
+            setGraphic(row);
             setTooltip(presentation.tooltip().map(Tooltip::new).orElse(null));
+            setAccessibleText(accessibleText(presentation));
+        }
+
+        private String accessibleText(EditorTreeItem presentation) {
+            List<String> parts = new ArrayList<>();
+            parts.add(presentation.label());
+            presentation.description().ifPresent(parts::add);
+            parts.addAll(
+                    presentation.decorations().stream().map(EditorIcon::tooltip).toList());
+            return String.join(", ", parts);
         }
     }
 }

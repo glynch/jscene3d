@@ -16,6 +16,9 @@ import io.github.glynch.jscene3d.editor.view.EditorCollectionItem;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionSelectionModel;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionSnapshot;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIconId;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewId;
@@ -34,10 +37,10 @@ public final class ProjectExtension implements EditorExtension {
     public static final ViewId VIEW_ID = new ViewId("io.github.glynch.jscene3d.editor.project");
 
     private static final List<EditorCollectionCategory> CATEGORIES = List.of(
-            category(ProjectAsset.Kind.WORLD_DEFINITION, "Worlds", "W"),
-            category(ProjectAsset.Kind.ENTITY_DEFINITION, "Entity Definitions", "E"),
-            category(ProjectAsset.Kind.SOURCE_ASSET, "Source Assets", "S"),
-            category(ProjectAsset.Kind.IMPORT_DEFINITION, "Imports", "I"));
+            category(ProjectAsset.Kind.WORLD_DEFINITION, "Worlds"),
+            category(ProjectAsset.Kind.ENTITY_DEFINITION, "Entity Definitions"),
+            category(ProjectAsset.Kind.SOURCE_ASSET, "Source Assets"),
+            category(ProjectAsset.Kind.IMPORT_DEFINITION, "Imports"));
     private static final Comparator<ProjectAsset> ASSET_ORDER = Comparator.comparingInt(
                     (ProjectAsset item) -> order(item.kind()))
             .thenComparing(ProjectAsset::label, String.CASE_INSENSITIVE_ORDER)
@@ -96,8 +99,8 @@ public final class ProjectExtension implements EditorExtension {
         }
 
         @Override
-        public Optional<String> rootIcon() {
-            return Optional.of("P");
+        public Optional<EditorIcon> rootIcon() {
+            return Optional.of(new EditorIcon(EditorIcons.PROJECT, "Project"));
         }
 
         @Override
@@ -134,9 +137,9 @@ public final class ProjectExtension implements EditorExtension {
                     Optional.of(asset.kind().label()),
                     Optional.of(asset.selection().inspector().source()),
                     Optional.of(asset.source().toString()),
-                    Optional.of(marker(asset.kind())),
+                    Optional.of(new EditorIcon(icon(asset.kind()), asset.kind().label())),
                     Optional.of(categoryId(asset.kind())),
-                    Optional.of("R/O"),
+                    List.of(new EditorIcon(EditorIcons.READ_ONLY, "Read-only")),
                     Optional.empty(),
                     Optional.of(asset.kind().name().toLowerCase(Locale.ROOT)));
         }
@@ -184,20 +187,20 @@ public final class ProjectExtension implements EditorExtension {
                 .findFirst();
     }
 
-    private static EditorCollectionCategory category(ProjectAsset.Kind kind, String label, String marker) {
-        return new EditorCollectionCategory(categoryId(kind), label, Optional.of(marker));
+    private static EditorCollectionCategory category(ProjectAsset.Kind kind, String label) {
+        return new EditorCollectionCategory(categoryId(kind), label, Optional.of(new EditorIcon(icon(kind), label)));
     }
 
     private static String categoryId(ProjectAsset.Kind kind) {
         return kind.name().toLowerCase(Locale.ROOT);
     }
 
-    private static String marker(ProjectAsset.Kind kind) {
+    private static EditorIconId icon(ProjectAsset.Kind kind) {
         return switch (kind) {
-            case WORLD_DEFINITION -> "W";
-            case ENTITY_DEFINITION -> "E";
-            case SOURCE_ASSET -> "S";
-            case IMPORT_DEFINITION -> "I";
+            case WORLD_DEFINITION -> EditorIcons.WORLD;
+            case ENTITY_DEFINITION -> EditorIcons.ENTITY_DEFINITION;
+            case SOURCE_ASSET -> EditorIcons.SOURCE_ASSET;
+            case IMPORT_DEFINITION -> EditorIcons.IMPORT;
         };
     }
 

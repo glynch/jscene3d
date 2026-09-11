@@ -36,10 +36,12 @@ viewport coordination. Toolkit-independent extension contracts live in
 `jscene3d-editor-api`, preventing editor extensions from exposing JavaFX controls.
 The API separates executable commands from their workbench placements, describes
 views through stable kinds and editor-rendered models (including asynchronous
-trees and searchable collections), owns registrations through extension-scoped subscriptions, and provides
-portable status, window-message, and diagnostic publication facilities. The
-initial hierarchy, asset browser, and inspector do not introduce a second project
-document model; they project authored definitions through editor-owned views.
+trees and searchable collections), identifies icons through namespaced semantic
+identities with required accessible explanations, owns registrations through
+extension-scoped subscriptions, and provides portable status, window-message,
+and diagnostic publication facilities. The initial hierarchy, asset browser,
+and inspector do not introduce a second project document model; they project
+authored definitions through editor-owned views.
 
 Built-in workbench features use the same extension path as future external
 extensions. The application activates them through an editor extension host,
@@ -47,7 +49,10 @@ which owns contribution lifetimes and exposes project-open/project-close events.
 The Hierarchy contributes an asynchronous, toolkit-independent tree model. The
 Project browser contributes a toolkit-independent collection snapshot with
 optional categories and shared selection; its workbench adapter owns search and
-grid/list presentation. Workbench-owned JavaFX adapters render both view kinds
+grid/list presentation. Primary icons describe item kinds while independent
+decorations describe states such as read-only and initially disabled, allowing
+both meanings to remain visible at once. Workbench-owned JavaFX adapters render
+the views and icons, expose icon explanations as tooltips and accessible text,
 and bridge selection back to the shared editor selection model. JavaFX remains
 an implementation detail of the workbench rather than a requirement for view
 extensions.

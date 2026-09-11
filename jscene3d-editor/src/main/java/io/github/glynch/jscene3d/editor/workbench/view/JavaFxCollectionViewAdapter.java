@@ -12,6 +12,8 @@ import io.github.glynch.jscene3d.editor.view.EditorCollectionItem;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionSelectionModel;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionSnapshot;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
+import io.github.glynch.jscene3d.editor.view.EditorIcon;
+import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +54,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     private final Optional<EditorCollectionSelectionModel<T>> selectionModel;
     private final Consumer<CommandId> commandExecutor;
     private final String allItemsLabel;
-    private final String rootIcon;
+    private final Optional<EditorIcon> rootIcon;
     private final String searchPlaceholder;
     private final VBox root = new VBox();
     private final TreeView<CategoryLocation> navigation = new TreeView<>();
@@ -61,8 +63,8 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     private final ScrollPane gridScroll = new ScrollPane();
     private final StackPane content = new StackPane();
     private final ToggleGroup cardGroup = new ToggleGroup();
-    private final ToggleButton gridView = new ToggleButton("▦");
-    private final ToggleButton listView = new ToggleButton("☷");
+    private final ToggleButton gridView = new ToggleButton();
+    private final ToggleButton listView = new ToggleButton();
     private final TextField search = new TextField();
     private final Label breadcrumb = new Label();
     private final Label empty = new Label();
@@ -86,8 +88,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         selectionModel = Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
         this.commandExecutor = Objects.requireNonNull(commandExecutor, "commandExecutor");
         allItemsLabel = requireText(logicalView.allItemsLabel(), "view.allItemsLabel()");
-        rootIcon = Objects.requireNonNull(logicalView.rootIcon(), "view.rootIcon()")
-                .orElse("");
+        rootIcon = Objects.requireNonNull(logicalView.rootIcon(), "view.rootIcon()");
         searchPlaceholder = requireText(logicalView.searchPlaceholder(), "view.searchPlaceholder()");
         categoryById = indexCategories(categories);
         configureView();
@@ -173,6 +174,8 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         listView.setToggleGroup(presentations);
         configurePresentationButton(gridView, "Grid view", true);
         configurePresentationButton(listView, "List view", false);
+        gridView.setGraphic(JavaFxIconRenderer.create(new EditorIcon(EditorIcons.GRID, "Grid view")));
+        listView.setGraphic(JavaFxIconRenderer.create(new EditorIcon(EditorIcons.LIST, "List view")));
         HBox viewButtons = new HBox(gridView, listView);
         viewButtons.getStyleClass().addAll("editor-collection-view-buttons", "editor-project-view-buttons");
 
@@ -264,10 +267,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
                         .count();
                 rootItem.getChildren()
                         .add(new TreeItem<>(new CategoryLocation(
-                                category.label(),
-                                Optional.of(category.id()),
-                                count,
-                                category.icon().orElse(""))));
+                                category.label(), Optional.of(category.id()), count, category.icon())));
             }
             rootItem.setExpanded(true);
             navigation.setRoot(rootItem);
@@ -353,9 +353,6 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     }
 
     private VBox createPresentation(EditorCollectionItem item) {
-        Label marker = new Label(item.icon().orElse(""));
-        marker.setTooltip(item.description().map(Tooltip::new).orElse(null));
-        marker.getStyleClass().addAll("editor-collection-marker", "editor-asset-marker");
         Label name = new Label(item.label());
         name.setMinWidth(0.0);
         name.setMaxWidth(Double.MAX_VALUE);
@@ -364,7 +361,11 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         name.setTooltip(new Tooltip(item.label()));
         name.getStyleClass().addAll("editor-collection-name", "editor-asset-name");
         HBox.setHgrow(name, Priority.ALWAYS);
-        HBox heading = new HBox(6.0, marker, name);
+        HBox heading = new HBox(6.0);
+        item.icon()
+                .map(icon -> JavaFxIconRenderer.create(icon, "editor-collection-marker", "editor-asset-marker"))
+                .ifPresent(heading.getChildren()::add);
+        heading.getChildren().add(name);
         heading.setAlignment(Pos.CENTER_LEFT);
         heading.setMaxWidth(Double.MAX_VALUE);
 
@@ -372,11 +373,16 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         description.getStyleClass().addAll("editor-collection-description", "editor-asset-kind");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        Label badge = new Label(item.badge().orElse(""));
-        badge.setManaged(item.badge().isPresent());
-        badge.setVisible(item.badge().isPresent());
-        badge.getStyleClass().addAll("editor-collection-badge", "editor-asset-read-only");
-        HBox metadata = new HBox(6.0, description, spacer, badge);
+        HBox decorations = new HBox(3.0);
+        decorations.setAlignment(Pos.CENTER_RIGHT);
+        decorations.getStyleClass().add("editor-item-decorations");
+        for (EditorIcon decoration : item.decorations()) {
+            decorations
+                    .getChildren()
+                    .add(JavaFxIconRenderer.create(
+                            decoration, "editor-item-decoration", "editor-collection-decoration"));
+        }
+        HBox metadata = new HBox(6.0, description, spacer, decorations);
         metadata.setAlignment(Pos.CENTER_LEFT);
         metadata.setMaxWidth(Double.MAX_VALUE);
 
@@ -484,8 +490,6 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
                 setGraphic(null);
                 return;
             }
-            Label marker = new Label(item.marker());
-            marker.getStyleClass().add("editor-project-tree-marker");
             Label name = new Label(item.label());
             name.setMinWidth(0.0);
             name.setMaxWidth(Double.MAX_VALUE);
@@ -495,7 +499,12 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
             HBox.setHgrow(name, Priority.ALWAYS);
             Label count = new Label(Long.toString(item.count()));
             count.getStyleClass().add("editor-project-tree-count");
-            HBox row = new HBox(7.0, marker, name, count);
+            HBox row = new HBox(7.0);
+            item.icon()
+                    .map(icon -> JavaFxIconRenderer.create(
+                            icon, "editor-collection-navigation-icon", "editor-project-tree-marker"))
+                    .ifPresent(row.getChildren()::add);
+            row.getChildren().addAll(name, count);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
             row.getStyleClass().add("editor-project-tree-row");
@@ -506,5 +515,5 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     }
 
     /** One rendered category location; an empty identity denotes the collection root. */
-    private record CategoryLocation(String label, Optional<String> categoryId, long count, String marker) {}
+    private record CategoryLocation(String label, Optional<String> categoryId, long count, Optional<EditorIcon> icon) {}
 }

@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.view;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -15,9 +16,9 @@ import java.util.Optional;
  * @param description optional secondary description
  * @param detail optional supporting detail such as a project-relative path
  * @param tooltip optional accessible detail
- * @param icon optional editor icon identity
+ * @param icon optional primary icon presentation
  * @param categoryId optional category identity declared by the owning view
- * @param badge optional compact item badge
+ * @param decorations state icons rendered after the item metadata
  * @param command optional command invoked when the item is opened
  * @param contextValue optional semantic value used to select item actions
  */
@@ -26,9 +27,9 @@ public record EditorCollectionItem(
         Optional<String> description,
         Optional<String> detail,
         Optional<String> tooltip,
-        Optional<String> icon,
+        Optional<EditorIcon> icon,
         Optional<String> categoryId,
-        Optional<String> badge,
+        List<EditorIcon> decorations,
         Optional<CommandId> command,
         Optional<String> contextValue) {
     /** Copies and validates one item presentation. */
@@ -41,7 +42,7 @@ public record EditorCollectionItem(
         Objects.requireNonNull(tooltip, "tooltip");
         Objects.requireNonNull(icon, "icon");
         Objects.requireNonNull(categoryId, "categoryId");
-        Objects.requireNonNull(badge, "badge");
+        decorations = List.copyOf(Objects.requireNonNull(decorations, "decorations"));
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(contextValue, "contextValue");
     }

@@ -35,8 +35,8 @@ public interface EditorCollectionView<T> extends EditorView {
         return "All Items";
     }
 
-    /** Returns the optional editor icon identity for the collection root. */
-    default Optional<String> rootIcon() {
+    /** Returns the optional editor icon presentation for the collection root. */
+    default Optional<EditorIcon> rootIcon() {
         return Optional.empty();
     }
 

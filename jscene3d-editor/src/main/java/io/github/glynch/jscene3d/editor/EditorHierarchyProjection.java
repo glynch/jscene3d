@@ -12,7 +12,10 @@ import java.util.function.BiConsumer;
 /** Internal seam which rebuilds Hierarchy and Inspector projections for one document revision. */
 @FunctionalInterface
 interface EditorHierarchyProjection {
-    /** Projects a world, its modified entries, and enabled-state commands. */
+    /** Projects a world, its modified entries, and authored entity/component commands. */
     EditorHierarchyNode project(
-            WorldDefinition world, Set<EntityId> modifiedEntityIds, BiConsumer<EntityId, Boolean> enabledEditor);
+            WorldDefinition world,
+            Set<EntityId> modifiedEntityIds,
+            BiConsumer<EntityId, Boolean> enabledEditor,
+            EditorComponentPropertyEditor componentPropertyEditor);
 }

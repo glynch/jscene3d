@@ -12,9 +12,11 @@ import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorPropertyEditor;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
+import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
+import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
@@ -23,6 +25,7 @@ import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.nio.file.Path;
@@ -62,7 +65,7 @@ final class EditorInspectorProjector {
     /** Projects one local or generated entity and its descriptor-backed components. */
     static EditorSelection entity(
             LocalEntity entity, Path source, Path projectRoot, RegisteredTypeCatalog types, boolean generated) {
-        return entity(entity, source, projectRoot, types, generated, Optional.empty());
+        return entity(entity, source, projectRoot, types, generated, Optional.empty(), Optional.empty());
     }
 
     /** Projects one local or generated entity with an optional enabled-state edit command. */
@@ -73,6 +76,18 @@ final class EditorInspectorProjector {
             RegisteredTypeCatalog types,
             boolean generated,
             Optional<Consumer<Boolean>> enabledEditor) {
+        return entity(entity, source, projectRoot, types, generated, enabledEditor, Optional.empty());
+    }
+
+    /** Projects one local or generated entity with optional authored entity/component edit commands. */
+    static EditorSelection entity(
+            LocalEntity entity,
+            Path source,
+            Path projectRoot,
+            RegisteredTypeCatalog types,
+            boolean generated,
+            Optional<Consumer<Boolean>> enabledEditor,
+            Optional<EditorComponentPropertyEditor> componentEditor) {
         String title = entity.name().orElse("Unnamed entity");
         List<EditorDetails.Section> sections = new ArrayList<>();
         sections.add(section(
@@ -81,7 +96,7 @@ final class EditorInspectorProjector {
                         booleanProperty("enabled", "Enabled", entity.isEnabled(), enabledEditor),
                         numberProperty(
                                 "child-count", "Children", entity.children().size()))));
-        sections.addAll(componentSections(entity.components(), types));
+        sections.addAll(componentSections(entity.id(), entity.components(), types, componentEditor));
         EditorDetails view = view(
                 title,
                 generated ? "Generated entity" : "Local entity",
@@ -235,19 +250,42 @@ final class EditorInspectorProjector {
                 .toList();
     }
 
+    /** Projects editable component definitions for one locally authored entity. */
+    private static List<EditorDetails.Section> componentSections(
+            EntityId entityId,
+            List<ComponentDefinition> components,
+            RegisteredTypeCatalog types,
+            Optional<EditorComponentPropertyEditor> componentEditor) {
+        return components.stream()
+                .map(component -> componentSection(Optional.of(entityId), component, types, componentEditor))
+                .toList();
+    }
+
     /** Projects one component while retaining authored values even if metadata is unavailable. */
     private static EditorDetails.Section componentSection(ComponentDefinition component, RegisteredTypeCatalog types) {
+        return componentSection(Optional.empty(), component, types, Optional.empty());
+    }
+
+    /** Projects one optionally editable component while retaining unavailable metadata safely. */
+    private static EditorDetails.Section componentSection(
+            Optional<EntityId> entityId,
+            ComponentDefinition component,
+            RegisteredTypeCatalog types,
+            Optional<EditorComponentPropertyEditor> componentEditor) {
         ComponentType type = new ComponentType(component.type(), component.typeVersion());
         return types.findComponent(type)
-                .map(descriptor -> descriptorSection(component, descriptor.presentation(), descriptor.properties()))
+                .map(descriptor -> descriptorSection(
+                        entityId, component, descriptor.presentation(), descriptor.properties(), componentEditor))
                 .orElseGet(() -> missingDescriptorSection(component));
     }
 
     /** Applies descriptor presentation, property order, defaults, and constraints. */
     private static EditorDetails.Section descriptorSection(
+            Optional<EntityId> entityId,
             ComponentDefinition component,
             DescriptorPresentation presentation,
-            Map<PropertyId, PropertyDescriptor> descriptors) {
+            Map<PropertyId, PropertyDescriptor> descriptors,
+            Optional<EditorComponentPropertyEditor> componentEditor) {
         List<EditorDetails.Property> properties = new ArrayList<>();
         for (Map.Entry<PropertyId, PropertyDescriptor> entry : descriptors.entrySet()) {
             PropertyId id = entry.getKey();
@@ -272,7 +310,7 @@ final class EditorInspectorProjector {
                     descriptor.isRequired(),
                     descriptor.presentation().description(),
                     constraints(descriptor),
-                    Optional.empty()));
+                    propertyEditor(entityId, component, id, descriptor, componentEditor)));
         }
         component.properties().forEach((id, value) -> {
             if (!descriptors.containsKey(id)) {
@@ -280,6 +318,31 @@ final class EditorInspectorProjector {
             }
         });
         return new EditorDetails.Section(presentation.displayName(), presentation.description(), true, properties);
+    }
+
+    /** Supplies the first descriptor-backed editor for authored Transform3d positions. */
+    private static Optional<EditorPropertyEditor> propertyEditor(
+            Optional<EntityId> entityId,
+            ComponentDefinition component,
+            PropertyId propertyId,
+            PropertyDescriptor descriptor,
+            Optional<EditorComponentPropertyEditor> componentEditor) {
+        if (entityId.isEmpty()
+                || componentEditor.isEmpty()
+                || !component.type().equals(Spatial3dDescriptors.transformType().id())
+                || component.typeVersion()
+                        != Spatial3dDescriptors.transformType().version()
+                || !propertyId.equals(Spatial3dDescriptors.positionProperty())) {
+            return Optional.empty();
+        }
+        ComponentId componentId = component.id();
+        return Optional.of(replacement -> {
+            ProjectValue value = EditorVectorValueParser.parse(replacement, 3);
+            if (!descriptor.accepts(value)) {
+                throw new IllegalArgumentException("replacement does not satisfy property " + propertyId.value());
+            }
+            componentEditor.orElseThrow().set(entityId.orElseThrow(), componentId, propertyId, value);
+        });
     }
 
     /** Preserves authored values when exact safe descriptor metadata could not be resolved. */

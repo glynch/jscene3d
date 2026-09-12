@@ -107,12 +107,27 @@ public final class ViewportController {
         replacePendingPreview(new PreviewRequest(
                 Optional.of(Objects.requireNonNull(session, "session")),
                 Optional.of(Objects.requireNonNull(trace, "trace")),
+                Objects.requireNonNull(completion, "completion"),
+                ignored -> {}));
+    }
+
+    /**
+     * Requests replacement of the preview from the latest in-memory working-copy revision.
+     *
+     * @param session current editor project session
+     * @param completion refreshed preview diagnostic receiver
+     */
+    public void refreshProject(EditorProjectSession session, Consumer<List<ProjectDiagnostic>> completion) {
+        replacePendingPreview(new PreviewRequest(
+                Optional.of(Objects.requireNonNull(session, "session")),
+                Optional.empty(),
+                ignored -> {},
                 Objects.requireNonNull(completion, "completion")));
     }
 
     /** Requests removal of the current project preview after an unsuccessful project open. */
     public void clearProject() {
-        replacePendingPreview(new PreviewRequest(Optional.empty(), Optional.empty(), ignored -> {}));
+        replacePendingPreview(new PreviewRequest(Optional.empty(), Optional.empty(), ignored -> {}, ignored -> {}));
     }
 
     /** Records JavaFX focus changes for the next visible status update. */
@@ -127,6 +142,12 @@ public final class ViewportController {
             return null;
         }
         if (request.session().isPresent()) {
+            if (request.trace().isEmpty()) {
+                List<ProjectDiagnostic> diagnostics =
+                        currentPreview.show(request.session().orElseThrow());
+                Platform.runLater(() -> request.refreshCompletion().accept(diagnostics));
+                return null;
+            }
             EditorProjectOpenTrace trace = request.trace().orElseThrow();
             try {
                 List<ProjectDiagnostic> previewDiagnostics = trace.compose(
@@ -211,7 +232,8 @@ public final class ViewportController {
     private record PreviewRequest(
             Optional<EditorProjectSession> session,
             Optional<EditorProjectOpenTrace> trace,
-            Consumer<EditorPreviewResult> completion) {}
+            Consumer<EditorPreviewResult> completion,
+            Consumer<List<ProjectDiagnostic>> refreshCompletion) {}
 
     /** Composed preview waiting for its first render and presentation in the current frame. */
     private record PendingPresentation(PreviewRequest request, List<ProjectDiagnostic> diagnostics) {}

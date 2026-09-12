@@ -9,10 +9,14 @@ import io.github.glynch.jscene3d.editor.lifecycle.EditorEvent;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopy;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopyId;
 import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
+import io.github.glynch.jscene3d.project.component.ComponentDefinition;
+import io.github.glynch.jscene3d.project.component.ComponentId;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -20,6 +24,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -191,6 +196,34 @@ public final class EditorWorldWorkingCopy implements EditorWorkingCopy {
         publishContentChange(wasDirty);
     }
 
+    /**
+     * Replaces one property on a locally authored component and records a resource-aware undo entry.
+     *
+     * @param entityId entity owning the component
+     * @param componentId component to update
+     * @param propertyId property to replace
+     * @param value validated portable replacement value
+     */
+    public void setComponentProperty(
+            EntityId entityId, ComponentId componentId, PropertyId propertyId, ProjectValue value) {
+        EntityId targetEntity = Objects.requireNonNull(entityId, "entityId");
+        ComponentId targetComponent = Objects.requireNonNull(componentId, "componentId");
+        PropertyId targetProperty = Objects.requireNonNull(propertyId, "propertyId");
+        ProjectValue replacement = Objects.requireNonNull(value, "value");
+        EntryUpdate update = updateEntries(current.roots(), targetEntity, targetComponent, targetProperty, replacement);
+        if (!update.changed()) {
+            return;
+        }
+        WorldDefinition changed =
+                new WorldDefinition(current.id(), current.name(), current.connections(), update.entries());
+        boolean wasDirty = isDirty();
+        WorldEdit edit = new WorldEdit(new EditorUndoRedoEntry("Set component property", id), current, changed);
+        undoHistory.push(edit);
+        redoHistory.clear();
+        current = changed;
+        publishContentChange(wasDirty);
+    }
+
     private void publishContentChange(boolean wasDirty) {
         contentChanges.emit(this);
         if (wasDirty != isDirty()) {
@@ -267,6 +300,33 @@ public final class EditorWorldWorkingCopy implements EditorWorkingCopy {
         return new EntryUpdate(List.copyOf(updated), changed);
     }
 
+    private static EntryUpdate updateEntries(
+            List<EntityEntry> entries,
+            EntityId targetEntity,
+            ComponentId targetComponent,
+            PropertyId targetProperty,
+            ProjectValue value) {
+        List<EntityEntry> updated = new ArrayList<>(entries.size());
+        boolean changed = false;
+        for (EntityEntry entry : entries) {
+            EntityEntry replacement = entry;
+            if (entry instanceof LocalEntity local) {
+                if (local.id().equals(targetEntity)) {
+                    replacement = withComponentProperty(local, targetComponent, targetProperty, value);
+                } else {
+                    EntryUpdate children =
+                            updateEntries(local.children(), targetEntity, targetComponent, targetProperty, value);
+                    if (children.changed()) {
+                        replacement = withChildren(local, children.entries());
+                    }
+                }
+            }
+            changed |= replacement != entry;
+            updated.add(replacement);
+        }
+        return new EntryUpdate(List.copyOf(updated), changed);
+    }
+
     private static EntityEntry withEnabled(EntityEntry entry, boolean enabled) {
         if (entry.isEnabled() == enabled) {
             return entry;
@@ -291,6 +351,32 @@ public final class EditorWorldWorkingCopy implements EditorWorkingCopy {
         return local.name()
                 .map(name -> new LocalEntity(local.id(), name, local.isEnabled(), local.components(), children))
                 .orElseGet(() -> new LocalEntity(local.id(), local.isEnabled(), local.components(), children));
+    }
+
+    private static LocalEntity withComponentProperty(
+            LocalEntity local, ComponentId componentId, PropertyId propertyId, ProjectValue value) {
+        List<ComponentDefinition> components =
+                new ArrayList<>(local.components().size());
+        boolean changed = false;
+        for (ComponentDefinition component : local.components()) {
+            ComponentDefinition replacement = component;
+            if (component.id().equals(componentId)) {
+                Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>(component.properties());
+                ProjectValue previous = properties.put(propertyId, value);
+                if (!value.equals(previous)) {
+                    replacement = new ComponentDefinition(
+                            component.id(), component.type(), component.typeVersion(), properties);
+                }
+            }
+            changed |= replacement != component;
+            components.add(replacement);
+        }
+        if (!changed) {
+            return local;
+        }
+        return local.name()
+                .map(name -> new LocalEntity(local.id(), name, local.isEnabled(), components, local.children()))
+                .orElseGet(() -> new LocalEntity(local.id(), local.isEnabled(), components, local.children()));
     }
 
     /** One reversible world edit with its affected resource identity. */

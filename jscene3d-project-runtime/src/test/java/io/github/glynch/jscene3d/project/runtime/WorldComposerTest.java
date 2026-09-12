@@ -109,6 +109,35 @@ final class WorldComposerTest {
         assertThat(roots.stream().map(Entity::id).toList()).doesNotHaveDuplicates();
     }
 
+    /** Uses the supplied working-copy revision instead of reloading the root world from its resolver. */
+    @Test
+    void composesAnInMemoryWorldRevision() throws IOException {
+        WorldDefinition saved = worldWithComponent();
+        Path source = temporaryDirectory.resolve("world.world.json");
+        DefinitionWriter.write(source, saved);
+        AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
+        LocalEntity editedRoot = new LocalEntity(LOCAL_ROOT, "Value", true, List.of(component("2")), List.of());
+        WorldDefinition edited = new WorldDefinition(WORLD_ASSET, "Value world", List.of(editedRoot));
+
+        WorldCompositionResult result = WorldComposer.compose(
+                source.toUri(),
+                assets,
+                edited,
+                registeredTypes(descriptor()),
+                List.of(extension(new RecordingFactory())),
+                List.of(),
+                NO_RESOURCES);
+
+        assertThat(result.isComposed()).isTrue();
+        RecordedComponent value = result.world()
+                .orElseThrow()
+                .roots()
+                .getFirst()
+                .component(VALUE_COMPONENT, RecordedComponent.class)
+                .orElseThrow();
+        assertThat(value.value()).isEqualByComparingTo("2");
+    }
+
     /** Applies public arguments in the correct definition-instance scope without a placement wrapper. */
     @Test
     void resolvesPlacementArgumentsWithinEachInstance() throws IOException {
@@ -786,14 +815,19 @@ final class WorldComposerTest {
             List<WorldModuleBinding<?>> modules,
             RuntimeResourceProvider resources) {
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
-        RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
+        return WorldComposer.compose(
+                assets, AssetRef.to(world.id()), registeredTypes(descriptor), extensions, modules, resources);
+    }
+
+    /** Creates the fixture's exact registered descriptor catalog. */
+    private static RegisteredTypeCatalog registeredTypes(ComponentTypeDescriptor descriptor) {
+        return RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
                 EXTENSION_ID,
                 "1.0.0",
                 ">=0.1.0 <0.2.0",
                 DescriptorPresentation.named("Example Game"),
                 List.of(),
                 List.of(descriptor))));
-        return WorldComposer.compose(assets, AssetRef.to(world.id()), types, extensions, modules, resources);
     }
 
     /** Creates the executable contribution for the test component type. */

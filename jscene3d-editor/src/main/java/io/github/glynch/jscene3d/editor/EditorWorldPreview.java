@@ -4,7 +4,6 @@
  */
 package io.github.glynch.jscene3d.editor;
 
-import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.runtime.World;
@@ -16,7 +15,6 @@ import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import io.github.glynch.jscene3d.render.Renderer;
 import java.net.URI;
 import java.util.ArrayList;
@@ -40,8 +38,9 @@ final class EditorWorldPreview implements AutoCloseable {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         List<ComponentRuntimeExtension> extensions = previewExtensions(session);
         WorldCompositionResult composition = WorldComposer.compose(
+                session.startupWorldWorkingCopy().id().resource(),
                 session.content().definitions(),
-                AssetRef.<WorldDefinition>to(session.startupWorld().id()),
+                session.startupWorld(),
                 session.types(),
                 extensions,
                 List.of(WorldModuleBinding.of(Spatial3dWorldModule.class, spatial)),

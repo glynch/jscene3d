@@ -20,6 +20,7 @@ import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
@@ -185,8 +186,39 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
                     ignored -> property.editor().orElseThrow().setValue(Boolean.toString(value.isSelected())));
             return value;
         }
+        if (property.editor().isPresent()) {
+            return createTextEditor(property);
+        }
         Label value = new Label(property.value());
         value.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
+        return value;
+    }
+
+    /** Creates a commit-on-Enter-or-blur text editor while retaining the last valid projection. */
+    private static TextField createTextEditor(EditorDetails.Property property) {
+        TextField value = new TextField(property.value());
+        value.setAccessibleText(property.displayName());
+        boolean[] committing = {false};
+        Runnable commit = () -> {
+            if (committing[0] || property.value().equals(value.getText())) {
+                return;
+            }
+            committing[0] = true;
+            try {
+                property.editor().orElseThrow().setValue(value.getText());
+            } catch (IllegalArgumentException exception) {
+                value.setText(property.value());
+                value.selectAll();
+            } finally {
+                committing[0] = false;
+            }
+        };
+        value.setOnAction(ignored -> commit.run());
+        value.focusedProperty().addListener((ignored, wasFocused, isFocused) -> {
+            if (wasFocused && !isFocused) {
+                commit.run();
+            }
+        });
         return value;
     }
 

@@ -182,12 +182,15 @@ public final class EditorProjectLoader {
                 .map(AssetMetadata::path)
                 .orElse(project.runtime().entryScene());
         progress.phaseStarted(EditorLoadingPhase.BUILDING_HIERARCHY);
-        EditorHierarchyProjection hierarchyProjection = (updated, modifiedEntityIds, enabledEditor) -> projectHierarchy(
-                updated,
-                worldSource,
-                new HierarchyProjectionContext(project.root(), authored, definitions, types, new LinkedHashSet<>()),
-                modifiedEntityIds,
-                enabledEditor);
+        EditorHierarchyProjection hierarchyProjection =
+                (updated, modifiedEntityIds, enabledEditor, componentPropertyEditor) -> projectHierarchy(
+                        updated,
+                        worldSource,
+                        new HierarchyProjectionContext(
+                                project.root(), authored, definitions, types, new LinkedHashSet<>()),
+                        modifiedEntityIds,
+                        enabledEditor,
+                        componentPropertyEditor);
         EditorProjectSession session = operation.measure(
                 "project.hierarchy.project",
                 Map.of(),
@@ -496,10 +499,12 @@ public final class EditorProjectLoader {
             Path source,
             HierarchyProjectionContext context,
             Set<EntityId> modifiedEntityIds,
-            BiConsumer<EntityId, Boolean> enabledEditor) {
+            BiConsumer<EntityId, Boolean> enabledEditor,
+            EditorComponentPropertyEditor componentPropertyEditor) {
+        HierarchyProjectionEditors editors =
+                new HierarchyProjectionEditors(modifiedEntityIds, enabledEditor, componentPropertyEditor);
         List<EditorHierarchyNode> children = world.roots().stream()
-                .map(entry ->
-                        projectEntry(entry, source, context, new HashSet<>(), false, modifiedEntityIds, enabledEditor))
+                .map(entry -> projectEntry(entry, source, context, new HashSet<>(), false, editors))
                 .toList();
         return new EditorHierarchyNode(
                 EditorHierarchyNode.Kind.WORLD,
@@ -518,13 +523,11 @@ public final class EditorProjectLoader {
             HierarchyProjectionContext context,
             Set<AssetId> ancestors,
             boolean generated,
-            Set<EntityId> modifiedEntityIds,
-            BiConsumer<EntityId, Boolean> enabledEditor) {
+            HierarchyProjectionEditors editors) {
         return switch (entry) {
-            case LocalEntity local ->
-                projectLocal(local, source, context, ancestors, generated, modifiedEntityIds, enabledEditor);
+            case LocalEntity local -> projectLocal(local, source, context, ancestors, generated, editors);
             case EntityPlacement placement ->
-                projectPlacement(placement, source, context, ancestors, generated, modifiedEntityIds, enabledEditor);
+                projectPlacement(placement, source, context, ancestors, generated, editors);
         };
     }
 
@@ -535,23 +538,29 @@ public final class EditorProjectLoader {
             HierarchyProjectionContext context,
             Set<AssetId> ancestors,
             boolean generated,
-            Set<EntityId> modifiedEntityIds,
-            BiConsumer<EntityId, Boolean> enabledEditor) {
+            HierarchyProjectionEditors editors) {
         List<EditorHierarchyNode> children = local.children().stream()
-                .map(child ->
-                        projectEntry(child, source, context, ancestors, generated, modifiedEntityIds, enabledEditor))
+                .map(child -> projectEntry(child, source, context, ancestors, generated, editors))
                 .toList();
-        Optional<Consumer<Boolean>> editor =
-                generated ? Optional.empty() : Optional.of(value -> enabledEditor.accept(local.id(), value));
+        Optional<Consumer<Boolean>> editor = generated
+                ? Optional.empty()
+                : Optional.of(value -> editors.enabled().accept(local.id(), value));
         return new EditorHierarchyNode(
                 generated ? EditorHierarchyNode.Kind.GENERATED_ENTITY : EditorHierarchyNode.Kind.LOCAL_ENTITY,
                 local.name().orElse("Unnamed entity"),
                 Optional.of(local.id()),
                 Optional.empty(),
                 new EditorHierarchyNode.AuthoringState(
-                        local.isEnabled(), !generated && modifiedEntityIds.contains(local.id())),
+                        local.isEnabled(),
+                        !generated && editors.modifiedEntityIds().contains(local.id())),
                 EditorInspectorProjector.entity(
-                        local, source, context.projectRoot(), context.types(), generated, editor),
+                        local,
+                        source,
+                        context.projectRoot(),
+                        context.types(),
+                        generated,
+                        editor,
+                        generated ? Optional.empty() : Optional.of(editors.componentProperty())),
                 children);
     }
 
@@ -562,8 +571,7 @@ public final class EditorProjectLoader {
             HierarchyProjectionContext context,
             Set<AssetId> ancestors,
             boolean generated,
-            Set<EntityId> modifiedEntityIds,
-            BiConsumer<EntityId, Boolean> enabledEditor) {
+            HierarchyProjectionEditors editors) {
         DefinitionLoadResult<EntityDefinition> result =
                 context.definitions().loadEntity(placement.definition(), context.types());
         context.diagnostics().addAll(result.diagnostics());
@@ -575,7 +583,8 @@ public final class EditorProjectLoader {
                     Optional.of(placement.id()),
                     Optional.of(placement.definition().id()),
                     new EditorHierarchyNode.AuthoringState(
-                            placement.isEnabled(), !generated && modifiedEntityIds.contains(placement.id())),
+                            placement.isEnabled(),
+                            !generated && editors.modifiedEntityIds().contains(placement.id())),
                     EditorInspectorProjector.placement(
                             placement,
                             loaded,
@@ -585,7 +594,7 @@ public final class EditorProjectLoader {
                             generated,
                             generated
                                     ? Optional.empty()
-                                    : Optional.of(value -> enabledEditor.accept(placement.id(), value))),
+                                    : Optional.of(value -> editors.enabled().accept(placement.id(), value))),
                     List.of());
         }
         EntityDefinition definition = loaded.orElseThrow();
@@ -594,8 +603,7 @@ public final class EditorProjectLoader {
                 .map(AssetMetadata::path)
                 .orElse(source);
         List<EditorHierarchyNode> children = definition.root().children().stream()
-                .map(child -> projectEntry(
-                        child, definitionSource, context, ancestors, true, modifiedEntityIds, enabledEditor))
+                .map(child -> projectEntry(child, definitionSource, context, ancestors, true, editors))
                 .toList();
         ancestors.remove(placement.definition().id());
         String label = placement.name().orElseGet(() -> definition.root().name().orElse(definition.name()));
@@ -605,7 +613,8 @@ public final class EditorProjectLoader {
                 Optional.of(placement.id()),
                 Optional.of(definition.id()),
                 new EditorHierarchyNode.AuthoringState(
-                        placement.isEnabled(), !generated && modifiedEntityIds.contains(placement.id())),
+                        placement.isEnabled(),
+                        !generated && editors.modifiedEntityIds().contains(placement.id())),
                 EditorInspectorProjector.placement(
                         placement,
                         loaded,
@@ -615,9 +624,15 @@ public final class EditorProjectLoader {
                         generated,
                         generated
                                 ? Optional.empty()
-                                : Optional.of(value -> enabledEditor.accept(placement.id(), value))),
+                                : Optional.of(value -> editors.enabled().accept(placement.id(), value))),
                 children);
     }
+
+    /** Mutable-document callbacks and state shared by recursive hierarchy projection. */
+    private record HierarchyProjectionEditors(
+            Set<EntityId> modifiedEntityIds,
+            BiConsumer<EntityId, Boolean> enabled,
+            EditorComponentPropertyEditor componentProperty) {}
 
     /** Shared immutable services and state for recursive hierarchy projection. */
     private record HierarchyProjectionContext(

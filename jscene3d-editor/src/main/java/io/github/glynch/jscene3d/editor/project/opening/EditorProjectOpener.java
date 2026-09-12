@@ -19,6 +19,7 @@ import io.github.glynch.jscene3d.editor.EditorProjectOpenTrace;
 import io.github.glynch.jscene3d.editor.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.EditorWorkspace;
 import io.github.glynch.jscene3d.editor.ViewportController;
+import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
@@ -46,6 +47,8 @@ public final class EditorProjectOpener implements AutoCloseable {
     private final ViewportController viewport;
     private final Supplier<EditorProjectOpenProgress> progress;
     private final Consumer<String> windowTitle;
+
+    private EditorRegistration previewRefreshRegistration = () -> {};
 
     /**
      * Creates the project-opening workflow around the already constructed editor runtime.
@@ -86,6 +89,8 @@ public final class EditorProjectOpener implements AutoCloseable {
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();
         EditorProjectOpenTrace trace = new EditorProjectOpenTrace(telemetry, normalized);
         EditorProjectOpenProgress openingProgress = Objects.requireNonNull(progress.get(), "project open progress");
+        previewRefreshRegistration.close();
+        previewRefreshRegistration = () -> {};
         publication.clearProject();
         workspace.beginOpening(normalized);
         openingProgress.opening(normalized);
@@ -98,6 +103,8 @@ public final class EditorProjectOpener implements AutoCloseable {
     /** Stops accepting project work and interrupts a load that is still in progress. */
     @Override
     public void close() {
+        previewRefreshRegistration.close();
+        previewRefreshRegistration = () -> {};
         executor.shutdownNow();
     }
 
@@ -168,7 +175,25 @@ public final class EditorProjectOpener implements AutoCloseable {
                         + ", preview " + format(durations.previewComposition())
                         + ", first frame " + firstFrame + ")");
         workspace.finishProjectOpening(session.project().identity().name() + " · ready");
+        previewRefreshRegistration = session.workingCopies()
+                .onDidChangeContent()
+                .subscribe(ignored -> viewport.refreshProject(
+                        session, diagnostics -> applyRefreshedPreview(loadDiagnostics, diagnostics)));
         openingProgress.finish();
+    }
+
+    /** Publishes diagnostics produced while recomposing an edited working-copy preview. */
+    private void applyRefreshedPreview(
+            List<ProjectDiagnostic> loadDiagnostics, List<ProjectDiagnostic> previewDiagnostics) {
+        List<ProjectDiagnostic> combined = new ArrayList<>(loadDiagnostics);
+        combined.addAll(previewDiagnostics);
+        publication.showDiagnostics(combined);
+        boolean failed = previewDiagnostics.stream()
+                .anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
+        if (failed) {
+            workspace.showMessage(new EditorMessage(
+                    ERROR, "Unable to refresh the project preview. See Diagnostics.", OPEN_DIAGNOSTICS));
+        }
     }
 
     /** Clears project-owned state while preserving diagnostics and a visible failure message. */

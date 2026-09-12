@@ -73,16 +73,61 @@ public final class WorldComposer {
         if (!loaded.isValid()) {
             return WorldCompositionResult.failure(diagnostics);
         }
-        URI source = loaded.source();
+        return composeValidated(
+                loaded.source(),
+                validDefinitions,
+                loaded.definition().orElseThrow(),
+                new CompositionInputs(validTypes, validExtensions, validModules, validResources),
+                diagnostics);
+    }
+
+    /**
+     * Transactionally composes an already validated in-memory world revision.
+     *
+     * <p>This overload is intended for editor working copies. Referenced entity definitions continue to resolve
+     * through {@code definitions}, while the supplied world revision remains authoritative for the root.
+     *
+     * @param source absolute source URI used for diagnostics
+     * @param definitions resolver for referenced entity definitions
+     * @param definition validated in-memory world revision
+     * @param types safe resolved component descriptor catalog
+     * @param extensions trusted executable runtime extensions
+     * @param modules host-supplied world-module bindings
+     * @param resources host-owned runtime resource provider
+     * @return inactive world or ordered structured diagnostics
+     */
+    public static WorldCompositionResult compose(
+            URI source,
+            DefinitionResolver definitions,
+            WorldDefinition definition,
+            RegisteredTypeCatalog types,
+            Collection<ComponentRuntimeExtension> extensions,
+            Collection<WorldModuleBinding<?>> modules,
+            RuntimeResourceProvider resources) {
+        return composeValidated(
+                Objects.requireNonNull(source, "source"),
+                Objects.requireNonNull(definitions, "definitions"),
+                Objects.requireNonNull(definition, "definition"),
+                new CompositionInputs(types, extensions, modules, resources),
+                new ArrayList<>());
+    }
+
+    /** Composes one validated root through the shared transactional implementation. */
+    private static WorldCompositionResult composeValidated(
+            URI source,
+            DefinitionResolver definitions,
+            WorldDefinition definition,
+            CompositionInputs inputs,
+            List<ProjectDiagnostic> diagnostics) {
         try {
             World world = WorldCompositionEngine.compose(
                     source,
-                    validDefinitions,
-                    loaded.definition().orElseThrow(),
-                    validTypes,
-                    validExtensions,
-                    validModules,
-                    validResources);
+                    definitions,
+                    definition,
+                    inputs.types(),
+                    inputs.extensions(),
+                    inputs.modules(),
+                    inputs.resources());
             return WorldCompositionResult.success(world, diagnostics);
         } catch (RuntimeDiagnosticsException exception) {
             diagnostics.addAll(exception.diagnostics());
@@ -100,6 +145,25 @@ public final class WorldComposer {
                     ""));
         }
         return WorldCompositionResult.failure(diagnostics);
+    }
+
+    /** Validated collaborators shared by both public composition entry points. */
+    private record CompositionInputs(
+            RegisteredTypeCatalog types,
+            List<ComponentRuntimeExtension> extensions,
+            List<WorldModuleBinding<?>> modules,
+            RuntimeResourceProvider resources) {
+        private CompositionInputs(
+                RegisteredTypeCatalog types,
+                Collection<ComponentRuntimeExtension> extensions,
+                Collection<WorldModuleBinding<?>> modules,
+                RuntimeResourceProvider resources) {
+            this(
+                    Objects.requireNonNull(types, "types"),
+                    List.copyOf(extensions),
+                    List.copyOf(modules),
+                    Objects.requireNonNull(resources, "resources"));
+        }
     }
 
     /** Creates one terminal structured runtime diagnostic. */

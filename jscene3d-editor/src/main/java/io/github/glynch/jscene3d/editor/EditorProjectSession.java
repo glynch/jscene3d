@@ -247,7 +247,10 @@ public final class EditorProjectSession {
 
     private EditorHierarchyNode projectHierarchy() {
         return hierarchyProjection.project(
-                startupWorld.current(), startupWorld.modifiedEntityIds(), startupWorld::setEntityEnabled);
+                startupWorld.current(),
+                startupWorld.modifiedEntityIds(),
+                startupWorld::setEntityEnabled,
+                startupWorld::setComponentProperty);
     }
 
     private void refreshProjection() {

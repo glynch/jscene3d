@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.view.EditorPropertyEditor;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopy;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopyId;
 import io.github.glynch.jscene3d.project.settings.CoreProjectSettings;
@@ -362,6 +363,42 @@ final class EditorProjectLoaderTest {
                 .isFalse();
     }
 
+    /** Edits, validates, undoes, redoes, and persists an authored Transform3d position. */
+    @Test
+    void editsAndSavesAuthoredTransformPosition() throws IOException {
+        writeEditableTransformProject();
+        EditorProjectSession session =
+                loader().load(temporaryDirectory).session().orElseThrow();
+        EditorDetails.Property position = transformPosition(session);
+
+        assertThat(position.value()).isEqualTo("[0.0, 0.0, 0.0]");
+        assertThat(position.editor()).isPresent();
+        EditorPropertyEditor positionEditor = position.editor().orElseThrow();
+        assertThatThrownBy(() -> positionEditor.setValue("1, 2, 3"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bracketed vector");
+        assertThat(session.isDirty()).isFalse();
+
+        position.editor().orElseThrow().setValue("[1.5, 2, -3]");
+
+        assertThat(session.isDirty()).isTrue();
+        assertThat(transformPosition(session).value()).isEqualTo("[1.5, 2, -3]");
+        assertThat(session.undoEntry())
+                .hasValueSatisfying(entry -> assertThat(entry.label()).isEqualTo("Set component property"));
+
+        session.undo();
+        assertThat(transformPosition(session).value()).isEqualTo("[0.0, 0.0, 0.0]");
+        assertThat(session.isDirty()).isFalse();
+
+        session.redo();
+        session.save();
+
+        assertThat(session.isDirty()).isFalse();
+        EditorProjectSession reopened =
+                loader().load(temporaryDirectory).session().orElseThrow();
+        assertThat(transformPosition(reopened).value()).isEqualTo("[1.5, 2, -3]");
+    }
+
     /** Publishes typed working-copy state and tags undo history with its affected resource. */
     @Test
     void publishesWorldWorkingCopyLifecycle() throws IOException {
@@ -554,6 +591,44 @@ final class EditorProjectLoaderTest {
                   }]
                 }
                 """);
+    }
+
+    /** Replaces the standard placement world with one locally authored transform target. */
+    private void writeEditableTransformProject() throws IOException {
+        writeProject();
+        write("worlds/test.world.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/world-definition-1.json",
+                  "assetId":"89508a65-a28a-4650-90a6-8042b936ca16",
+                  "assetType":"world-definition",
+                  "formatVersion":1,
+                  "name":"Test World",
+                  "connections":[],
+                  "roots":[{
+                    "entryType":"local",
+                    "entityId":"853f50a0-17dc-46ac-9f04-f772e54c44b2",
+                    "name":"Player",
+                    "enabled":true,
+                    "components":[{
+                      "componentId":"6947ae19-3787-44a4-8a87-149022182770",
+                      "type":"io.github.glynch.jscene3d.spatial3d/transform-3d",
+                      "typeVersion":1,
+                      "properties":{}
+                    }],
+                    "children":[]
+                  }]
+                }
+                """);
+    }
+
+    /** Returns the currently projected Transform3d position property. */
+    private static EditorDetails.Property transformPosition(EditorProjectSession session) {
+        return session.hierarchy().children().getFirst().selection().details().orElseThrow().sections().stream()
+                .filter(section -> section.title().equals("Transform 3D"))
+                .flatMap(section -> section.properties().stream())
+                .filter(property -> property.identity().equals("position"))
+                .findFirst()
+                .orElseThrow();
     }
 
     /** Writes one UTF-8 test project file below the temporary project root. */

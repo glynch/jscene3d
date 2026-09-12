@@ -16,6 +16,8 @@
         <!-- jpackage requires the first macOS bundle-version component to be positive. -->
         <jscene3d.editor.bundleVersion>1.0.0</jscene3d.editor.bundleVersion>
         <jscene3d.editor.distributionDirectory>${project.build.directory}/distribution</jscene3d.editor.distributionDirectory>
+        <jscene3d.editor.diskImage>${jscene3d.editor.distributionDirectory}/jscene3d-editor-${jscene3d.editor.bundleVersion}-macos-arm64.dmg</jscene3d.editor.diskImage>
+        <jscene3d.editor.generatedDiskImage>${jscene3d.editor.distributionDirectory}/JScene3D Editor-${jscene3d.editor.bundleVersion}.dmg</jscene3d.editor.generatedDiskImage>
         <jscene3d.editor.icon>${project.basedir}/src/main/packaging/jscene3d-editor.icns</jscene3d.editor.icon>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
@@ -218,7 +220,13 @@
                                         <stripDebug>true</stripDebug>
                                     </jLink>
                                     <javaOptions>
-                                        <option>-XstartOnFirstThread</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.prism=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.scene.layout=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.scene=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.sg.prism=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.scenario=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.javafx.tk=openglfx</option>
+                                        <option>--add-exports=javafx.graphics/com.sun.glass.ui=openglfx</option>
                                     </javaOptions>
                                     <macAppCategory>developer-tools</macAppCategory>
                                     <macPackageIdentifier>io.github.glynch.jscene3d.editor</macPackageIdentifier>
@@ -246,6 +254,20 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <executions>
                             <execution>
+                                <id>rename-macos-arm64-editor-disk-image</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>/bin/mv</executable>
+                                    <arguments>
+                                        <argument>${jscene3d.editor.generatedDiskImage}</argument>
+                                        <argument>${jscene3d.editor.diskImage}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
                                 <id>verify-macos-arm64-editor-code-signature</id>
                                 <phase>verify</phase>
                                 <goals>
@@ -271,7 +293,7 @@
                                     <executable>/usr/bin/hdiutil</executable>
                                     <arguments>
                                         <argument>verify</argument>
-                                        <argument>${jscene3d.editor.distributionDirectory}/JScene3D Editor-${jscene3d.editor.bundleVersion}.dmg</argument>
+                                        <argument>${jscene3d.editor.diskImage}</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

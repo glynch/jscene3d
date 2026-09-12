@@ -234,6 +234,34 @@ final class EditorProjectLoaderTest {
                 .hasMessageContaining("requires a project directory");
     }
 
+    /** Prefers the editor-owned cache when it contains published imports. */
+    @Test
+    void resolvesEditorProjectCache() throws IOException {
+        Path projectCache = temporaryDirectory.resolve(".jscene3d/cache");
+        Files.createDirectories(projectCache.resolve("imports"));
+        Files.createDirectories(temporaryDirectory.resolve(".jscene3d/published/imports"));
+
+        assertThat(EditorProjectLoader.resolvePublishedContentRoot(temporaryDirectory))
+                .isEqualTo(projectCache);
+    }
+
+    /** Resolves the portable import snapshot supplied by a Project Workspace Archive. */
+    @Test
+    void resolvesPortablePublishedImports() throws IOException {
+        Path publishedContent = temporaryDirectory.resolve(".jscene3d/published");
+        Files.createDirectories(publishedContent.resolve("imports"));
+
+        assertThat(EditorProjectLoader.resolvePublishedContentRoot(temporaryDirectory))
+                .isEqualTo(publishedContent);
+    }
+
+    /** Retains compatibility with Maven workspaces until editor-owned caches replace them. */
+    @Test
+    void resolvesLegacyMavenImportCache() {
+        assertThat(EditorProjectLoader.resolvePublishedContentRoot(temporaryDirectory))
+                .isEqualTo(temporaryDirectory.resolve("target/import-cache"));
+    }
+
     /** Creates the complete valid source project used by the read-only loading test. */
     private void writeProject() throws IOException {
         write("jscene3d.json", """

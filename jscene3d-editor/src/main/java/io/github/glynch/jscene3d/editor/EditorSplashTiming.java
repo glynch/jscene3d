@@ -8,32 +8,40 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 
-/** Controls optional minimum splash visibility without delaying editor work. */
-record EditorSplashTiming(Duration minimumVisibility) {
+/** Controls minimum cold-start splash visibility without delaying editor work. */
+record EditorSplashTiming(Duration startupMinimumVisibility) {
     static final String MINIMUM_SECONDS_ARGUMENT = "splash-minimum-seconds";
+    private static final Duration DEFAULT_STARTUP_MINIMUM_VISIBILITY = Duration.ofSeconds(2);
 
     /** Validates a minimum visibility duration. */
     EditorSplashTiming {
-        Objects.requireNonNull(minimumVisibility, "minimumVisibility");
-        if (minimumVisibility.isNegative()) {
-            throw new IllegalArgumentException("minimumVisibility must not be negative");
+        Objects.requireNonNull(startupMinimumVisibility, "startupMinimumVisibility");
+        if (startupMinimumVisibility.isNegative()) {
+            throw new IllegalArgumentException("startupMinimumVisibility must not be negative");
         }
     }
 
     /** Reads the editor-only splash timing option from JavaFX named arguments. */
     static EditorSplashTiming fromNamedArguments(Map<String, String> namedArguments) {
         String seconds =
-                Objects.requireNonNull(namedArguments, "namedArguments").getOrDefault(MINIMUM_SECONDS_ARGUMENT, "0");
+                Objects.requireNonNull(namedArguments, "namedArguments").get(MINIMUM_SECONDS_ARGUMENT);
+        if (seconds == null) {
+            return new EditorSplashTiming(DEFAULT_STARTUP_MINIMUM_VISIBILITY);
+        }
         return new EditorSplashTiming(parseSeconds(seconds));
     }
 
-    /** Returns how much longer the splash must remain after the supplied elapsed time. */
-    Duration remainingAfter(Duration elapsed) {
+    /** Returns how much longer the active presentation must remain after the supplied elapsed time. */
+    Duration remainingAfter(EditorSplashPresentation presentation, Duration elapsed) {
+        Objects.requireNonNull(presentation, "presentation");
         Duration validElapsed = Objects.requireNonNull(elapsed, "elapsed");
         if (validElapsed.isNegative()) {
             throw new IllegalArgumentException("elapsed must not be negative");
         }
-        Duration remaining = minimumVisibility.minus(validElapsed);
+        if (presentation == EditorSplashPresentation.PROJECT_LOADING) {
+            return Duration.ZERO;
+        }
+        Duration remaining = startupMinimumVisibility.minus(validElapsed);
         return remaining.isNegative() ? Duration.ZERO : remaining;
     }
 

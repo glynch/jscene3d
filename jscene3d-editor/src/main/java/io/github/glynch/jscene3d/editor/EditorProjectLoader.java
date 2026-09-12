@@ -61,7 +61,9 @@ import java.util.Set;
 /** Assembles editor state from project data without loading or executing application code. */
 public final class EditorProjectLoader {
     private static final String PROJECT_RESOURCES = "src/main/resources";
-    private static final String IMPORT_CACHE = "target/import-cache";
+    private static final String PROJECT_CACHE = ".jscene3d/cache";
+    private static final String PUBLISHED_CONTENT = ".jscene3d/published";
+    private static final String LEGACY_MAVEN_CACHE = "target/import-cache";
     private static final RuntimeResourceProvider UNAVAILABLE_RESOURCES = new RuntimeResourceProvider() {
         @Override
         public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
@@ -300,16 +302,29 @@ public final class EditorProjectLoader {
         if (imports.size() != project.imports().size()) {
             return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
         }
+        Path publishedContentRoot = resolvePublishedContentRoot(project.root());
         try {
             return PublishedProjectContent.load(
-                    project, types, authored, project.root().resolve(IMPORT_CACHE), Spatial3dResourceLoaders.all());
+                    project, types, authored, publishedContentRoot, Spatial3dResourceLoaders.all());
         } catch (IllegalArgumentException | IllegalStateException | UncheckedIOException exception) {
-            diagnostics.add(error(
-                    project.root().resolve(IMPORT_CACHE),
-                    EditorDiagnosticCode.IMPORT_CONTENT_UNAVAILABLE,
-                    exception.toString()));
+            diagnostics.add(
+                    error(publishedContentRoot, EditorDiagnosticCode.IMPORT_CONTENT_UNAVAILABLE, exception.toString()));
             return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
         }
+    }
+
+    /** Resolves current editor cache, portable publication, then the transitional Maven cache. */
+    static Path resolvePublishedContentRoot(Path projectRoot) {
+        Path validProjectRoot = Objects.requireNonNull(projectRoot, "projectRoot");
+        Path projectCache = validProjectRoot.resolve(PROJECT_CACHE);
+        if (Files.isDirectory(projectCache.resolve("imports"))) {
+            return projectCache;
+        }
+        Path publishedContent = validProjectRoot.resolve(PUBLISHED_CONTENT);
+        if (Files.isDirectory(publishedContent.resolve("imports"))) {
+            return publishedContent;
+        }
+        return validProjectRoot.resolve(LEGACY_MAVEN_CACHE);
     }
 
     /** Validates authored definitions and builds deterministic asset-browser entries. */

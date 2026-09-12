@@ -38,6 +38,20 @@ The example demonstrates Draco mesh decompression, skeletal animation, and
 secondary texture-coordinate selection. Detailed provenance and the downloaded
 file checksum are stored beside the bundled asset.
 
+## Soldier glTF model
+
+- Asset: Soldier (`Vanguard`) binary glTF model
+- Character creator: T. Choonyung
+- Character and animations: Mixamo
+- Distributor: [Three.js examples](https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/Soldier.glb)
+- Usage terms: [Adobe Mixamo FAQ](https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html) and [Adobe General Terms of Use](https://www.adobe.com/legal/terms.html)
+- Bundled file: `jscene3d-examples/src/main/resources/io/github/glynch/jscene3d/examples/soldier/Soldier.glb`
+
+The model is included as an embedded example resource. A rendered presentation
+of the character also appears in the JScene3D Examples application icon.
+Detailed provenance and the downloaded file checksum are stored beside the
+bundled asset.
+
 ## Interpolation Test glTF model
 
 - Asset: Interpolation Test binary glTF model

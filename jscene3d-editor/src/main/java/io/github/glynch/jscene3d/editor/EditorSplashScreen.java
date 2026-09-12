@@ -50,6 +50,7 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
 
     private @Nullable FadeTransition fade;
     private @Nullable PauseTransition dismissalDelay;
+    private EditorSplashPresentation presentation = EditorSplashPresentation.STARTUP;
     private long displayedAtNanos = -1L;
 
     /** Creates the full-frame product splash with live project and loading information. */
@@ -75,6 +76,7 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
 
     /** Restores the initial product-startup presentation. */
     void showStartup() {
+        presentation = EditorSplashPresentation.STARTUP;
         showOverlay(false);
         showProjectDetails(false);
         showPhase(EditorLoadingPhase.STARTING_EDITOR);
@@ -88,7 +90,11 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
     public void showProject(Path directory) {
         Path normalized =
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();
-        showOverlay(!isVisible());
+        boolean openingFromWorkbench = !isVisible();
+        if (openingFromWorkbench) {
+            presentation = EditorSplashPresentation.PROJECT_LOADING;
+        }
+        showOverlay(openingFromWorkbench);
         showProjectDetails(true);
         Path fileName = normalized.getFileName();
         setProjectName(fileName == null ? normalized.toString() : fileName.toString());
@@ -120,7 +126,7 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
         Duration visibleFor = displayedAtNanos < 0L
                 ? Duration.ZERO
                 : Duration.ofNanos(Math.max(0L, System.nanoTime() - displayedAtNanos));
-        Duration remaining = timing.remainingAfter(visibleFor);
+        Duration remaining = timing.remainingAfter(presentation, visibleFor);
         if (remaining.isZero()) {
             startFade();
             return;

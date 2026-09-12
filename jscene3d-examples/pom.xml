@@ -14,6 +14,8 @@
 
     <properties>
         <jacoco.skip>true</jacoco.skip>
+        <jscene3d.examples.distributionDirectory>${project.build.directory}/distribution</jscene3d.examples.distributionDirectory>
+        <jscene3d.examples.icon>${project.basedir}/src/main/packaging/jscene3d-examples.icns</jscene3d.examples.icon>
         <jscene3d.examples.natives>${lwjgl.natives}</jscene3d.examples.natives>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
@@ -211,6 +213,7 @@
                                     <mainClass>io.github.glynch.jscene3d.examples.ExampleBrowser</mainClass>
                                     <destination>${project.build.directory}/jpackage-macos-arm64</destination>
                                     <removeDestination>true</removeDestination>
+                                    <icon>${jscene3d.examples.icon}</icon>
                                     <addModules>
                                         <module>java.base</module>
                                         <module>java.desktop</module>
@@ -235,12 +238,40 @@
                                     <macPackageName>JScene3D</macPackageName>
                                 </configuration>
                             </execution>
+                            <execution>
+                                <id>create-macos-arm64-example-browser-disk-image</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                                <configuration>
+                                    <type>DMG</type>
+                                    <appVersion>${jscene3d.examples.bundleVersion}</appVersion>
+                                    <appImage>${project.build.directory}/jpackage-macos-arm64/JScene3D Examples.app</appImage>
+                                    <destination>${jscene3d.examples.distributionDirectory}</destination>
+                                    <removeDestination>true</removeDestination>
+                                </configuration>
+                            </execution>
                         </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
                         <executions>
+                            <execution>
+                                <id>rename-macos-arm64-example-browser-disk-image</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>/bin/mv</executable>
+                                    <arguments>
+                                        <argument>${jscene3d.examples.distributionDirectory}/JScene3D Examples-${jscene3d.examples.bundleVersion}.dmg</argument>
+                                        <argument>${jscene3d.examples.distributionDirectory}/jscene3d-examples-${jscene3d.examples.bundleVersion}-macos-arm64.dmg</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
                             <execution>
                                 <id>verify-macos-arm64-bundled-resources</id>
                                 <phase>verify</phase>
@@ -288,22 +319,18 @@
                                     </arguments>
                                 </configuration>
                             </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-assembly-plugin</artifactId>
-                        <executions>
                             <execution>
-                                <id>assemble-macos-arm64-example-browser</id>
-                                <phase>package</phase>
+                                <id>verify-macos-arm64-example-browser-disk-image</id>
+                                <phase>verify</phase>
                                 <goals>
-                                    <goal>single</goal>
+                                    <goal>exec</goal>
                                 </goals>
                                 <configuration>
-                                    <descriptors>
-                                        <descriptor>src/assembly/macos-arm64.xml</descriptor>
-                                    </descriptors>
+                                    <executable>/usr/bin/hdiutil</executable>
+                                    <arguments>
+                                        <argument>verify</argument>
+                                        <argument>${jscene3d.examples.distributionDirectory}/jscene3d-examples-${jscene3d.examples.bundleVersion}-macos-arm64.dmg</argument>
+                                    </arguments>
                                 </configuration>
                             </execution>
                         </executions>

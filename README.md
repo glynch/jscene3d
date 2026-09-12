@@ -75,7 +75,7 @@ Build the standalone macOS ARM64 editor disk image with:
 ./mvnw clean verify -pl jscene3d-editor -am -Peditor-distribution-macos-arm64
 ```
 
-The resulting `jscene3d-editor/target/distribution/JScene3D Editor-1.0.0.dmg`
+The resulting `jscene3d-editor/target/distribution/jscene3d-editor-1.0.0-macos-arm64.dmg`
 contains the native editor application and its trimmed Java runtime. The build
 requires an Apple Silicon Mac and verifies both the application signature and
 the completed disk image.
@@ -233,14 +233,13 @@ Build the standalone macOS ARM64 example-browser distribution with:
 ```
 
 The resulting distribution is
-`jscene3d-examples/target/jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64.zip`.
+`jscene3d-examples/target/distribution/jscene3d-examples-1.0.0-macos-arm64.dmg`.
 It contains a native `JScene3D Examples.app` application image with the examples,
 assets, runtime dependencies, macOS ARM64 LWJGL native libraries, and a trimmed
-Java runtime. Extract it and open the application:
+Java runtime. Open the disk image and install the application:
 
 ```shell
-unzip jscene3d-examples/target/jscene3d-examples-0.1.0-SNAPSHOT-macos-arm64.zip
-open "JScene3D Examples.app"
+open jscene3d-examples/target/distribution/jscene3d-examples-1.0.0-macos-arm64.dmg
 ```
 
 The native launcher uses the included runtime and supplies

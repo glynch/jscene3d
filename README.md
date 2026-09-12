@@ -69,6 +69,17 @@ Pass a project directory to open it immediately:
 ./tools/scripts/run-editor.sh /path/to/project
 ```
 
+Build the standalone macOS ARM64 editor disk image with:
+
+```shell
+./mvnw clean verify -pl jscene3d-editor -am -Peditor-distribution-macos-arm64
+```
+
+The resulting `jscene3d-editor/target/distribution/JScene3D Editor-1.0.0.dmg`
+contains the native editor application and its trimmed Java runtime. The build
+requires an Apple Silicon Mac and verifies both the application signature and
+the completed disk image.
+
 The JavaFX editor embeds the JScene3D renderer through OpenGLFX. It loads the
 project manifest, safe extension descriptors, authored assets, published import
 generations, and startup world without executing application code. The entry

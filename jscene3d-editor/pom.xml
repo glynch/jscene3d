@@ -13,6 +13,10 @@
     <description>Native JavaFX visual editor for JScene3D projects.</description>
 
     <properties>
+        <!-- jpackage requires the first macOS bundle-version component to be positive. -->
+        <jscene3d.editor.bundleVersion>1.0.0</jscene3d.editor.bundleVersion>
+        <jscene3d.editor.distributionDirectory>${project.build.directory}/distribution</jscene3d.editor.distributionDirectory>
+        <jscene3d.editor.icon>${project.basedir}/src/main/packaging/jscene3d-editor.icns</jscene3d.editor.icon>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 
@@ -103,6 +107,179 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>editor-distribution-macos-arm64</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>enforce-editor-macos-arm64-distribution-host</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>enforce</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <requireOS>
+                                            <family>mac</family>
+                                            <arch>aarch64</arch>
+                                        </requireOS>
+                                    </rules>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>collect-macos-arm64-editor-runtime</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <outputDirectory>${project.build.directory}/jpackage-input-macos-arm64</outputDirectory>
+                                    <overWriteSnapshots>true</overWriteSnapshots>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-macos-arm64-editor-jar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/jpackage-input-macos-arm64</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.build.directory}</directory>
+                                            <filtering>false</filtering>
+                                            <includes>
+                                                <include>${project.build.finalName}.jar</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>create-macos-arm64-editor</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                                <configuration>
+                                    <type>APP_IMAGE</type>
+                                    <name>JScene3D Editor</name>
+                                    <appVersion>${jscene3d.editor.bundleVersion}</appVersion>
+                                    <vendor>JScene3D</vendor>
+                                    <description>Visual editor for JScene3D projects.</description>
+                                    <copyright>Copyright 2026 Graham Lynch</copyright>
+                                    <modulePaths>
+                                        <path>${project.build.directory}/jpackage-input-macos-arm64</path>
+                                    </modulePaths>
+                                    <module>io.github.glynch.jscene3d.editor/io.github.glynch.jscene3d.editor.EditorLauncher</module>
+                                    <destination>${project.build.directory}/jpackage-macos-arm64</destination>
+                                    <removeDestination>true</removeDestination>
+                                    <icon>${jscene3d.editor.icon}</icon>
+                                    <addModules>
+                                        <module>java.base</module>
+                                        <module>java.desktop</module>
+                                        <module>java.logging</module>
+                                        <module>java.management</module>
+                                        <module>java.naming</module>
+                                        <module>java.prefs</module>
+                                        <module>java.sql</module>
+                                        <module>java.xml</module>
+                                        <module>io.github.glynch.jscene3d.doom</module>
+                                        <module>jdk.incubator.vector</module>
+                                        <module>jdk.unsupported</module>
+                                    </addModules>
+                                    <jLink>
+                                        <noHeaderFiles>true</noHeaderFiles>
+                                        <noManPages>true</noManPages>
+                                        <stripDebug>true</stripDebug>
+                                    </jLink>
+                                    <javaOptions>
+                                        <option>-XstartOnFirstThread</option>
+                                    </javaOptions>
+                                    <macAppCategory>developer-tools</macAppCategory>
+                                    <macPackageIdentifier>io.github.glynch.jscene3d.editor</macPackageIdentifier>
+                                    <macPackageName>JScene3D Editor</macPackageName>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>create-macos-arm64-editor-disk-image</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                                <configuration>
+                                    <type>DMG</type>
+                                    <appVersion>${jscene3d.editor.bundleVersion}</appVersion>
+                                    <appImage>${project.build.directory}/jpackage-macos-arm64/JScene3D Editor.app</appImage>
+                                    <destination>${jscene3d.editor.distributionDirectory}</destination>
+                                    <removeDestination>true</removeDestination>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>verify-macos-arm64-editor-code-signature</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>/usr/bin/codesign</executable>
+                                    <arguments>
+                                        <argument>--verify</argument>
+                                        <argument>--deep</argument>
+                                        <argument>--strict</argument>
+                                        <argument>${project.build.directory}/jpackage-macos-arm64/JScene3D Editor.app</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>verify-macos-arm64-editor-disk-image</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>/usr/bin/hdiutil</executable>
+                                    <arguments>
+                                        <argument>verify</argument>
+                                        <argument>${jscene3d.editor.distributionDirectory}/JScene3D Editor-${jscene3d.editor.bundleVersion}.dmg</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>prepare-editor-run</id>
             <build>

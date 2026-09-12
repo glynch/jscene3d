@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.configuration.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.SettingRegistry;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
@@ -39,6 +41,8 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
+import io.github.glynch.jscene3d.project.settings.CoreProjectSettings;
+import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
 import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoadResult;
 import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoader;
@@ -55,6 +59,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -146,6 +151,9 @@ public final class EditorProjectLoader {
         progress.phaseStarted(EditorLoadingPhase.LOADING_EXTENSIONS);
         RegisteredTypeCatalog types =
                 operation.measure("project.extensions.load", Map.of(), () -> loadTypeCatalog(project, diagnostics));
+        ProjectConfiguration configuration =
+                new ProjectConfiguration(project.root(), settingRegistry(project, types, diagnostics), settings);
+        diagnostics.addAll(configuration.diagnostics());
         progress.phaseStarted(EditorLoadingPhase.READING_IMPORTS);
         List<ImportDefinition> imports =
                 operation.measure("project.import-definitions.load", Map.of(), () -> loadImports(project, diagnostics));
@@ -153,7 +161,7 @@ public final class EditorProjectLoader {
         ProjectContent content = operation.measure(
                 "project.published-content.load",
                 Map.of(),
-                () -> loadContent(project, settings, authored, types, imports, diagnostics));
+                () -> loadContent(project, configuration, authored, types, imports, diagnostics));
         DefinitionResolver definitions = content.definitions();
         progress.phaseStarted(EditorLoadingPhase.VALIDATING_ASSETS);
         List<ProjectAsset> assets = operation.measure(
@@ -185,7 +193,7 @@ public final class EditorProjectLoader {
                 Map.of(),
                 () -> new EditorProjectSession(
                         new EditorProjectSession.Source(
-                                project, settings, authored, types, content, world, worldSource),
+                                project, configuration, authored, types, content, world, worldSource),
                         assets,
                         hierarchyProjection));
         return new EditorProjectLoadResult(Optional.of(session), List.copyOf(diagnostics));
@@ -314,7 +322,7 @@ public final class EditorProjectLoader {
     /** Combines authored definitions with already-published definitions and spatial resources. */
     private static ProjectContent loadContent(
             GameProject project,
-            ProjectSettings settings,
+            ProjectConfiguration configuration,
             AssetCatalog authored,
             RegisteredTypeCatalog types,
             List<ImportDefinition> imports,
@@ -322,7 +330,7 @@ public final class EditorProjectLoader {
         if (imports.size() != project.imports().size()) {
             return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
         }
-        Path publishedContentRoot = resolvePublishedContentRoot(project.root(), settings);
+        Path publishedContentRoot = resolvePublishedContentRoot(project.root(), configuration);
         try {
             return PublishedProjectContent.load(
                     project, types, authored, publishedContentRoot, Spatial3dResourceLoaders.all());
@@ -338,13 +346,15 @@ public final class EditorProjectLoader {
         Path validProjectRoot = Objects.requireNonNull(projectRoot, "projectRoot");
         ProjectSettings settings =
                 new ProjectSettingsLoader().load(validProjectRoot).settings().orElse(ProjectSettings.defaults());
-        return resolvePublishedContentRoot(validProjectRoot, settings);
+        ProjectConfiguration configuration = new ProjectConfiguration(
+                validProjectRoot, SettingRegistry.of(CoreProjectSettings.definitions()), settings);
+        return resolvePublishedContentRoot(validProjectRoot, configuration);
     }
 
     /** Resolves configured editor cache, portable publication, then transitional Maven output. */
-    private static Path resolvePublishedContentRoot(Path projectRoot, ProjectSettings settings) {
+    private static Path resolvePublishedContentRoot(Path projectRoot, ProjectConfiguration configuration) {
         Path validProjectRoot = Objects.requireNonNull(projectRoot, "projectRoot");
-        Path projectCache = settings.resolveCache(validProjectRoot);
+        Path projectCache = configuration.resolve(CoreProjectSettings.CACHE_LOCATION);
         if (Files.isDirectory(projectCache.resolve("imports"))) {
             return projectCache;
         }
@@ -353,6 +363,28 @@ public final class EditorProjectLoader {
             return publishedContent;
         }
         return validProjectRoot.resolve(LEGACY_MAVEN_CACHE);
+    }
+
+    /** Composes built-in and discovered extension settings into one deterministic registry. */
+    private static SettingRegistry settingRegistry(
+            GameProject project, RegisteredTypeCatalog types, LinkedHashSet<ProjectDiagnostic> diagnostics) {
+        Map<String, SettingDefinition<?>> definitions = new LinkedHashMap<>();
+        CoreProjectSettings.definitions()
+                .forEach(definition -> definitions.put(definition.key().value(), definition));
+        types.extensions().stream()
+                .flatMap(extension -> extension.settings().stream())
+                .forEach(definition -> {
+                    SettingDefinition<?> existing =
+                            definitions.putIfAbsent(definition.key().value(), definition);
+                    if (existing != null) {
+                        diagnostics.add(error(
+                                project.root().resolve(PROJECT_RESOURCES),
+                                EditorDiagnosticCode.SETTING_REGISTRY_INVALID,
+                                "Setting " + definition.key().value() + " is declared by both " + existing.owner()
+                                        + " and " + definition.owner()));
+                    }
+                });
+        return SettingRegistry.of(definitions.values());
     }
 
     /** Validates authored definitions and builds deterministic asset-browser entries. */

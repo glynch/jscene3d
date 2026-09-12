@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.extension.internal;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -20,6 +21,7 @@ import org.jspecify.annotations.Nullable;
  * @param description optional extension description
  * @param types contributed registered types
  * @param components contributed component types
+ * @param settings contributed project settings
  */
 public record RawExtensionDescriptor(
         @JsonProperty("$schema") @Nullable String schema,
@@ -30,7 +32,8 @@ public record RawExtensionDescriptor(
         @Nullable String displayName,
         @Nullable String description,
         @Nullable List<@Nullable Type> types,
-        @Nullable List<@Nullable Component> components) {
+        @Nullable List<@Nullable Component> components,
+        @Nullable List<@Nullable Setting> settings) {
     /** Nullable raw registered-type descriptor. */
     record Type(
             @Nullable String id,
@@ -82,4 +85,24 @@ public record RawExtensionDescriptor(
 
     /** Nullable raw registered-type reference. */
     record RegisteredType(@Nullable String type, @Nullable Integer typeVersion) {}
+
+    /** Nullable raw setting contribution. */
+    record Setting(
+            @Nullable String key,
+            @Nullable String type,
+            @Nullable JsonNode defaultValue,
+            @Nullable String displayName,
+            @Nullable String description,
+            @Nullable String category,
+            @Nullable String scope,
+            @Nullable Integer order,
+            @Nullable BigDecimal minimum,
+            @Nullable BigDecimal maximum,
+            @Nullable BigDecimal step,
+            @Nullable List<@Nullable Choice> choices,
+            @Nullable String pathKind,
+            @Nullable Boolean projectRelative) {}
+
+    /** Nullable raw choice offered by an enumerated setting. */
+    record Choice(@Nullable String value, @Nullable String label) {}
 }

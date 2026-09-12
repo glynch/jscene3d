@@ -19,6 +19,7 @@ import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectPublication;
+import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
@@ -40,6 +41,7 @@ public final class EditorApplication extends Application {
     private final EditorProjectLoader projectLoader;
     private final EditorProjectContext projectContext;
     private final EditorSelectionContext selectionContext;
+    private final EditorConfigurationContext configurationContext;
     private final EditorExtensionHost extensionHost;
 
     private @Nullable GLCanvas canvas;
@@ -56,7 +58,8 @@ public final class EditorApplication extends Application {
                 EditorExtensionPath.configured());
         projectContext = new EditorProjectContext();
         selectionContext = new EditorSelectionContext();
-        extensionHost = new EditorExtensionHost(projectContext, selectionContext);
+        configurationContext = new EditorConfigurationContext();
+        extensionHost = new EditorExtensionHost(projectContext, selectionContext, configurationContext);
     }
 
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
@@ -88,7 +91,7 @@ public final class EditorApplication extends Application {
         projectOpener = new EditorProjectOpener(
                 telemetry,
                 projectLoader,
-                new EditorProjectPublication(projectContext, projectDiagnostics::showDiagnostics),
+                new EditorProjectPublication(projectContext, projectDiagnostics::showDiagnostics, configurationContext),
                 editorWorkspace,
                 controller,
                 loadingScreen,
@@ -121,6 +124,7 @@ public final class EditorApplication extends Application {
         closeProjectOpener();
         closeWorkspace();
         extensionHost.close();
+        configurationContext.close();
         disposeCanvas();
     }
 

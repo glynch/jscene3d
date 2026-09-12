@@ -24,18 +24,18 @@ class ProjectSettingsPersistenceTest {
     @Test
     void readerBindsSettingsDirectlyWithJacksonDefaults() throws IOException {
         ProjectSettings settings = read("""
-                {"schemaVersion":1,"cache":{"location":"build/../.cache/jscene3d"}}
+                {"schemaVersion":1,"settings":{"jscene3d.cache.location":"build/../.cache/jscene3d"}}
                 """);
 
         assertThat(settings.schema()).isEqualTo(ProjectSettings.CURRENT_SCHEMA_URI);
         assertThat(settings.schemaVersion()).isEqualTo(ProjectSettings.SCHEMA_VERSION);
-        assertThat(settings.cacheLocation()).isEqualTo(Path.of(".cache/jscene3d"));
+        assertThat(settings.value(CoreProjectSettings.CACHE_LOCATION.value())).contains("build/../.cache/jscene3d");
     }
 
     @Test
     void readerRetainsStrictJacksonChecks() {
         assertThatThrownBy(() -> read("""
-                {"schemaVersion":1,"cache":{"location":"cache","unknown":true}}
+                {"schemaVersion":1,"settings":{},"unknown":true}
                 """)).isInstanceOf(IOException.class);
         assertThatThrownBy(() -> read("""
                 {"schemaVersion":1,"schemaVersion":1}
@@ -57,7 +57,7 @@ class ProjectSettingsPersistenceTest {
                 .startsWith("{\n")
                 .contains("\"$schema\" : \"" + ProjectSettings.CURRENT_SCHEMA_URI + "\"")
                 .contains("\"schemaVersion\" : 1")
-                .contains("\"location\" : \".cache/jscene3d\"")
+                .contains("\"jscene3d.cache.location\" : \".cache/jscene3d\"")
                 .endsWith("\n");
         assertThat(read(json)).isEqualTo(expected);
     }
@@ -72,7 +72,7 @@ class ProjectSettingsPersistenceTest {
         saver.save(temporaryDirectory, second);
 
         Path target = temporaryDirectory.resolve(ProjectSettings.SETTINGS_NAME);
-        assertThat(Files.readString(target)).contains("\"location\" : \"second-cache\"");
+        assertThat(Files.readString(target)).contains("\"jscene3d.cache.location\" : \"second-cache\"");
         assertThat(new ProjectSettingsLoader().load(temporaryDirectory).settings())
                 .contains(second);
         try (var files = Files.list(target.getParent())) {

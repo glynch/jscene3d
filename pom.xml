@@ -35,6 +35,7 @@
     <modules>
         <module>jscene3d-documentation</module>
         <module>jscene3d-core</module>
+        <module>jscene3d-configuration</module>
         <module>jscene3d-physics</module>
         <module>jscene3d-game</module>
         <module>jscene3d-project</module>
@@ -194,6 +195,11 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-configuration</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

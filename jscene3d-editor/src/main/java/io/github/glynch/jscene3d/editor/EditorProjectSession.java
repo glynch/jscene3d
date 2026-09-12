@@ -4,8 +4,10 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.configuration.SettingKey;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.command.EditorUndoRedoEntry;
+import io.github.glynch.jscene3d.editor.configuration.EditorConfigurationChange;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorEvent;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorEventSource;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorWorkingCopyRegistry;
@@ -17,6 +19,7 @@ import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectContent;
+import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
@@ -32,7 +35,7 @@ import java.util.Optional;
  */
 public final class EditorProjectSession {
     private final GameProject project;
-    private final ProjectSettings settings;
+    private final ProjectConfiguration configuration;
     private final AssetCatalog authoredAssets;
     private final RegisteredTypeCatalog types;
     private final ProjectContent content;
@@ -41,6 +44,7 @@ public final class EditorProjectSession {
     private final EditorWorkingCopyRegistry workingCopies = new EditorWorkingCopyRegistry();
     private final EditorWorldWorkingCopy startupWorld;
     private final EditorEventSource<EditorHierarchyNode> hierarchyChanges = new EditorEventSource<>();
+    private final EditorEventSource<EditorConfigurationChange> configurationChanges = new EditorEventSource<>();
 
     private EditorHierarchyNode hierarchy;
 
@@ -48,7 +52,7 @@ public final class EditorProjectSession {
     EditorProjectSession(Source source, List<ProjectAsset> assets, EditorHierarchyProjection hierarchyProjection) {
         Source validSource = Objects.requireNonNull(source, "source");
         project = validSource.project();
-        settings = validSource.settings();
+        configuration = validSource.configuration();
         authoredAssets = validSource.authoredAssets();
         types = validSource.types();
         content = validSource.content();
@@ -76,7 +80,33 @@ public final class EditorProjectSession {
      * @return validated portable project settings
      */
     public ProjectSettings settings() {
-        return settings;
+        return configuration.document();
+    }
+
+    /**
+     * Returns the effective project configuration and its declarative setting registry.
+     *
+     * @return live project configuration
+     */
+    public ProjectConfiguration configuration() {
+        return configuration;
+    }
+
+    /** Returns the typed event fired after a project setting is persisted. */
+    public EditorEvent<EditorConfigurationChange> onDidChangeConfiguration() {
+        return configurationChanges;
+    }
+
+    /** Atomically persists one declared project setting and publishes its new effective value. */
+    public <T> void updateSetting(SettingKey<T> key, T value) throws IOException {
+        configuration.update(key, value);
+        configurationChanges.emit(new EditorConfigurationChange(key, true));
+    }
+
+    /** Removes one project override and publishes the declaration's effective default. */
+    public void resetSetting(SettingKey<?> key) throws IOException {
+        configuration.reset(key);
+        configurationChanges.emit(new EditorConfigurationChange(key, false));
     }
 
     /** Returns authored definition metadata. */
@@ -226,7 +256,7 @@ public final class EditorProjectSession {
     /** Groups the immutable loaded inputs from which an editor project session is opened. */
     record Source(
             GameProject project,
-            ProjectSettings settings,
+            ProjectConfiguration configuration,
             AssetCatalog authoredAssets,
             RegisteredTypeCatalog types,
             ProjectContent content,
@@ -235,7 +265,7 @@ public final class EditorProjectSession {
         /** Validates the complete loaded source. */
         Source {
             Objects.requireNonNull(project, "project");
-            Objects.requireNonNull(settings, "settings");
+            Objects.requireNonNull(configuration, "configuration");
             Objects.requireNonNull(authoredAssets, "authoredAssets");
             Objects.requireNonNull(types, "types");
             Objects.requireNonNull(content, "content");

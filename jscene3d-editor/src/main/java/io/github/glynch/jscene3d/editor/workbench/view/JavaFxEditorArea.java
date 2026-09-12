@@ -4,9 +4,12 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.view;
 
+import io.github.glynch.jscene3d.editor.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import io.github.glynch.jscene3d.editor.window.EditorMessage;
+import io.github.glynch.jscene3d.editor.workbench.configuration.JavaFxProjectSettingsPane;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorViewPlacement;
@@ -16,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyStringProperty;
@@ -26,6 +30,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import org.jspecify.annotations.Nullable;
 
 /** Hosts the permanent scene preview and extension-provided editor-area views. */
 public final class JavaFxEditorArea implements AutoCloseable {
@@ -38,6 +43,7 @@ public final class JavaFxEditorArea implements AutoCloseable {
     private final Map<ViewId, OpenView> openViews = new LinkedHashMap<>();
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
+    private @Nullable Tab settingsTab;
 
     /**
      * Creates an editor area around the scene preview.
@@ -90,8 +96,37 @@ public final class JavaFxEditorArea implements AutoCloseable {
         return tabs;
     }
 
+    /** Opens or reveals the generated settings editor for the current project. */
+    public void showProjectSettings(EditorProjectSession session, Consumer<EditorMessage> messages) {
+        Tab current = settingsTab;
+        if (current == null) {
+            JavaFxProjectSettingsPane settings = new JavaFxProjectSettingsPane(session, messages);
+            Label title = new Label("Project Settings");
+            title.getStyleClass().add(EditorStyleClasses.EDITOR_EDITOR_TAB_TITLE);
+            Tab created = new Tab();
+            created.setGraphic(title);
+            created.setContent(settings.node());
+            created.setClosable(true);
+            created.setOnClosed(ignored -> settingsTab = null);
+            settingsTab = created;
+            tabs.getTabs().add(created);
+            current = created;
+        }
+        tabs.getSelectionModel().select(current);
+    }
+
+    /** Closes the project-owned settings editor when its project is replaced. */
+    public void closeProjectSettings() {
+        Tab current = settingsTab;
+        settingsTab = null;
+        if (current != null) {
+            tabs.getTabs().remove(current);
+        }
+    }
+
     @Override
     public void close() {
+        closeProjectSettings();
         requestRegistration.close();
         viewRegistration.close();
         openViews.values().forEach(OpenView::close);

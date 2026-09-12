@@ -349,6 +349,88 @@
     -fx-pref-width: 9px;
 }
 
+.editor-settings-root,
+.editor-settings-scroll,
+.editor-settings-scroll > .viewport,
+.editor-settings-content {
+    -fx-background-color: -jscene-canvas;
+}
+
+.editor-settings-header {
+    -fx-background-color: -jscene-panel;
+    -fx-border-color: transparent transparent -jscene-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 20px 24px;
+}
+
+.editor-settings-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-settings-content {
+    -fx-padding: 18px 24px 28px 24px;
+    -fx-spacing: 8px;
+}
+
+.editor-settings-owner {
+    -fx-font-size: 17px;
+    -fx-font-weight: 600;
+    -fx-padding: 8px 0 2px 0;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-settings-category {
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-padding: 8px 0 2px 0;
+    -fx-text-fill: -jscene-focus;
+}
+
+.editor-settings-row {
+    -fx-background-color: -jscene-panel;
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 3px;
+    -fx-padding: 12px 14px;
+}
+
+.editor-settings-name {
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-settings-description,
+.editor-settings-key {
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-settings-description {
+    -fx-font-size: 11px;
+}
+
+.editor-settings-key {
+    -fx-font-family: monospace;
+    -fx-font-size: 10px;
+}
+
+.editor-settings-value {
+    -fx-min-width: 340px;
+    -fx-pref-width: 420px;
+}
+
+.editor-settings-value > .text-field,
+.editor-settings-value > .combo-box {
+    -fx-max-width: infinity;
+    -fx-min-width: 240px;
+    -fx-pref-width: 330px;
+}
+
+.editor-settings-reset {
+    -fx-min-width: 64px;
+}
+
 .editor-extensions-view {
     -fx-background-color: -jscene-panel;
     -fx-padding: 8px;

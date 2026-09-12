@@ -14,6 +14,8 @@ public enum EditorDiagnosticCode implements DiagnosticCode {
     EXTENSION_METADATA_UNAVAILABLE("editor.extension.metadata", "Project extension metadata could not be discovered"),
     /** Built-in and project type metadata could not be combined. */
     TYPE_CATALOG_INVALID("editor.type.catalog", "Project type metadata contains conflicting registrations"),
+    /** Core and extension setting declarations contain conflicting keys. */
+    SETTING_REGISTRY_INVALID("editor.setting.registry", "Project settings contain conflicting declarations"),
     /** Published imported content could not be opened. */
     IMPORT_CONTENT_UNAVAILABLE("editor.import.content", "Published imported content could not be opened"),
     /** The configured startup world is not an authored world definition. */

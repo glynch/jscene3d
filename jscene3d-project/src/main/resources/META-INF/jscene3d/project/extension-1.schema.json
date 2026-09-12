@@ -50,6 +50,12 @@
       "items": {
         "$ref": "#/$defs/componentTypeDescriptor"
       }
+    },
+    "settings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/setting"
+      }
     }
   },
   "$defs": {
@@ -250,6 +256,85 @@
             ]
           },
           "uniqueItems": true
+        }
+      }
+    },
+    "setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "type",
+        "defaultValue",
+        "displayName",
+        "category",
+        "scope"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)+$"
+        },
+        "type": {
+          "enum": ["boolean", "integer", "number", "string", "path", "enum"]
+        },
+        "defaultValue": {},
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "const": "project"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "step": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/settingChoice"
+          }
+        },
+        "pathKind": {
+          "enum": ["file", "directory"]
+        },
+        "projectRelative": {
+          "type": "boolean"
+        }
+      }
+    },
+    "settingChoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

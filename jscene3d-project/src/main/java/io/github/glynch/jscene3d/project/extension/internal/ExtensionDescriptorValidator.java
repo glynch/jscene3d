@@ -8,6 +8,13 @@ import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isPr
 import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isRegisteredTypeId;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.glynch.jscene3d.configuration.SettingChoice;
+import io.github.glynch.jscene3d.configuration.SettingConstraints;
+import io.github.glynch.jscene3d.configuration.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.SettingKey;
+import io.github.glynch.jscene3d.configuration.SettingPathKind;
+import io.github.glynch.jscene3d.configuration.SettingScope;
+import io.github.glynch.jscene3d.configuration.SettingValueType;
 import io.github.glynch.jscene3d.project.component.AttachmentPointId;
 import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
@@ -106,13 +113,238 @@ public final class ExtensionDescriptorValidator {
         String safeId = isProjectId(id) ? id : "invalid.extension";
         List<RegisteredTypeDescriptor> types = validateTypes(raw.types(), safeId);
         List<ComponentTypeDescriptor> components = validateComponents(raw.components(), safeId);
+        List<SettingDefinition<?>> settings = validateSettings(raw.settings(), safeId, displayName);
         validateCrossTypeIdentities(types, components);
         if (diagnostics.hasErrors()) {
             return Optional.empty();
         }
         DescriptorPresentation presentation = presentation(displayName, description);
-        return Optional.of(new ExtensionDescriptor(id, version, engineRequires, presentation, types, components));
+        return Optional.of(
+                new ExtensionDescriptor(id, version, engineRequires, presentation, types, components, settings));
     }
+
+    /** Validates declarative settings without executing extension code. */
+    private List<SettingDefinition<?>> validateSettings(
+            @Nullable List<RawExtensionDescriptor.@Nullable Setting> rawSettings,
+            String extensionId,
+            String extensionDisplayName) {
+        if (rawSettings == null) {
+            return List.of();
+        }
+        List<SettingDefinition<?>> settings = new ArrayList<>();
+        Set<String> unique = new HashSet<>();
+        for (int index = 0; index < rawSettings.size(); index++) {
+            String location = "/settings/" + index;
+            Optional<SettingDefinition<?>> definition =
+                    validateSetting(rawSettings.get(index), extensionId, extensionDisplayName, location);
+            if (definition.isPresent()
+                    && !unique.add(definition.orElseThrow().key().value())) {
+                diagnostics.error(
+                        ExtensionDiagnosticCode.SETTING_DUPLICATE,
+                        "setting is duplicated: "
+                                + definition.orElseThrow().key().value(),
+                        location + "/key");
+            } else {
+                definition.ifPresent(settings::add);
+            }
+        }
+        return List.copyOf(settings);
+    }
+
+    /** Validates one extension-owned setting declaration. */
+    private Optional<SettingDefinition<?>> validateSetting(
+            RawExtensionDescriptor.@Nullable Setting raw,
+            String extensionId,
+            String extensionDisplayName,
+            String location) {
+        if (raw == null) {
+            diagnostics.error(ExtensionDiagnosticCode.FIELD_REQUIRED, "setting must be an object", location);
+            return Optional.empty();
+        }
+        String key = fields.requiredText(raw.key(), location + "/key");
+        SettingValueType type = settingType(raw.type(), location + "/type");
+        String displayName = fields.requiredText(raw.displayName(), location + "/displayName");
+        Optional<String> description = fields.optionalText(raw.description(), location + "/description");
+        String category = fields.requiredText(raw.category(), location + "/category");
+        SettingScope scope = settingScope(raw.scope(), location + "/scope");
+        int order = raw.order() == null ? 0 : raw.order();
+        Optional<Object> defaultValue = settingDefault(raw.defaultValue(), type, location + "/defaultValue");
+        SettingConstraints constraints = settingConstraints(raw, type, location);
+        if (key.isEmpty() || displayName.isEmpty() || category.isEmpty() || defaultValue.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            SettingMetadata metadata = new SettingMetadata(
+                    extensionId,
+                    extensionDisplayName,
+                    key,
+                    displayName,
+                    description,
+                    category,
+                    scope,
+                    order,
+                    constraints);
+            return Optional.of(settingDefinition(metadata, type, defaultValue.orElseThrow()));
+        } catch (IllegalArgumentException exception) {
+            ExtensionDiagnosticCode code =
+                    exception.getMessage() != null && exception.getMessage().contains("setting key")
+                            ? ExtensionDiagnosticCode.SETTING_KEY_INVALID
+                            : ExtensionDiagnosticCode.SETTING_CONSTRAINT_INVALID;
+            diagnostics.error(
+                    code, Objects.requireNonNullElse(exception.getMessage(), code.defaultMessage()), location);
+            return Optional.empty();
+        }
+    }
+
+    /** Parses one supported setting value family. */
+    private SettingValueType settingType(@Nullable String value, String location) {
+        String text = fields.requiredText(value, location);
+        try {
+            return SettingValueType.parse(text);
+        } catch (IllegalArgumentException ignored) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.SETTING_TYPE_INVALID,
+                    "type must be boolean, integer, number, string, path, or enum",
+                    location);
+            return SettingValueType.STRING;
+        }
+    }
+
+    /** Parses one supported setting persistence scope. */
+    private SettingScope settingScope(@Nullable String value, String location) {
+        String text = fields.requiredText(value, location);
+        if ("project".equals(text)) {
+            return SettingScope.PROJECT;
+        }
+        diagnostics.error(ExtensionDiagnosticCode.SETTING_SCOPE_INVALID, "scope must currently be project", location);
+        return SettingScope.PROJECT;
+    }
+
+    /** Converts a JSON default into the declared setting value family. */
+    private Optional<Object> settingDefault(@Nullable JsonNode value, SettingValueType type, String location) {
+        if (value == null || value.isNull()) {
+            diagnostics.error(ExtensionDiagnosticCode.FIELD_REQUIRED, "defaultValue is required", location);
+            return Optional.empty();
+        }
+        Object raw =
+                switch (type) {
+                    case BOOLEAN -> value.isBoolean() ? value.booleanValue() : null;
+                    case INTEGER -> value.isIntegralNumber() ? value.bigIntegerValue() : null;
+                    case NUMBER -> value.isNumber() ? value.decimalValue() : null;
+                    case STRING, PATH, ENUM -> value.isTextual() ? value.textValue() : null;
+                };
+        if (raw == null) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.SETTING_DEFAULT_INVALID,
+                    "defaultValue does not match the declared setting type",
+                    location);
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(type.convert(raw));
+        } catch (IllegalArgumentException exception) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.SETTING_DEFAULT_INVALID,
+                    Objects.requireNonNullElse(exception.getMessage(), "setting default is invalid"),
+                    location);
+            return Optional.empty();
+        }
+    }
+
+    /** Builds typed constraints and reports malformed choice and path metadata. */
+    private SettingConstraints settingConstraints(
+            RawExtensionDescriptor.Setting raw, SettingValueType type, String location) {
+        List<SettingChoice> choices = settingChoices(raw.choices(), location + "/choices");
+        Optional<SettingPathKind> pathKind = settingPathKind(raw.pathKind(), location + "/pathKind");
+        boolean projectRelative = raw.projectRelative() != null && raw.projectRelative();
+        try {
+            return new SettingConstraints(
+                    Optional.ofNullable(raw.minimum()),
+                    Optional.ofNullable(raw.maximum()),
+                    Optional.ofNullable(raw.step()),
+                    choices,
+                    pathKind,
+                    projectRelative);
+        } catch (IllegalArgumentException exception) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.SETTING_CONSTRAINT_INVALID,
+                    Objects.requireNonNullElse(exception.getMessage(), "setting constraints are invalid"),
+                    location);
+            return type == SettingValueType.ENUM
+                    ? SettingConstraints.choices(List.of(new SettingChoice("invalid", "Invalid")))
+                    : SettingConstraints.NONE;
+        }
+    }
+
+    /** Parses choice metadata for an enumerated setting. */
+    private List<SettingChoice> settingChoices(
+            @Nullable List<RawExtensionDescriptor.@Nullable Choice> rawChoices, String location) {
+        if (rawChoices == null) {
+            return List.of();
+        }
+        List<SettingChoice> choices = new ArrayList<>();
+        for (int index = 0; index < rawChoices.size(); index++) {
+            RawExtensionDescriptor.Choice raw = rawChoices.get(index);
+            String itemLocation = location + "/" + index;
+            if (raw == null) {
+                diagnostics.error(ExtensionDiagnosticCode.FIELD_REQUIRED, "choice must be an object", itemLocation);
+                continue;
+            }
+            String value = fields.requiredText(raw.value(), itemLocation + "/value");
+            String label = fields.requiredText(raw.label(), itemLocation + "/label");
+            if (!value.isEmpty() && !label.isEmpty()) {
+                choices.add(new SettingChoice(value, label));
+            }
+        }
+        return List.copyOf(choices);
+    }
+
+    /** Parses an optional path-target presentation hint. */
+    private Optional<SettingPathKind> settingPathKind(@Nullable String value, String location) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(SettingPathKind.valueOf(value.replace('-', '_').toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException ignored) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.SETTING_CONSTRAINT_INVALID, "pathKind must be file or directory", location);
+            return Optional.empty();
+        }
+    }
+
+    /** Constructs a setting definition using the Java type assigned to its value family. */
+    private static SettingDefinition<?> settingDefinition(
+            SettingMetadata metadata, SettingValueType type, Object defaultValue) {
+        return typedSettingDefinition(metadata, type, type.valueClass(), defaultValue);
+    }
+
+    private static <T> SettingDefinition<T> typedSettingDefinition(
+            SettingMetadata metadata, SettingValueType type, Class<T> valueClass, Object defaultValue) {
+        return new SettingDefinition<>(
+                metadata.extensionId(),
+                metadata.extensionDisplayName(),
+                new SettingKey<>(metadata.key(), valueClass),
+                type,
+                valueClass.cast(defaultValue),
+                metadata.displayName(),
+                metadata.description(),
+                metadata.category(),
+                metadata.scope(),
+                metadata.order(),
+                metadata.constraints());
+    }
+
+    private record SettingMetadata(
+            String extensionId,
+            String extensionDisplayName,
+            String key,
+            String displayName,
+            Optional<String> description,
+            String category,
+            SettingScope scope,
+            int order,
+            SettingConstraints constraints) {}
 
     /** Validates the authoritative schema version and optional canonical URI. */
     private void validateSchema(@Nullable String schema, int schemaVersion) {

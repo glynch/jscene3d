@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.extension;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
+import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
@@ -51,6 +52,13 @@ public interface EditorExtensionContext {
      * @return command-placement registry
      */
     EditorCommandPlacementRegistry commandPlacements();
+
+    /**
+     * Returns effective project settings declared by core and installed extensions.
+     *
+     * @return read-only project configuration
+     */
+    EditorConfiguration configuration();
 
     /**
      * Returns the editor status-bar facility.

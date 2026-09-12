@@ -11,7 +11,11 @@ public enum ProjectSettingsDiagnosticCode implements DiagnosticCode {
     /** The settings document is not valid JSON or does not satisfy the version-one contract. */
     SETTINGS_INVALID("project.settings.invalid", "Project settings are invalid"),
     /** The settings document could not be read. */
-    SETTINGS_READ_FAILED("project.settings.read", "Project settings could not be read");
+    SETTINGS_READ_FAILED("project.settings.read", "Project settings could not be read"),
+    /** A stored setting has no declaration from core or an installed extension. */
+    SETTING_UNKNOWN("project.settings.unknown", "A project setting is not currently declared"),
+    /** A stored setting does not satisfy its declaration and its default is being used. */
+    SETTING_VALUE_INVALID("project.settings.value", "A project setting value is invalid");
 
     private final String code;
     private final String message;

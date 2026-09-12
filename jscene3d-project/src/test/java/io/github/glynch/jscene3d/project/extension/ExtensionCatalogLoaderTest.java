@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.project.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.configuration.SettingPathKind;
+import io.github.glynch.jscene3d.configuration.SettingValueType;
 import io.github.glynch.jscene3d.project.component.AttachmentPointId;
 import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
@@ -120,6 +122,20 @@ final class ExtensionCatalogLoaderTest {
                   "lifecycle": ["created", "destroyed"],
                   "updatePhases": ["before-physics"]
                 }
+              ],
+              "settings": [
+                {
+                  "key": "example.game.cache.location",
+                  "type": "path",
+                  "defaultValue": ".example/cache",
+                  "displayName": "Cache Location",
+                  "description": "Generated example data.",
+                  "category": "Files",
+                  "scope": "project",
+                  "order": 10,
+                  "pathKind": "directory",
+                  "projectRelative": true
+                }
               ]
             }
             """;
@@ -142,6 +158,12 @@ final class ExtensionCatalogLoaderTest {
                 assertThat(extension.id()).isEqualTo("example.game");
                 assertThat(extension.version()).isEqualTo("1.2.0");
                 assertThat(extension.presentation().description()).contains("Test extension metadata.");
+                assertThat(extension.settings()).singleElement().satisfies(setting -> {
+                    assertThat(setting.key().value()).isEqualTo("example.game.cache.location");
+                    assertThat(setting.valueType()).isEqualTo(SettingValueType.PATH);
+                    assertThat(setting.constraints().pathKind()).contains(SettingPathKind.DIRECTORY);
+                    assertThat(setting.constraints().projectRelative()).isTrue();
+                });
             });
             assertGroupType(result.catalog());
             assertMoverComponent(result.catalog());

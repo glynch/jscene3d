@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopy;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopyId;
+import io.github.glynch.jscene3d.project.settings.CoreProjectSettings;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import io.github.glynch.jscene3d.telemetry.TelemetryMeasurement;
 import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
@@ -52,6 +53,8 @@ final class EditorProjectLoaderTest {
         assertThat(session.types().extensions())
                 .extracting(extension -> extension.id())
                 .contains("io.github.glynch.jscene3d.game3d", "io.github.glynch.jscene3d.presentation");
+        assertThat(session.configuration().registry().find("example.editor-test.preview.grid-enabled"))
+                .isPresent();
         assertThat(session.assets()).extracting(ProjectAsset::label).containsExactly("Reusable Beacon", "Test World");
         assertThat(session.hierarchy().label()).isEqualTo("Test World");
         assertThat(session.hierarchy().children()).singleElement().satisfies(placement -> {
@@ -255,7 +258,7 @@ final class EditorProjectLoaderTest {
                 {
                   "$schema":"https://jscene3d.org/schemas/project-settings-1.json",
                   "schemaVersion":1,
-                  "cache":{"location":".cache/editor"}
+                  "settings":{"jscene3d.cache.location":".cache/editor"}
                 }
                 """);
         Path configuredCache = temporaryDirectory.resolve(".cache/editor");
@@ -266,20 +269,44 @@ final class EditorProjectLoaderTest {
                 .isEqualTo(configuredCache);
     }
 
-    /** Rejects invalid shared settings instead of silently using a machine-dependent path. */
+    /** Keeps a project usable while reporting a declared setting whose value is invalid. */
     @Test
-    void rejectsInvalidProjectSettings() throws IOException {
+    void reportsInvalidDeclaredSettingAndUsesItsDefault() throws IOException {
         writeProject();
         write(".jscene3d/settings.json", """
-                {"schemaVersion":1,"cache":{"location":"../outside"}}
+                {"schemaVersion":1,"settings":{"jscene3d.cache.location":"../outside"}}
                 """);
 
         EditorProjectLoadResult result = loader().load(temporaryDirectory);
 
-        assertThat(result.session()).isEmpty();
+        assertThat(result.session()).isPresent();
+        assertThat(result.session().orElseThrow().configuration().resolve(CoreProjectSettings.CACHE_LOCATION))
+                .isEqualTo(temporaryDirectory.toRealPath().resolve(".jscene3d/cache"));
         assertThat(result.diagnostics())
                 .extracting(diagnostic -> diagnostic.code().code())
-                .contains("project.settings.invalid");
+                .contains("project.settings.value");
+    }
+
+    /** Persists a declared setting immediately and publishes its typed change event. */
+    @Test
+    void updatesProjectConfigurationThroughTheSession() throws IOException {
+        writeProject();
+        EditorProjectSession session =
+                loader().load(temporaryDirectory).session().orElseThrow();
+        AtomicInteger configurationChanges = new AtomicInteger();
+        session.onDidChangeConfiguration().subscribe(change -> {
+            assertThat(change.affects(CoreProjectSettings.CACHE_LOCATION)).isTrue();
+            assertThat(change.projectOverride()).isTrue();
+            configurationChanges.incrementAndGet();
+        });
+
+        session.updateSetting(CoreProjectSettings.CACHE_LOCATION, Path.of(".cache/generated"));
+
+        assertThat(configurationChanges).hasValue(1);
+        assertThat(session.configuration().resolve(CoreProjectSettings.CACHE_LOCATION))
+                .isEqualTo(temporaryDirectory.toRealPath().resolve(".cache/generated"));
+        assertThat(Files.readString(temporaryDirectory.resolve(".jscene3d/settings.json")))
+                .contains("\"jscene3d.cache.location\" : \".cache/generated\"");
     }
 
     /** Edits, undoes, redoes, and atomically persists an authored enabled property. */
@@ -424,6 +451,16 @@ final class EditorProjectLoaderTest {
                   "engineRequires":">=0.1.0-SNAPSHOT <0.2.0",
                   "displayName":"Editor Test",
                   "types":[],
+                  "settings":[{
+                    "key":"example.editor-test.preview.grid-enabled",
+                    "type":"boolean",
+                    "defaultValue":false,
+                    "displayName":"Show Preview Grid",
+                    "description":"Shows a grid in the scene preview.",
+                    "category":"Preview",
+                    "scope":"project",
+                    "order":10
+                  }],
                   "components":[{
                     "id":"example.editor-test/inert-behavior",
                     "typeVersion":1,

@@ -293,6 +293,32 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_ROOT = "editor-root";
     /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_CATEGORY = "editor-settings-category";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_CONTENT = "editor-settings-content";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_DESCRIPTION = "editor-settings-description";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_HEADER = "editor-settings-header";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_KEY = "editor-settings-key";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_NAME = "editor-settings-name";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_OWNER = "editor-settings-owner";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_RESET = "editor-settings-reset";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_ROOT = "editor-settings-root";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_ROW = "editor-settings-row";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_SCROLL = "editor-settings-scroll";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_TITLE = "editor-settings-title";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_SETTINGS_VALUE = "editor-settings-value";
+    /** CSS class named {@value}. */
     public static final String EDITOR_SHELL = "editor-shell";
     /** CSS class named {@value}. */
     public static final String EDITOR_SPLASH = "editor-splash";

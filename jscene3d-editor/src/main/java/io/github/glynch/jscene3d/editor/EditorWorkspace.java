@@ -68,6 +68,7 @@ public final class EditorWorkspace extends BorderPane {
     private final JavaFxEditorArea editorArea;
     private final JavaFxWorkbenchRegions regions;
     private final EditorStatusBarPane statusBar;
+    private final MenuItem projectSettingsItem = new MenuItem("Project Settings…");
     private final MenuItem saveProjectItem = new MenuItem("Save");
     private final MenuItem undoItem = new MenuItem("Undo");
     private final MenuItem redoItem = new MenuItem("Redo");
@@ -158,6 +159,7 @@ public final class EditorWorkspace extends BorderPane {
         clearSelection();
         documentRegistration.close();
         dirtyRegistration.close();
+        editorArea.closeProjectSettings();
         document = Objects.requireNonNull(session, "session");
         documentRegistration = session.onDidChangeHierarchy().subscribe(ignored -> updateDocumentCommands());
         dirtyRegistration = session.workingCopies().onDidChangeDirty().subscribe(ignored -> updateDocumentCommands());
@@ -170,6 +172,7 @@ public final class EditorWorkspace extends BorderPane {
         clearSelection();
         documentRegistration.close();
         dirtyRegistration.close();
+        editorArea.closeProjectSettings();
         documentRegistration = () -> {};
         dirtyRegistration = () -> {};
         document = null;
@@ -224,10 +227,11 @@ public final class EditorWorkspace extends BorderPane {
 
         MenuItem openProjectItem = new MenuItem("Open Project…");
         openProjectItem.setOnAction(ignored -> openProject.run());
+        projectSettingsItem.setOnAction(ignored -> showProjectSettings());
         saveProjectItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
         saveProjectItem.setOnAction(ignored -> saveDocument());
         Menu file = new Menu("File");
-        file.getItems().addAll(openProjectItem, new SeparatorMenuItem(), saveProjectItem);
+        file.getItems().addAll(openProjectItem, projectSettingsItem, new SeparatorMenuItem(), saveProjectItem);
         undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN));
         undoItem.setOnAction(ignored -> undo());
         redoItem.setAccelerator(
@@ -272,6 +276,13 @@ public final class EditorWorkspace extends BorderPane {
         }
     }
 
+    private void showProjectSettings() {
+        EditorProjectSession current = document;
+        if (current != null) {
+            editorArea.showProjectSettings(current, this::showMessage);
+        }
+    }
+
     private void undo() {
         EditorProjectSession current = document;
         if (current != null) {
@@ -292,6 +303,7 @@ public final class EditorWorkspace extends BorderPane {
         boolean worldDirty =
                 current != null && current.startupWorldWorkingCopy().isDirty();
         previewDirty.set(worldDirty);
+        projectSettingsItem.setDisable(current == null);
         saveProjectItem.setDisable(!dirty);
         undoItem.setDisable(current == null || !current.canUndo());
         redoItem.setDisable(current == null || !current.canRedo());

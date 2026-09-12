@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.project.settings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.configuration.SettingRegistry;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -29,8 +30,6 @@ class ProjectSettingsLoaderTest {
 
         assertThat(result.diagnostics()).isEmpty();
         assertThat(result.settings()).contains(ProjectSettings.defaults());
-        assertThat(result.settings().orElseThrow().resolveCache(temporaryDirectory))
-                .isEqualTo(temporaryDirectory.resolve(".jscene3d/cache").toAbsolutePath());
     }
 
     @Test
@@ -39,43 +38,39 @@ class ProjectSettingsLoaderTest {
                 {
                   "$schema": "https://jscene3d.org/schemas/project-settings-1.json",
                   "schemaVersion": 1,
-                  "cache": {"location": ".cache/jscene3d"}
+                  "settings": {"jscene3d.cache.location": ".cache/jscene3d"}
                 }
                 """);
 
         ProjectSettingsLoadResult result = new ProjectSettingsLoader().load(temporaryDirectory);
 
         assertThat(result.diagnostics()).isEmpty();
-        assertThat(result.settings().orElseThrow().cacheLocation()).isEqualTo(Path.of(".cache/jscene3d"));
+        assertThat(result.settings().orElseThrow().value(CoreProjectSettings.CACHE_LOCATION.value()))
+                .contains(".cache/jscene3d");
     }
 
     @Test
-    void rejectsCacheLocationOutsideProject() throws IOException {
+    void retainsValuesForRegistryBasedSemanticValidation() throws IOException {
         writeSettings("""
-                {"schemaVersion": 1, "cache": {"location": "../shared-cache"}}
+                {
+                  "schemaVersion": 1,
+                  "settings": {
+                    "jscene3d.cache.location": "../shared-cache",
+                    "missing.extension.option": true
+                  }
+                }
                 """);
 
         ProjectSettingsLoadResult result = new ProjectSettingsLoader().load(temporaryDirectory);
 
-        assertThat(result.settings()).isEmpty();
-        assertThat(result.diagnostics())
-                .singleElement()
-                .satisfies(diagnostic ->
-                        assertThat(diagnostic.code()).isEqualTo(ProjectSettingsDiagnosticCode.SETTINGS_INVALID));
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.settings().orElseThrow().settings())
+                .containsEntry("jscene3d.cache.location", "../shared-cache")
+                .containsEntry("missing.extension.option", true);
     }
 
     @Test
-    void rejectsUnknownSettings() throws IOException {
-        writeSettings("""
-                {"schemaVersion": 1, "cache": {}, "machinePath": "/machine/cache"}
-                """);
-
-        assertThat(new ProjectSettingsLoader().load(temporaryDirectory).settings())
-                .isEmpty();
-    }
-
-    @Test
-    void suppliesDefaultCacheWhenCacheObjectIsAbsent() throws IOException {
+    void suppliesEmptyOverridesWhenSettingsObjectIsAbsent() throws IOException {
         writeSettings("""
                 {"schemaVersion": 1}
                 """);
@@ -97,16 +92,29 @@ class ProjectSettingsLoaderTest {
                 .isEmpty();
 
         writeSettings("""
-                {"schemaVersion": 1, "cache": []}
+                {"schemaVersion": 1, "settings": []}
                 """);
         assertThat(new ProjectSettingsLoader().load(temporaryDirectory).settings())
                 .isEmpty();
+    }
 
+    @Test
+    void retainsNullForRegistryBasedSemanticValidation() throws IOException {
         writeSettings("""
-                {"schemaVersion": 1, "cache": {"location": " "}}
+                {"schemaVersion": 1, "settings": {"jscene3d.cache.location": null}}
                 """);
-        assertThat(new ProjectSettingsLoader().load(temporaryDirectory).settings())
-                .isEmpty();
+
+        ProjectSettings settings =
+                new ProjectSettingsLoader().load(temporaryDirectory).settings().orElseThrow();
+        ProjectConfiguration configuration = new ProjectConfiguration(
+                temporaryDirectory, SettingRegistry.of(CoreProjectSettings.definitions()), settings);
+
+        assertThat(settings.settings()).containsEntry("jscene3d.cache.location", null);
+        assertThat(configuration.get(CoreProjectSettings.CACHE_LOCATION))
+                .isEqualTo(CoreProjectSettings.DEFAULT_CACHE_LOCATION);
+        assertThat(configuration.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("project.settings.value");
     }
 
     @Test
@@ -120,17 +128,6 @@ class ProjectSettingsLoaderTest {
                 .singleElement()
                 .satisfies(diagnostic ->
                         assertThat(diagnostic.code()).isEqualTo(ProjectSettingsDiagnosticCode.SETTINGS_READ_FAILED));
-    }
-
-    @Test
-    void rejectsNonPortableCachePaths() {
-        Path empty = Path.of("");
-        Path absolute = temporaryDirectory.toAbsolutePath();
-        Path parent = Path.of("../cache");
-
-        assertThatThrownBy(() -> new ProjectSettings(empty)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ProjectSettings(absolute)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ProjectSettings(parent)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

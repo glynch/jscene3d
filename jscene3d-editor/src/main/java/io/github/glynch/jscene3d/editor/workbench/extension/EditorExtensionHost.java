@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
+import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.DiagnosticCollectionId;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostic;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
@@ -37,6 +38,7 @@ import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
+import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
 import java.util.ArrayList;
@@ -57,6 +59,7 @@ public final class EditorExtensionHost implements AutoCloseable {
 
     private final EditorProjectContext projects;
     private final EditorSelections selections;
+    private final EditorConfiguration configuration;
     private final Map<String, ExtensionSubscriptionsImpl> activeExtensions = new LinkedHashMap<>();
     private final Map<String, EditorExtensionDescriptor> extensionDescriptors = new LinkedHashMap<>();
     private final List<Consumer<List<EditorExtensionDescriptor>>> extensionObservers = new ArrayList<>();
@@ -83,8 +86,21 @@ public final class EditorExtensionHost implements AutoCloseable {
      * @param selections shared editor selection
      */
     public EditorExtensionHost(EditorProjectContext projects, EditorSelections selections) {
+        this(projects, selections, new EditorConfigurationContext());
+    }
+
+    /**
+     * Creates an empty host with the window's live effective configuration.
+     *
+     * @param projects current-project lifecycle
+     * @param selections shared editor selection
+     * @param configuration effective project configuration
+     */
+    public EditorExtensionHost(
+            EditorProjectContext projects, EditorSelections selections, EditorConfiguration configuration) {
         this.projects = Objects.requireNonNull(projects, "projects");
         this.selections = Objects.requireNonNull(selections, "selections");
+        this.configuration = Objects.requireNonNull(configuration, "configuration");
     }
 
     /**
@@ -465,6 +481,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         @Override
         public EditorCommandPlacementRegistry commandPlacements() {
             return EditorExtensionHost.this::registerCommandPlacement;
+        }
+
+        @Override
+        public EditorConfiguration configuration() {
+            return configuration;
         }
 
         @Override

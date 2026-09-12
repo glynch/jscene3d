@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
+import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
@@ -98,6 +99,11 @@ final class EditorExtensionContractTest {
 
         @Override
         public EditorCommandPlacementRegistry commandPlacements() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EditorConfiguration configuration() {
             throw new UnsupportedOperationException();
         }
 

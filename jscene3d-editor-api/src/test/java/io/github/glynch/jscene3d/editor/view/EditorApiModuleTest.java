@@ -21,6 +21,7 @@ final class EditorApiModuleTest {
                 .containsExactlyInAnyOrder(
                         "io.github.glynch.jscene3d.editor.activity",
                         "io.github.glynch.jscene3d.editor.command",
+                        "io.github.glynch.jscene3d.editor.configuration",
                         "io.github.glynch.jscene3d.editor.diagnostic",
                         "io.github.glynch.jscene3d.editor.extension",
                         "io.github.glynch.jscene3d.editor.lifecycle",
@@ -28,7 +29,8 @@ final class EditorApiModuleTest {
                         "io.github.glynch.jscene3d.editor.selection",
                         "io.github.glynch.jscene3d.editor.status",
                         "io.github.glynch.jscene3d.editor.view",
-                        "io.github.glynch.jscene3d.editor.window");
+                        "io.github.glynch.jscene3d.editor.window",
+                        "io.github.glynch.jscene3d.editor.workingcopy");
         assertThat(descriptor.requires())
                 .extracting(ModuleDescriptor.Requires::name)
                 .noneMatch(name -> name.startsWith("javafx."));

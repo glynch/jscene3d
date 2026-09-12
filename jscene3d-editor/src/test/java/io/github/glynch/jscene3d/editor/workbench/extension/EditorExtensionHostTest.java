@@ -7,12 +7,16 @@ package io.github.glynch.jscene3d.editor.workbench.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.configuration.SettingKey;
+import io.github.glynch.jscene3d.configuration.SettingRegistry;
 import io.github.glynch.jscene3d.editor.activity.ActivityId;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandLocations;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
+import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
+import io.github.glynch.jscene3d.editor.configuration.EditorConfigurationChange;
 import io.github.glynch.jscene3d.editor.diagnostic.DiagnosticCollectionId;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostic;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
@@ -22,6 +26,7 @@ import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensions;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.lifecycle.EditorEvent;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemContribution;
@@ -259,6 +264,46 @@ final class EditorExtensionHostTest {
         assertThatThrownBy(() -> host.activate(misplacedActivity))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("primary sidebar");
+        host.close();
+    }
+
+    @Test
+    void exposesTheWindowConfigurationToActivatedExtensions() {
+        SettingKey<Boolean> enabled = new SettingKey<>("io.github.glynch.test.enabled", Boolean.class);
+        EditorConfiguration configuration = new EditorConfiguration() {
+            @Override
+            public SettingRegistry registry() {
+                return SettingRegistry.of(List.of());
+            }
+
+            @Override
+            public <T> Optional<T> get(SettingKey<T> key) {
+                return key.equals(enabled) ? Optional.of(key.valueClass().cast(true)) : Optional.empty();
+            }
+
+            @Override
+            public EditorEvent<EditorConfigurationChange> onDidChange() {
+                return listener -> () -> {};
+            }
+        };
+        EditorExtensionHost host =
+                new EditorExtensionHost(new EditorProjectContext(), new EditorSelectionContext(), configuration);
+        AtomicReference<EditorConfiguration> received = new AtomicReference<>();
+
+        host.activate(new EditorExtension() {
+            @Override
+            public String id() {
+                return "io.github.glynch.test.configuration";
+            }
+
+            @Override
+            public void activate(EditorExtensionContext context) {
+                received.set(context.configuration());
+            }
+        });
+
+        assertThat(received).hasValue(configuration);
+        assertThat(received.get().get(enabled)).contains(true);
         host.close();
     }
 

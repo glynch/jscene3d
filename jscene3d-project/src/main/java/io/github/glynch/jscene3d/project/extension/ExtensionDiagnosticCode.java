@@ -85,6 +85,18 @@ public enum ExtensionDiagnosticCode implements DiagnosticCode {
     SCHEMA_UNSUPPORTED("extension.schema.unsupported", "The extension schema version is unsupported"),
     /** The extension schema URI is invalid. */
     SCHEMA_URI_INVALID("extension.schema.uri", "The extension schema URI is invalid"),
+    /** A setting constraint is invalid for its declared type. */
+    SETTING_CONSTRAINT_INVALID("extension.setting.constraint", "An extension setting constraint is invalid"),
+    /** A setting default does not satisfy its declaration. */
+    SETTING_DEFAULT_INVALID("extension.setting.default", "An extension setting default is invalid"),
+    /** An extension setting is duplicated. */
+    SETTING_DUPLICATE("extension.setting.duplicate", "An extension setting is duplicated"),
+    /** An extension setting identity is invalid. */
+    SETTING_KEY_INVALID("extension.setting.key", "An extension setting identity is invalid"),
+    /** An extension setting scope is unsupported. */
+    SETTING_SCOPE_INVALID("extension.setting.scope", "An extension setting scope is unsupported"),
+    /** An extension setting value type is unsupported. */
+    SETTING_TYPE_INVALID("extension.setting.type", "An extension setting value type is unsupported"),
     /** A registered extension type is duplicated. */
     TYPE_DUPLICATE("extension.type.duplicate", "A registered extension type is duplicated"),
     /** A registered extension type identifier is invalid. */

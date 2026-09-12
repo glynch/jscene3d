@@ -6,29 +6,36 @@ package io.github.glynch.jscene3d.project.settings;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.io.File;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Pattern;
+import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Portable settings shared by every editor opening a project workspace.
+ * Portable, generic settings values shared by every editor opening a project workspace.
  *
- * <p>The record is the Jackson-bound settings model. Its compact constructor owns semantic validation while the
- * constructor supplies defaults for optional JSON properties.
+ * <p>Setting meaning and validation live in declarative setting definitions. This Jackson-bound document preserves
+ * unknown extension values instead of requiring a Java field for every contribution.
  *
  * @param schema JSON schema reference written with the settings
  * @param schemaVersion settings format version
- * @param cache cache configuration
+ * @param settings stored project-scope values indexed by stable setting key
  */
-@JsonPropertyOrder({"$schema", "schemaVersion", "cache"})
+@JsonPropertyOrder({"$schema", "schemaVersion", "settings"})
 public record ProjectSettings(
         @JsonProperty("$schema") String schema,
 
         @JsonProperty(value = "schemaVersion", required = true)
         int schemaVersion,
 
-        CacheSettings cache) {
+        Map<String, Object> settings) {
     /** Conventional project-relative settings filename. */
     public static final String SETTINGS_NAME = ".jscene3d/settings.json";
 
@@ -38,96 +45,103 @@ public record ProjectSettings(
     /** Current project-settings schema version. */
     public static final int SCHEMA_VERSION = 1;
 
-    /** Conventional editor cache location used when the project does not override it. */
-    public static final Path DEFAULT_CACHE_LOCATION = Path.of(".jscene3d/cache");
-
-    /** Windows drive-root syntax, which is absolute even when parsed on another operating system. */
-    private static final Pattern WINDOWS_ABSOLUTE_PATH = Pattern.compile("^[A-Za-z]:/.*");
-
-    /** Validates one complete effective settings value. */
+    /** Validates one complete persisted settings document. */
     public ProjectSettings {
         schema = Objects.requireNonNullElse(schema, CURRENT_SCHEMA_URI);
         if (schemaVersion != SCHEMA_VERSION) {
             throw new IllegalArgumentException("schemaVersion must be " + SCHEMA_VERSION);
         }
-        cache = Objects.requireNonNullElseGet(cache, CacheSettings::defaults);
+        settings = immutableValues(Objects.requireNonNullElse(settings, Map.of()));
     }
 
-    /**
-     * Creates settings with one cache override and the current format envelope.
-     *
-     * @param cacheLocation project-relative cache location
-     */
+    /** Creates settings with one cache override and the current format envelope. */
     public ProjectSettings(Path cacheLocation) {
         this(
                 CURRENT_SCHEMA_URI,
                 SCHEMA_VERSION,
-                new CacheSettings(portable(Objects.requireNonNull(cacheLocation, "cacheLocation"))));
+                Map.of(
+                        CoreProjectSettings.CACHE_LOCATION.value(),
+                        Objects.requireNonNull(cacheLocation, "cacheLocation").toString()));
     }
 
-    /**
-     * Returns settings containing only standard defaults.
-     *
-     * @return standard project settings
-     */
+    /** Returns a document containing no explicit overrides. */
     public static ProjectSettings defaults() {
-        return new ProjectSettings(CURRENT_SCHEMA_URI, SCHEMA_VERSION, CacheSettings.defaults());
+        return new ProjectSettings(CURRENT_SCHEMA_URI, SCHEMA_VERSION, Map.of());
     }
 
-    /**
-     * Returns the normalized project-relative cache location.
-     *
-     * @return normalized cache location
-     */
+    /** Returns one untyped stored value while preserving unknown extension keys. */
+    public Optional<Object> value(String key) {
+        return Optional.ofNullable(settings.get(Objects.requireNonNull(key, "key")));
+    }
+
+    /** Returns a copy with one complete stored override. */
+    public ProjectSettings with(String key, Object value) {
+        LinkedHashMap<String, Object> updated = new LinkedHashMap<>(settings);
+        updated.put(Objects.requireNonNull(key, "key"), immutableValue(value));
+        return new ProjectSettings(schema, schemaVersion, updated);
+    }
+
+    /** Returns a copy without one stored override. */
+    public ProjectSettings without(String key) {
+        LinkedHashMap<String, Object> updated = new LinkedHashMap<>(settings);
+        updated.remove(Objects.requireNonNull(key, "key"));
+        return new ProjectSettings(schema, schemaVersion, updated);
+    }
+
+    /** Compatibility convenience for the built-in cache value. */
     public Path cacheLocation() {
-        return Path.of(cache.location());
+        Object stored = settings.get(CoreProjectSettings.CACHE_LOCATION.value());
+        return stored == null
+                ? CoreProjectSettings.DEFAULT_CACHE_LOCATION
+                : Path.of((String) stored).normalize();
     }
 
-    /**
-     * Resolves the configured cache beneath one normalized project root.
-     *
-     * @param projectRoot project workspace root
-     * @return normalized absolute cache path
-     */
+    /** Resolves the built-in cache value beneath one project root. */
     public Path resolveCache(Path projectRoot) {
         Path root = Objects.requireNonNull(projectRoot, "projectRoot")
                 .toAbsolutePath()
                 .normalize();
-        Path resolved = root.resolve(cacheLocation()).normalize();
+        Path location = cacheLocation();
+        Path resolved = root.resolve(location).normalize();
         if (!resolved.startsWith(root)) {
             throw new IllegalArgumentException("cache location resolves outside the project workspace");
         }
         return resolved;
     }
 
-    /** Returns a normalized, forward-slash project-relative location. */
-    private static String portable(Path location) {
-        String supplied = location.toString().replace(File.separatorChar, '/');
-        if (location.isAbsolute() || WINDOWS_ABSOLUTE_PATH.matcher(supplied).matches()) {
-            throw new IllegalArgumentException("cache location must be relative to the project workspace");
-        }
-        String normalized = location.normalize().toString().replace(File.separatorChar, '/');
-        if (normalized.isBlank() || normalized.equals("..") || normalized.startsWith("../")) {
-            throw new IllegalArgumentException("cache location must remain inside the project workspace");
-        }
-        return normalized;
+    private static Map<String, Object> immutableValues(Map<String, Object> values) {
+        LinkedHashMap<String, Object> copied = new LinkedHashMap<>();
+        values.forEach((key, value) -> copied.put(Objects.requireNonNull(key, "settings key"), immutableValue(value)));
+        return Collections.unmodifiableMap(copied);
     }
 
-    /**
-     * Portable cache settings.
-     *
-     * @param location normalized project-relative cache location using forward slashes
-     */
-    @JsonPropertyOrder("location")
-    public record CacheSettings(String location) {
-        /** Validates and normalizes the cache location. */
-        public CacheSettings {
-            location = portable(location == null ? DEFAULT_CACHE_LOCATION : Path.of(location));
+    private static @Nullable Object immutableValue(@Nullable Object value) {
+        if (value == null) {
+            return null;
         }
-
-        /** Returns the standard cache configuration. */
-        private static CacheSettings defaults() {
-            return new CacheSettings(portable(DEFAULT_CACHE_LOCATION));
+        if (value instanceof String
+                || value instanceof Boolean
+                || value instanceof Integer
+                || value instanceof Long
+                || value instanceof BigInteger
+                || value instanceof BigDecimal
+                || value instanceof Double) {
+            return value;
         }
+        if (value instanceof Number number) {
+            return new BigDecimal(number.toString());
+        }
+        if (value instanceof List<?> list) {
+            ArrayList<Object> copied = new ArrayList<>();
+            list.forEach(item -> copied.add(immutableValue(item)));
+            return Collections.unmodifiableList(copied);
+        }
+        if (value instanceof Map<?, ?> map) {
+            LinkedHashMap<String, Object> copied = new LinkedHashMap<>();
+            map.forEach((key, item) -> copied.put((String) key, immutableValue(item)));
+            return Collections.unmodifiableMap(copied);
+        }
+        throw new IllegalArgumentException(
+                "unsupported JSON setting value: " + value.getClass().getName());
     }
 }

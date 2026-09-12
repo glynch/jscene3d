@@ -104,6 +104,27 @@ final class EditorWorkbenchLayoutTest {
         host.close();
     }
 
+    /** Supports each major region exposed by the header's quick-access controls. */
+    @Test
+    void togglesQuickAccessRegionsIndependently() {
+        EditorExtensionHost host = host();
+        EditorWorkbenchLayout layout = new EditorWorkbenchLayout(host);
+        List<EditorWorkbenchPart> quickAccessParts = List.of(
+                EditorWorkbenchPart.PRIMARY_SIDEBAR, EditorWorkbenchPart.PANEL, EditorWorkbenchPart.SECONDARY_SIDEBAR);
+
+        quickAccessParts.forEach(part -> layout.setVisible(part, false));
+
+        assertThat(layout.current().visibleParts())
+                .contains(EditorWorkbenchPart.ACTIVITY_BAR, EditorWorkbenchPart.STATUS_BAR)
+                .doesNotContainAnyElementsOf(quickAccessParts);
+
+        quickAccessParts.forEach(part -> layout.setVisible(part, true));
+
+        assertThat(layout.current().visibleParts()).containsExactlyInAnyOrder(EditorWorkbenchPart.values());
+        layout.close();
+        host.close();
+    }
+
     /** Rejects unknown views and containers which are not user-facing layout destinations. */
     @Test
     void rejectsUnsupportedMoves() {

@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.glynch.jscene3d.editor.view.EditorIconId;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class JavaFxIconRegistryTest {
@@ -23,6 +24,9 @@ class JavaFxIconRegistryTest {
         assertThat(icons.resolve(EditorIcons.ERROR).tone()).isEqualTo(JavaFxIconGlyph.Tone.ERROR);
         assertThat(icons.resolve(EditorIcons.WARNING).tone()).isEqualTo(JavaFxIconGlyph.Tone.WARNING);
         assertThat(icons.resolve(EditorIcons.INFORMATION).tone()).isEqualTo(JavaFxIconGlyph.Tone.INFORMATION);
+        assertThat(List.of(EditorIcons.PRIMARY_SIDEBAR, EditorIcons.PANEL, EditorIcons.SECONDARY_SIDEBAR))
+                .map(icon -> icons.resolve(icon).path())
+                .doesNotHaveDuplicates();
     }
 
     @Test

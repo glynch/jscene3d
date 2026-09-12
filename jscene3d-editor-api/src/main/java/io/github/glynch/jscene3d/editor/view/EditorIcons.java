@@ -59,6 +59,15 @@ public final class EditorIcons {
     /** Workbench layout customization. */
     public static final EditorIconId LAYOUT = icon("layout");
 
+    /** Primary-side-bar visibility. */
+    public static final EditorIconId PRIMARY_SIDEBAR = icon("primary-sidebar");
+
+    /** Bottom-panel visibility. */
+    public static final EditorIconId PANEL = icon("panel");
+
+    /** Secondary-side-bar visibility. */
+    public static final EditorIconId SECONDARY_SIDEBAR = icon("secondary-sidebar");
+
     private EditorIcons() {}
 
     private static EditorIconId icon(String name) {

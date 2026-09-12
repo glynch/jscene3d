@@ -114,6 +114,11 @@
     -fx-text-fill: -jscene-text-muted;
 }
 
+.editor-layout-actions {
+    -fx-alignment: center-left;
+    -fx-spacing: 2px;
+}
+
 .editor-layout-button {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
@@ -126,6 +131,29 @@
 
 .editor-layout-button:hover {
     -fx-background-color: -jscene-hover;
+}
+
+.editor-layout-toggle {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-max-height: 30px;
+    -fx-max-width: 30px;
+    -fx-min-height: 30px;
+    -fx-min-width: 30px;
+    -fx-padding: 6px;
+}
+
+.editor-layout-toggle:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-layout-actions > .editor-layout-toggle:selected {
+    -fx-background-color: -jscene-panel-raised;
+    -fx-border-color: -jscene-divider;
+}
+
+.editor-layout-actions > .editor-layout-toggle:selected .editor-icon-shape {
+    -fx-fill: -jscene-text-strong;
 }
 
 .editor-layout-menu {

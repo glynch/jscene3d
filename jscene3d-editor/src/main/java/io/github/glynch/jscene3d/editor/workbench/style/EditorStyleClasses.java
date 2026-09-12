@@ -209,6 +209,8 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_LEFT_WORKSPACE_SPLIT = "editor-left-workspace-split";
     /** CSS class named {@value}. */
+    public static final String EDITOR_LAYOUT_ACTIONS = "editor-layout-actions";
+    /** CSS class named {@value}. */
     public static final String EDITOR_LAYOUT_BUTTON = "editor-layout-button";
     /** CSS class named {@value}. */
     public static final String EDITOR_LAYOUT_MENU = "editor-layout-menu";
@@ -218,6 +220,8 @@ public final class EditorStyleClasses {
     public static final String EDITOR_LAYOUT_MENU_ROW = "editor-layout-menu-row";
     /** CSS class named {@value}. */
     public static final String EDITOR_LAYOUT_MENU_SECTION = "editor-layout-menu-section";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_LAYOUT_TOGGLE = "editor-layout-toggle";
     /** CSS class named {@value}. */
     public static final String EDITOR_MENU_BAR = "editor-menu-bar";
     /** CSS class named {@value}. */

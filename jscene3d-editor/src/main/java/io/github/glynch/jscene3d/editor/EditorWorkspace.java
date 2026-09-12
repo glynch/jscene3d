@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
 import io.github.glynch.jscene3d.editor.workbench.layout.JavaFxLayoutCustomizer;
+import io.github.glynch.jscene3d.editor.workbench.layout.JavaFxLayoutQuickAccess;
 import io.github.glynch.jscene3d.editor.workbench.layout.JavaFxWorkbenchRegions;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusBarPane;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
@@ -49,6 +50,7 @@ public final class EditorWorkspace extends BorderPane {
     private final JavaFxViewContainer secondaryViewContainer;
     private final JavaFxActivityBar activityBar;
     private final JavaFxLayoutCustomizer layoutCustomizer;
+    private final JavaFxLayoutQuickAccess layoutQuickAccess;
     private final JavaFxEditorArea editorArea;
     private final JavaFxWorkbenchRegions regions;
     private final EditorStatusBarPane statusBar;
@@ -94,7 +96,8 @@ public final class EditorWorkspace extends BorderPane {
                 inspectorPanel,
                 statusBar.node());
         layoutCustomizer = new JavaFxLayoutCustomizer(layout, icons, extensions::showView);
-        setTop(createTopChrome(openProject, layoutCustomizer.button()));
+        layoutQuickAccess = new JavaFxLayoutQuickAccess(layout, icons, layoutCustomizer.button());
+        setTop(createTopChrome(openProject, layoutQuickAccess.node()));
         setCenter(regions.node());
         getStyleClass().add(EditorStyleClasses.EDITOR_SHELL);
     }
@@ -164,6 +167,7 @@ public final class EditorWorkspace extends BorderPane {
 
     /** Releases workbench adapters before the extension host is closed. */
     void close() {
+        layoutQuickAccess.close();
         layoutCustomizer.close();
         regions.close();
         activityBar.close();
@@ -176,7 +180,7 @@ public final class EditorWorkspace extends BorderPane {
     }
 
     /** Creates compact product, menu, project-context, and command chrome. */
-    private HBox createTopChrome(Runnable openProject, Button customizeLayout) {
+    private HBox createTopChrome(Runnable openProject, HBox layoutActions) {
         Label productName = new Label("JScene3D");
         productName.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_NAME);
         Label productKind = new Label("EDITOR");
@@ -199,7 +203,7 @@ public final class EditorWorkspace extends BorderPane {
         openButton.getStyleClass().add(EditorStyleClasses.EDITOR_OPEN_PROJECT_BUTTON);
 
         HBox chrome =
-                new HBox(8.0, productName, productKind, menuBar, spacer, projectContext, customizeLayout, openButton);
+                new HBox(8.0, productName, productKind, menuBar, spacer, projectContext, layoutActions, openButton);
         chrome.setAlignment(Pos.CENTER_LEFT);
         chrome.getStyleClass().add(EditorStyleClasses.EDITOR_TOP);
         return chrome;

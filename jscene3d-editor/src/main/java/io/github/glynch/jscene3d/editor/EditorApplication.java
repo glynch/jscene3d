@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectPublication;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
+import io.github.glynch.jscene3d.editor.workbench.dialog.JavaFxModalDialogs;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
@@ -70,8 +71,15 @@ public final class EditorApplication extends Application {
                 EditorSplashTiming.fromNamedArguments(getParameters().getNamed());
         EditorSplashScreen loadingScreen = new EditorSplashScreen(EditorBuildInfo.engineVersion(), splashTiming);
         GLCanvas viewportCanvas = createCanvas();
-        EditorWorkspace editorWorkspace =
-                new EditorWorkspace(viewportCanvas, () -> chooseProject(stage), selectionContext, extensionHost);
+        JavaFxModalDialogs dialogs = new JavaFxModalDialogs(stage);
+        extensionHost.showDialogsWith(dialogs::show);
+        EditorWorkspace editorWorkspace = new EditorWorkspace(
+                viewportCanvas,
+                () -> chooseProject(stage),
+                this::requestClose,
+                selectionContext,
+                extensionHost,
+                EditorBuildInfo.engineVersion());
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
         extensionHost.activate(projectDiagnostics);
@@ -108,7 +116,7 @@ public final class EditorApplication extends Application {
         stage.setMinHeight(520.0);
         stage.setOnCloseRequest(event -> {
             event.consume();
-            disposeCanvas();
+            requestClose();
         });
         stage.show();
         Platform.runLater(editorWorkspace::applyInitialDividerPositions);
@@ -238,6 +246,14 @@ public final class EditorApplication extends Application {
         disposalRequested = true;
         closeProjectOpener();
         currentCanvas.dispose();
+    }
+
+    /** Requests a close through the dirty-resource guard before renderer disposal begins. */
+    private void requestClose() {
+        EditorWorkspace currentWorkspace = workspace;
+        if (currentWorkspace == null || currentWorkspace.prepareToClose()) {
+            disposeCanvas();
+        }
     }
 
     /** Closes JavaFX only after the render thread releases the renderer and surface. */

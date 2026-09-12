@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommand;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
+import io.github.glynch.jscene3d.editor.command.EditorCommandRegistration;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.DiagnosticCollectionId;
@@ -25,6 +26,8 @@ import io.github.glynch.jscene3d.editor.extension.EditorExtensions;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
+import io.github.glynch.jscene3d.editor.menu.EditorMenuContribution;
+import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
@@ -36,9 +39,13 @@ import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import io.github.glynch.jscene3d.editor.window.EditorDialog;
+import io.github.glynch.jscene3d.editor.window.EditorDialogButtonId;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
+import io.github.glynch.jscene3d.editor.workbench.command.EditorCommandMenuRegistry;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
+import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
 import java.util.ArrayList;
@@ -50,12 +57,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /** Activates extensions and owns their toolkit-independent workbench contributions. */
 public final class EditorExtensionHost implements AutoCloseable {
     private static final Consumer<EditorMessage> DEFAULT_MESSAGE_SINK =
             message -> System.getLogger(EditorExtensionHost.class.getName())
                     .log(System.Logger.Level.INFO, message.severity() + ": " + message.text());
+    private static final Function<EditorDialog, Optional<EditorDialogButtonId>> DEFAULT_DIALOG_SINK =
+            ignored -> Optional.empty();
 
     private final EditorProjectContext projects;
     private final EditorSelections selections;
@@ -68,15 +78,15 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final Map<ViewId, EditorViewContribution> views = new LinkedHashMap<>();
     private final List<Consumer<List<EditorViewContribution>>> viewObservers = new ArrayList<>();
     private final List<Consumer<ViewId>> viewRequestObservers = new ArrayList<>();
-    private final Map<CommandId, EditorCommand> commands = new LinkedHashMap<>();
-    private final List<EditorCommandPlacement> commandPlacements = new ArrayList<>();
     private final Map<StatusItemId, StatusItemRegistration> statusItems = new LinkedHashMap<>();
     private final List<Consumer<List<EditorStatusItemSnapshot>>> statusObservers = new ArrayList<>();
     private final Map<DiagnosticCollectionId, DiagnosticCollectionRegistration> diagnosticCollections =
             new LinkedHashMap<>();
     private final List<Consumer<List<EditorDiagnosticSnapshot>>> diagnosticObservers = new ArrayList<>();
     private final EditorWindow window = new WindowFacade();
+    private final EditorCommandMenuRegistry commandMenus = new EditorCommandMenuRegistry(() -> window);
     private Consumer<EditorMessage> messageSink = DEFAULT_MESSAGE_SINK;
+    private Function<EditorDialog, Optional<EditorDialogButtonId>> dialogSink = DEFAULT_DIALOG_SINK;
     private boolean closed;
 
     /**
@@ -226,6 +236,22 @@ public final class EditorExtensionHost implements AutoCloseable {
         messageSink = Objects.requireNonNull(sink, "sink");
     }
 
+    /** Routes extension modal dialogs to the workbench's platform adapter. */
+    public void showDialogsWith(Function<EditorDialog, Optional<EditorDialogButtonId>> sink) {
+        requireOpen();
+        dialogSink = Objects.requireNonNull(sink, "sink");
+    }
+
+    /**
+     * Observes complete ordered menus with their currently placed command state.
+     *
+     * <p>The listener immediately receives the current snapshot.
+     */
+    public EditorRegistration observeMenus(Consumer<List<EditorMenuSnapshot>> observer) {
+        requireOpen();
+        return commandMenus.observe(observer);
+    }
+
     /**
      * Invokes a registered command through the same path used by workbench actions.
      *
@@ -244,6 +270,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         window.showView(view);
     }
 
+    /** Shows one toolkit-independent application-modal dialog. */
+    public Optional<EditorDialogButtonId> showDialog(EditorDialog dialog) {
+        return window.showDialog(dialog);
+    }
+
     /** Deactivates extensions in reverse order and removes every remaining contribution. */
     @Override
     public void close() {
@@ -256,8 +287,7 @@ public final class EditorExtensionHost implements AutoCloseable {
         extensionDescriptors.clear();
         activities.clear();
         views.clear();
-        commands.clear();
-        commandPlacements.clear();
+        commandMenus.close();
         statusItems.clear();
         diagnosticCollections.clear();
         notifyExtensionObservers();
@@ -322,19 +352,25 @@ public final class EditorExtensionHost implements AutoCloseable {
 
     private void executeCommand(CommandId command) {
         requireOpen();
-        CommandId id = Objects.requireNonNull(command, "command");
-        EditorCommand registered = commands.get(id);
-        if (registered == null) {
-            throw new IllegalArgumentException("command identity is not registered: " + id);
-        }
-        registered.execute(() -> window);
+        commandMenus.execute(command);
     }
 
-    private EditorRegistration registerCommandPlacement(EditorCommandPlacement placement) {
+    /** Registers one workbench or extension command. */
+    public EditorCommandRegistration registerCommand(EditorCommandContribution contribution, EditorCommand command) {
         requireOpen();
-        EditorCommandPlacement registered = Objects.requireNonNull(placement, "placement");
-        commandPlacements.add(registered);
-        return once(() -> commandPlacements.remove(registered));
+        return commandMenus.registerCommand(contribution, command);
+    }
+
+    /** Registers one visual placement for a registered workbench or extension command. */
+    public EditorRegistration registerCommandPlacement(EditorCommandPlacement placement) {
+        requireOpen();
+        return commandMenus.registerPlacement(placement);
+    }
+
+    /** Registers one toolkit-independent top-level menu. */
+    public EditorRegistration registerMenu(EditorMenuContribution contribution) {
+        requireOpen();
+        return commandMenus.registerMenu(contribution);
     }
 
     private EditorStatusItem createStatusItem(EditorStatusItemContribution contribution) {
@@ -477,8 +513,9 @@ public final class EditorExtensionHost implements AutoCloseable {
         public EditorCommandRegistry commands() {
             return new EditorCommandRegistry() {
                 @Override
-                public EditorRegistration register(EditorCommandContribution contribution, EditorCommand command) {
-                    return registerCommand(contribution, command);
+                public EditorCommandRegistration register(
+                        EditorCommandContribution contribution, EditorCommand command) {
+                    return EditorExtensionHost.this.registerCommand(contribution, command);
                 }
 
                 @Override
@@ -491,6 +528,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         @Override
         public EditorCommandPlacementRegistry commandPlacements() {
             return EditorExtensionHost.this::registerCommandPlacement;
+        }
+
+        @Override
+        public EditorMenuRegistry menus() {
+            return EditorExtensionHost.this::registerMenu;
         }
 
         @Override
@@ -527,16 +569,6 @@ public final class EditorExtensionHost implements AutoCloseable {
         public ExtensionSubscriptions subscriptions() {
             return subscriptions;
         }
-
-        private EditorRegistration registerCommand(EditorCommandContribution contribution, EditorCommand command) {
-            requireOpen();
-            EditorCommandContribution metadata = Objects.requireNonNull(contribution, "contribution");
-            EditorCommand registered = Objects.requireNonNull(command, "command");
-            if (commands.putIfAbsent(metadata.id(), registered) != null) {
-                throw new IllegalArgumentException("command identity is already registered: " + metadata.id());
-            }
-            return once(() -> commands.remove(metadata.id(), registered));
-        }
     }
 
     private final class WindowFacade implements EditorWindow {
@@ -553,6 +585,12 @@ public final class EditorExtensionHost implements AutoCloseable {
                 throw new IllegalArgumentException("view identity is not registered: " + id);
             }
             List.copyOf(viewRequestObservers).forEach(observer -> observer.accept(id));
+        }
+
+        @Override
+        public Optional<EditorDialogButtonId> showDialog(EditorDialog dialog) {
+            requireOpen();
+            return Objects.requireNonNull(dialogSink.apply(Objects.requireNonNull(dialog, "dialog")), "dialog result");
         }
     }
 

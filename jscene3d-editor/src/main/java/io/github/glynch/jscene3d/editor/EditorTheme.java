@@ -9,7 +9,7 @@ import java.util.Objects;
 import javafx.scene.Scene;
 
 /** Installs the packaged visual theme on an editor scene. */
-final class EditorTheme {
+public final class EditorTheme {
     private static final String RESOURCE_NAME = "editor.css";
 
     /** Prevents construction of the stateless theme component. */
@@ -27,7 +27,7 @@ final class EditorTheme {
     }
 
     /** Returns the external URL of the packaged editor stylesheet. */
-    static String stylesheet() {
+    public static String stylesheet() {
         URL resource = Objects.requireNonNull(EditorTheme.class.getResource(RESOURCE_NAME), RESOURCE_NAME);
         return resource.toExternalForm();
     }

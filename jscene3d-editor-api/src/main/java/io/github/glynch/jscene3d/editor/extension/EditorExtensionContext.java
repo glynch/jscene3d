@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
+import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
@@ -52,6 +53,15 @@ public interface EditorExtensionContext {
      * @return command-placement registry
      */
     EditorCommandPlacementRegistry commandPlacements();
+
+    /**
+     * Returns the registry for extension-owned top-level menus.
+     *
+     * <p>Commands can be placed in these menus or in editor-owned menus without constructing toolkit controls.
+     *
+     * @return top-level menu registry
+     */
+    EditorMenuRegistry menus();
 
     /**
      * Returns effective project settings declared by core and installed extensions.

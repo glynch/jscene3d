@@ -208,12 +208,14 @@ public final class EditorProjectSession {
     }
 
     /**
-     * Atomically saves the current startup-world revision to its authored source.
+     * Atomically saves every dirty registered resource to its authored source.
      *
      * @throws IOException when the complete replacement cannot be persisted atomically
      */
     public void save() throws IOException {
-        startupWorld.save();
+        for (EditorWorkingCopy workingCopy : workingCopies.dirtyWorkingCopies()) {
+            workingCopy.save();
+        }
     }
 
     /**

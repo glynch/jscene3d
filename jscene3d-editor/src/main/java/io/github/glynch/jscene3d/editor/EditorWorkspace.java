@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
+import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
@@ -12,12 +13,16 @@ import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.activity.EditorActivitySelection;
 import io.github.glynch.jscene3d.editor.workbench.activity.JavaFxActivityBar;
+import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet;
+import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet.DocumentCommandState;
+import io.github.glynch.jscene3d.editor.workbench.dialog.EditorWindowCloseGuard;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
 import io.github.glynch.jscene3d.editor.workbench.layout.JavaFxLayoutCustomizer;
 import io.github.glynch.jscene3d.editor.workbench.layout.JavaFxLayoutQuickAccess;
 import io.github.glynch.jscene3d.editor.workbench.layout.JavaFxWorkbenchRegions;
+import io.github.glynch.jscene3d.editor.workbench.menu.JavaFxMenuBar;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusBarPane;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxEditorArea;
@@ -34,15 +39,9 @@ import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.OverrunStyle;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Tooltip;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -56,6 +55,8 @@ public final class EditorWorkspace extends BorderPane {
     private static final PseudoClass DIRTY_PSEUDO_CLASS = PseudoClass.getPseudoClass("dirty");
 
     private final EditorSelections selections;
+    private final EditorExtensionHost extensions;
+    private final EditorWindowCloseGuard closeGuard;
     private final Label projectContext = new Label("No project");
     private final StringProperty previewTitle = new SimpleStringProperty("Empty Preview");
     private final BooleanProperty previewDirty = new SimpleBooleanProperty(false);
@@ -71,10 +72,8 @@ public final class EditorWorkspace extends BorderPane {
     private final JavaFxEditorArea editorArea;
     private final JavaFxWorkbenchRegions regions;
     private final EditorStatusBarPane statusBar;
-    private final MenuItem projectSettingsItem = new MenuItem("Project Settings…");
-    private final MenuItem saveProjectItem = new MenuItem("Save");
-    private final MenuItem undoItem = new MenuItem("Undo");
-    private final MenuItem redoItem = new MenuItem("Redo");
+    private final EditorWorkbenchCommandSet commandSet;
+    private final JavaFxMenuBar menuBar;
 
     private EditorRegistration documentRegistration = () -> {};
     private EditorRegistration dirtyRegistration = () -> {};
@@ -84,9 +83,13 @@ public final class EditorWorkspace extends BorderPane {
     EditorWorkspace(
             GLCanvas viewportCanvas,
             Runnable openProject,
+            Runnable requestClose,
             EditorSelections selections,
-            EditorExtensionHost extensions) {
+            EditorExtensionHost extensions,
+            String editorVersion) {
         this.selections = Objects.requireNonNull(selections, "selections");
+        this.extensions = Objects.requireNonNull(extensions, "extensions");
+        closeGuard = new EditorWindowCloseGuard(extensions::showDialog);
         JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
         layout = new EditorWorkbenchLayout(extensions);
         activitySelection = new EditorActivitySelection(extensions, layout);
@@ -124,7 +127,18 @@ public final class EditorWorkspace extends BorderPane {
                 statusBar.node());
         layoutCustomizer = new JavaFxLayoutCustomizer(layout, icons, extensions::showView);
         layoutQuickAccess = new JavaFxLayoutQuickAccess(layout, icons, layoutCustomizer.button());
-        setTop(createTopChrome(openProject, layoutQuickAccess.node()));
+        commandSet = new EditorWorkbenchCommandSet(
+                extensions,
+                new EditorWorkbenchCommandSet.Actions(
+                        openProject,
+                        this::showProjectSettings,
+                        this::saveDocument,
+                        this::undo,
+                        this::redo,
+                        requestClose),
+                editorVersion);
+        menuBar = new JavaFxMenuBar(extensions);
+        setTop(createTopChrome(menuBar.node(), layoutQuickAccess.node()));
         setCenter(regions.node());
         getStyleClass().add(EditorStyleClasses.EDITOR_SHELL);
     }
@@ -207,10 +221,24 @@ public final class EditorWorkspace extends BorderPane {
         statusBar.showMessage(message);
     }
 
+    /** Confirms or saves dirty resources before an orderly window close. */
+    boolean prepareToClose() {
+        EditorProjectSession current = document;
+        if (current == null || !current.isDirty()) {
+            return true;
+        }
+        return closeGuard.confirmClose(
+                current.project().identity().name(),
+                current.workingCopies().dirtyCount(),
+                () -> document == current && trySaveDocument());
+    }
+
     /** Releases workbench adapters before the extension host is closed. */
     void close() {
         documentRegistration.close();
         dirtyRegistration.close();
+        menuBar.close();
+        commandSet.close();
         layoutQuickAccess.close();
         layoutCustomizer.close();
         regions.close();
@@ -226,28 +254,12 @@ public final class EditorWorkspace extends BorderPane {
     }
 
     /** Creates compact product, menu, project-context, and command chrome. */
-    private HBox createTopChrome(Runnable openProject, HBox layoutActions) {
+    private HBox createTopChrome(MenuBar menus, HBox layoutActions) {
         Label productName = new Label("JScene3D");
         productName.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_NAME);
         Label productKind = new Label("EDITOR");
         productKind.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_KIND);
 
-        MenuItem openProjectItem = new MenuItem("Open Project…");
-        openProjectItem.setOnAction(ignored -> openProject.run());
-        projectSettingsItem.setOnAction(ignored -> showProjectSettings());
-        saveProjectItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
-        saveProjectItem.setOnAction(ignored -> saveDocument());
-        Menu file = new Menu("File");
-        file.getItems().addAll(openProjectItem, projectSettingsItem, new SeparatorMenuItem(), saveProjectItem);
-        undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN));
-        undoItem.setOnAction(ignored -> undo());
-        redoItem.setAccelerator(
-                new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN));
-        redoItem.setOnAction(ignored -> redo());
-        Menu edit = new Menu("Edit");
-        edit.getItems().addAll(undoItem, redoItem);
-        MenuBar menuBar = new MenuBar(file, edit);
-        menuBar.getStyleClass().add(EditorStyleClasses.EDITOR_MENU_BAR);
         updateDocumentCommands();
 
         Region spacer = new Region();
@@ -256,30 +268,35 @@ public final class EditorWorkspace extends BorderPane {
         projectContext.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
         projectContext.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_CONTEXT);
         Button openButton = new Button("Open Project…");
-        openButton.setOnAction(ignored -> openProject.run());
+        openButton.setOnAction(ignored -> extensions.execute(EditorCommands.OPEN_PROJECT));
         openButton.getStyleClass().add(EditorStyleClasses.EDITOR_OPEN_PROJECT_BUTTON);
 
-        HBox chrome =
-                new HBox(8.0, productName, productKind, menuBar, spacer, projectContext, layoutActions, openButton);
+        HBox chrome = new HBox(8.0, productName, productKind, menus, spacer, projectContext, layoutActions, openButton);
         chrome.setAlignment(Pos.CENTER_LEFT);
         chrome.getStyleClass().add(EditorStyleClasses.EDITOR_TOP);
         return chrome;
     }
 
     private void saveDocument() {
+        trySaveDocument();
+    }
+
+    private boolean trySaveDocument() {
         EditorProjectSession current = document;
         if (current == null) {
-            return;
+            return true;
         }
         try {
             current.save();
             setProjectStatus(current.project().identity().name() + " · saved");
+            return true;
         } catch (IOException exception) {
             setProjectStatus("Unable to save " + current.project().identity().name());
             showMessage(new EditorMessage(
                     EditorMessageSeverity.ERROR,
                     "Unable to save the project: "
                             + Objects.requireNonNullElse(exception.getMessage(), exception.toString())));
+            return false;
         }
     }
 
@@ -310,10 +327,8 @@ public final class EditorWorkspace extends BorderPane {
         boolean worldDirty =
                 current != null && current.startupWorldWorkingCopy().isDirty();
         previewDirty.set(worldDirty);
-        projectSettingsItem.setDisable(current == null);
-        saveProjectItem.setDisable(!dirty);
-        undoItem.setDisable(current == null || !current.canUndo());
-        redoItem.setDisable(current == null || !current.canRedo());
+        commandSet.update(new DocumentCommandState(
+                current != null, dirty, current != null && current.canUndo(), current != null && current.canRedo()));
         if (current != null) {
             String projectName = current.project().identity().name();
             projectContext.setText(dirty ? projectName + '*' : projectName);

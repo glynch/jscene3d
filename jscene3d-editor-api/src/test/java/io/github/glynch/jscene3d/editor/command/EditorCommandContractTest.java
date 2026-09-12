@@ -9,11 +9,14 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import io.github.glynch.jscene3d.editor.window.EditorDialog;
+import io.github.glynch.jscene3d.editor.window.EditorDialogButtonId;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +37,7 @@ final class EditorCommandContractTest {
         assertThat(contribution.id()).isEqualTo(id);
         assertThat(contribution.title()).isEqualTo("Say Hello");
         assertThat(placement.command()).isEqualTo(id);
+        assertThat(placement.group()).isEqualTo("default");
         assertThat(placement.order()).isEqualTo(10);
         assertThat(messages).singleElement().extracting(EditorMessage::text).isEqualTo("Hello World!");
     }
@@ -82,6 +86,12 @@ final class EditorCommandContractTest {
                 .isThrownBy(() -> new EditorCommandPlacement(command, null, 0))
                 .withMessage("location");
         assertThatNullPointerException()
+                .isThrownBy(() -> new EditorCommandPlacement(command, location, null, 0))
+                .withMessage("group");
+        assertThatThrownBy(() -> new EditorCommandPlacement(command, location, " ", 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("group must not be blank");
+        assertThatNullPointerException()
                 .isThrownBy(() -> EditorCommandLocations.viewTitle(null))
                 .withMessage("view");
     }
@@ -104,6 +114,11 @@ final class EditorCommandContractTest {
 
         @Override
         public void showView(ViewId view) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<EditorDialogButtonId> showDialog(EditorDialog dialog) {
             throw new UnsupportedOperationException();
         }
     }

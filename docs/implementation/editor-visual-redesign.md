@@ -263,6 +263,29 @@ Verification:
 - design the local extension package and community-registry lifecycle before
   adding install, update, disable, trust, or removal controls.
 
+## Slice 10: Commands, menus, and modal window lifecycle
+
+Route core and extension actions through one toolkit-independent command model
+before adding executable preview transport.
+
+Deliverables:
+
+- retain command metadata and observable enabled state in the extension host;
+- generate JScene3D, File, Edit, and extension-owned menus from declarations;
+- allow extensions to place commands in existing menus or declare a top-level
+  menu without exposing JavaFX;
+- open generated Settings in the editor area and About as a modal dialog;
+- route native window close and Quit through the same dirty-resource guard;
+- save every dirty registered working copy when Save is selected.
+
+Verification:
+
+- unit-test menu ordering, grouping, extension placement, and command state;
+- unit-test modal declaration validation and every dirty-close result;
+- confirm disabled commands cannot execute through programmatic dispatch;
+- inspect all three core menus, About, Settings, and dirty Quit in the native
+  editor.
+
 ## Suggested change sequence
 
 Keep commits small and behaviorally coherent:
@@ -277,6 +300,7 @@ Keep commits small and behaviorally coherent:
 8. Add session workbench placement and validate the interaction before
    persisting it.
 9. Add Activity Bar contributions and the installed bundled-extensions view.
+10. Generate menus from command contributions and protect dirty window close.
 
 Each change should include its tests and leave the editor launchable. The
 selected mockups guide visual acceptance, while the project architecture and

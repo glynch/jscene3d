@@ -121,9 +121,12 @@ remaining space. These are starting proportions, not fixed dimensions.
 
 ### Application chrome
 
-The top chrome contains product and project context plus compact menus. It does
-not contain Play, Pause, or Step transport while the editor has no executable
-game-preview contract.
+The top chrome contains product and project context plus compact declarative
+menus. JScene3D owns About, Settings, and Quit; File owns project/file lifecycle
+commands; Edit owns Undo and Redo. Extensions place registered commands into
+these menus or declare a new top-level menu without constructing JavaFX controls.
+The chrome does not contain Play, Pause, or Step transport while the editor has
+no executable game-preview contract.
 
 Viewport-specific commands belong inside the viewport header. This keeps camera,
 framing, grid, bounds, collision-overlay, and projection controls scoped to the
@@ -211,9 +214,10 @@ interaction has been accepted.
 
 The narrow Activity Bar switches between infrequently co-visible primary views
 without baking those views into the JavaFX shell. Each activity contributes an
-identity, title, semantic icon, order, and target view. Selecting the active
-activity again collapses or restores the primary side bar. Activity entries and
-their target views remain pinned until the owning extension is deactivated.
+identity, title, semantic icon, order, and ordered primary-sidebar views.
+Selecting the active activity again collapses or restores the primary side bar.
+Activity entries and their views remain pinned until the owning extension is
+deactivated.
 
 Scene and Extensions are bundled contributions using the same contracts intended
 for future editor extensions. The Extensions view initially reports extensions

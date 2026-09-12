@@ -9,9 +9,17 @@ import java.util.Objects;
 
 /** Well-known editor-owned surfaces on which extensions can place commands. */
 public final class EditorCommandLocations {
+    /** Commands displayed in the JScene3D application menu. */
+    public static final CommandLocationId JSCENE3D_MENU =
+            new CommandLocationId("io.github.glynch.jscene3d.editor.jscene3d-menu");
+
     /** Commands displayed in the editor's File menu. */
     public static final CommandLocationId FILE_MENU =
             new CommandLocationId("io.github.glynch.jscene3d.editor.file-menu");
+
+    /** Commands displayed in the editor's Edit menu. */
+    public static final CommandLocationId EDIT_MENU =
+            new CommandLocationId("io.github.glynch.jscene3d.editor.edit-menu");
 
     /** Commands displayed in the viewport-local toolbar. */
     public static final CommandLocationId VIEWPORT_TOOLBAR =

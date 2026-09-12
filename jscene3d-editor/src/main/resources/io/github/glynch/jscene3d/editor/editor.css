@@ -368,6 +368,55 @@
     -fx-border-width: 0 0 1px 0;
 }
 
+.editor-area-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: -jscene-chrome;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent -jscene-divider -jscene-divider transparent;
+    -fx-border-width: 2px 1px 1px 0;
+    -fx-padding: 0 10px;
+}
+
+.editor-area-tabs > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: -jscene-hover;
+}
+
+.editor-area-tabs > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -jscene-canvas;
+    -fx-border-color: -jscene-accent -jscene-divider -jscene-canvas -jscene-divider;
+    -fx-border-width: 2px 1px 1px 1px;
+}
+
+.editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected {
+    -fx-border-color: -jscene-focus -jscene-divider -jscene-canvas -jscene-divider;
+}
+
+.editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
+    -fx-border-color: transparent;
+}
+
+.editor-area-tabs > .tab-header-area > .headers-region > .tab .label {
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-area-tabs > .tab-header-area > .headers-region > .tab:hover .label {
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .label {
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-area-tabs > .tab-header-area > .headers-region > .tab .tab-close-button {
+    -fx-background-color: -jscene-text-muted;
+}
+
+.editor-area-tabs > .tab-header-area > .headers-region > .tab:hover .tab-close-button,
+.editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .tab-close-button {
+    -fx-background-color: -jscene-text-strong;
+}
+
 .editor-area-tabs > .tab-content-area {
     -fx-background-color: -jscene-canvas;
 }

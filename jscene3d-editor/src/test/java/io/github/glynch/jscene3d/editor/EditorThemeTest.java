@@ -75,6 +75,23 @@ final class EditorThemeTest {
                         "-fx-opacity: 1;");
     }
 
+    /** Distinguishes persistent tab selection from hover and transient keyboard focus. */
+    @Test
+    void distinguishesSelectedEditorTabsFromHoverAndKeyboardFocus() throws IOException {
+        assertThat(stylesheet())
+                .contains(
+                        ".editor-area-tabs > .tab-header-area > .headers-region > .tab:hover {",
+                        ".editor-area-tabs > .tab-header-area > .headers-region > .tab:selected {",
+                        "-fx-border-color: -jscene-accent -jscene-divider -jscene-canvas -jscene-divider;",
+                        ".editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected {",
+                        "-fx-border-color: -jscene-focus -jscene-divider -jscene-canvas -jscene-divider;",
+                        ".editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {",
+                        "-fx-border-color: transparent;",
+                        ".editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .label {",
+                        "-fx-text-fill: -jscene-text-strong;",
+                        ".editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .tab-close-button {");
+    }
+
     /** Loads the packaged editor stylesheet as UTF-8 text. */
     private static String stylesheet() throws IOException {
         try (InputStream input =

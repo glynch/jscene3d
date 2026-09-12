@@ -40,13 +40,13 @@ public enum EditorLoadingPhase {
         this.progress = progress;
     }
 
-    /** Returns the concise activity description displayed by the splash screen. */
-    String description() {
+    /** Returns the concise activity description displayed by loading-progress presentations. */
+    public String description() {
         return description;
     }
 
     /** Returns cumulative phase progress in the inclusive range {@code 0.0..1.0}. */
-    double progress() {
+    public double progress() {
         return progress;
     }
 }

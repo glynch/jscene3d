@@ -112,7 +112,7 @@ final class EditorSplashScreenTest {
         assertThat(mark.isFocusTraversable()).isFalse();
 
         Path project = Path.of("/example/a-very-long-project-directory/Doomed Corridors");
-        splash.showProject(project);
+        splash.opening(project);
         splash.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
         Label projectName = (Label) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_PROJECT_NAME));
         Label projectPath = (Label) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_PROJECT_PATH));

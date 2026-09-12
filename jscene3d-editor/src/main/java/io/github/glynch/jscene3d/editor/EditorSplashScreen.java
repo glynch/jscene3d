@@ -31,8 +31,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.jspecify.annotations.Nullable;
 
-/** JScene3D-branded startup and project-loading view shown above the editor shell. */
-public final class EditorSplashScreen extends StackPane implements EditorProjectLoadProgress {
+/** JScene3D-branded startup view, optionally showing the initial project's loading progress. */
+public final class EditorSplashScreen extends StackPane implements EditorProjectOpenProgress {
     private static final javafx.util.Duration FADE_DURATION = javafx.util.Duration.millis(180.0);
     private static final String ARTWORK_RESOURCE = "splash/viewport-emergence-background.png";
 
@@ -48,7 +48,6 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
 
     private @Nullable FadeTransition fade;
     private @Nullable PauseTransition dismissalDelay;
-    private EditorSplashPresentation presentation = EditorSplashPresentation.STARTUP;
     private long displayedAtNanos = -1L;
 
     /** Creates the full-frame product splash with live project and loading information. */
@@ -74,8 +73,7 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
 
     /** Restores the initial product-startup presentation. */
     void showStartup() {
-        presentation = EditorSplashPresentation.STARTUP;
-        showOverlay(false);
+        showOverlay();
         showProjectDetails(false);
         showPhase(EditorLoadingPhase.STARTING_EDITOR);
     }
@@ -85,14 +83,10 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
      *
      * @param directory project directory being opened
      */
-    public void showProject(Path directory) {
+    @Override
+    public void opening(Path directory) {
         Path normalized =
                 Objects.requireNonNull(directory, "directory").toAbsolutePath().normalize();
-        boolean openingFromWorkbench = !isVisible();
-        if (openingFromWorkbench) {
-            presentation = EditorSplashPresentation.PROJECT_LOADING;
-        }
-        showOverlay(openingFromWorkbench);
         showProjectDetails(true);
         Path fileName = normalized.getFileName();
         setProjectName(fileName == null ? normalized.toString() : fileName.toString());
@@ -124,7 +118,7 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
         Duration visibleFor = displayedAtNanos < 0L
                 ? Duration.ZERO
                 : Duration.ofNanos(Math.max(0L, System.nanoTime() - displayedAtNanos));
-        Duration remaining = timing.remainingAfter(presentation, visibleFor);
+        Duration remaining = timing.remainingAfter(visibleFor);
         if (remaining.isZero()) {
             startFade();
             return;
@@ -244,12 +238,9 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
         return new Background(image);
     }
 
-    /** Makes the overlay modal and optionally starts a new minimum-visibility interval. */
-    private void showOverlay(boolean restartMinimumVisibility) {
+    /** Makes the startup overlay modal until its initial work has completed. */
+    private void showOverlay() {
         stopDismissal();
-        if (restartMinimumVisibility) {
-            markDisplayed();
-        }
         setManaged(true);
         setVisible(true);
         setMouseTransparent(false);

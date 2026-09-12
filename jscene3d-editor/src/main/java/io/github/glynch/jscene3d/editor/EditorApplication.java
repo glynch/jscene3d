@@ -27,6 +27,7 @@ import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.Optional;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -103,7 +104,7 @@ public final class EditorApplication extends Application {
                 new EditorProjectPublication(projectContext, projectDiagnostics::showDiagnostics, configurationContext),
                 editorWorkspace,
                 controller,
-                loadingScreen,
+                projectOpenProgress(startupProjectRequested, loadingScreen, editorWorkspace),
                 stage::setTitle);
         installViewportEvents(viewportCanvas, controller);
 
@@ -198,6 +199,15 @@ public final class EditorApplication extends Application {
             editorWorkspace.showWelcome();
             loadingScreen.finish();
         }
+    }
+
+    /** Selects the startup splash at most once before using status-bar progress in-session. */
+    private static EditorProjectOpenProgressProvider projectOpenProgress(
+            boolean startupProjectRequested, EditorSplashScreen loadingScreen, EditorWorkspace editorWorkspace) {
+        Optional<EditorProjectOpenProgress> startupProgress =
+                startupProjectRequested ? Optional.of(loadingScreen) : Optional.empty();
+        return new EditorProjectOpenProgressProvider(
+                startupProgress, () -> new EditorStatusProjectOpenProgress(editorWorkspace::setProjectStatus));
     }
 
     /** Returns the project opener installed during JavaFX stage initialization. */

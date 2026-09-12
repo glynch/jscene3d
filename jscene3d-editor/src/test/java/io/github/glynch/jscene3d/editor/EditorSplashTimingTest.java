@@ -34,19 +34,8 @@ final class EditorSplashTimingTest {
     void calculatesRemainingVisibility() {
         EditorSplashTiming timing = new EditorSplashTiming(Duration.ofSeconds(3));
 
-        assertThat(timing.remainingAfter(EditorSplashPresentation.STARTUP, Duration.ofMillis(1_250)))
-                .isEqualTo(Duration.ofMillis(1_750));
-        assertThat(timing.remainingAfter(EditorSplashPresentation.STARTUP, Duration.ofSeconds(4)))
-                .isZero();
-    }
-
-    /** Does not impose cold-start branding time on project loads initiated from the workbench. */
-    @Test
-    void doesNotDelayInSessionProjectLoads() {
-        EditorSplashTiming timing = new EditorSplashTiming(Duration.ofSeconds(3));
-
-        assertThat(timing.remainingAfter(EditorSplashPresentation.PROJECT_LOADING, Duration.ZERO))
-                .isZero();
+        assertThat(timing.remainingAfter(Duration.ofMillis(1_250))).isEqualTo(Duration.ofMillis(1_750));
+        assertThat(timing.remainingAfter(Duration.ofSeconds(4))).isZero();
     }
 
     /** Rejects malformed, negative, and non-finite command-line values. */

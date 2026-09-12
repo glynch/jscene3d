@@ -31,15 +31,11 @@ record EditorSplashTiming(Duration startupMinimumVisibility) {
         return new EditorSplashTiming(parseSeconds(seconds));
     }
 
-    /** Returns how much longer the active presentation must remain after the supplied elapsed time. */
-    Duration remainingAfter(EditorSplashPresentation presentation, Duration elapsed) {
-        Objects.requireNonNull(presentation, "presentation");
+    /** Returns how much longer startup must remain visible after the supplied elapsed time. */
+    Duration remainingAfter(Duration elapsed) {
         Duration validElapsed = Objects.requireNonNull(elapsed, "elapsed");
         if (validElapsed.isNegative()) {
             throw new IllegalArgumentException("elapsed must not be negative");
-        }
-        if (presentation == EditorSplashPresentation.PROJECT_LOADING) {
-            return Duration.ZERO;
         }
         Duration remaining = startupMinimumVisibility.minus(validElapsed);
         return remaining.isNegative() ? Duration.ZERO : remaining;

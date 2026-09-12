@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Complete validated macOS disk-image plan prepared without changing output. */
 final class MacOsDiskImagePlan {
@@ -16,13 +17,18 @@ final class MacOsDiskImagePlan {
 
     private final MacOsDiskImageRequest request;
     private final Path applicationImage;
+    private final Optional<Path> backgroundImage;
     private final ApplicationImageMetadata metadata;
 
     /** Stores a fully validated plan. */
     private MacOsDiskImagePlan(
-            MacOsDiskImageRequest request, Path applicationImage, ApplicationImageMetadata metadata) {
+            MacOsDiskImageRequest request,
+            Path applicationImage,
+            Optional<Path> backgroundImage,
+            ApplicationImageMetadata metadata) {
         this.request = request;
         this.applicationImage = applicationImage;
+        this.backgroundImage = backgroundImage;
         this.metadata = metadata;
     }
 
@@ -38,6 +44,7 @@ final class MacOsDiskImagePlan {
         MacOsDiskImageRequest validRequest = Objects.requireNonNull(request, "request");
         MacOsPackageValues.requireHost(operatingSystemName);
         Path image = requireApplicationImage(validRequest.applicationImage());
+        Optional<Path> background = validRequest.backgroundImage().map(MacOsDiskImagePlan::requireBackgroundImage);
         ApplicationImageMetadata metadata = ApplicationImageMetadata.read(image.resolve("Contents/app"));
         String applicationName = MacOsPackageValues.requireApplicationName(metadata.applicationName());
         MacOsPackageValues.requireApplicationVersion(metadata.applicationVersion());
@@ -45,12 +52,17 @@ final class MacOsDiskImagePlan {
         requireRegularFile(image.resolve("Contents/MacOS").resolve(applicationName), "native launcher");
         requireRegularFile(image.resolve("Contents/runtime/Contents/Home/lib/modules"), "bundled Java runtime");
         validateOutput(validRequest.outputDirectory(), image, applicationName, metadata.applicationVersion());
-        return new MacOsDiskImagePlan(validRequest, image, metadata);
+        return new MacOsDiskImagePlan(validRequest, image, background, metadata);
     }
 
     /** Returns the completed macOS application image. */
     Path applicationImage() {
         return applicationImage;
+    }
+
+    /** Returns the optional validated branded Finder background. */
+    Optional<Path> backgroundImage() {
+        return backgroundImage;
     }
 
     /** Returns the application name recorded in the application image. */
@@ -78,6 +90,19 @@ final class MacOsDiskImagePlan {
             throw new IllegalArgumentException("applicationImage does not have a .app suffix: " + image);
         }
         return image;
+    }
+
+    /** Resolves one regular background image without accepting symbolic links. */
+    private static Path requireBackgroundImage(Path requestedImage) {
+        if (!Files.isRegularFile(requestedImage) || Files.isSymbolicLink(requestedImage)) {
+            throw new IllegalArgumentException("disk-image background is not a regular file: " + requestedImage);
+        }
+        try {
+            return requestedImage.toRealPath();
+        } catch (IOException exception) {
+            throw new IllegalArgumentException(
+                    "disk-image background cannot be resolved: " + requestedImage, exception);
+        }
     }
 
     /** Requires the bundle filename to agree with its embedded application name. */

@@ -6,17 +6,11 @@ package io.github.glynch.jscene3d.project.exporting;
 
 import io.github.glynch.jscene3d.project.exporting.internal.StagedPathInstall;
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.BasicFileAttributes;
 
 /** Stages, invokes, validates, and transactionally installs one macOS disk image. */
 final class MacOsDiskImageAssembly {
-    private static final Path APPLICATIONS_DIRECTORY = Path.of("/Applications");
-
     private final MacOsDiskImagePlan plan;
     private final DiskImageTool tool;
 
@@ -39,9 +33,10 @@ final class MacOsDiskImageAssembly {
         Files.createDirectories(outputParent);
         Path staging = Files.createTempDirectory(outputParent, ".disk-image-staging-");
         try {
-            Path generated = staging.resolve(plan.outputPath().getFileName());
-            Path content = stageContent(staging.resolve("content"));
-            tool.create(content, plan.applicationName(), generated);
+            Path output = Files.createDirectory(staging.resolve("output"));
+            Path resources = Files.createDirectory(staging.resolve("resources"));
+            tool.create(plan, output, resources);
+            Path generated = output.resolve(plan.outputPath().getFileName());
             validateGeneratedDiskImage(generated);
             StagedPathInstall.replace(generated, plan.outputPath());
         } finally {
@@ -49,43 +44,10 @@ final class MacOsDiskImageAssembly {
         }
     }
 
-    /** Stages the application image and conventional Applications link without invoking Finder. */
-    private Path stageContent(Path content) throws IOException {
-        Files.createDirectory(content);
-        copyApplicationImage(
-                plan.applicationImage(), content.resolve(plan.applicationImage().getFileName()));
-        Files.createSymbolicLink(content.resolve("Applications"), APPLICATIONS_DIRECTORY);
-        return content;
-    }
-
-    /** Copies an application bundle while preserving native file attributes and symbolic links. */
-    private static void copyApplicationImage(Path source, Path destination) throws IOException {
-        Files.walkFileTree(source, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
-                    throws IOException {
-                Files.createDirectories(
-                        destination.resolve(source.relativize(directory).toString()));
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                Path target = destination.resolve(source.relativize(file).toString());
-                if (attributes.isSymbolicLink()) {
-                    Files.createSymbolicLink(target, Files.readSymbolicLink(file));
-                } else {
-                    Files.copy(file, target, StandardCopyOption.COPY_ATTRIBUTES);
-                }
-                return FileVisitResult.CONTINUE;
-            }
-        });
-    }
-
     /** Requires one non-empty regular DMG produced in the private staging directory. */
     private static void validateGeneratedDiskImage(Path diskImage) throws IOException {
         if (!Files.isRegularFile(diskImage) || Files.isSymbolicLink(diskImage) || Files.size(diskImage) == 0) {
-            throw new IOException("hdiutil did not produce the expected disk image: " + diskImage);
+            throw new IOException("jpackage did not produce the expected disk image: " + diskImage);
         }
     }
 }

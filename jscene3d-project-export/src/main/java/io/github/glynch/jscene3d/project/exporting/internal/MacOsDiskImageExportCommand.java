@@ -11,7 +11,8 @@ import java.nio.file.Path;
 
 /** Internal command adapter used by build tools to invoke the macOS disk-image exporter. */
 public final class MacOsDiskImageExportCommand {
-    private static final int ARGUMENT_COUNT = 2;
+    private static final int MINIMUM_ARGUMENT_COUNT = 2;
+    private static final int MAXIMUM_ARGUMENT_COUNT = 3;
 
     /** Prevents construction. */
     private MacOsDiskImageExportCommand() {
@@ -21,17 +22,20 @@ public final class MacOsDiskImageExportCommand {
     /**
      * Exports one macOS disk image from ordered build-tool arguments.
      *
-     * @param arguments application image and output directory
+     * @param arguments application image, output directory, and optional background image
      * @throws IOException when export fails
      */
     public static void main(String[] arguments) throws IOException {
-        if (arguments.length != ARGUMENT_COUNT) {
-            throw new IllegalArgumentException("expected application image and output directory");
+        if (arguments.length < MINIMUM_ARGUMENT_COUNT || arguments.length > MAXIMUM_ARGUMENT_COUNT) {
+            throw new IllegalArgumentException(
+                    "expected application image, output directory, and optional background image");
         }
-        MacOsDiskImageRequest request = MacOsDiskImageRequest.builder()
+        MacOsDiskImageRequest.Builder request = MacOsDiskImageRequest.builder()
                 .applicationImage(Path.of(arguments[0]))
-                .outputDirectory(Path.of(arguments[1]))
-                .build();
-        new MacOsDiskImageExporter().export(request);
+                .outputDirectory(Path.of(arguments[1]));
+        if (arguments.length == MAXIMUM_ARGUMENT_COUNT) {
+            request.backgroundImage(Path.of(arguments[2]));
+        }
+        new MacOsDiskImageExporter().export(request.build());
     }
 }

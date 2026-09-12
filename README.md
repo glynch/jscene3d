@@ -648,8 +648,10 @@ and installers consume that directory rather than reproducing its content
 selection rules. On macOS, the exporter can wrap the same directory in a
 `jpackage` application image and create a non-interactive DMG suitable for an
 unattended build. A project may declare an `.icns` application icon in its
-manifest. A conventional executable or self-extracting JAR is not a supported
-game export format.
+manifest, and a DMG request may supply a project-owned Finder background in any
+image format supported by Java Image I/O. The exporter converts that source to
+the TIFF override required by `jpackage`. A conventional executable or
+self-extracting JAR is not a supported game export format.
 
 The read-only live Entity hierarchy identifies local authored entities,
 authored definition placements, and runtime-spawned definition roots. Placement

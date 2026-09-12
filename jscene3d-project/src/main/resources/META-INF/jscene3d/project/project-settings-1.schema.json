@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jscene3d.org/schemas/project-settings-1.json",
+  "title": "JScene3D Project Settings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schemaVersion": {"const": 1},
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "location": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

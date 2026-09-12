@@ -235,7 +235,6 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             EditorTreeItem presentation = provider.item(element);
             Label name = new Label(presentation.label());
             name.setMinWidth(0.0);
-            HBox.setHgrow(name, Priority.ALWAYS);
             HBox row = new HBox(7.0);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
@@ -243,7 +242,17 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
                     .icon()
                     .map(icon -> icons.create(icon, EditorStyleClasses.EDITOR_TREE_ITEM_ICON))
                     .ifPresent(row.getChildren()::add);
-            row.getChildren().add(name);
+            HBox identity = new HBox(5.0);
+            identity.setAlignment(Pos.CENTER_LEFT);
+            identity.getChildren().add(name);
+            for (EditorIcon decoration : presentation.decorations()) {
+                identity.getChildren()
+                        .add(icons.create(
+                                decoration,
+                                EditorStyleClasses.EDITOR_ITEM_DECORATION,
+                                EditorStyleClasses.EDITOR_TREE_ITEM_DECORATION));
+            }
+            row.getChildren().add(identity);
             presentation.description().ifPresent(description -> {
                 Label detail = new Label(description);
                 detail.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_ITEM_DESCRIPTION);
@@ -252,13 +261,6 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             row.getChildren().add(spacer);
-            for (EditorIcon decoration : presentation.decorations()) {
-                row.getChildren()
-                        .add(icons.create(
-                                decoration,
-                                EditorStyleClasses.EDITOR_ITEM_DECORATION,
-                                EditorStyleClasses.EDITOR_TREE_ITEM_DECORATION));
-            }
             row.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_ITEM_ROW);
             setText(null);
             setGraphic(row);

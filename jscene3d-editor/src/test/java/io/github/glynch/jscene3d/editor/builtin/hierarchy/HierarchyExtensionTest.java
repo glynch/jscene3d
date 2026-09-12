@@ -46,7 +46,7 @@ final class HierarchyExtensionTest {
         EditorTreeView<EditorHierarchyNode> view = (EditorTreeView<EditorHierarchyNode>) contribution.view();
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).isEmpty();
 
-        EditorHierarchyNode child = node("Player", EditorHierarchyNode.Kind.LOCAL_ENTITY, List.of());
+        EditorHierarchyNode child = node("Player", EditorHierarchyNode.Kind.LOCAL_ENTITY, List.of(), true);
         EditorHierarchyNode generated = new EditorHierarchyNode(
                 EditorHierarchyNode.Kind.GENERATED_ENTITY,
                 "Generated Door",
@@ -67,6 +67,8 @@ final class HierarchyExtensionTest {
         assertThat(view.dataProvider().item(child).collapsibleState()).isEqualTo(EditorTreeItemCollapsibleState.NONE);
         assertThat(view.dataProvider().item(root).icon()).contains(new EditorIcon(EditorIcons.WORLD, "World"));
         assertThat(view.dataProvider().item(child).icon()).contains(new EditorIcon(EditorIcons.ENTITY, "Local entity"));
+        assertThat(view.dataProvider().item(child).decorations())
+                .containsExactly(new EditorIcon(EditorIcons.MODIFIED, "Modified"));
         assertThat(view.dataProvider().item(generated).decorations())
                 .containsExactly(
                         new EditorIcon(EditorIcons.READ_ONLY, "Generated read-only entity"),
@@ -88,8 +90,19 @@ final class HierarchyExtensionTest {
 
     private static EditorHierarchyNode node(
             String label, EditorHierarchyNode.Kind kind, List<EditorHierarchyNode> children) {
+        return node(label, kind, children, false);
+    }
+
+    private static EditorHierarchyNode node(
+            String label, EditorHierarchyNode.Kind kind, List<EditorHierarchyNode> children, boolean modified) {
         return new EditorHierarchyNode(
-                kind, label, Optional.empty(), Optional.empty(), true, selection(label, selectionKind(kind)), children);
+                kind,
+                label,
+                Optional.empty(),
+                Optional.empty(),
+                new EditorHierarchyNode.AuthoringState(true, modified),
+                selection(label, selectionKind(kind)),
+                children);
     }
 
     private static EditorSelection selection(String label, EditorSelectionKindId selectionKind) {

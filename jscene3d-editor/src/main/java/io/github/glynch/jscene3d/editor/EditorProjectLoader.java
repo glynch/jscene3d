@@ -22,6 +22,7 @@ import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
+import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
@@ -38,6 +39,9 @@ import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
+import io.github.glynch.jscene3d.project.settings.ProjectSettings;
+import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoadResult;
+import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoader;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -57,11 +61,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /** Assembles editor state from project data without loading or executing application code. */
 public final class EditorProjectLoader {
     private static final String PROJECT_RESOURCES = "src/main/resources";
-    private static final String PROJECT_CACHE = ".jscene3d/cache";
     private static final String PUBLISHED_CONTENT = ".jscene3d/published";
     private static final String LEGACY_MAVEN_CACHE = "target/import-cache";
     private static final RuntimeResourceProvider UNAVAILABLE_RESOURCES = new RuntimeResourceProvider() {
@@ -122,6 +127,12 @@ public final class EditorProjectLoader {
         }
         GameProject project = projectResult.project().orElseThrow();
         progress.projectIdentified(project.identity().name());
+        ProjectSettingsLoadResult settingsResult = new ProjectSettingsLoader().load(project.root());
+        diagnostics.addAll(settingsResult.diagnostics());
+        if (settingsResult.settings().isEmpty()) {
+            return failure(diagnostics);
+        }
+        ProjectSettings settings = settingsResult.settings().orElseThrow();
 
         progress.phaseStarted(EditorLoadingPhase.SCANNING_ASSETS);
         AssetCatalogLoadResult assetResult =
@@ -142,7 +153,7 @@ public final class EditorProjectLoader {
         ProjectContent content = operation.measure(
                 "project.published-content.load",
                 Map.of(),
-                () -> loadContent(project, authored, types, imports, diagnostics));
+                () -> loadContent(project, settings, authored, types, imports, diagnostics));
         DefinitionResolver definitions = content.definitions();
         progress.phaseStarted(EditorLoadingPhase.VALIDATING_ASSETS);
         List<ProjectAsset> assets = operation.measure(
@@ -163,12 +174,20 @@ public final class EditorProjectLoader {
                 .map(AssetMetadata::path)
                 .orElse(project.runtime().entryScene());
         progress.phaseStarted(EditorLoadingPhase.BUILDING_HIERARCHY);
-        EditorHierarchyNode hierarchy = operation.measure(
+        EditorHierarchyProjection hierarchyProjection = (updated, modifiedEntityIds, enabledEditor) -> projectHierarchy(
+                updated,
+                worldSource,
+                new HierarchyProjectionContext(project.root(), authored, definitions, types, new LinkedHashSet<>()),
+                modifiedEntityIds,
+                enabledEditor);
+        EditorProjectSession session = operation.measure(
                 "project.hierarchy.project",
                 Map.of(),
-                () -> projectHierarchy(world, worldSource, project.root(), authored, definitions, types, diagnostics));
-        EditorProjectSession session =
-                new EditorProjectSession(project, authored, types, content, world, hierarchy, assets);
+                () -> new EditorProjectSession(
+                        new EditorProjectSession.Source(
+                                project, settings, authored, types, content, world, worldSource),
+                        assets,
+                        hierarchyProjection));
         return new EditorProjectLoadResult(Optional.of(session), List.copyOf(diagnostics));
     }
 
@@ -295,6 +314,7 @@ public final class EditorProjectLoader {
     /** Combines authored definitions with already-published definitions and spatial resources. */
     private static ProjectContent loadContent(
             GameProject project,
+            ProjectSettings settings,
             AssetCatalog authored,
             RegisteredTypeCatalog types,
             List<ImportDefinition> imports,
@@ -302,7 +322,7 @@ public final class EditorProjectLoader {
         if (imports.size() != project.imports().size()) {
             return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
         }
-        Path publishedContentRoot = resolvePublishedContentRoot(project.root());
+        Path publishedContentRoot = resolvePublishedContentRoot(project.root(), settings);
         try {
             return PublishedProjectContent.load(
                     project, types, authored, publishedContentRoot, Spatial3dResourceLoaders.all());
@@ -316,7 +336,15 @@ public final class EditorProjectLoader {
     /** Resolves current editor cache, portable publication, then the transitional Maven cache. */
     static Path resolvePublishedContentRoot(Path projectRoot) {
         Path validProjectRoot = Objects.requireNonNull(projectRoot, "projectRoot");
-        Path projectCache = validProjectRoot.resolve(PROJECT_CACHE);
+        ProjectSettings settings =
+                new ProjectSettingsLoader().load(validProjectRoot).settings().orElse(ProjectSettings.defaults());
+        return resolvePublishedContentRoot(validProjectRoot, settings);
+    }
+
+    /** Resolves configured editor cache, portable publication, then transitional Maven output. */
+    private static Path resolvePublishedContentRoot(Path projectRoot, ProjectSettings settings) {
+        Path validProjectRoot = Objects.requireNonNull(projectRoot, "projectRoot");
+        Path projectCache = settings.resolveCache(validProjectRoot);
         if (Files.isDirectory(projectCache.resolve("imports"))) {
             return projectCache;
         }
@@ -434,15 +462,12 @@ public final class EditorProjectLoader {
     private static EditorHierarchyNode projectHierarchy(
             WorldDefinition world,
             Path source,
-            Path projectRoot,
-            AssetCatalog authored,
-            DefinitionResolver definitions,
-            RegisteredTypeCatalog types,
-            LinkedHashSet<ProjectDiagnostic> diagnostics) {
-        HierarchyProjectionContext context =
-                new HierarchyProjectionContext(projectRoot, authored, definitions, types, diagnostics);
+            HierarchyProjectionContext context,
+            Set<EntityId> modifiedEntityIds,
+            BiConsumer<EntityId, Boolean> enabledEditor) {
         List<EditorHierarchyNode> children = world.roots().stream()
-                .map(entry -> projectEntry(entry, source, context, new HashSet<>(), false))
+                .map(entry ->
+                        projectEntry(entry, source, context, new HashSet<>(), false, modifiedEntityIds, enabledEditor))
                 .toList();
         return new EditorHierarchyNode(
                 EditorHierarchyNode.Kind.WORLD,
@@ -450,7 +475,7 @@ public final class EditorProjectLoader {
                 Optional.empty(),
                 Optional.of(world.id()),
                 true,
-                EditorInspectorProjector.world(world, source, projectRoot),
+                EditorInspectorProjector.world(world, source, context.projectRoot()),
                 children);
     }
 
@@ -460,10 +485,14 @@ public final class EditorProjectLoader {
             Path source,
             HierarchyProjectionContext context,
             Set<AssetId> ancestors,
-            boolean generated) {
+            boolean generated,
+            Set<EntityId> modifiedEntityIds,
+            BiConsumer<EntityId, Boolean> enabledEditor) {
         return switch (entry) {
-            case LocalEntity local -> projectLocal(local, source, context, ancestors, generated);
-            case EntityPlacement placement -> projectPlacement(placement, source, context, ancestors, generated);
+            case LocalEntity local ->
+                projectLocal(local, source, context, ancestors, generated, modifiedEntityIds, enabledEditor);
+            case EntityPlacement placement ->
+                projectPlacement(placement, source, context, ancestors, generated, modifiedEntityIds, enabledEditor);
         };
     }
 
@@ -473,17 +502,24 @@ public final class EditorProjectLoader {
             Path source,
             HierarchyProjectionContext context,
             Set<AssetId> ancestors,
-            boolean generated) {
+            boolean generated,
+            Set<EntityId> modifiedEntityIds,
+            BiConsumer<EntityId, Boolean> enabledEditor) {
         List<EditorHierarchyNode> children = local.children().stream()
-                .map(child -> projectEntry(child, source, context, ancestors, generated))
+                .map(child ->
+                        projectEntry(child, source, context, ancestors, generated, modifiedEntityIds, enabledEditor))
                 .toList();
+        Optional<Consumer<Boolean>> editor =
+                generated ? Optional.empty() : Optional.of(value -> enabledEditor.accept(local.id(), value));
         return new EditorHierarchyNode(
                 generated ? EditorHierarchyNode.Kind.GENERATED_ENTITY : EditorHierarchyNode.Kind.LOCAL_ENTITY,
                 local.name().orElse("Unnamed entity"),
                 Optional.of(local.id()),
                 Optional.empty(),
-                local.isEnabled(),
-                EditorInspectorProjector.entity(local, source, context.projectRoot(), context.types(), generated),
+                new EditorHierarchyNode.AuthoringState(
+                        local.isEnabled(), !generated && modifiedEntityIds.contains(local.id())),
+                EditorInspectorProjector.entity(
+                        local, source, context.projectRoot(), context.types(), generated, editor),
                 children);
     }
 
@@ -493,7 +529,9 @@ public final class EditorProjectLoader {
             Path source,
             HierarchyProjectionContext context,
             Set<AssetId> ancestors,
-            boolean generated) {
+            boolean generated,
+            Set<EntityId> modifiedEntityIds,
+            BiConsumer<EntityId, Boolean> enabledEditor) {
         DefinitionLoadResult<EntityDefinition> result =
                 context.definitions().loadEntity(placement.definition(), context.types());
         context.diagnostics().addAll(result.diagnostics());
@@ -504,9 +542,18 @@ public final class EditorProjectLoader {
                     placement.name().orElse("Unavailable definition"),
                     Optional.of(placement.id()),
                     Optional.of(placement.definition().id()),
-                    placement.isEnabled(),
+                    new EditorHierarchyNode.AuthoringState(
+                            placement.isEnabled(), !generated && modifiedEntityIds.contains(placement.id())),
                     EditorInspectorProjector.placement(
-                            placement, loaded, source, context.projectRoot(), context.types(), generated),
+                            placement,
+                            loaded,
+                            source,
+                            context.projectRoot(),
+                            context.types(),
+                            generated,
+                            generated
+                                    ? Optional.empty()
+                                    : Optional.of(value -> enabledEditor.accept(placement.id(), value))),
                     List.of());
         }
         EntityDefinition definition = loaded.orElseThrow();
@@ -515,7 +562,8 @@ public final class EditorProjectLoader {
                 .map(AssetMetadata::path)
                 .orElse(source);
         List<EditorHierarchyNode> children = definition.root().children().stream()
-                .map(child -> projectEntry(child, definitionSource, context, ancestors, true))
+                .map(child -> projectEntry(
+                        child, definitionSource, context, ancestors, true, modifiedEntityIds, enabledEditor))
                 .toList();
         ancestors.remove(placement.definition().id());
         String label = placement.name().orElseGet(() -> definition.root().name().orElse(definition.name()));
@@ -524,9 +572,18 @@ public final class EditorProjectLoader {
                 label,
                 Optional.of(placement.id()),
                 Optional.of(definition.id()),
-                placement.isEnabled(),
+                new EditorHierarchyNode.AuthoringState(
+                        placement.isEnabled(), !generated && modifiedEntityIds.contains(placement.id())),
                 EditorInspectorProjector.placement(
-                        placement, loaded, source, context.projectRoot(), context.types(), generated),
+                        placement,
+                        loaded,
+                        source,
+                        context.projectRoot(),
+                        context.types(),
+                        generated,
+                        generated
+                                ? Optional.empty()
+                                : Optional.of(value -> enabledEditor.accept(placement.id(), value))),
                 children);
     }
 

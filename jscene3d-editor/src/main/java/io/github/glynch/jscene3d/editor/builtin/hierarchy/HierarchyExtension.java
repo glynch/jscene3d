@@ -85,8 +85,11 @@ public final class HierarchyExtension implements EditorExtension {
 
     private static void selectInitialEntry(EditorSelections selections, Optional<EditorHierarchyNode> hierarchy) {
         hierarchy.ifPresentOrElse(
-                root -> selections.select(
-                        root.children().stream().findFirst().orElse(root).selection()),
+                root -> selections.select(selections
+                        .current()
+                        .flatMap(selection -> findSelection(root, selection))
+                        .orElseGet(() -> root.children().stream().findFirst().orElse(root))
+                        .selection()),
                 selections::clear);
     }
 
@@ -196,13 +199,17 @@ public final class HierarchyExtension implements EditorExtension {
     }
 
     private static Optional<EditorHierarchyNode> findSelection(EditorHierarchyNode node, EditorSelection selection) {
-        if (node.selection().equals(selection)) {
+        if (sameIdentity(node.selection(), selection)) {
             return Optional.of(node);
         }
         return node.children().stream()
                 .map(child -> findSelection(child, selection))
                 .flatMap(Optional::stream)
                 .findFirst();
+    }
+
+    private static boolean sameIdentity(EditorSelection first, EditorSelection second) {
+        return first.kind().equals(second.kind()) && first.identity().equals(second.identity());
     }
 
     private static EditorIconId icon(EditorHierarchyNode.Kind kind) {
@@ -224,6 +231,9 @@ public final class HierarchyExtension implements EditorExtension {
 
     private static List<EditorIcon> decorations(EditorHierarchyNode element) {
         ArrayList<EditorIcon> decorations = new ArrayList<>();
+        if (element.isModified()) {
+            decorations.add(new EditorIcon(EditorIcons.MODIFIED, "Modified"));
+        }
         if (element.kind() == EditorHierarchyNode.Kind.GENERATED_ENTITY) {
             decorations.add(new EditorIcon(EditorIcons.READ_ONLY, "Generated read-only entity"));
         }

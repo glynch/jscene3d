@@ -11,6 +11,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopy;
+import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopyId;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import io.github.glynch.jscene3d.telemetry.TelemetryMeasurement;
 import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
@@ -21,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -243,6 +246,144 @@ final class EditorProjectLoaderTest {
 
         assertThat(EditorProjectLoader.resolvePublishedContentRoot(temporaryDirectory))
                 .isEqualTo(projectCache);
+    }
+
+    /** Prefers a portable project-configured cache over the conventional editor cache. */
+    @Test
+    void resolvesConfiguredEditorProjectCache() throws IOException {
+        write(".jscene3d/settings.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/project-settings-1.json",
+                  "schemaVersion":1,
+                  "cache":{"location":".cache/editor"}
+                }
+                """);
+        Path configuredCache = temporaryDirectory.resolve(".cache/editor");
+        Files.createDirectories(configuredCache.resolve("imports"));
+        Files.createDirectories(temporaryDirectory.resolve(".jscene3d/cache/imports"));
+
+        assertThat(EditorProjectLoader.resolvePublishedContentRoot(temporaryDirectory))
+                .isEqualTo(configuredCache);
+    }
+
+    /** Rejects invalid shared settings instead of silently using a machine-dependent path. */
+    @Test
+    void rejectsInvalidProjectSettings() throws IOException {
+        writeProject();
+        write(".jscene3d/settings.json", """
+                {"schemaVersion":1,"cache":{"location":"../outside"}}
+                """);
+
+        EditorProjectLoadResult result = loader().load(temporaryDirectory);
+
+        assertThat(result.session()).isEmpty();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains("project.settings.invalid");
+    }
+
+    /** Edits, undoes, redoes, and atomically persists an authored enabled property. */
+    @Test
+    void editsAndSavesAuthoredEnabledProperty() throws IOException {
+        writeProject();
+        EditorProjectSession session =
+                loader().load(temporaryDirectory).session().orElseThrow();
+        EditorHierarchyNode placement = session.hierarchy().children().getFirst();
+        EditorDetails.Property enabled =
+                placement.selection().details().orElseThrow().sections().getFirst().properties().stream()
+                        .filter(property -> property.identity().equals("enabled"))
+                        .findFirst()
+                        .orElseThrow();
+
+        assertThat(enabled.editor()).isPresent();
+        enabled.editor().orElseThrow().setValue("false");
+
+        assertThat(session.isDirty()).isTrue();
+        assertThat(session.canUndo()).isTrue();
+        assertThat(session.canRedo()).isFalse();
+        assertThat(session.hierarchy().children().getFirst().isEnabled()).isFalse();
+        assertThat(session.hierarchy().children().getFirst().isModified()).isTrue();
+
+        session.undo();
+        assertThat(session.isDirty()).isFalse();
+        assertThat(session.hierarchy().children().getFirst().isEnabled()).isTrue();
+        assertThat(session.hierarchy().children().getFirst().isModified()).isFalse();
+        assertThat(session.canRedo()).isTrue();
+
+        session.redo();
+        assertThat(session.hierarchy().children().getFirst().isModified()).isTrue();
+        session.save();
+
+        assertThat(session.isDirty()).isFalse();
+        assertThat(session.hierarchy().children().getFirst().isModified()).isFalse();
+        assertThat(Files.readString(temporaryDirectory.resolve("worlds/test.world.json")))
+                .contains("\"enabled\" : false");
+        assertThat(loader().load(temporaryDirectory)
+                        .session()
+                        .orElseThrow()
+                        .hierarchy()
+                        .children()
+                        .getFirst()
+                        .isEnabled())
+                .isFalse();
+    }
+
+    /** Publishes typed working-copy state and tags undo history with its affected resource. */
+    @Test
+    void publishesWorldWorkingCopyLifecycle() throws IOException {
+        writeProject();
+        EditorProjectSession session =
+                loader().load(temporaryDirectory).session().orElseThrow();
+        AtomicInteger hierarchyChanges = new AtomicInteger();
+        AtomicInteger contentChanges = new AtomicInteger();
+        AtomicInteger dirtyChanges = new AtomicInteger();
+        AtomicInteger saves = new AtomicInteger();
+        session.onDidChangeHierarchy().subscribe(ignored -> hierarchyChanges.incrementAndGet());
+        session.workingCopies().onDidChangeContent().subscribe(ignored -> contentChanges.incrementAndGet());
+        session.workingCopies().onDidChangeDirty().subscribe(ignored -> dirtyChanges.incrementAndGet());
+        session.workingCopies().onDidSave().subscribe(ignored -> saves.incrementAndGet());
+        EditorWorkingCopyId worldId = new EditorWorkingCopyId(
+                temporaryDirectory
+                        .resolve("worlds/test.world.json")
+                        .toRealPath()
+                        .toUri(),
+                "world");
+        EditorWorkingCopy worldWorkingCopy =
+                session.workingCopies().find(worldId).orElseThrow();
+
+        EditorDetails.Property enabled = session
+                .hierarchy()
+                .children()
+                .getFirst()
+                .selection()
+                .details()
+                .orElseThrow()
+                .sections()
+                .getFirst()
+                .properties()
+                .stream()
+                .filter(property -> property.identity().equals("enabled"))
+                .findFirst()
+                .orElseThrow();
+        enabled.editor().orElseThrow().setValue("false");
+
+        assertThat(worldWorkingCopy.isDirty()).isTrue();
+        assertThat(session.workingCopies().dirtyWorkingCopies()).containsExactly(worldWorkingCopy);
+        assertThat(session.workingCopies().dirtyCount()).isEqualTo(1);
+        assertThat(session.undoEntry()).hasValueSatisfying(entry -> {
+            assertThat(entry.label()).isEqualTo("Set entity enabled");
+            assertThat(entry.workingCopyId()).isEqualTo(worldId);
+        });
+
+        session.undo();
+        session.redo();
+        session.save();
+
+        assertThat(session.workingCopies().hasDirty()).isFalse();
+        assertThat(hierarchyChanges).hasValue(4);
+        assertThat(contentChanges).hasValue(3);
+        assertThat(dirtyChanges).hasValue(4);
+        assertThat(saves).hasValue(1);
     }
 
     /** Resolves the portable import snapshot supplied by a Project Workspace Archive. */

@@ -18,12 +18,12 @@ import io.github.glynch.jscene3d.project.entity.PropertyTarget;
 import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.entity.SpatialTarget;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
+import io.github.glynch.jscene3d.project.internal.AtomicProjectFileWriter;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueJsonWriter;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -325,14 +325,9 @@ public final class DefinitionWriter {
         json.writeEndObject();
     }
 
-    /** Creates parent directories as needed and replaces one complete target file. */
+    /** Creates parent directories as needed and atomically replaces one complete target file. */
     private static void writeBytes(Path target, byte[] content) throws IOException {
-        Path absoluteTarget = target.toAbsolutePath().normalize();
-        Path parent = absoluteTarget.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Files.write(absoluteTarget, content);
+        AtomicProjectFileWriter.write(target, content);
     }
 
     /** Ensures every canonical document ends with exactly one LF. */

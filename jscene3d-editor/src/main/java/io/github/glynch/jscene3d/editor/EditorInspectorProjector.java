@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.view.EditorPropertyEditor;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.StringJoiner;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /** Projects validated project data into immutable, non-executable Inspector data. */
@@ -52,7 +54,7 @@ final class EditorInspectorProjector {
                 source,
                 projectRoot,
                 world.id().toString(),
-                false,
+                Editability.READ_ONLY,
                 List.of(section("World", properties)));
         return selection(EditorSelectionKinds.WORLD, source, world.id().toString(), view);
     }
@@ -60,12 +62,23 @@ final class EditorInspectorProjector {
     /** Projects one local or generated entity and its descriptor-backed components. */
     static EditorSelection entity(
             LocalEntity entity, Path source, Path projectRoot, RegisteredTypeCatalog types, boolean generated) {
+        return entity(entity, source, projectRoot, types, generated, Optional.empty());
+    }
+
+    /** Projects one local or generated entity with an optional enabled-state edit command. */
+    static EditorSelection entity(
+            LocalEntity entity,
+            Path source,
+            Path projectRoot,
+            RegisteredTypeCatalog types,
+            boolean generated,
+            Optional<Consumer<Boolean>> enabledEditor) {
         String title = entity.name().orElse("Unnamed entity");
         List<EditorDetails.Section> sections = new ArrayList<>();
         sections.add(section(
                 "Entity",
                 List.of(
-                        booleanProperty("enabled", "Enabled", entity.isEnabled()),
+                        booleanProperty("enabled", "Enabled", entity.isEnabled(), enabledEditor),
                         numberProperty(
                                 "child-count", "Children", entity.children().size()))));
         sections.addAll(componentSections(entity.components(), types));
@@ -75,7 +88,7 @@ final class EditorInspectorProjector {
                 source,
                 projectRoot,
                 entity.id().toString(),
-                generated,
+                editability(generated, enabledEditor.isPresent()),
                 sections);
         EditorSelectionKindId kind =
                 generated ? EditorSelectionKinds.GENERATED_ENTITY : EditorSelectionKinds.LOCAL_ENTITY;
@@ -90,13 +103,25 @@ final class EditorInspectorProjector {
             Path projectRoot,
             RegisteredTypeCatalog types,
             boolean generated) {
+        return placement(placement, definition, source, projectRoot, types, generated, Optional.empty());
+    }
+
+    /** Projects an authored placement with an optional enabled-state edit command. */
+    static EditorSelection placement(
+            EntityPlacement placement,
+            Optional<EntityDefinition> definition,
+            Path source,
+            Path projectRoot,
+            RegisteredTypeCatalog types,
+            boolean generated,
+            Optional<Consumer<Boolean>> enabledEditor) {
         String title = placement
                 .name()
                 .orElseGet(() -> definition.map(EntityDefinition::name).orElse("Unavailable definition"));
         List<EditorDetails.Property> placementProperties = new ArrayList<>();
         placementProperties.add(textProperty(
                 "definition", "Definition", placement.definition().id().toString()));
-        placementProperties.add(booleanProperty("enabled", "Enabled", placement.isEnabled()));
+        placementProperties.add(booleanProperty("enabled", "Enabled", placement.isEnabled(), enabledEditor));
         placement.arguments().forEach((id, value) -> placementProperties.add(authoredProperty(id, value)));
         List<EditorDetails.Section> sections = new ArrayList<>();
         sections.add(section("Placement", placementProperties));
@@ -108,7 +133,7 @@ final class EditorInspectorProjector {
                 source,
                 projectRoot,
                 placement.id().toString(),
-                generated,
+                editability(generated, enabledEditor.isPresent()),
                 sections);
         return selection(EditorSelectionKinds.PLACEMENT, source, placement.id().toString(), view);
     }
@@ -136,7 +161,7 @@ final class EditorInspectorProjector {
                 source,
                 projectRoot,
                 definition.id().toString(),
-                false,
+                Editability.READ_ONLY,
                 sections);
         return selection(EditorSelectionKinds.ASSET, source, definition.id().toString(), view);
     }
@@ -149,7 +174,7 @@ final class EditorInspectorProjector {
                 source,
                 projectRoot,
                 world.id().toString(),
-                false,
+                Editability.READ_ONLY,
                 List.of(section(
                         "Definition",
                         List.of(
@@ -177,7 +202,7 @@ final class EditorInspectorProjector {
                 asset.path(),
                 projectRoot,
                 asset.id(),
-                false,
+                Editability.READ_ONLY,
                 List.of(section("Asset", properties)));
         return selection(EditorSelectionKinds.ASSET, asset.path(), asset.id(), view);
     }
@@ -197,7 +222,7 @@ final class EditorInspectorProjector {
                 definition.source(),
                 projectRoot,
                 definition.id(),
-                false,
+                Editability.READ_ONLY,
                 List.of(section("Import", properties)));
         return selection(EditorSelectionKinds.ASSET, definition.source(), definition.id(), view);
     }
@@ -246,7 +271,8 @@ final class EditorInspectorProjector {
                     origin,
                     descriptor.isRequired(),
                     descriptor.presentation().description(),
-                    constraints(descriptor)));
+                    constraints(descriptor),
+                    Optional.empty()));
         }
         component.properties().forEach((id, value) -> {
             if (!descriptors.containsKey(id)) {
@@ -293,7 +319,8 @@ final class EditorInspectorProjector {
                 EditorDetails.ValueOrigin.AUTHORED,
                 false,
                 Optional.empty(),
-                Map.of());
+                Map.of(),
+                Optional.empty());
     }
 
     /** Creates one text-valued summary row. */
@@ -306,15 +333,39 @@ final class EditorInspectorProjector {
         return summaryProperty(id, name, ProjectValueKind.NUMBER, Integer.toString(value));
     }
 
-    /** Creates one boolean summary row. */
-    private static EditorDetails.Property booleanProperty(String id, String name, boolean value) {
-        return summaryProperty(id, name, ProjectValueKind.BOOLEAN, Boolean.toString(value));
+    /** Creates a boolean row optionally backed by one document edit command. */
+    private static EditorDetails.Property booleanProperty(
+            String id, String name, boolean value, Optional<Consumer<Boolean>> editor) {
+        Optional<EditorPropertyEditor> propertyEditor = editor.map(command -> replacement -> {
+            if (!"true".equals(replacement) && !"false".equals(replacement)) {
+                throw new IllegalArgumentException("boolean property value must be true or false");
+            }
+            command.accept(Boolean.valueOf(replacement));
+        });
+        return new EditorDetails.Property(
+                id,
+                name,
+                label(ProjectValueKind.BOOLEAN),
+                Boolean.toString(value),
+                EditorDetails.ValueOrigin.AUTHORED,
+                false,
+                Optional.empty(),
+                Map.of(),
+                propertyEditor);
     }
 
     /** Creates a projected summary row backed by immutable loaded data. */
     private static EditorDetails.Property summaryProperty(String id, String name, ProjectValueKind kind, String value) {
         return new EditorDetails.Property(
-                id, name, label(kind), value, EditorDetails.ValueOrigin.AUTHORED, false, Optional.empty(), Map.of());
+                id,
+                name,
+                label(kind),
+                value,
+                EditorDetails.ValueOrigin.AUTHORED,
+                false,
+                Optional.empty(),
+                Map.of(),
+                Optional.empty());
     }
 
     /** Creates one ordinary Inspector section. */
@@ -329,16 +380,26 @@ final class EditorInspectorProjector {
             Path source,
             Path projectRoot,
             String identity,
-            boolean generated,
+            Editability editability,
             List<EditorDetails.Section> sections) {
-        String tooltip = generated ? "Generated content · read-only" : "Read-only";
+        String tooltip = editability == Editability.GENERATED_READ_ONLY ? "Generated content · read-only" : "Read-only";
         return new EditorDetails(
                 title,
                 kind,
                 displaySource(source, projectRoot),
                 identity,
-                List.of(new EditorIcon(EditorIcons.READ_ONLY, tooltip)),
+                editability == Editability.EDITABLE
+                        ? List.of()
+                        : List.of(new EditorIcon(EditorIcons.READ_ONLY, tooltip)),
                 sections);
+    }
+
+    /** Describes whether an Inspector projection can be edited and why not. */
+    private static Editability editability(boolean generated, boolean editable) {
+        if (editable) {
+            return Editability.EDITABLE;
+        }
+        return generated ? Editability.GENERATED_READ_ONLY : Editability.READ_ONLY;
     }
 
     /** Creates a source-scoped stable selection key because entity IDs are asset-local. */
@@ -403,5 +464,11 @@ final class EditorInspectorProjector {
     /** Formats a structural value kind for secondary metadata. */
     static String label(ProjectValueKind kind) {
         return kind.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    private enum Editability {
+        EDITABLE,
+        READ_ONLY,
+        GENERATED_READ_ONLY
     }
 }

@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.project.opening;
 
 import io.github.glynch.jscene3d.editor.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.function.Consumer;
 public final class EditorProjectPublication {
     private final EditorProjectContext projects;
     private final Consumer<List<ProjectDiagnostic>> diagnostics;
+    private EditorRegistration documentRegistration = () -> {};
 
     /**
      * Creates a publisher over the editor's project and diagnostic contexts.
@@ -30,6 +32,8 @@ public final class EditorProjectPublication {
 
     /** Clears the current extension-facing project. */
     public void clearProject() {
+        documentRegistration.close();
+        documentRegistration = () -> {};
         projects.clear();
     }
 
@@ -47,6 +51,8 @@ public final class EditorProjectPublication {
                         loaded.project().root().toUri()),
                 loaded.hierarchy(),
                 loaded.assets());
+        documentRegistration.close();
+        documentRegistration = loaded.onDidChangeHierarchy().subscribe(projects::updateHierarchy);
     }
 
     /**

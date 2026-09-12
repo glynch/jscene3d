@@ -16,4 +16,5 @@ module io.github.glynch.jscene3d.editor.api {
     exports io.github.glynch.jscene3d.editor.status;
     exports io.github.glynch.jscene3d.editor.view;
     exports io.github.glynch.jscene3d.editor.window;
+    exports io.github.glynch.jscene3d.editor.workingcopy;
 }

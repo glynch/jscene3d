@@ -114,6 +114,11 @@
     -fx-text-fill: -jscene-text-muted;
 }
 
+.editor-project-context:dirty {
+    -fx-font-weight: 700;
+    -fx-text-fill: -jscene-text-strong;
+}
+
 .editor-layout-actions {
     -fx-alignment: center-left;
     -fx-spacing: 2px;
@@ -323,6 +328,25 @@
 
 .editor-area-tabs > .tab-content-area {
     -fx-background-color: -jscene-canvas;
+}
+
+.editor-editor-tab {
+    -fx-alignment: center-left;
+}
+
+.editor-editor-tab-title {
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-editor-tab-dirty {
+    -fx-background-color: -jscene-warning;
+    -fx-background-radius: 999px;
+    -fx-max-height: 9px;
+    -fx-max-width: 9px;
+    -fx-min-height: 9px;
+    -fx-min-width: 9px;
+    -fx-pref-height: 9px;
+    -fx-pref-width: 9px;
 }
 
 .editor-extensions-view {
@@ -746,6 +770,10 @@
 
 .editor-item-decoration {
     -fx-opacity: 0.9;
+}
+
+.editor-tree-item-decoration {
+    -fx-opacity: 1;
 }
 
 .editor-project-tree-marker,

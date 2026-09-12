@@ -110,6 +110,19 @@ public final class EditorProjectContext implements EditorProjects {
         notifyAssetListeners();
     }
 
+    /**
+     * Replaces only the current Hierarchy projection after an in-memory document edit.
+     *
+     * @param hierarchyRoot updated editor-internal hierarchy projection
+     */
+    public void updateHierarchy(EditorHierarchyNode hierarchyRoot) {
+        if (current.isEmpty()) {
+            throw new IllegalStateException("cannot update hierarchy without an open project");
+        }
+        hierarchy = Optional.of(Objects.requireNonNull(hierarchyRoot, "hierarchyRoot"));
+        notifyHierarchyListeners();
+    }
+
     /** Clears project-owned state before another project is loaded or after a failure. */
     public void clear() {
         if (current.isEmpty() && hierarchy.isEmpty() && assets.isEmpty()) {

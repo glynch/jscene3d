@@ -55,7 +55,7 @@ public record EditorDetails(
     }
 
     /**
-     * One typed read-only property row.
+     * One typed property row, optionally backed by an editor command.
      *
      * @param identity stable identity of the property
      * @param displayName user-facing property name
@@ -65,6 +65,7 @@ public record EditorDetails(
      * @param required whether the property is required by its schema
      * @param description optional explanation of the property
      * @param constraints named constraints applying to the property
+     * @param editor optional command accepting a complete replacement value
      */
     public record Property(
             String identity,
@@ -74,7 +75,8 @@ public record EditorDetails(
             ValueOrigin origin,
             boolean required,
             Optional<String> description,
-            Map<String, String> constraints) {
+            Map<String, String> constraints,
+            Optional<EditorPropertyEditor> editor) {
         /** Copies and validates one property projection. */
         public Property {
             Objects.requireNonNull(identity, "identity");
@@ -84,6 +86,7 @@ public record EditorDetails(
             Objects.requireNonNull(origin, "origin");
             Objects.requireNonNull(description, "description");
             constraints = Map.copyOf(constraints);
+            Objects.requireNonNull(editor, "editor");
         }
     }
 

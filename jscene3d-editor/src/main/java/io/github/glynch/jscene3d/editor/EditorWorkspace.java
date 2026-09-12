@@ -5,9 +5,11 @@
 package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
+import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
+import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.activity.JavaFxActivityBar;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
@@ -20,10 +22,14 @@ import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxEditorArea;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxPanelPart;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxViewContainer;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -31,19 +37,27 @@ import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
-/** Owns the editor's resizable JavaFX workspace and its visible read-only state. */
+/** Owns the editor's resizable JavaFX workspace and its visible document state. */
 public final class EditorWorkspace extends BorderPane {
+    private static final PseudoClass DIRTY_PSEUDO_CLASS = PseudoClass.getPseudoClass("dirty");
+
     private final EditorSelections selections;
     private final Label projectContext = new Label("No project");
     private final StringProperty previewTitle = new SimpleStringProperty("Empty Preview");
+    private final BooleanProperty previewDirty = new SimpleBooleanProperty(false);
     private final JavaFxPanelPart bottomPanel;
     private final EditorWorkbenchLayout layout;
     private final JavaFxViewContainer primaryViewContainer;
@@ -54,6 +68,13 @@ public final class EditorWorkspace extends BorderPane {
     private final JavaFxEditorArea editorArea;
     private final JavaFxWorkbenchRegions regions;
     private final EditorStatusBarPane statusBar;
+    private final MenuItem saveProjectItem = new MenuItem("Save");
+    private final MenuItem undoItem = new MenuItem("Undo");
+    private final MenuItem redoItem = new MenuItem("Redo");
+
+    private EditorRegistration documentRegistration = () -> {};
+    private EditorRegistration dirtyRegistration = () -> {};
+    private @Nullable EditorProjectSession document;
 
     /** Creates the shell around an existing viewport and the real open-project command. */
     EditorWorkspace(
@@ -75,8 +96,8 @@ public final class EditorWorkspace extends BorderPane {
         inspectorPanel
                 .getStyleClass()
                 .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_INSPECTOR_PANEL);
-        editorArea =
-                new JavaFxEditorArea(extensions, layout, icons, previewTitle, createViewportContent(viewportCanvas));
+        editorArea = new JavaFxEditorArea(
+                extensions, layout, icons, previewTitle, previewDirty, createViewportContent(viewportCanvas));
         bottomPanel = new JavaFxPanelPart(
                 extensions,
                 layout,
@@ -123,6 +144,7 @@ public final class EditorWorkspace extends BorderPane {
         Path fileName = normalized.getFileName();
         String candidateName = fileName == null ? normalized.toString() : fileName.toString();
         projectContext.setText(candidateName);
+        projectContext.setAccessibleText(candidateName);
         projectContext.setTooltip(new Tooltip(normalized.toString()));
         setProjectStatus("Opening " + candidateName + "…");
     }
@@ -134,17 +156,29 @@ public final class EditorWorkspace extends BorderPane {
      */
     public void showProject(EditorProjectSession session) {
         clearSelection();
-        String projectName = session.project().identity().name();
-        projectContext.setText(projectName);
+        documentRegistration.close();
+        dirtyRegistration.close();
+        document = Objects.requireNonNull(session, "session");
+        documentRegistration = session.onDidChangeHierarchy().subscribe(ignored -> updateDocumentCommands());
+        dirtyRegistration = session.workingCopies().onDidChangeDirty().subscribe(ignored -> updateDocumentCommands());
         previewTitle.set(session.hierarchy().label() + " Preview");
+        updateDocumentCommands();
     }
 
     /** Clears project-owned views after an unsuccessful open. */
     public void clearProject() {
         clearSelection();
+        documentRegistration.close();
+        dirtyRegistration.close();
+        documentRegistration = () -> {};
+        dirtyRegistration = () -> {};
+        document = null;
         projectContext.setText("No project");
+        projectContext.setAccessibleText("No project");
         projectContext.setTooltip(null);
         previewTitle.set("Empty Preview");
+        previewDirty.set(false);
+        updateDocumentCommands();
     }
 
     /**
@@ -167,6 +201,8 @@ public final class EditorWorkspace extends BorderPane {
 
     /** Releases workbench adapters before the extension host is closed. */
     void close() {
+        documentRegistration.close();
+        dirtyRegistration.close();
         layoutQuickAccess.close();
         layoutCustomizer.close();
         regions.close();
@@ -188,10 +224,20 @@ public final class EditorWorkspace extends BorderPane {
 
         MenuItem openProjectItem = new MenuItem("Open Project…");
         openProjectItem.setOnAction(ignored -> openProject.run());
+        saveProjectItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
+        saveProjectItem.setOnAction(ignored -> saveDocument());
         Menu file = new Menu("File");
-        file.getItems().add(openProjectItem);
-        MenuBar menuBar = new MenuBar(file);
+        file.getItems().addAll(openProjectItem, new SeparatorMenuItem(), saveProjectItem);
+        undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN));
+        undoItem.setOnAction(ignored -> undo());
+        redoItem.setAccelerator(
+                new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN));
+        redoItem.setOnAction(ignored -> redo());
+        Menu edit = new Menu("Edit");
+        edit.getItems().addAll(undoItem, redoItem);
+        MenuBar menuBar = new MenuBar(file, edit);
         menuBar.getStyleClass().add(EditorStyleClasses.EDITOR_MENU_BAR);
+        updateDocumentCommands();
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -207,6 +253,61 @@ public final class EditorWorkspace extends BorderPane {
         chrome.setAlignment(Pos.CENTER_LEFT);
         chrome.getStyleClass().add(EditorStyleClasses.EDITOR_TOP);
         return chrome;
+    }
+
+    private void saveDocument() {
+        EditorProjectSession current = document;
+        if (current == null) {
+            return;
+        }
+        try {
+            current.save();
+            setProjectStatus(current.project().identity().name() + " · saved");
+        } catch (IOException exception) {
+            setProjectStatus("Unable to save " + current.project().identity().name());
+            showMessage(new EditorMessage(
+                    EditorMessageSeverity.ERROR,
+                    "Unable to save the project: "
+                            + Objects.requireNonNullElse(exception.getMessage(), exception.toString())));
+        }
+    }
+
+    private void undo() {
+        EditorProjectSession current = document;
+        if (current != null) {
+            current.undo();
+        }
+    }
+
+    private void redo() {
+        EditorProjectSession current = document;
+        if (current != null) {
+            current.redo();
+        }
+    }
+
+    private void updateDocumentCommands() {
+        EditorProjectSession current = document;
+        boolean dirty = current != null && current.isDirty();
+        boolean worldDirty =
+                current != null && current.startupWorldWorkingCopy().isDirty();
+        previewDirty.set(worldDirty);
+        saveProjectItem.setDisable(!dirty);
+        undoItem.setDisable(current == null || !current.canUndo());
+        redoItem.setDisable(current == null || !current.canRedo());
+        if (current != null) {
+            String projectName = current.project().identity().name();
+            projectContext.setText(dirty ? projectName + '*' : projectName);
+            projectContext.setAccessibleText(dirty ? projectName + ", modified" : projectName);
+            projectContext.pseudoClassStateChanged(DIRTY_PSEUDO_CLASS, dirty);
+            if (dirty) {
+                setProjectStatus(projectName + " · modified");
+            } else {
+                setProjectStatus(projectName);
+            }
+        } else {
+            projectContext.pseudoClassStateChanged(DIRTY_PSEUDO_CLASS, false);
+        }
     }
 
     /** Clears UI and shared selection state before project-owned values are replaced. */

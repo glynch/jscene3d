@@ -24,7 +24,8 @@ final class EditorDetailsViewContractTest {
                 EditorDetails.ValueOrigin.AUTHORED,
                 false,
                 Optional.empty(),
-                Map.of());
+                Map.of(),
+                Optional.empty());
         EditorDetails details = new EditorDetails(
                 "Player",
                 "Local entity",

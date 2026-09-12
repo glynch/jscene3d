@@ -60,6 +60,21 @@ final class EditorThemeTest {
         assertThat(stylesheet.substring(extensionsListRule)).contains("-fx-fixed-cell-size: 78px;");
     }
 
+    /** Keeps resource and project dirty state prominent in the accepted editor theme. */
+    @Test
+    void givesDirtyStateProminentResourceAndProjectMarkers() throws IOException {
+        assertThat(stylesheet())
+                .contains(
+                        ".editor-project-context:dirty {",
+                        "-fx-font-weight: 700;",
+                        ".editor-editor-tab-dirty {",
+                        "-fx-background-color: -jscene-warning;",
+                        "-fx-min-height: 9px;",
+                        "-fx-min-width: 9px;",
+                        ".editor-tree-item-decoration {",
+                        "-fx-opacity: 1;");
+    }
+
     /** Loads the packaged editor stylesheet as UTF-8 text. */
     private static String stylesheet() throws IOException {
         try (InputStream input =

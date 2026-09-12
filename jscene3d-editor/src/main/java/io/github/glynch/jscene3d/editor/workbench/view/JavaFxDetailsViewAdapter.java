@@ -15,6 +15,8 @@ import java.util.Objects;
 import java.util.Optional;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
@@ -154,9 +156,8 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
     private static VBox createProperty(EditorDetails.Property property) {
         Label name = new Label(property.displayName());
         name.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_PROPERTY_NAME);
-        Label value = new Label(property.value());
+        Control value = createPropertyValue(property);
         value.setMaxWidth(Double.MAX_VALUE);
-        value.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
         value.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_VALUE);
         if (property.origin() == EditorDetails.ValueOrigin.DEFAULT) {
             value.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_DEFAULT_VALUE);
@@ -174,6 +175,19 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
         VBox row = new VBox(3.0, name, value, metadata);
         row.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_PROPERTY);
         return row;
+    }
+
+    private static Control createPropertyValue(EditorDetails.Property property) {
+        if (property.editor().isPresent() && "boolean".equals(property.valueKind())) {
+            CheckBox value = new CheckBox();
+            value.setSelected(Boolean.parseBoolean(property.value()));
+            value.setOnAction(
+                    ignored -> property.editor().orElseThrow().setValue(Boolean.toString(value.isSelected())));
+            return value;
+        }
+        Label value = new Label(property.value());
+        value.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
+        return value;
     }
 
     private static String propertyMetadata(EditorDetails.Property property) {

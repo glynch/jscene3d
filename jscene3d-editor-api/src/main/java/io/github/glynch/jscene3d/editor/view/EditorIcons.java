@@ -35,6 +35,9 @@ public final class EditorIcons {
     /** Initially disabled state. */
     public static final EditorIconId DISABLED = icon("disabled");
 
+    /** Authored content modified since the last save. */
+    public static final EditorIconId MODIFIED = icon("modified");
+
     /** Grid presentation. */
     public static final EditorIconId GRID = icon("grid");
 

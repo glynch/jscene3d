@@ -83,6 +83,7 @@ final class ExtensionDetailsView implements EditorDetailsView {
                 EditorDetails.ValueOrigin.AUTHORED,
                 true,
                 Optional.empty(),
-                Map.of());
+                Map.of(),
+                Optional.empty());
     }
 }

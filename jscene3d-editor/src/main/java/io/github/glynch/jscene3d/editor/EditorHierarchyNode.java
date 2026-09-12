@@ -18,6 +18,7 @@ public final class EditorHierarchyNode {
     private final Optional<EntityId> entityId;
     private final Optional<AssetId> definitionId;
     private final boolean enabled;
+    private final boolean modified;
     private final EditorSelection selection;
     private final List<EditorHierarchyNode> children;
 
@@ -40,11 +41,35 @@ public final class EditorHierarchyNode {
             boolean enabled,
             EditorSelection selection,
             List<EditorHierarchyNode> children) {
+        this(kind, label, entityId, definitionId, new AuthoringState(enabled, false), selection, children);
+    }
+
+    /**
+     * Stores one hierarchy projection including its current authoring state.
+     *
+     * @param kind hierarchy entry kind
+     * @param label human-readable label
+     * @param entityId optional entity identity
+     * @param definitionId optional referenced definition identity
+     * @param authoringState current enabled and modified state
+     * @param selection shared editor selection
+     * @param children ordered child entries
+     */
+    public EditorHierarchyNode(
+            Kind kind,
+            String label,
+            Optional<EntityId> entityId,
+            Optional<AssetId> definitionId,
+            AuthoringState authoringState,
+            EditorSelection selection,
+            List<EditorHierarchyNode> children) {
+        AuthoringState state = Objects.requireNonNull(authoringState, "authoringState");
         this.kind = Objects.requireNonNull(kind, "kind");
         this.label = Objects.requireNonNull(label, "label");
         this.entityId = Objects.requireNonNull(entityId, "entityId");
         this.definitionId = Objects.requireNonNull(definitionId, "definitionId");
-        this.enabled = enabled;
+        enabled = state.enabled();
+        modified = state.modified();
         this.selection = Objects.requireNonNull(selection, "selection");
         this.children = List.copyOf(children);
     }
@@ -95,6 +120,15 @@ public final class EditorHierarchyNode {
     }
 
     /**
+     * Returns whether this exact authored entry differs from its saved revision.
+     *
+     * @return whether this hierarchy entry has unsaved changes
+     */
+    public boolean isModified() {
+        return modified;
+    }
+
+    /**
      * Returns the stable shared selection represented by this hierarchy entry.
      *
      * @return shared selection
@@ -129,4 +163,12 @@ public final class EditorHierarchyNode {
         /** Local entity projected from inside a placed reusable definition. */
         GENERATED_ENTITY
     }
+
+    /**
+     * Current authored presentation state for one hierarchy entry.
+     *
+     * @param enabled whether the entry starts locally enabled
+     * @param modified whether the entry differs from its saved revision
+     */
+    public record AuthoringState(boolean enabled, boolean modified) {}
 }

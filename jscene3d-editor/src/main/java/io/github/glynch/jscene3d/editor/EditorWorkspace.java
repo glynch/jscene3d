@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
+import io.github.glynch.jscene3d.editor.workbench.activity.EditorActivitySelection;
 import io.github.glynch.jscene3d.editor.workbench.activity.JavaFxActivityBar;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
@@ -63,6 +64,8 @@ public final class EditorWorkspace extends BorderPane {
     private final JavaFxViewContainer primaryViewContainer;
     private final JavaFxViewContainer secondaryViewContainer;
     private final JavaFxActivityBar activityBar;
+    private final EditorActivitySelection activitySelection;
+    private final EditorRegistration activitySelectionRegistration;
     private final JavaFxLayoutCustomizer layoutCustomizer;
     private final JavaFxLayoutQuickAccess layoutQuickAccess;
     private final JavaFxEditorArea editorArea;
@@ -86,7 +89,9 @@ public final class EditorWorkspace extends BorderPane {
         this.selections = Objects.requireNonNull(selections, "selections");
         JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
         layout = new EditorWorkbenchLayout(extensions);
+        activitySelection = new EditorActivitySelection(extensions, layout);
         primaryViewContainer = new JavaFxViewContainer(extensions, layout, EditorViewContainers.PRIMARY_SIDEBAR, icons);
+        activitySelectionRegistration = activitySelection.observe(primaryViewContainer::showActivity);
         VBox hierarchyPanel = primaryViewContainer.node();
         hierarchyPanel
                 .getStyleClass()
@@ -108,7 +113,7 @@ public final class EditorWorkspace extends BorderPane {
                 EditorWorkspaceLayout.PREFERRED_BOTTOM_HEIGHT,
                 EditorWorkspaceLayout::verticalForBottomHeight);
         statusBar = new EditorStatusBarPane(extensions, icons);
-        activityBar = new JavaFxActivityBar(extensions, layout, icons);
+        activityBar = new JavaFxActivityBar(extensions, activitySelection, icons);
         regions = new JavaFxWorkbenchRegions(
                 layout,
                 activityBar.node(),
@@ -210,6 +215,8 @@ public final class EditorWorkspace extends BorderPane {
         layoutCustomizer.close();
         regions.close();
         activityBar.close();
+        activitySelectionRegistration.close();
+        activitySelection.close();
         editorArea.close();
         statusBar.close();
         secondaryViewContainer.close();

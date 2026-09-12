@@ -231,8 +231,11 @@ the same extension contracts intended for community contributions.
 Deliverables:
 
 - add toolkit-independent Activity Bar contributions backed by registered,
-  pinned primary-sidebar views;
+  pinned primary-sidebar view containers;
 - contribute Scene and Extensions activities from bundled editor extensions;
+- replace the complete Activity Bar-owned primary-side-bar content when a
+  different container is selected;
+- keep the selected container independent from primary-side-bar visibility;
 - allow the active activity to collapse and restore the primary side bar;
 - expose safe extension metadata through the editor extension context;
 - list activated bundled extensions in the Extensions view and open the selected

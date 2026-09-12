@@ -9,7 +9,6 @@ import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
-import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,31 +17,31 @@ import java.util.Objects;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
-import org.jspecify.annotations.Nullable;
 
 /** JavaFX adapter for extension-contributed editor activities. */
 public final class JavaFxActivityBar implements AutoCloseable {
-    private final EditorExtensionHost extensions;
-    private final EditorWorkbenchLayout layout;
+    private final EditorActivitySelection selection;
     private final JavaFxIconRenderer icons;
     private final VBox root = new VBox();
     private final Map<ActivityId, Button> buttons = new LinkedHashMap<>();
-    private final EditorRegistration registration;
-    private @Nullable ActivityId selected;
+    private final EditorRegistration activityRegistration;
+    private final EditorRegistration selectionRegistration;
 
     /**
      * Creates an Activity Bar which follows extension contributions.
      *
      * @param extensions active extension host
-     * @param layout current session layout
+     * @param selection selected activity container
      * @param icons icon renderer
      */
-    public JavaFxActivityBar(EditorExtensionHost extensions, EditorWorkbenchLayout layout, JavaFxIconRenderer icons) {
-        this.extensions = Objects.requireNonNull(extensions, "extensions");
-        this.layout = Objects.requireNonNull(layout, "layout");
+    public JavaFxActivityBar(
+            EditorExtensionHost extensions, EditorActivitySelection selection, JavaFxIconRenderer icons) {
+        EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
+        this.selection = Objects.requireNonNull(selection, "selection");
         this.icons = Objects.requireNonNull(icons, "icons");
         root.getStyleClass().add(EditorStyleClasses.EDITOR_ACTIVITY_BAR);
-        registration = extensions.observeActivities(this::showActivities);
+        activityRegistration = host.observeActivities(this::showActivities);
+        selectionRegistration = selection.observe(ignored -> updateSelection());
     }
 
     /**
@@ -56,7 +55,8 @@ public final class JavaFxActivityBar implements AutoCloseable {
 
     @Override
     public void close() {
-        registration.close();
+        selectionRegistration.close();
+        activityRegistration.close();
         buttons.clear();
         root.getChildren().clear();
     }
@@ -69,46 +69,21 @@ public final class JavaFxActivityBar implements AutoCloseable {
             button.setGraphic(icons.create(activity.icon(), EditorStyleClasses.EDITOR_ACTIVITY_ICON));
             button.setAccessibleText(activity.title());
             button.setTooltip(new Tooltip(activity.title()));
-            button.setOnAction(ignored -> select(activity));
+            button.setOnAction(ignored -> selection.select(activity.id()));
             button.getStyleClass().add(EditorStyleClasses.EDITOR_ACTIVITY_BUTTON);
             buttons.put(activity.id(), button);
             root.getChildren().add(button);
         }
-        EditorActivityContribution active = activities.stream()
-                .filter(activity -> activity.id().equals(selected))
-                .findFirst()
-                .orElseGet(() -> activities.stream().findFirst().orElse(null));
-        if (active == null) {
-            selected = null;
-        } else {
-            selected = active.id();
-            extensions.showView(active.view());
-        }
-        updateSelection();
-    }
-
-    private void select(EditorActivityContribution activity) {
-        if (activity.id().equals(selected)) {
-            layout.partOf(activity.view()).ifPresent(part -> {
-                boolean reveal = !layout.isVisible(part);
-                layout.setVisible(part, reveal);
-                if (reveal) {
-                    extensions.showView(activity.view());
-                }
-            });
-            return;
-        }
-        selected = activity.id();
-        extensions.showView(activity.view());
         updateSelection();
     }
 
     private void updateSelection() {
         buttons.values()
                 .forEach(button -> button.getStyleClass().remove(EditorStyleClasses.EDITOR_ACTIVITY_BUTTON_ACTIVE));
-        Button active = selected == null ? null : buttons.get(selected);
-        if (active != null) {
-            active.getStyleClass().add(EditorStyleClasses.EDITOR_ACTIVITY_BUTTON_ACTIVE);
-        }
+        selection
+                .current()
+                .selected()
+                .map(buttons::get)
+                .ifPresent(active -> active.getStyleClass().add(EditorStyleClasses.EDITOR_ACTIVITY_BUTTON_ACTIVE));
     }
 }

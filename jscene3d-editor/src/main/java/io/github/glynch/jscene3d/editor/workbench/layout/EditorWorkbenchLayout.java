@@ -241,7 +241,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
 
     private void replaceActivities(List<EditorActivityContribution> replacement) {
         Set<ViewId> pinned = new LinkedHashSet<>();
-        Objects.requireNonNull(replacement, "replacement").forEach(activity -> pinned.add(activity.view()));
+        Objects.requireNonNull(replacement, "replacement").forEach(activity -> pinned.addAll(activity.views()));
         activityViews = Set.copyOf(pinned);
         overrides.keySet().removeAll(activityViews);
         notifyObservers();

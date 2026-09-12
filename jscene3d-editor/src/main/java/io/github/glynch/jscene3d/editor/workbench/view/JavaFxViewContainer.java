@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import io.github.glynch.jscene3d.editor.workbench.activity.EditorActivitySelectionState;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorViewPlacement;
@@ -34,6 +35,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
     private final EditorRegistration requestRegistration;
     private List<EditorViewPlacement> placements = List.of();
     private Optional<ViewId> shownView = Optional.empty();
+    private Optional<EditorActivitySelectionState> activitySelection = Optional.empty();
 
     /**
      * Creates a container which immediately observes current placements for one location.
@@ -99,6 +101,17 @@ public final class JavaFxViewContainer implements AutoCloseable {
         renderPlacements();
     }
 
+    /**
+     * Replaces Activity Bar-owned content with the selected activity container while retaining ordinary moved views.
+     *
+     * @param selection selected activity and complete activity-owned view membership
+     */
+    public void showActivity(EditorActivitySelectionState selection) {
+        activitySelection = Optional.of(Objects.requireNonNull(selection, "selection"));
+        shownView = Optional.empty();
+        renderPlacements();
+    }
+
     @Override
     public void close() {
         requestRegistration.close();
@@ -117,6 +130,7 @@ public final class JavaFxViewContainer implements AutoCloseable {
         List<EditorViewPlacement> matching = placements.stream()
                 .filter(placement -> placement.container().equals(id))
                 .toList();
+        matching = filterActivityViews(matching);
         List<EditorViewPlacement> available = matching;
         Optional<EditorViewPlacement> preferred = shownView.flatMap(view -> available.stream()
                 .filter(placement -> placement.view().id().equals(view))
@@ -132,6 +146,14 @@ public final class JavaFxViewContainer implements AutoCloseable {
         } else if (!matching.isEmpty()) {
             showTabs(matching);
         }
+    }
+
+    private List<EditorViewPlacement> filterActivityViews(List<EditorViewPlacement> matching) {
+        return activitySelection
+                .map(selection -> matching.stream()
+                        .filter(placement -> selection.includes(placement.view().id()))
+                        .toList())
+                .orElse(matching);
     }
 
     private void showSingle(EditorViewPlacement placement) {

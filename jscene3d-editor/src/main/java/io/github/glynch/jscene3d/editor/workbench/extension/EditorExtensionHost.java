@@ -276,13 +276,13 @@ public final class EditorExtensionHost implements AutoCloseable {
     private EditorRegistration registerActivity(EditorActivityContribution contribution) {
         requireOpen();
         EditorActivityContribution registered = Objects.requireNonNull(contribution, "contribution");
-        EditorViewContribution activityView = views.get(registered.view());
-        if (activityView == null) {
-            throw new IllegalArgumentException("activity view is not registered: " + registered.view());
-        }
-        if (!activityView.container().equals(EditorViewContainers.PRIMARY_SIDEBAR)) {
-            throw new IllegalArgumentException(
-                    "activity view must be contributed to the primary sidebar: " + registered.view());
+        registered.views().forEach(this::requirePrimarySidebarView);
+        Optional<EditorActivityContribution> owningActivity = activities.values().stream()
+                .filter(activity -> activity.views().stream().anyMatch(registered.views()::contains))
+                .findFirst();
+        if (owningActivity.isPresent()) {
+            throw new IllegalArgumentException("activity view already belongs to another container: "
+                    + owningActivity.orElseThrow().id());
         }
         if (activities.putIfAbsent(registered.id(), registered) != null) {
             throw new IllegalArgumentException("activity identity is already registered: " + registered.id());
@@ -293,6 +293,16 @@ public final class EditorExtensionHost implements AutoCloseable {
                 notifyActivityObservers();
             }
         });
+    }
+
+    private void requirePrimarySidebarView(ViewId view) {
+        EditorViewContribution activityView = views.get(view);
+        if (activityView == null) {
+            throw new IllegalArgumentException("activity view is not registered: " + view);
+        }
+        if (!activityView.container().equals(EditorViewContainers.PRIMARY_SIDEBAR)) {
+            throw new IllegalArgumentException("activity view must be contributed to the primary sidebar: " + view);
+        }
     }
 
     private EditorRegistration registerView(EditorViewContribution contribution) {

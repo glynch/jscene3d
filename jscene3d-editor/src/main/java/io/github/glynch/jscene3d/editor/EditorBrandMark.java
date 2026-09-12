@@ -9,11 +9,11 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 
 /** Displays the packaged raster derived from the approved JScene3D SVG brand mark. */
-final class EditorBrandMark extends ImageView {
+public final class EditorBrandMark extends ImageView {
     private static final String MARK_RESOURCE = "splash/jscene3d-mark.png";
 
     /** Creates an accessible, non-interactive mark at the requested square size. */
-    EditorBrandMark(double size) {
+    public EditorBrandMark(double size) {
         super(loadMark());
         setFitWidth(size);
         setFitHeight(size);

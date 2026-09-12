@@ -184,10 +184,6 @@
     -fx-pref-width: 160px;
 }
 
-.editor-open-project-button {
-    -fx-padding: 4px 9px;
-}
-
 .button,
 .toggle-button,
 .combo-box-base {
@@ -438,6 +434,69 @@
     -fx-min-width: 9px;
     -fx-pref-height: 9px;
     -fx-pref-width: 9px;
+}
+
+.editor-welcome {
+    -fx-alignment: center;
+    -fx-background-color: -jscene-canvas;
+}
+
+.editor-welcome-content {
+    -fx-max-width: 680px;
+    -fx-padding: 56px 64px 96px 64px;
+}
+
+.editor-welcome-identity {
+    -fx-alignment: center-left;
+}
+
+.editor-welcome-mark {
+    -fx-opacity: 1;
+}
+
+.editor-welcome-title {
+    -fx-font-size: 32px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-welcome-subtitle {
+    -fx-font-size: 15px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-welcome-section-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-welcome-action {
+    -fx-alignment: center-left;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-font-size: 14px;
+    -fx-graphic-text-gap: 9px;
+    -fx-padding: 7px 9px;
+    -fx-text-fill: -jscene-information;
+}
+
+.editor-welcome-action:hover {
+    -fx-background-color: -jscene-hover;
+    -fx-border-color: transparent;
+}
+
+.editor-welcome-action:focused {
+    -fx-border-color: -jscene-focus;
+}
+
+.editor-welcome-action-icon {
+    -fx-max-height: 20px;
+    -fx-max-width: 20px;
+    -fx-min-height: 20px;
+    -fx-min-width: 20px;
+    -fx-pref-height: 20px;
+    -fx-pref-width: 20px;
 }
 
 .editor-settings-root,

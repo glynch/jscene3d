@@ -92,6 +92,21 @@ final class EditorThemeTest {
                         ".editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .tab-close-button {");
     }
 
+    /** Styles the no-project action in Welcome rather than retaining a permanent toolbar action. */
+    @Test
+    void stylesTheWelcomeProjectAction() throws IOException {
+        assertThat(stylesheet())
+                .contains(
+                        ".editor-welcome {",
+                        ".editor-welcome-content {",
+                        ".editor-welcome-title {",
+                        ".editor-welcome-subtitle {",
+                        ".editor-welcome-action {",
+                        ".editor-welcome-action:hover {",
+                        ".editor-welcome-action:focused {")
+                .doesNotContain(".editor-open-project-button {");
+    }
+
     /** Loads the packaged editor stylesheet as UTF-8 text. */
     private static String stylesheet() throws IOException {
         try (InputStream input =

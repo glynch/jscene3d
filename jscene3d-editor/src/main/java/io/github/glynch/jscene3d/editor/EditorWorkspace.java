@@ -37,7 +37,6 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.OverrunStyle;
@@ -56,7 +55,6 @@ public final class EditorWorkspace extends BorderPane {
     private static final double TOP_CHROME_MARK_SIZE = 24.0;
 
     private final EditorSelections selections;
-    private final EditorExtensionHost extensions;
     private final EditorWindowCloseGuard closeGuard;
     private final Label projectContext = new Label("No project");
     private final StringProperty previewTitle = new SimpleStringProperty("Empty Preview");
@@ -89,35 +87,40 @@ public final class EditorWorkspace extends BorderPane {
             EditorExtensionHost extensions,
             EditorBuildInfo buildInfo) {
         this.selections = Objects.requireNonNull(selections, "selections");
-        this.extensions = Objects.requireNonNull(extensions, "extensions");
-        closeGuard = new EditorWindowCloseGuard(extensions::showDialog);
+        EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
+        closeGuard = new EditorWindowCloseGuard(host::showDialog);
         JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
-        layout = new EditorWorkbenchLayout(extensions);
-        activitySelection = new EditorActivitySelection(extensions, layout);
-        primaryViewContainer = new JavaFxViewContainer(extensions, layout, EditorViewContainers.PRIMARY_SIDEBAR, icons);
+        layout = new EditorWorkbenchLayout(host);
+        activitySelection = new EditorActivitySelection(host, layout);
+        primaryViewContainer = new JavaFxViewContainer(host, layout, EditorViewContainers.PRIMARY_SIDEBAR, icons);
         activitySelectionRegistration = activitySelection.observe(primaryViewContainer::showActivity);
         VBox hierarchyPanel = primaryViewContainer.node();
         hierarchyPanel
                 .getStyleClass()
                 .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_HIERARCHY_PANEL);
-        secondaryViewContainer =
-                new JavaFxViewContainer(extensions, layout, EditorViewContainers.SECONDARY_SIDEBAR, icons);
+        secondaryViewContainer = new JavaFxViewContainer(host, layout, EditorViewContainers.SECONDARY_SIDEBAR, icons);
         VBox inspectorPanel = secondaryViewContainer.node();
         inspectorPanel
                 .getStyleClass()
                 .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_INSPECTOR_PANEL);
         editorArea = new JavaFxEditorArea(
-                extensions, layout, icons, previewTitle, previewDirty, createViewportContent(viewportCanvas));
+                host,
+                layout,
+                icons,
+                previewTitle,
+                previewDirty,
+                createViewportContent(viewportCanvas),
+                () -> host.execute(EditorCommands.OPEN_PROJECT));
         bottomPanel = new JavaFxPanelPart(
-                extensions,
+                host,
                 layout,
                 EditorViewContainers.BOTTOM_PANEL,
                 icons,
                 EditorWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT,
                 EditorWorkspaceLayout.PREFERRED_BOTTOM_HEIGHT,
                 EditorWorkspaceLayout::verticalForBottomHeight);
-        statusBar = new EditorStatusBarPane(extensions, icons);
-        activityBar = new JavaFxActivityBar(extensions, activitySelection, icons);
+        statusBar = new EditorStatusBarPane(host, icons);
+        activityBar = new JavaFxActivityBar(host, activitySelection, icons);
         regions = new JavaFxWorkbenchRegions(
                 layout,
                 activityBar.node(),
@@ -126,10 +129,10 @@ public final class EditorWorkspace extends BorderPane {
                 bottomPanel,
                 inspectorPanel,
                 statusBar.node());
-        layoutCustomizer = new JavaFxLayoutCustomizer(layout, icons, extensions::showView);
+        layoutCustomizer = new JavaFxLayoutCustomizer(layout, icons, host::showView);
         layoutQuickAccess = new JavaFxLayoutQuickAccess(layout, icons, layoutCustomizer.button());
         commandSet = new EditorWorkbenchCommandSet(
-                extensions,
+                host,
                 new EditorWorkbenchCommandSet.Actions(
                         openProject,
                         this::showProjectSettings,
@@ -138,7 +141,7 @@ public final class EditorWorkspace extends BorderPane {
                         this::redo,
                         requestClose),
                 Objects.requireNonNull(buildInfo, "buildInfo").aboutText());
-        menuBar = new JavaFxMenuBar(extensions);
+        menuBar = new JavaFxMenuBar(host);
         setTop(createTopChrome(menuBar.node(), layoutQuickAccess.node()));
         setCenter(regions.node());
         getStyleClass().add(EditorStyleClasses.EDITOR_SHELL);
@@ -147,6 +150,11 @@ public final class EditorWorkspace extends BorderPane {
     /** Applies bounded initial divider positions after the stage has completed its first layout. */
     void applyInitialDividerPositions() {
         regions.applyInitialDividerPositions();
+    }
+
+    /** Opens the Welcome editor when startup completes without a requested project. */
+    void showWelcome() {
+        editorArea.showEmptyWorkspace();
     }
 
     /** Updates the viewport portion of the status bar. */
@@ -184,6 +192,7 @@ public final class EditorWorkspace extends BorderPane {
         documentRegistration = session.onDidChangeHierarchy().subscribe(ignored -> updateDocumentCommands());
         dirtyRegistration = session.workingCopies().onDidChangeDirty().subscribe(ignored -> updateDocumentCommands());
         previewTitle.set(session.hierarchy().label() + " Preview");
+        editorArea.showProjectPreview();
         updateDocumentCommands();
     }
 
@@ -192,7 +201,7 @@ public final class EditorWorkspace extends BorderPane {
         clearSelection();
         documentRegistration.close();
         dirtyRegistration.close();
-        editorArea.closeProjectSettings();
+        editorArea.showEmptyWorkspace();
         documentRegistration = () -> {};
         dirtyRegistration = () -> {};
         document = null;
@@ -268,11 +277,7 @@ public final class EditorWorkspace extends BorderPane {
         projectContext.setMaxWidth(300.0);
         projectContext.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
         projectContext.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_CONTEXT);
-        Button openButton = new Button("Open Project…");
-        openButton.setOnAction(ignored -> extensions.execute(EditorCommands.OPEN_PROJECT));
-        openButton.getStyleClass().add(EditorStyleClasses.EDITOR_OPEN_PROJECT_BUTTON);
-
-        HBox chrome = new HBox(8.0, productMark, productKind, menus, spacer, projectContext, layoutActions, openButton);
+        HBox chrome = new HBox(8.0, productMark, productKind, menus, spacer, projectContext, layoutActions);
         chrome.setAlignment(Pos.CENTER_LEFT);
         chrome.getStyleClass().add(EditorStyleClasses.EDITOR_TOP);
         return chrome;

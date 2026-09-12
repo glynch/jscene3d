@@ -7,18 +7,33 @@ package io.github.glynch.jscene3d.editor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
+import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
+import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
+import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import io.github.glynch.jscene3d.editor.workbench.view.JavaFxEditorArea;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tab;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 
@@ -105,6 +120,68 @@ final class EditorSplashScreenTest {
         assertThat(projectName.getText()).isEqualTo("Doomed Corridors");
         assertThat(projectPath.getTooltip().getText()).isEqualTo(project.toString());
         assertThat(percentage.getText()).isEqualTo("96%");
+        assertEditorAreaStartupPresentation();
+    }
+
+    /** Verifies the mutually exclusive no-project and project startup presentations. */
+    private static void assertEditorAreaStartupPresentation() {
+        EditorProjectContext projects = new EditorProjectContext();
+        EditorSelectionContext selections = new EditorSelectionContext();
+        EditorConfigurationContext configuration = new EditorConfigurationContext();
+        AtomicBoolean openProjectRequested = new AtomicBoolean();
+        StackPane previewContent = new StackPane();
+        try (EditorExtensionHost extensions = new EditorExtensionHost(projects, selections, configuration);
+                EditorWorkbenchLayout layout = new EditorWorkbenchLayout(extensions);
+                JavaFxEditorArea editorArea = new JavaFxEditorArea(
+                        extensions,
+                        layout,
+                        JavaFxIconRenderer.builtIn(),
+                        new SimpleStringProperty("Doomed Corridors Preview"),
+                        new SimpleBooleanProperty(false),
+                        previewContent,
+                        () -> openProjectRequested.set(true))) {
+            assertThat(editorArea.node().getTabs())
+                    .singleElement()
+                    .extracting(Tab::getContent)
+                    .isSameAs(previewContent);
+
+            editorArea.showEmptyWorkspace();
+            assertThat(editorArea.node().getTabs())
+                    .singleElement()
+                    .extracting(Tab::getText)
+                    .isEqualTo("Welcome");
+            Tab welcome = editorArea.node().getTabs().getFirst();
+            Button openProject =
+                    (Button) findByStyleClass(welcome.getContent(), EditorStyleClasses.EDITOR_WELCOME_OPEN_PROJECT)
+                            .orElseThrow();
+            openProject.fire();
+            assertThat(openProjectRequested).isTrue();
+
+            editorArea.showProjectPreview();
+            assertThat(editorArea.node().getTabs()).hasSize(2);
+            assertThat(editorArea.node().getSelectionModel().getSelectedItem()).isNotSameAs(welcome);
+
+            editorArea.showEmptyWorkspace();
+            assertThat(editorArea.node().getTabs())
+                    .singleElement()
+                    .extracting(Tab::getText)
+                    .isEqualTo("Welcome");
+        } finally {
+            configuration.close();
+        }
+    }
+
+    private static Optional<Node> findByStyleClass(Node node, String styleClass) {
+        if (node.getStyleClass().contains(styleClass)) {
+            return Optional.of(node);
+        }
+        if (node instanceof Parent parent) {
+            return parent.getChildrenUnmodifiable().stream()
+                    .map(child -> findByStyleClass(child, styleClass))
+                    .flatMap(Optional::stream)
+                    .findFirst();
+        }
+        return Optional.empty();
     }
 
     private static String selector(String styleClass) {

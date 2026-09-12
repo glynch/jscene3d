@@ -32,7 +32,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import org.jspecify.annotations.Nullable;
 
-/** Hosts the permanent scene preview and extension-provided editor-area views. */
+/** Hosts Welcome, the project preview, and extension-provided editor-area views. */
 public final class JavaFxEditorArea implements AutoCloseable {
     private final JavaFxViewRenderer renderer;
     private final TabPane tabs = new TabPane();
@@ -43,6 +43,9 @@ public final class JavaFxEditorArea implements AutoCloseable {
     private final Map<ViewId, OpenView> openViews = new LinkedHashMap<>();
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
+    private final JavaFxIconRenderer icons;
+    private final Runnable openProject;
+    private @Nullable Tab welcomeTab;
     private @Nullable Tab settingsTab;
 
     /**
@@ -54,6 +57,7 @@ public final class JavaFxEditorArea implements AutoCloseable {
      * @param previewTitleProperty observable scene-preview title
      * @param previewDirtyProperty observable scene-preview dirty state
      * @param previewContent rendered scene-preview content
+     * @param openProject opens a project through the workbench command
      */
     public JavaFxEditorArea(
             EditorExtensionHost extensions,
@@ -61,9 +65,12 @@ public final class JavaFxEditorArea implements AutoCloseable {
             JavaFxIconRenderer icons,
             ReadOnlyStringProperty previewTitleProperty,
             ReadOnlyBooleanProperty previewDirtyProperty,
-            Node previewContent) {
+            Node previewContent,
+            Runnable openProject) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
-        renderer = new JavaFxViewRenderer(host, Objects.requireNonNull(icons, "icons"));
+        this.icons = Objects.requireNonNull(icons, "icons");
+        this.openProject = Objects.requireNonNull(openProject, "openProject");
+        renderer = new JavaFxViewRenderer(host, this.icons);
         ReadOnlyStringProperty title = Objects.requireNonNull(previewTitleProperty, "previewTitleProperty");
         ReadOnlyBooleanProperty dirty = Objects.requireNonNull(previewDirtyProperty, "previewDirtyProperty");
         previewTitle.textProperty().bind(title);
@@ -81,8 +88,8 @@ public final class JavaFxEditorArea implements AutoCloseable {
         preview.setGraphic(previewGraphic);
         preview.setContent(Objects.requireNonNull(previewContent, "previewContent"));
         preview.setClosable(false);
-        tabs.getTabs().add(preview);
         tabs.getStyleClass().add(EditorStyleClasses.EDITOR_AREA_TABS);
+        tabs.getTabs().add(preview);
         viewRegistration = Objects.requireNonNull(layout, "layout").observeViews(this::showPlacements);
         requestRegistration = host.observeViewRequests(this::reveal);
     }
@@ -94,6 +101,35 @@ public final class JavaFxEditorArea implements AutoCloseable {
      */
     public TabPane node() {
         return tabs;
+    }
+
+    /** Opens or reveals the no-project Welcome editor. */
+    public void showWelcome() {
+        Tab current = welcomeTab;
+        if (current == null) {
+            Tab created = new Tab("Welcome", new JavaFxWelcomePane(icons, openProject));
+            created.setClosable(true);
+            created.setOnClosed(ignored -> welcomeTab = null);
+            welcomeTab = created;
+            tabs.getTabs().addFirst(created);
+            current = created;
+        }
+        tabs.getSelectionModel().select(current);
+    }
+
+    /** Opens or reveals the project preview without closing an existing Welcome editor. */
+    public void showProjectPreview() {
+        if (!tabs.getTabs().contains(preview)) {
+            tabs.getTabs().add(preview);
+        }
+        tabs.getSelectionModel().select(preview);
+    }
+
+    /** Removes project-owned editors and restores a Welcome editor when no project remains. */
+    public void showEmptyWorkspace() {
+        closeProjectSettings();
+        tabs.getTabs().remove(preview);
+        showWelcome();
     }
 
     /** Opens or reveals the generated settings editor for the current project. */
@@ -127,6 +163,7 @@ public final class JavaFxEditorArea implements AutoCloseable {
     @Override
     public void close() {
         closeProjectSettings();
+        welcomeTab = null;
         requestRegistration.close();
         viewRegistration.close();
         openViews.values().forEach(OpenView::close);

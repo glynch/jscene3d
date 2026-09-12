@@ -245,8 +245,6 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_MODAL_ROOT = "editor-modal-root";
     /** CSS class named {@value}. */
-    public static final String EDITOR_OPEN_PROJECT_BUTTON = "editor-open-project-button";
-    /** CSS class named {@value}. */
     public static final String EDITOR_PANEL = "editor-panel";
     /** CSS class named {@value}. */
     public static final String EDITOR_PANEL_CLOSE = "editor-panel-close";
@@ -396,6 +394,26 @@ public final class EditorStyleClasses {
     public static final String EDITOR_TREE_VIEW = "editor-tree-view";
     /** CSS class named {@value}. */
     public static final String EDITOR_UPPER_WORKSPACE_SPLIT = "editor-upper-workspace-split";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME = "editor-welcome";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_ACTION = "editor-welcome-action";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_ACTION_ICON = "editor-welcome-action-icon";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_CONTENT = "editor-welcome-content";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_IDENTITY = "editor-welcome-identity";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_MARK = "editor-welcome-mark";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_OPEN_PROJECT = "editor-welcome-open-project";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_SECTION_TITLE = "editor-welcome-section-title";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_SUBTITLE = "editor-welcome-subtitle";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_WELCOME_TITLE = "editor-welcome-title";
     /** CSS class named {@value}. */
     public static final String EDITOR_VIEWPORT = "editor-viewport";
     /** CSS class named {@value}. */

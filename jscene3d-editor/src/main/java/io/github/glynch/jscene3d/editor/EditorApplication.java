@@ -93,7 +93,7 @@ public final class EditorApplication extends Application {
         ViewportController controller = new ViewportController(
                 viewportCanvas,
                 editorWorkspace::setViewportStatus,
-                () -> finishStartupSplash(loadingScreen, startupProjectRequested),
+                () -> finishStartupSplash(loadingScreen, editorWorkspace, startupProjectRequested),
                 () -> completeDisposal(stage));
         canvas = viewportCanvas;
         workspace = editorWorkspace;
@@ -191,9 +191,11 @@ public final class EditorApplication extends Application {
         }
     }
 
-    /** Dismisses startup branding after the empty viewport presents when no project was requested. */
-    private static void finishStartupSplash(EditorSplashScreen loadingScreen, boolean startupProjectRequested) {
+    /** Presents Welcome and dismisses startup branding when no project was requested. */
+    private static void finishStartupSplash(
+            EditorSplashScreen loadingScreen, EditorWorkspace editorWorkspace, boolean startupProjectRequested) {
         if (!startupProjectRequested) {
+            editorWorkspace.showWelcome();
             loadingScreen.finish();
         }
     }

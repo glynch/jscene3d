@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.editor.builtin.hierarchy;
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.activity.ActivityId;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
+import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
+import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
@@ -39,7 +41,8 @@ public final class HierarchyExtension implements EditorExtension {
     /** Stable identity of the built-in Hierarchy view. */
     public static final ViewId VIEW_ID = new ViewId("io.github.glynch.jscene3d.editor.hierarchy");
 
-    private static final ActivityId ACTIVITY_ID = new ActivityId("io.github.glynch.jscene3d.editor.scene-activity");
+    /** Stable identity of the built-in Scene Activity Bar container. */
+    public static final ActivityId ACTIVITY_ID = new ActivityId("io.github.glynch.jscene3d.editor.scene-activity");
 
     private final EditorProjectContext projects;
 
@@ -76,11 +79,19 @@ public final class HierarchyExtension implements EditorExtension {
         editor.subscriptions()
                 .add(editor.views()
                         .register(new EditorViewContribution(
-                                new HierarchyTreeView(selections), EditorViewContainers.PRIMARY_SIDEBAR, 10)));
+                                new HierarchyTreeView(selections),
+                                EditorViewContainers.PRIMARY_SIDEBAR,
+                                10,
+                                EditorContextCondition.isTrue(EditorContextKeys.PROJECT_OPEN))));
         editor.subscriptions()
                 .add(editor.activities()
                         .register(new EditorActivityContribution(
-                                ACTIVITY_ID, "Scene", new EditorIcon(EditorIcons.SCENE, "Scene"), VIEW_ID, 10)));
+                                ACTIVITY_ID,
+                                "Scene",
+                                new EditorIcon(EditorIcons.SCENE, "Scene"),
+                                VIEW_ID,
+                                10,
+                                EditorContextCondition.isTrue(EditorContextKeys.PROJECT_OPEN))));
     }
 
     private static void selectInitialEntry(EditorSelections selections, Optional<EditorHierarchyNode> hierarchy) {

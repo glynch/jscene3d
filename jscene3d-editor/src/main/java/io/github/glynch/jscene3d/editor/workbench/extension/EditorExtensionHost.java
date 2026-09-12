@@ -15,6 +15,9 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistration;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
+import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
+import io.github.glynch.jscene3d.editor.context.EditorContextKey;
+import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
 import io.github.glynch.jscene3d.editor.diagnostic.DiagnosticCollectionId;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostic;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
@@ -45,6 +48,7 @@ import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorCommandMenuRegistry;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
+import io.github.glynch.jscene3d.editor.workbench.context.EditorContextState;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
@@ -70,6 +74,8 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final EditorProjectContext projects;
     private final EditorSelections selections;
     private final EditorConfiguration configuration;
+    private final EditorContextState context = new EditorContextState();
+    private final EditorRegistration projectContextRegistration;
     private final Map<String, ExtensionSubscriptionsImpl> activeExtensions = new LinkedHashMap<>();
     private final Map<String, EditorExtensionDescriptor> extensionDescriptors = new LinkedHashMap<>();
     private final List<Consumer<List<EditorExtensionDescriptor>>> extensionObservers = new ArrayList<>();
@@ -111,6 +117,8 @@ public final class EditorExtensionHost implements AutoCloseable {
         this.projects = Objects.requireNonNull(projects, "projects");
         this.selections = Objects.requireNonNull(selections, "selections");
         this.configuration = Objects.requireNonNull(configuration, "configuration");
+        projectContextRegistration =
+                this.projects.observe(project -> setContext(EditorContextKeys.PROJECT_OPEN, project.isPresent()));
     }
 
     /**
@@ -136,9 +144,9 @@ public final class EditorExtensionHost implements AutoCloseable {
                     "extension descriptor identity does not match extension identity: " + id);
         }
         ExtensionSubscriptionsImpl subscriptions = new ExtensionSubscriptionsImpl();
-        EditorExtensionContext context = new Context(subscriptions);
+        EditorExtensionContext extensionContext = new Context(subscriptions);
         try {
-            candidate.activate(context);
+            candidate.activate(extensionContext);
             activeExtensions.put(id, subscriptions);
             extensionDescriptors.put(id, descriptor);
             notifyExtensionObservers();
@@ -282,6 +290,7 @@ public final class EditorExtensionHost implements AutoCloseable {
             return;
         }
         closed = true;
+        projectContextRegistration.close();
         List.copyOf(activeExtensions.values()).reversed().forEach(ExtensionSubscriptionsImpl::close);
         activeExtensions.clear();
         extensionDescriptors.clear();
@@ -396,14 +405,41 @@ public final class EditorExtensionHost implements AutoCloseable {
 
     private List<EditorViewContribution> viewSnapshot() {
         return views.values().stream()
+                .filter(contribution -> matches(contribution.condition()))
                 .sorted((left, right) -> Integer.compare(left.order(), right.order()))
                 .toList();
     }
 
     private List<EditorActivityContribution> activitySnapshot() {
         return activities.values().stream()
+                .filter(this::isAvailable)
                 .sorted(Comparator.comparingInt(EditorActivityContribution::order))
                 .toList();
+    }
+
+    /** Returns whether a view remains registered even when its context condition is currently false. */
+    public boolean isViewRegistered(ViewId view) {
+        requireOpen();
+        return views.containsKey(Objects.requireNonNull(view, "view"));
+    }
+
+    private boolean isAvailable(EditorActivityContribution contribution) {
+        return matches(contribution.condition())
+                && contribution.views().stream()
+                        .map(views::get)
+                        .filter(Objects::nonNull)
+                        .anyMatch(view -> matches(view.condition()));
+    }
+
+    private boolean matches(Optional<EditorContextCondition<?>> condition) {
+        return condition.map(candidate -> candidate.matches(context)).orElse(true);
+    }
+
+    private <T> void setContext(EditorContextKey<T> key, T value) {
+        if (context.set(key, value)) {
+            notifyViewObservers();
+            notifyActivityObservers();
+        }
     }
 
     private void notifyActivityObservers() {
@@ -583,6 +619,9 @@ public final class EditorExtensionHost implements AutoCloseable {
             ViewId id = Objects.requireNonNull(view, "view");
             if (!views.containsKey(id)) {
                 throw new IllegalArgumentException("view identity is not registered: " + id);
+            }
+            if (!matches(views.get(id).condition())) {
+                throw new IllegalStateException("view is not available in the current editor context: " + id);
             }
             List.copyOf(viewRequestObservers).forEach(observer -> observer.accept(id));
         }

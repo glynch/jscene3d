@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.inspector;
 
+import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
+import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
@@ -53,7 +55,8 @@ public final class InspectorExtension implements EditorExtension {
                         .register(new EditorViewContribution(
                                 new InspectorDetailsView(editor.selections()),
                                 EditorViewContainers.SECONDARY_SIDEBAR,
-                                10)));
+                                10,
+                                EditorContextCondition.isTrue(EditorContextKeys.PROJECT_OPEN))));
     }
 
     private record InspectorDetailsView(EditorSelections selections) implements EditorDetailsView {

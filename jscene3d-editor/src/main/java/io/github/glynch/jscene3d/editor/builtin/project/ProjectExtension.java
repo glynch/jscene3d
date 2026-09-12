@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.project;
 
+import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
+import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
@@ -82,7 +84,10 @@ public final class ProjectExtension implements EditorExtension {
         editor.subscriptions()
                 .add(editor.views()
                         .register(new EditorViewContribution(
-                                new ProjectCollectionView(selections), EditorViewContainers.BOTTOM_PANEL, 10)));
+                                new ProjectCollectionView(selections),
+                                EditorViewContainers.BOTTOM_PANEL,
+                                10,
+                                EditorContextCondition.isTrue(EditorContextKeys.PROJECT_OPEN))));
     }
 
     private final class ProjectCollectionView implements EditorCollectionView<ProjectAsset> {

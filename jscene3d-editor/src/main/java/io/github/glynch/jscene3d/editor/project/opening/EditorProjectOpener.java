@@ -111,8 +111,8 @@ public final class EditorProjectOpener implements AutoCloseable {
             return;
         }
         EditorProjectSession session = result.session().orElseThrow();
-        workspace.showProject(session);
         publication.showProject(session);
+        workspace.showProject(session);
         windowTitle.accept(session.project().identity().name() + " — JScene3D Editor");
         openingProgress.projectIdentified(session.project().identity().name());
         openingProgress.phaseStarted(EditorLoadingPhase.PREPARING_PREVIEW);
@@ -167,7 +167,7 @@ public final class EditorProjectOpener implements AutoCloseable {
                         + " (project " + format(durations.projectLoad())
                         + ", preview " + format(durations.previewComposition())
                         + ", first frame " + firstFrame + ")");
-        workspace.setProjectStatus(session.project().identity().name() + " · ready");
+        workspace.finishProjectOpening(session.project().identity().name() + " · ready");
         openingProgress.finish();
     }
 

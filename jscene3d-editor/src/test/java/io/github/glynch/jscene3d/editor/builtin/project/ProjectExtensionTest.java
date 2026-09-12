@@ -38,20 +38,7 @@ final class ProjectExtensionTest {
         host.observeViews(contributions::add);
 
         host.activate(new ProjectExtension(projects));
-
-        EditorViewContribution contribution = contributions.getLast().getFirst();
-        assertThat(contribution.container()).isEqualTo(EditorViewContainers.BOTTOM_PANEL);
-        assertThat(contribution.view().id()).isEqualTo(ProjectExtension.VIEW_ID);
-        assertThat(contribution.view()).isInstanceOf(EditorCollectionView.class);
-        @SuppressWarnings("unchecked")
-        EditorCollectionView<ProjectAsset> view = (EditorCollectionView<ProjectAsset>) contribution.view();
-        assertThat(snapshot(view).elements()).isEmpty();
-        assertThat(view.categories())
-                .extracting(category -> category.label())
-                .containsExactly("Worlds", "Entity Definitions", "Source Assets", "Imports");
-        assertThat(view.allItemsLabel()).isEqualTo("Project Assets");
-        assertThat(view.rootIcon()).contains(new EditorIcon(EditorIcons.PROJECT, "Project"));
-        assertThat(view.searchPlaceholder()).isEqualTo("Search assets…");
+        assertThat(contributions.getLast()).isEmpty();
 
         ProjectAsset source = item("actors", "source-z", ProjectAsset.Kind.SOURCE_ASSET);
         ProjectAsset world = item("MAP01", "world-a", ProjectAsset.Kind.WORLD_DEFINITION);
@@ -59,6 +46,20 @@ final class ProjectExtensionTest {
                 new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")),
                 hierarchy(),
                 List.of(source, world));
+
+        EditorViewContribution contribution = contributions.getLast().getFirst();
+        assertThat(contribution.container()).isEqualTo(EditorViewContainers.BOTTOM_PANEL);
+        assertThat(contribution.view().id()).isEqualTo(ProjectExtension.VIEW_ID);
+        assertThat(contribution.view()).isInstanceOf(EditorCollectionView.class);
+        @SuppressWarnings("unchecked")
+        EditorCollectionView<ProjectAsset> view = (EditorCollectionView<ProjectAsset>) contribution.view();
+        assertThat(snapshot(view).elements()).containsExactly(world, source);
+        assertThat(view.categories())
+                .extracting(category -> category.label())
+                .containsExactly("Worlds", "Entity Definitions", "Source Assets", "Imports");
+        assertThat(view.allItemsLabel()).isEqualTo("Project Assets");
+        assertThat(view.rootIcon()).contains(new EditorIcon(EditorIcons.PROJECT, "Project"));
+        assertThat(view.searchPlaceholder()).isEqualTo("Search assets…");
 
         assertThat(snapshot(view).rootLabel()).isEqualTo("Test");
         assertThat(snapshot(view).elements()).containsExactly(world, source);

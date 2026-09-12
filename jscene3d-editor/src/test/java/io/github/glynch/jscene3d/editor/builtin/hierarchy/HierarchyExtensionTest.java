@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.builtin.hierarchy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
@@ -34,17 +35,13 @@ final class HierarchyExtensionTest {
         EditorSelectionContext editorSelection = new EditorSelectionContext();
         EditorExtensionHost host = new EditorExtensionHost(projects, editorSelection);
         List<List<EditorViewContribution>> snapshots = new ArrayList<>();
+        List<List<EditorActivityContribution>> activitySnapshots = new ArrayList<>();
         host.observeViews(snapshots::add);
+        host.observeActivities(activitySnapshots::add);
 
         host.activate(new HierarchyExtension(projects));
-
-        EditorViewContribution contribution = snapshots.getLast().getFirst();
-        assertThat(contribution.container()).isEqualTo(EditorViewContainers.PRIMARY_SIDEBAR);
-        assertThat(contribution.view().id()).isEqualTo(HierarchyExtension.VIEW_ID);
-        assertThat(contribution.view()).isInstanceOf(EditorTreeView.class);
-        @SuppressWarnings("unchecked")
-        EditorTreeView<EditorHierarchyNode> view = (EditorTreeView<EditorHierarchyNode>) contribution.view();
-        assertThat(view.dataProvider().roots().toCompletableFuture().join()).isEmpty();
+        assertThat(snapshots.getLast()).isEmpty();
+        assertThat(activitySnapshots.getLast()).isEmpty();
 
         EditorHierarchyNode child = node("Player", EditorHierarchyNode.Kind.LOCAL_ENTITY, List.of(), true);
         EditorHierarchyNode generated = new EditorHierarchyNode(
@@ -59,6 +56,16 @@ final class HierarchyExtensionTest {
         projects.showProject(
                 new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")), root, List.of());
 
+        EditorViewContribution contribution = snapshots.getLast().getFirst();
+        assertThat(activitySnapshots.getLast())
+                .singleElement()
+                .extracting(EditorActivityContribution::title)
+                .isEqualTo("Scene");
+        assertThat(contribution.container()).isEqualTo(EditorViewContainers.PRIMARY_SIDEBAR);
+        assertThat(contribution.view().id()).isEqualTo(HierarchyExtension.VIEW_ID);
+        assertThat(contribution.view()).isInstanceOf(EditorTreeView.class);
+        @SuppressWarnings("unchecked")
+        EditorTreeView<EditorHierarchyNode> view = (EditorTreeView<EditorHierarchyNode>) contribution.view();
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).containsExactly(root);
         assertThat(view.dataProvider().children(root).toCompletableFuture().join())
                 .containsExactly(child, generated);
@@ -84,6 +91,8 @@ final class HierarchyExtensionTest {
 
         assertThat(view.dataProvider().roots().toCompletableFuture().join()).isEmpty();
         assertThat(editorSelection.current()).isEmpty();
+        assertThat(snapshots.getLast()).isEmpty();
+        assertThat(activitySnapshots.getLast()).isEmpty();
         host.close();
         assertThat(snapshots.getLast()).isEmpty();
     }

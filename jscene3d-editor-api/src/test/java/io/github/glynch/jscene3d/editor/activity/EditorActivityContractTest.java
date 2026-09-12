@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.editor.activity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
+import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.ViewId;
@@ -29,7 +31,22 @@ final class EditorActivityContractTest {
         assertThat(contribution.icon()).isEqualTo(icon);
         assertThat(contribution.views()).containsExactly(view);
         assertThat(contribution.order()).isEqualTo(20);
+        assertThat(contribution.condition()).isEmpty();
         assertThat(id).hasToString("io.github.glynch.test.scene");
+    }
+
+    /** Retains one typed availability condition without requiring presentation code. */
+    @Test
+    void retainsOptionalContextCondition() {
+        ActivityId id = new ActivityId("io.github.glynch.test.scene");
+        EditorIcon icon = new EditorIcon(EditorIcons.SCENE, "Scene");
+        ViewId view = new ViewId("io.github.glynch.test.scene-view");
+        EditorContextCondition<Boolean> condition = EditorContextCondition.isTrue(EditorContextKeys.PROJECT_OPEN);
+
+        EditorActivityContribution contribution =
+                new EditorActivityContribution(id, "Scene", icon, view, 20, condition);
+
+        assertThat(contribution.condition()).contains(condition);
     }
 
     /** Rejects invalid activity identities and blank user-facing titles. */

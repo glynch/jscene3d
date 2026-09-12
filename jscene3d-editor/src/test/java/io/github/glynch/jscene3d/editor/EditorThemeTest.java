@@ -92,6 +92,17 @@ final class EditorThemeTest {
                         ".editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .tab-close-button {");
     }
 
+    /** Prevents keyboard focus on an inactive panel tab from resembling a second selection. */
+    @Test
+    void keepsPanelTabFocusDistinctFromSelection() throws IOException {
+        assertThat(stylesheet())
+                .contains(
+                        ".editor-panel-tab:focused {",
+                        "-fx-effect: none;",
+                        ".editor-panel-tab-active:focused {",
+                        "-fx-border-color: transparent transparent -jscene-accent transparent;");
+    }
+
     /** Styles the no-project action in Welcome rather than retaining a permanent toolbar action. */
     @Test
     void stylesTheWelcomeProjectAction() throws IOException {

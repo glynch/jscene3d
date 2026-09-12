@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
+import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
 import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
@@ -91,7 +92,7 @@ public final class EditorWorkspace extends BorderPane {
         closeGuard = new EditorWindowCloseGuard(host::showDialog);
         JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
         layout = new EditorWorkbenchLayout(host);
-        activitySelection = new EditorActivitySelection(host, layout);
+        activitySelection = new EditorActivitySelection(host, layout, HierarchyExtension.ACTIVITY_ID);
         primaryViewContainer = new JavaFxViewContainer(host, layout, EditorViewContainers.PRIMARY_SIDEBAR, icons);
         activitySelectionRegistration = activitySelection.observe(primaryViewContainer::showActivity);
         VBox hierarchyPanel = primaryViewContainer.node();
@@ -193,6 +194,7 @@ public final class EditorWorkspace extends BorderPane {
         dirtyRegistration = session.workingCopies().onDidChangeDirty().subscribe(ignored -> updateDocumentCommands());
         previewTitle.set(session.hierarchy().label() + " Preview");
         editorArea.showProjectPreview();
+        activitySelection.revealDefault();
         updateDocumentCommands();
     }
 
@@ -220,6 +222,12 @@ public final class EditorWorkspace extends BorderPane {
      */
     public void setProjectStatus(String text) {
         statusBar.showProjectStatus(text);
+    }
+
+    /** Completes project presentation with the default project navigation visible. */
+    public void finishProjectOpening(String status) {
+        activitySelection.revealDefault();
+        statusBar.showProjectStatus(status);
     }
 
     /**

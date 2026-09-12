@@ -851,6 +851,15 @@
     -fx-text-fill: -jscene-text-strong;
 }
 
+.editor-panel-tab:focused {
+    -fx-border-color: transparent;
+    -fx-effect: none;
+}
+
+.editor-panel-tab-active:focused {
+    -fx-border-color: transparent transparent -jscene-accent transparent;
+}
+
 .editor-panel-tab .editor-panel-tab-label {
     -fx-text-fill: -jscene-text-muted;
 }

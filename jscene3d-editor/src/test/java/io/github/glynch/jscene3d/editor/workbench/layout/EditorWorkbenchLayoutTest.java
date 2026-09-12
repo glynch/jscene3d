@@ -7,12 +7,18 @@ package io.github.glynch.jscene3d.editor.workbench.layout;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.activity.ActivityId;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
+import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
+import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorView;
@@ -22,8 +28,10 @@ import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.view.ViewKindId;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -121,6 +129,62 @@ final class EditorWorkbenchLayoutTest {
         quickAccessParts.forEach(part -> layout.setVisible(part, true));
 
         assertThat(layout.current().visibleParts()).containsExactlyInAnyOrder(EditorWorkbenchPart.values());
+        layout.close();
+        host.close();
+    }
+
+    /** A reveal is a presentation command and therefore republishes even when visibility was already requested. */
+    @Test
+    void reappliesAnAlreadyVisibleRegionWhenItIsRevealed() {
+        EditorExtensionHost host = host();
+        host.activate(extension(new AtomicReference<>()));
+        EditorWorkbenchLayout layout = new EditorWorkbenchLayout(host);
+        List<EditorWorkbenchLayoutState> snapshots = new ArrayList<>();
+        layout.observe(snapshots::add);
+
+        int initialSnapshotCount = snapshots.size();
+
+        layout.reveal(EditorWorkbenchPart.PRIMARY_SIDEBAR);
+
+        assertThat(snapshots).hasSize(initialSnapshotCount + 1);
+        assertThat(snapshots.getLast().isVisible(EditorWorkbenchPart.PRIMARY_SIDEBAR))
+                .isTrue();
+        layout.close();
+        host.close();
+    }
+
+    /** Collapses unavailable regions without losing the user's visibility preference. */
+    @Test
+    void derivesEffectiveVisibilityFromAvailableContributions() {
+        EditorProjectContext projects = new EditorProjectContext();
+        EditorExtensionHost host = new EditorExtensionHost(projects, new EditorSelectionContext());
+        host.activate(new InspectorExtension());
+        EditorWorkbenchLayout layout = new EditorWorkbenchLayout(host);
+
+        assertThat(layout.current().visibleParts()).contains(EditorWorkbenchPart.SECONDARY_SIDEBAR);
+        assertThat(layout.current().availableParts()).doesNotContain(EditorWorkbenchPart.SECONDARY_SIDEBAR);
+        assertThat(layout.current().isVisible(EditorWorkbenchPart.SECONDARY_SIDEBAR))
+                .isFalse();
+
+        projects.showProject(
+                new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")),
+                hierarchy(),
+                List.of());
+
+        assertThat(layout.current().availableParts()).contains(EditorWorkbenchPart.SECONDARY_SIDEBAR);
+        assertThat(layout.current().isVisible(EditorWorkbenchPart.SECONDARY_SIDEBAR))
+                .isTrue();
+
+        layout.setVisible(EditorWorkbenchPart.SECONDARY_SIDEBAR, false);
+        projects.clear();
+        projects.showProject(
+                new EditorProject("io.github.glynch.test", "Test", URI.create("file:///test/")),
+                hierarchy(),
+                List.of());
+
+        assertThat(layout.current().availableParts()).contains(EditorWorkbenchPart.SECONDARY_SIDEBAR);
+        assertThat(layout.current().isVisible(EditorWorkbenchPart.SECONDARY_SIDEBAR))
+                .isFalse();
         layout.close();
         host.close();
     }
@@ -236,6 +300,19 @@ final class EditorWorkbenchLayoutTest {
 
     private static EditorExtensionHost host() {
         return new EditorExtensionHost(new EditorProjectContext(), new EditorSelectionContext());
+    }
+
+    private static EditorHierarchyNode hierarchy() {
+        EditorDetails details = new EditorDetails("World", "World", "world", "world", List.of(), List.of());
+        EditorSelection selection = new EditorSelection(EditorSelectionKinds.WORLD, "world", details);
+        return new EditorHierarchyNode(
+                EditorHierarchyNode.Kind.WORLD,
+                "World",
+                Optional.empty(),
+                Optional.empty(),
+                true,
+                selection,
+                List.of());
     }
 
     private record TestView() implements EditorView {

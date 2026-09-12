@@ -36,6 +36,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
     private final EditorRegistration sourceRegistration;
     private final EditorRegistration activityRegistration;
     private final EditorRegistration requestRegistration;
+    private final EditorExtensionHost extensions;
     private Set<ViewId> activityViews = Set.of();
     private List<EditorViewContribution> contributions = List.of();
     private EditorPrimarySidebarPosition primarySidebarPosition = EditorPrimarySidebarPosition.LEFT;
@@ -48,6 +49,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
      */
     public EditorWorkbenchLayout(EditorExtensionHost extensions) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
+        this.extensions = host;
         sourceRegistration = host.observeViews(this::replaceContributions);
         activityRegistration = host.observeActivities(this::replaceActivities);
         requestRegistration = host.observeViewRequests(this::reveal);
@@ -171,6 +173,22 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
     }
 
     /**
+     * Reveals one major workbench region and republishes the resulting state to its presentation adapters.
+     *
+     * <p>Unlike {@link #setVisible(EditorWorkbenchPart, boolean)}, this is an idempotent presentation command. A
+     * repeated reveal deliberately reapplies the current state so a newly available view cannot leave its physical
+     * region behind the logical selection.
+     *
+     * @param part workbench region to reveal
+     */
+    public void reveal(EditorWorkbenchPart part) {
+        requireOpen();
+        EditorWorkbenchPart target = Objects.requireNonNull(part, "part");
+        visibleParts.add(target);
+        notifyStateObservers();
+    }
+
+    /**
      * Returns whether one major workbench region is visible.
      *
      * @param part workbench region
@@ -233,9 +251,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
 
     private void replaceContributions(List<EditorViewContribution> replacement) {
         contributions = List.copyOf(Objects.requireNonNull(replacement, "replacement"));
-        Set<ViewId> registered = new LinkedHashSet<>();
-        contributions.forEach(contribution -> registered.add(contribution.view().id()));
-        overrides.keySet().retainAll(registered);
+        overrides.keySet().removeIf(view -> !extensions.isViewRegistered(view));
         notifyObservers();
     }
 
@@ -290,7 +306,19 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
     }
 
     private EditorWorkbenchLayoutState state() {
-        return new EditorWorkbenchLayoutState(snapshot(), visibleParts, primarySidebarPosition);
+        List<EditorViewPlacement> views = snapshot();
+        return new EditorWorkbenchLayoutState(views, visibleParts, availableParts(views), primarySidebarPosition);
+    }
+
+    private static Set<EditorWorkbenchPart> availableParts(List<EditorViewPlacement> views) {
+        Set<EditorWorkbenchPart> available =
+                EnumSet.of(EditorWorkbenchPart.ACTIVITY_BAR, EditorWorkbenchPart.STATUS_BAR);
+        views.stream()
+                .map(EditorViewPlacement::container)
+                .map(EditorWorkbenchLayout::partFor)
+                .flatMap(Optional::stream)
+                .forEach(available::add);
+        return available;
     }
 
     private void notifyStateObservers() {

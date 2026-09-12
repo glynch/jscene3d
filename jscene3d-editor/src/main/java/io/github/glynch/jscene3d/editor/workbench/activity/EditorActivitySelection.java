@@ -22,6 +22,7 @@ import java.util.function.Consumer;
 /** Owns Activity Bar container selection independently from primary-side-bar visibility. */
 public final class EditorActivitySelection implements AutoCloseable {
     private final EditorWorkbenchLayout layout;
+    private final ActivityId defaultActivity;
     private final List<Consumer<EditorActivitySelectionState>> observers = new ArrayList<>();
     private final EditorRegistration activityRegistration;
     private final EditorRegistration viewRequestRegistration;
@@ -29,10 +30,18 @@ public final class EditorActivitySelection implements AutoCloseable {
     private Optional<ActivityId> selected = Optional.empty();
     private boolean closed;
 
-    /** Creates selection state which follows registered activities and view reveal requests. */
-    public EditorActivitySelection(EditorExtensionHost extensions, EditorWorkbenchLayout layout) {
+    /**
+     * Creates selection state which follows registered activities and view reveal requests.
+     *
+     * @param extensions active extension host
+     * @param layout current workbench layout
+     * @param defaultActivity workbench-owned activity selected whenever it becomes available
+     */
+    public EditorActivitySelection(
+            EditorExtensionHost extensions, EditorWorkbenchLayout layout, ActivityId defaultActivity) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
         this.layout = Objects.requireNonNull(layout, "layout");
+        this.defaultActivity = Objects.requireNonNull(defaultActivity, "defaultActivity");
         activityRegistration = host.observeActivities(this::replaceActivities);
         viewRequestRegistration = host.observeViewRequests(this::revealView);
     }
@@ -41,6 +50,15 @@ public final class EditorActivitySelection implements AutoCloseable {
     public EditorActivitySelectionState current() {
         requireOpen();
         return state();
+    }
+
+    /** Selects and reveals the configured default activity when it is currently available. */
+    public void revealDefault() {
+        requireOpen();
+        activities.stream()
+                .filter(activity -> activity.id().equals(defaultActivity))
+                .findFirst()
+                .ifPresent(this::reveal);
     }
 
     /**
@@ -88,12 +106,21 @@ public final class EditorActivitySelection implements AutoCloseable {
     }
 
     private void replaceActivities(List<EditorActivityContribution> replacement) {
+        boolean defaultWasAvailable = containsActivity(defaultActivity);
         activities = List.copyOf(Objects.requireNonNull(replacement, "replacement"));
-        Optional<ActivityId> replacementSelection = selected.filter(this::containsActivity);
-        if (replacementSelection.isEmpty()) {
-            replacementSelection = activities.stream().findFirst().map(EditorActivityContribution::id);
+        boolean defaultIsAvailable = containsActivity(defaultActivity);
+        if (!defaultWasAvailable && defaultIsAvailable) {
+            selected = Optional.of(defaultActivity);
+            layout.setVisible(EditorWorkbenchPart.PRIMARY_SIDEBAR, true);
+        } else if (defaultWasAvailable && !defaultIsAvailable) {
+            selected = Optional.empty();
+            layout.setVisible(EditorWorkbenchPart.PRIMARY_SIDEBAR, false);
+        } else {
+            selected = selected.filter(this::containsActivity);
+            if (selected.isEmpty()) {
+                layout.setVisible(EditorWorkbenchPart.PRIMARY_SIDEBAR, false);
+            }
         }
-        selected = replacementSelection;
         notifyObservers();
     }
 
@@ -105,12 +132,9 @@ public final class EditorActivitySelection implements AutoCloseable {
     }
 
     private void reveal(EditorActivityContribution activity) {
-        boolean changed = !isSelected(activity.id());
         selected = Optional.of(activity.id());
-        layout.setVisible(EditorWorkbenchPart.PRIMARY_SIDEBAR, true);
-        if (changed) {
-            notifyObservers();
-        }
+        layout.reveal(EditorWorkbenchPart.PRIMARY_SIDEBAR);
+        notifyObservers();
     }
 
     private void requireActivity(ActivityId activity) {

@@ -4,13 +4,28 @@
  */
 package io.github.glynch.jscene3d.editor.view;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
+import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
 import org.junit.jupiter.api.Test;
 
 final class EditorViewContributionTest {
     private static final ViewContainerId CONTAINER = new ViewContainerId("io.github.glynch.jscene3d.editor.panel");
+
+    @Test
+    void retainsOptionalContextCondition() {
+        EditorView view = testView("Test");
+        EditorContextCondition<Boolean> condition = EditorContextCondition.isTrue(EditorContextKeys.PROJECT_OPEN);
+
+        EditorViewContribution unconditional = new EditorViewContribution(view, CONTAINER, 0);
+        EditorViewContribution conditional = new EditorViewContribution(view, CONTAINER, 0, condition);
+
+        assertThat(unconditional.condition()).isEmpty();
+        assertThat(conditional.condition()).contains(condition);
+    }
 
     @Test
     @SuppressWarnings("NullAway") // Deliberate nulls verify public boundary validation.

@@ -4,11 +4,13 @@
  */
 package io.github.glynch.jscene3d.editor.activity;
 
+import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Contributes one selectable Activity Bar entry backed by a primary-side-bar view container.
@@ -18,8 +20,15 @@ import java.util.Objects;
  * @param icon semantic icon and accessible tooltip
  * @param views ordered primary-sidebar views belonging to this activity container
  * @param order ascending Activity Bar presentation order
+ * @param condition optional context condition controlling availability
  */
-public record EditorActivityContribution(ActivityId id, String title, EditorIcon icon, List<ViewId> views, int order) {
+public record EditorActivityContribution(
+        ActivityId id,
+        String title,
+        EditorIcon icon,
+        List<ViewId> views,
+        int order,
+        Optional<EditorContextCondition<?>> condition) {
     /**
      * Copies and validates one activity contribution.
      *
@@ -43,10 +52,28 @@ public record EditorActivityContribution(ActivityId id, String title, EditorIcon
             throw new IllegalArgumentException("activity container must not contain duplicate views");
         }
         views = List.copyOf(views);
+        Objects.requireNonNull(condition, "condition");
+    }
+
+    /** Creates an unconditionally available Activity Bar container. */
+    public EditorActivityContribution(ActivityId id, String title, EditorIcon icon, List<ViewId> views, int order) {
+        this(id, title, icon, views, order, Optional.empty());
     }
 
     /** Creates an Activity Bar container which initially contains one primary-side-bar view. */
     public EditorActivityContribution(ActivityId id, String title, EditorIcon icon, ViewId view, int order) {
-        this(id, title, icon, List.of(Objects.requireNonNull(view, "view")), order);
+        this(id, title, icon, List.of(Objects.requireNonNull(view, "view")), order, Optional.empty());
+    }
+
+    /** Creates a single-view Activity Bar container controlled by one typed context condition. */
+    public EditorActivityContribution(
+            ActivityId id, String title, EditorIcon icon, ViewId view, int order, EditorContextCondition<?> condition) {
+        this(
+                id,
+                title,
+                icon,
+                List.of(Objects.requireNonNull(view, "view")),
+                order,
+                Optional.of(Objects.requireNonNull(condition, "condition")));
     }
 }

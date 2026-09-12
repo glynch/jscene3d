@@ -12,17 +12,20 @@ import java.util.Set;
  * Immutable current state of the session workbench layout.
  *
  * @param views resolved view placements
- * @param visibleParts visible major workbench regions
+ * @param visibleParts major workbench regions enabled by the user
+ * @param availableParts major workbench regions which currently contain available contributions
  * @param primarySidebarPosition current primary-side-bar position
  */
 public record EditorWorkbenchLayoutState(
         List<EditorViewPlacement> views,
         Set<EditorWorkbenchPart> visibleParts,
+        Set<EditorWorkbenchPart> availableParts,
         EditorPrimarySidebarPosition primarySidebarPosition) {
     /** Copies and validates one layout snapshot. */
     public EditorWorkbenchLayoutState {
         views = List.copyOf(Objects.requireNonNull(views, "views"));
         visibleParts = Set.copyOf(Objects.requireNonNull(visibleParts, "visibleParts"));
+        availableParts = Set.copyOf(Objects.requireNonNull(availableParts, "availableParts"));
         Objects.requireNonNull(primarySidebarPosition, "primarySidebarPosition");
     }
 
@@ -33,6 +36,7 @@ public record EditorWorkbenchLayoutState(
      * @return whether the region is visible
      */
     public boolean isVisible(EditorWorkbenchPart part) {
-        return visibleParts.contains(Objects.requireNonNull(part, "part"));
+        EditorWorkbenchPart requested = Objects.requireNonNull(part, "part");
+        return visibleParts.contains(requested) && availableParts.contains(requested);
     }
 }

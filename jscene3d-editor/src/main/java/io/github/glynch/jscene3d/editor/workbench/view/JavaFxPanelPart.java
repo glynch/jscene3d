@@ -11,11 +11,13 @@ import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorViewPlacement;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
+import io.github.glynch.jscene3d.editor.workbench.selection.EditorAvailabilitySelection;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.DoubleBinaryOperator;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
@@ -53,6 +55,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
     private final ListChangeListener<SplitPane.Divider> dividerListListener;
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
+    private List<ViewId> availableViews = List.of();
     private @Nullable ViewId selected;
     private boolean expanded = true;
     private boolean closed;
@@ -133,6 +136,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
         }
         replaceObservedDivider(null);
         closeRenderedViews();
+        availableViews = List.of();
         node.getChildren().clear();
     }
 
@@ -160,7 +164,12 @@ public final class JavaFxPanelPart implements AutoCloseable {
         List<EditorViewPlacement> matching = placements.stream()
                 .filter(placement -> placement.container().equals(id))
                 .toList();
-        ViewId previousSelection = selected;
+        List<ViewId> replacementViews =
+                matching.stream().map(placement -> placement.view().id()).toList();
+        selected = EditorAvailabilitySelection.reconcile(
+                        availableViews, Optional.ofNullable(selected), replacementViews)
+                .orElse(null);
+        availableViews = replacementViews;
         closeRenderedViews();
         tabs.getChildren().clear();
         for (EditorViewPlacement placement : matching) {
@@ -175,9 +184,6 @@ public final class JavaFxPanelPart implements AutoCloseable {
             tabButtons.put(viewId, tab);
             tabs.getChildren().add(tab);
         }
-        selected = renderedViews.containsKey(previousSelection)
-                ? previousSelection
-                : renderedViews.keySet().stream().findFirst().orElse(null);
         showSelected();
     }
 

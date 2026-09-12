@@ -129,6 +129,8 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_EDITOR_TAB = "editor-editor-tab";
     /** CSS class named {@value}. */
+    public static final String EDITOR_EDITOR_TAB_GRAPHIC_ONLY = "editor-editor-tab-graphic-only";
+    /** CSS class named {@value}. */
     public static final String EDITOR_EDITOR_TAB_DIRTY = "editor-editor-tab-dirty";
     /** CSS class named {@value}. */
     public static final String EDITOR_EDITOR_TAB_TITLE = "editor-editor-tab-title";
@@ -422,6 +424,8 @@ public final class EditorStyleClasses {
     public static final String EDITOR_VIEWPORT_HEADER = "editor-viewport-header";
     /** CSS class named {@value}. */
     public static final String EDITOR_VIEWPORT_PANEL = "editor-viewport-panel";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_VIEW_TABS = "editor-view-tabs";
     /** CSS class named {@value}. */
     public static final String EDITOR_WORKSPACE_SPLIT = "editor-workspace-split";
 

@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import io.github.glynch.jscene3d.editor.workbench.view.JavaFxCollectionAccessibilityAssertions;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxEditorArea;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -110,6 +111,7 @@ final class EditorSplashScreenTest {
         assertThat(mark.isPreserveRatio()).isTrue();
         assertThat(mark.getAccessibleText()).isEqualTo("JScene3D");
         assertThat(mark.isFocusTraversable()).isFalse();
+        JavaFxCollectionAccessibilityAssertions.assertAccessibleProjectCategories();
 
         Path project = Path.of("/example/a-very-long-project-directory/Doomed Corridors");
         splash.opening(project);
@@ -130,20 +132,27 @@ final class EditorSplashScreenTest {
         EditorConfigurationContext configuration = new EditorConfigurationContext();
         AtomicBoolean openProjectRequested = new AtomicBoolean();
         StackPane previewContent = new StackPane();
+        SimpleStringProperty previewTitle = new SimpleStringProperty("Doomed Corridors Preview");
+        SimpleBooleanProperty previewDirty = new SimpleBooleanProperty(false);
         try (EditorExtensionHost extensions = new EditorExtensionHost(projects, selections, configuration);
                 EditorWorkbenchLayout layout = new EditorWorkbenchLayout(extensions);
                 JavaFxEditorArea editorArea = new JavaFxEditorArea(
                         extensions,
                         layout,
                         JavaFxIconRenderer.builtIn(),
-                        new SimpleStringProperty("Doomed Corridors Preview"),
-                        new SimpleBooleanProperty(false),
+                        previewTitle,
+                        previewDirty,
                         previewContent,
                         () -> openProjectRequested.set(true))) {
+            Tab preview = editorArea.node().getTabs().getFirst();
             assertThat(editorArea.node().getTabs())
                     .singleElement()
                     .extracting(Tab::getContent)
                     .isSameAs(previewContent);
+            assertThat(preview.getText()).isEqualTo("Doomed Corridors Preview");
+            previewDirty.set(true);
+            assertThat(preview.getText()).isEqualTo("Doomed Corridors Preview, modified");
+            previewDirty.set(false);
 
             editorArea.showEmptyWorkspace();
             assertThat(editorArea.node().getTabs())

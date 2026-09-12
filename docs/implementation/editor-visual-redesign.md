@@ -254,6 +254,14 @@ Verification:
 
 ## Recorded follow-up work
 
+- resolve the remaining macOS VoiceOver navigation gap between the selected
+  Project panel tab and its category tree: focus currently remains on the
+  horizontal tab control, so Up and Down Arrow do not reach Worlds, Entity
+  Definitions, Source Assets, or Imports until keyboard focus enters the tree;
+- qualify the JavaFX category-tree accessibility mapping on macOS: VoiceOver
+  currently describes a focused category label as text inside a table and
+  directs users to navigate with Control-Option plus an arrow key, which makes
+  ordinary tree navigation difficult to discover;
 - add `.jscene3d/settings.json` project settings before persisting layout or
   extension settings;
 - design theme contributions for dark/light color themes and installable icon

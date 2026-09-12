@@ -78,6 +78,10 @@ public final class JavaFxEditorArea implements AutoCloseable {
                 .accessibleTextProperty()
                 .bind(Bindings.createStringBinding(
                         () -> dirty.get() ? title.get() + ", modified" : title.get(), title, dirty));
+        preview.textProperty()
+                .bind(Bindings.createStringBinding(
+                        () -> dirty.get() ? title.get() + ", modified" : title.get(), title, dirty));
+        preview.getStyleClass().add(EditorStyleClasses.EDITOR_EDITOR_TAB_GRAPHIC_ONLY);
         previewTitle.getStyleClass().add(EditorStyleClasses.EDITOR_EDITOR_TAB_TITLE);
         previewDirtyIndicator.visibleProperty().bind(dirty);
         previewDirtyIndicator.managedProperty().bind(dirty);
@@ -88,6 +92,8 @@ public final class JavaFxEditorArea implements AutoCloseable {
         preview.setGraphic(previewGraphic);
         preview.setContent(Objects.requireNonNull(previewContent, "previewContent"));
         preview.setClosable(false);
+        tabs.setAccessibleText("Editor tabs");
+        tabs.setAccessibleHelp("Use Left and Right Arrow keys to switch editor tabs");
         tabs.getStyleClass().add(EditorStyleClasses.EDITOR_AREA_TABS);
         tabs.getTabs().add(preview);
         viewRegistration = Objects.requireNonNull(layout, "layout").observeViews(this::showPlacements);
@@ -171,6 +177,7 @@ public final class JavaFxEditorArea implements AutoCloseable {
         available.clear();
         previewTitle.textProperty().unbind();
         previewTitle.accessibleTextProperty().unbind();
+        preview.textProperty().unbind();
         previewDirtyIndicator.visibleProperty().unbind();
         previewDirtyIndicator.managedProperty().unbind();
         tabs.getTabs().clear();

@@ -331,9 +331,26 @@
     -fx-background-color: -jscene-hover;
 }
 
-.editor-activity-button-active {
+.editor-activity-button:focused {
+    -fx-border-color: -jscene-focus;
+    -fx-border-insets: 3px;
+    -fx-border-radius: 2px;
+    -fx-border-width: 2px;
+    -fx-effect: none;
+}
+
+.editor-activity-button-active,
+.editor-activity-button:selected {
     -fx-background-color: derive(-jscene-panel-raised, 4%);
     -fx-border-color: transparent transparent transparent -jscene-accent;
+}
+
+.editor-activity-button-active:focused,
+.editor-activity-button:selected:focused {
+    -fx-border-color: -jscene-focus, transparent transparent transparent -jscene-accent;
+    -fx-border-insets: 3px, 0;
+    -fx-border-radius: 2px, 0;
+    -fx-border-width: 2px, 0 0 0 2px;
 }
 
 .editor-activity-icon {
@@ -385,6 +402,8 @@
 
 .editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected {
     -fx-border-color: -jscene-focus -jscene-divider -jscene-canvas -jscene-divider;
+    -fx-border-width: 3px 1px 1px 1px;
+    -fx-effect: dropshadow(gaussian, rgba(154, 139, 255, 0.34), 4, 0, 0, 0);
 }
 
 .editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
@@ -402,6 +421,11 @@
 .editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .label {
     -fx-font-weight: 600;
     -fx-text-fill: -jscene-text-strong;
+}
+
+/* Keep Tab.text available to assistive technology while the preview graphic owns its visual title. */
+.editor-area-tabs > .tab-header-area > .headers-region > .tab.editor-editor-tab-graphic-only .tab-label {
+    -fx-content-display: graphic-only;
 }
 
 .editor-area-tabs > .tab-header-area > .headers-region > .tab .tab-close-button {
@@ -845,19 +869,39 @@
     -fx-background-color: -jscene-hover;
 }
 
-.editor-panel-tab-active {
+.editor-panel-tab-active,
+.editor-panel-tab:selected {
     -fx-background-color: -jscene-panel-raised;
     -fx-border-color: transparent transparent -jscene-accent transparent;
+    -fx-border-width: 0 0 2px 0;
     -fx-text-fill: -jscene-text-strong;
 }
 
 .editor-panel-tab:focused {
-    -fx-border-color: transparent;
+    -fx-border-color: -jscene-focus;
+    -fx-border-insets: 3px;
+    -fx-border-radius: 2px;
+    -fx-border-width: 2px;
     -fx-effect: none;
 }
 
-.editor-panel-tab-active:focused {
-    -fx-border-color: transparent transparent -jscene-accent transparent;
+.editor-panel-tab-active:focused,
+.editor-panel-tab:selected:focused {
+    -fx-border-color: -jscene-focus, transparent transparent -jscene-accent transparent;
+    -fx-border-insets: 3px, 0;
+    -fx-border-radius: 2px, 0;
+    -fx-border-width: 2px, 0 0 2px 0;
+}
+
+.editor-view-tabs:focused > .tab-header-area > .headers-region > .tab:selected {
+    -fx-effect: dropshadow(gaussian, rgba(154, 139, 255, 0.34), 4, 0, 0, 0);
+}
+
+.editor-view-tabs:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
+    -fx-border-color: -jscene-focus;
+    -fx-border-insets: 2px;
+    -fx-border-radius: 2px;
+    -fx-border-width: 2px;
 }
 
 .editor-panel-tab .editor-panel-tab-label {

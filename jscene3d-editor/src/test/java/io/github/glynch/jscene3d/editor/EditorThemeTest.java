@@ -87,6 +87,8 @@ final class EditorThemeTest {
                         "-fx-border-color: -jscene-focus -jscene-divider -jscene-canvas -jscene-divider;",
                         ".editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {",
                         "-fx-border-color: transparent;",
+                        ".tab.editor-editor-tab-graphic-only .tab-label {",
+                        "-fx-content-display: graphic-only;",
                         ".editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .label {",
                         "-fx-text-fill: -jscene-text-strong;",
                         ".editor-area-tabs > .tab-header-area > .headers-region > .tab:selected .tab-close-button {");
@@ -97,10 +99,13 @@ final class EditorThemeTest {
     void keepsPanelTabFocusDistinctFromSelection() throws IOException {
         assertThat(stylesheet())
                 .contains(
+                        ".editor-activity-button:focused {",
+                        ".editor-activity-button-active:focused,\n.editor-activity-button:selected:focused {",
                         ".editor-panel-tab:focused {",
                         "-fx-effect: none;",
-                        ".editor-panel-tab-active:focused {",
-                        "-fx-border-color: transparent transparent -jscene-accent transparent;");
+                        ".editor-panel-tab-active:focused,\n.editor-panel-tab:selected:focused {",
+                        "-fx-border-color: -jscene-focus, transparent transparent -jscene-accent transparent;",
+                        ".editor-view-tabs:focused > .tab-header-area > .headers-region > .tab:selected {");
     }
 
     /** Styles the no-project action in Welcome rather than retaining a permanent toolbar action. */

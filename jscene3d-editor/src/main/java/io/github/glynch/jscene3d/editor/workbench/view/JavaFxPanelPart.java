@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import io.github.glynch.jscene3d.editor.workbench.accessibility.JavaFxDirectionalNavigation;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorViewPlacement;
@@ -22,10 +23,14 @@ import java.util.function.DoubleBinaryOperator;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.ListChangeListener;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.AccessibleRole;
 import javafx.scene.control.Button;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -48,7 +53,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
     private final StackPane content = new StackPane();
     private final Button collapse = new Button("×");
     private final Map<ViewId, JavaFxRenderedView> renderedViews = new LinkedHashMap<>();
-    private final Map<ViewId, Button> tabButtons = new LinkedHashMap<>();
+    private final Map<ViewId, ToggleButton> tabButtons = new LinkedHashMap<>();
     private @Nullable SplitPane splitPane;
     private SplitPane.@Nullable Divider observedDivider;
     private final ChangeListener<Number> dividerPositionListener;
@@ -143,6 +148,9 @@ public final class JavaFxPanelPart implements AutoCloseable {
     private void configureNode() {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+        tabs.setAccessibleRole(AccessibleRole.TAB_PANE);
+        tabs.setAccessibleText("Panel tabs");
+        tabs.setAccessibleHelp("Use Left and Right Arrow keys to switch panel tabs");
         collapse.setAccessibleText("Collapse panel");
         collapse.setTooltip(new Tooltip("Collapse panel"));
         collapse.setOnAction(ignored -> collapse());
@@ -161,6 +169,10 @@ public final class JavaFxPanelPart implements AutoCloseable {
     }
 
     private void showPlacements(List<EditorViewPlacement> placements) {
+        Optional<ViewId> focused = tabButtons.entrySet().stream()
+                .filter(entry -> entry.getValue().isFocused())
+                .map(Map.Entry::getKey)
+                .findFirst();
         List<EditorViewPlacement> matching = placements.stream()
                 .filter(placement -> placement.container().equals(id))
                 .toList();
@@ -176,15 +188,28 @@ public final class JavaFxPanelPart implements AutoCloseable {
             ViewId viewId = placement.view().id();
             JavaFxRenderedView rendered = renderer.render(placement.view());
             renderedViews.put(viewId, rendered);
-            Button tab = new Button();
+            ToggleButton tab = new ToggleButton();
             tab.setGraphic(rendered.titleGraphic());
-            tab.setAccessibleText(placement.view().title());
+            tab.setAccessibleRole(AccessibleRole.TAB_ITEM);
+            tab.setAccessibleText(placement.view().title() + " tab");
+            tab.setAccessibleHelp("Shows the " + placement.view().title()
+                    + " view. Use Left and Right Arrow keys to switch panel tabs");
+            tab.setTooltip(new Tooltip(placement.view().title()));
             tab.setOnAction(ignored -> select(viewId));
+            tab.setOnKeyPressed(event -> navigateTabs(viewId, event));
             tab.getStyleClass().add(EditorStyleClasses.EDITOR_PANEL_TAB);
             tabButtons.put(viewId, tab);
             tabs.getChildren().add(tab);
         }
         showSelected();
+        if (focused.isPresent()) {
+            ToggleButton focusTarget = focused.map(tabButtons::get)
+                    .or(() -> Optional.ofNullable(selected).map(tabButtons::get))
+                    .orElse(null);
+            if (focusTarget != null) {
+                Platform.runLater(focusTarget::requestFocus);
+            }
+        }
     }
 
     private void closeRenderedViews() {
@@ -259,11 +284,26 @@ public final class JavaFxPanelPart implements AutoCloseable {
     }
 
     private void updateTabs() {
-        tabButtons.values().forEach(tab -> tab.getStyleClass().remove(EditorStyleClasses.EDITOR_PANEL_TAB_ACTIVE));
-        Button active = selected == null ? null : tabButtons.get(selected);
-        if (active != null) {
-            active.getStyleClass().add(EditorStyleClasses.EDITOR_PANEL_TAB_ACTIVE);
-        }
+        tabButtons.forEach((view, tab) -> {
+            boolean active = view.equals(selected);
+            tab.setSelected(active);
+            tab.getStyleClass().remove(EditorStyleClasses.EDITOR_PANEL_TAB_ACTIVE);
+            if (active) {
+                tab.getStyleClass().add(EditorStyleClasses.EDITOR_PANEL_TAB_ACTIVE);
+            }
+            String title = tab.getTooltip().getText();
+            tab.setAccessibleText(active ? title + " tab, selected" : title + " tab");
+        });
+    }
+
+    private void navigateTabs(ViewId current, KeyEvent event) {
+        JavaFxDirectionalNavigation.target(
+                        List.copyOf(tabButtons.keySet()), current, event.getCode(), Orientation.HORIZONTAL)
+                .ifPresent(target -> {
+                    select(target);
+                    tabButtons.get(target).requestFocus();
+                    event.consume();
+                });
     }
 
     private void moveDivider(double panelHeight) {

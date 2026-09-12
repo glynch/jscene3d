@@ -96,6 +96,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         rootIcon = Objects.requireNonNull(logicalView.rootIcon(), "view.rootIcon()");
         searchPlaceholder = requireText(logicalView.searchPlaceholder(), "view.searchPlaceholder()");
         categoryById = indexCategories(categories);
+        navigation.setAccessibleText(logicalView.title() + " categories");
         configureView();
         dataRegistration = provider.observeChanges(this::reload);
         selectionRegistration = selectionModel.map(model -> model.observe(this::applySelection));
@@ -109,7 +110,9 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
 
     /** Requests keyboard focus for the active collection presentation. */
     void requestFocus() {
-        if (showingGrid) {
+        if (!categories.isEmpty()) {
+            navigation.requestFocus();
+        } else if (showingGrid) {
             gridScroll.requestFocus();
         } else {
             list.requestFocus();
@@ -227,6 +230,8 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     }
 
     private SplitPane createCategorizedBrowser(VBox browserContent) {
+        navigation.setAccessibleHelp(
+                "Use Up and Down Arrow keys to move between categories, Right Arrow to expand, and Left Arrow to collapse");
         navigation.setCellFactory(ignored -> new CategoryCell());
         navigation.setShowRoot(true);
         navigation.setMinWidth(0.0);

@@ -171,6 +171,9 @@ public final class JavaFxViewContainer implements AutoCloseable {
 
     private void showTabs(List<EditorViewPlacement> placements) {
         TabPane tabs = new TabPane();
+        tabs.setAccessibleText("View tabs");
+        tabs.setAccessibleHelp("Use Left and Right Arrow keys to switch views");
+        tabs.getStyleClass().add(EditorStyleClasses.EDITOR_VIEW_TABS);
         for (EditorViewPlacement placement : placements) {
             JavaFxRenderedView rendered = renderer.render(placement.view());
             Tab tab = new Tab(placement.view().title(), rendered.node());

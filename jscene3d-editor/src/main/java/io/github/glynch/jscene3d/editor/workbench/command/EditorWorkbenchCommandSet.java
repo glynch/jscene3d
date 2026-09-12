@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuContribution;
 import io.github.glynch.jscene3d.editor.window.EditorDialog;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButton;
+import io.github.glynch.jscene3d.editor.window.EditorDialogButtonBehavior;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButtonId;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButtonRole;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -28,6 +29,8 @@ import java.util.Objects;
 public final class EditorWorkbenchCommandSet implements AutoCloseable {
     private static final EditorDialogButtonId ABOUT_OK =
             new EditorDialogButtonId("io.github.glynch.jscene3d.editor.dialog.about-ok");
+    private static final EditorDialogButtonId ABOUT_COPY =
+            new EditorDialogButtonId("io.github.glynch.jscene3d.editor.dialog.about-copy");
 
     private final List<EditorRegistration> registrations = new ArrayList<>();
     private final EditorCommandRegistration settings;
@@ -36,17 +39,17 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
     private final EditorCommandRegistration redo;
 
     /** Registers all core menus, commands, and placements. */
-    public EditorWorkbenchCommandSet(EditorExtensionHost extensions, Actions actions, String version) {
+    public EditorWorkbenchCommandSet(EditorExtensionHost extensions, Actions actions, String aboutText) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
         Actions workbench = Objects.requireNonNull(actions, "actions");
-        String editorVersion = Objects.requireNonNull(version, "version");
+        String editorAboutText = Objects.requireNonNull(aboutText, "aboutText");
 
         registerMenus(host);
         register(
                 host,
                 EditorCommands.SHOW_ABOUT,
                 "About JScene3D",
-                context -> context.window().showDialog(aboutDialog(editorVersion)));
+                context -> context.window().showDialog(aboutDialog(editorAboutText)));
         settings = register(
                 host,
                 EditorCommands.OPEN_SETTINGS,
@@ -121,16 +124,18 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
         return enabled ? EditorCommandState.ENABLED_STATE : EditorCommandState.DISABLED_STATE;
     }
 
-    private static EditorDialog aboutDialog(String version) {
-        String content = "Version: " + version + System.lineSeparator()
-                + "Java: " + System.getProperty("java.version") + System.lineSeparator()
-                + "OS: " + System.getProperty("os.name") + " " + System.getProperty("os.arch") + " "
-                + System.getProperty("os.version");
+    private static EditorDialog aboutDialog(String content) {
         return new EditorDialog(
-                "About JScene3D",
+                "About JScene3D Editor",
                 "JScene3D Editor",
                 content,
-                List.of(new EditorDialogButton(ABOUT_OK, "OK", EditorDialogButtonRole.DEFAULT)));
+                List.of(
+                        new EditorDialogButton(ABOUT_OK, "OK", EditorDialogButtonRole.DEFAULT),
+                        new EditorDialogButton(
+                                ABOUT_COPY,
+                                "Copy",
+                                EditorDialogButtonRole.SECONDARY,
+                                EditorDialogButtonBehavior.COPY_CONTENT)));
     }
 
     /** Workbench behavior invoked by the core command set. */

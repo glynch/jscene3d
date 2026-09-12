@@ -17,6 +17,7 @@ import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
@@ -89,8 +90,11 @@ final class EditorSplashScreenTest {
     private static void assertProductionPresentation(EditorSplashScreen splash) {
         Region artwork = (Region) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_ARTWORK));
         assertThat(artwork.getBackground().getImages()).hasSize(1);
-        assertThat(splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_MARK)))
-                .isNotNull();
+        ImageView mark = (ImageView) splash.lookup(selector(EditorStyleClasses.EDITOR_SPLASH_MARK));
+        assertThat(mark.getImage().isError()).isFalse();
+        assertThat(mark.isPreserveRatio()).isTrue();
+        assertThat(mark.getAccessibleText()).isEqualTo("JScene3D");
+        assertThat(mark.isFocusTraversable()).isFalse();
 
         Path project = Path.of("/example/a-very-long-project-directory/Doomed Corridors");
         splash.showProject(project);

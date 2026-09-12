@@ -66,10 +66,11 @@ public final class EditorApplication extends Application {
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
     @Override
     public void start(Stage stage) {
+        EditorBuildInfo buildInfo = EditorBuildInfo.current();
         boolean startupProjectRequested = !getParameters().getUnnamed().isEmpty();
         EditorSplashTiming splashTiming =
                 EditorSplashTiming.fromNamedArguments(getParameters().getNamed());
-        EditorSplashScreen loadingScreen = new EditorSplashScreen(EditorBuildInfo.engineVersion(), splashTiming);
+        EditorSplashScreen loadingScreen = new EditorSplashScreen(buildInfo.version(), splashTiming);
         GLCanvas viewportCanvas = createCanvas();
         JavaFxModalDialogs dialogs = new JavaFxModalDialogs(stage);
         extensionHost.showDialogsWith(dialogs::show);
@@ -79,7 +80,7 @@ public final class EditorApplication extends Application {
                 this::requestClose,
                 selectionContext,
                 extensionHost,
-                EditorBuildInfo.engineVersion());
+                buildInfo);
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
         extensionHost.activate(projectDiagnostics);

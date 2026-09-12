@@ -99,6 +99,52 @@
         </resources>
         <plugins>
             <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>capture-editor-build-information</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <commitIdGenerationMode>full</commitIdGenerationMode>
+                    <dateFormat>yyyy-MM-dd'T'HH:mm:ssXXX</dateFormat>
+                    <dateFormatTimeZone>UTC</dateFormatTimeZone>
+                    <dotGitDirectory>${maven.multiModuleProjectDirectory}/.git</dotGitDirectory>
+                    <failOnNoGitDirectory>false</failOnNoGitDirectory>
+                    <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>^git.build.time$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.commit.id.full$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.dirty$</includeOnlyProperty>
+                    </includeOnlyProperties>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>capture-editor-build-time</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>timestamp-property</goal>
+                        </goals>
+                        <configuration>
+                            <locale>en</locale>
+                            <name>jscene3d.editor.buildTime</name>
+                            <pattern>yyyy-MM-dd'T'HH:mm:ssXXX</pattern>
+                            <timeSource>current</timeSource>
+                            <timeZone>UTC</timeZone>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <configuration>

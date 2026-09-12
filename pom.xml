@@ -74,11 +74,13 @@
         <jscene3d.coverage.line.minimum>0.00</jscene3d.coverage.line.minimum>
 
         <assertj.version>3.27.7</assertj.version>
+        <build.helper.maven.version>3.6.1</build.helper.maven.version>
         <checkstyle.version>13.8.0</checkstyle.version>
         <jackson.version>2.22.2</jackson.version>
         <error.prone.version>2.50.0</error.prone.version>
         <forbiddenapis.version>3.10</forbiddenapis.version>
         <frontend.maven.version>2.0.2</frontend.maven.version>
+        <git.commit.id.maven.version>9.0.2</git.commit.id.maven.version>
         <jacoco.maven.version>0.8.15</jacoco.maven.version>
         <joml.version>1.10.9</joml.version>
         <jgltf.version>2.0.4</jgltf.version>
@@ -449,6 +451,16 @@
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>${exec.maven.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>io.github.git-commit-id</groupId>
+                    <artifactId>git-commit-id-maven-plugin</artifactId>
+                    <version>${git.commit.id.maven.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>${build.helper.maven.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>com.github.eirslett</groupId>

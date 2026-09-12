@@ -12,8 +12,15 @@ import java.util.Objects;
  * @param id stable action identity
  * @param title non-blank user-facing button title
  * @param role semantic platform presentation role
+ * @param behavior toolkit-independent activation behavior
  */
-public record EditorDialogButton(EditorDialogButtonId id, String title, EditorDialogButtonRole role) {
+public record EditorDialogButton(
+        EditorDialogButtonId id, String title, EditorDialogButtonRole role, EditorDialogButtonBehavior behavior) {
+    /** Creates a conventional action which closes the dialog. */
+    public EditorDialogButton(EditorDialogButtonId id, String title, EditorDialogButtonRole role) {
+        this(id, title, role, EditorDialogButtonBehavior.CLOSE);
+    }
+
     /** Validates one modal-dialog action. */
     public EditorDialogButton {
         Objects.requireNonNull(id, "id");
@@ -21,5 +28,6 @@ public record EditorDialogButton(EditorDialogButtonId id, String title, EditorDi
             throw new IllegalArgumentException("title must not be blank");
         }
         Objects.requireNonNull(role, "role");
+        Objects.requireNonNull(behavior, "behavior");
     }
 }

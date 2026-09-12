@@ -53,6 +53,7 @@ import org.jspecify.annotations.Nullable;
 /** Owns the editor's resizable JavaFX workspace and its visible document state. */
 public final class EditorWorkspace extends BorderPane {
     private static final PseudoClass DIRTY_PSEUDO_CLASS = PseudoClass.getPseudoClass("dirty");
+    private static final double TOP_CHROME_MARK_SIZE = 24.0;
 
     private final EditorSelections selections;
     private final EditorExtensionHost extensions;
@@ -86,7 +87,7 @@ public final class EditorWorkspace extends BorderPane {
             Runnable requestClose,
             EditorSelections selections,
             EditorExtensionHost extensions,
-            String editorVersion) {
+            EditorBuildInfo buildInfo) {
         this.selections = Objects.requireNonNull(selections, "selections");
         this.extensions = Objects.requireNonNull(extensions, "extensions");
         closeGuard = new EditorWindowCloseGuard(extensions::showDialog);
@@ -136,7 +137,7 @@ public final class EditorWorkspace extends BorderPane {
                         this::undo,
                         this::redo,
                         requestClose),
-                editorVersion);
+                Objects.requireNonNull(buildInfo, "buildInfo").aboutText());
         menuBar = new JavaFxMenuBar(extensions);
         setTop(createTopChrome(menuBar.node(), layoutQuickAccess.node()));
         setCenter(regions.node());
@@ -255,8 +256,8 @@ public final class EditorWorkspace extends BorderPane {
 
     /** Creates compact product, menu, project-context, and command chrome. */
     private HBox createTopChrome(MenuBar menus, HBox layoutActions) {
-        Label productName = new Label("JScene3D");
-        productName.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_NAME);
+        EditorBrandMark productMark = new EditorBrandMark(TOP_CHROME_MARK_SIZE);
+        productMark.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_MARK);
         Label productKind = new Label("EDITOR");
         productKind.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_KIND);
 
@@ -271,7 +272,7 @@ public final class EditorWorkspace extends BorderPane {
         openButton.setOnAction(ignored -> extensions.execute(EditorCommands.OPEN_PROJECT));
         openButton.getStyleClass().add(EditorStyleClasses.EDITOR_OPEN_PROJECT_BUTTON);
 
-        HBox chrome = new HBox(8.0, productName, productKind, menus, spacer, projectContext, layoutActions, openButton);
+        HBox chrome = new HBox(8.0, productMark, productKind, menus, spacer, projectContext, layoutActions, openButton);
         chrome.setAlignment(Pos.CENTER_LEFT);
         chrome.getStyleClass().add(EditorStyleClasses.EDITOR_TOP);
         return chrome;

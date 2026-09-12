@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.workbench.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.CommandLocationId;
@@ -18,6 +19,7 @@ import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuContribution;
 import io.github.glynch.jscene3d.editor.window.EditorDialog;
+import io.github.glynch.jscene3d.editor.window.EditorDialogButtonBehavior;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet.DocumentCommandState;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
@@ -49,6 +51,9 @@ class EditorWorkbenchCommandSetTest {
         });
         host.observeMenus(snapshots::add);
 
+        String aboutText = "Version: 0.1.0-test" + System.lineSeparator()
+                + "Commit: abc123" + System.lineSeparator()
+                + "Build date: 2026-09-12T00:00:00Z";
         EditorWorkbenchCommandSet commands = new EditorWorkbenchCommandSet(
                 host,
                 new EditorWorkbenchCommandSet.Actions(
@@ -58,7 +63,7 @@ class EditorWorkbenchCommandSetTest {
                         undoes::incrementAndGet,
                         redoes::incrementAndGet,
                         quits::incrementAndGet),
-                "0.1.0-test");
+                aboutText);
 
         assertThat(snapshots.getLast())
                 .extracting(menu -> menu.contribution().title())
@@ -99,8 +104,14 @@ class EditorWorkbenchCommandSetTest {
         assertThat(undoes).hasValue(1);
         assertThat(redoes).hasValue(1);
         assertThat(quits).hasValue(1);
+        assertThat(dialog.get().title()).isEqualTo("About JScene3D Editor");
         assertThat(dialog.get().heading()).isEqualTo("JScene3D Editor");
-        assertThat(dialog.get().content()).contains("Version: 0.1.0-test");
+        assertThat(dialog.get().content()).isEqualTo(aboutText);
+        assertThat(dialog.get().buttons())
+                .extracting(button -> button.title(), button -> button.behavior())
+                .containsExactly(
+                        tuple("OK", EditorDialogButtonBehavior.CLOSE),
+                        tuple("Copy", EditorDialogButtonBehavior.COPY_CONTENT));
 
         commands.close();
         assertThat(snapshots.getLast()).isEmpty();

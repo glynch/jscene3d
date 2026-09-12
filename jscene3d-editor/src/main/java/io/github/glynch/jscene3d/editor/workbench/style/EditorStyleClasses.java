@@ -231,6 +231,20 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_MENU_BAR = "editor-menu-bar";
     /** CSS class named {@value}. */
+    public static final String EDITOR_MODAL = "editor-modal";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_MODAL_ACTIONS = "editor-modal-actions";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_MODAL_BUTTON = "editor-modal-button";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_MODAL_CONTENT = "editor-modal-content";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_MODAL_COPY_BUTTON = "editor-modal-copy-button";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_MODAL_HEADING = "editor-modal-heading";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_MODAL_ROOT = "editor-modal-root";
+    /** CSS class named {@value}. */
     public static final String EDITOR_OPEN_PROJECT_BUTTON = "editor-open-project-button";
     /** CSS class named {@value}. */
     public static final String EDITOR_PANEL = "editor-panel";
@@ -253,7 +267,7 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_PRODUCT_KIND = "editor-product-kind";
     /** CSS class named {@value}. */
-    public static final String EDITOR_PRODUCT_NAME = "editor-product-name";
+    public static final String EDITOR_PRODUCT_MARK = "editor-product-mark";
     /** CSS class named {@value}. */
     public static final String EDITOR_PROJECT_BREADCRUMB = "editor-project-breadcrumb";
     /** CSS class named {@value}. */

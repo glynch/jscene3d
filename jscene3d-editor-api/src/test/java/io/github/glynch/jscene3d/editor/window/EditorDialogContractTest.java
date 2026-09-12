@@ -27,6 +27,7 @@ final class EditorDialogContractTest {
 
         assertThat(dialog.buttons()).extracting(EditorDialogButton::id).containsExactly(OK, CANCEL);
         assertThat(dialog.buttons().getFirst().role()).isEqualTo(EditorDialogButtonRole.DEFAULT);
+        assertThat(dialog.buttons().getFirst().behavior()).isEqualTo(EditorDialogButtonBehavior.CLOSE);
     }
 
     @Test

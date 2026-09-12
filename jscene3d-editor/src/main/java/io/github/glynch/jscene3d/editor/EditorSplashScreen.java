@@ -18,7 +18,6 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundImage;
 import javafx.scene.layout.BackgroundPosition;
@@ -36,7 +35,6 @@ import org.jspecify.annotations.Nullable;
 public final class EditorSplashScreen extends StackPane implements EditorProjectLoadProgress {
     private static final javafx.util.Duration FADE_DURATION = javafx.util.Duration.millis(180.0);
     private static final String ARTWORK_RESOURCE = "splash/viewport-emergence-background.png";
-    private static final String MARK_RESOURCE = "splash/jscene3d-mark.png";
 
     private final EditorSplashTiming timing;
     private final Label projectName = new Label();
@@ -141,11 +139,7 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
 
     /** Creates the original product mark and live JScene3D Editor wordmark. */
     private static HBox createBrand() {
-        ImageView mark = new ImageView(loadImage(MARK_RESOURCE));
-        mark.setFitWidth(72.0);
-        mark.setFitHeight(72.0);
-        mark.setPreserveRatio(true);
-        mark.setAccessibleText("JScene3D");
+        EditorBrandMark mark = new EditorBrandMark(72.0);
         mark.getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH_MARK);
 
         HBox wordmark = new HBox(

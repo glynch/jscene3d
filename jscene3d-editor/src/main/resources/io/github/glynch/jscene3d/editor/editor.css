@@ -98,12 +98,6 @@
     -fx-text-fill: -jscene-text-strong;
 }
 
-.editor-product-name {
-    -fx-font-size: 14px;
-    -fx-font-weight: 700;
-    -fx-text-fill: -jscene-text-strong;
-}
-
 .editor-product-kind {
     -fx-font-size: 10px;
     -fx-font-weight: 600;
@@ -236,6 +230,54 @@
 .combo-box-base:disabled,
 .text-input:disabled {
     -fx-opacity: 0.48;
+}
+
+.editor-modal-root {
+    -fx-background-color: transparent;
+}
+
+.editor-modal {
+    -fx-background-color: -jscene-panel;
+    -fx-background-radius: 22px;
+    -fx-border-color: derive(-jscene-divider, 18%);
+    -fx-border-radius: 22px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.58), 20, 0.18, 0, 5);
+    -fx-padding: 24px;
+}
+
+.editor-modal-heading {
+    -fx-font-size: 15px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-modal-content {
+    -fx-font-size: 12px;
+    -fx-line-spacing: 2px;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-modal-actions {
+    -fx-alignment: center;
+    -fx-padding: 6px 0 0 0;
+}
+
+.editor-modal-button {
+    -fx-background-radius: 18px;
+    -fx-border-radius: 18px;
+    -fx-min-height: 36px;
+}
+
+.editor-modal-copy-button {
+    -fx-background-color: -jscene-accent;
+    -fx-border-color: -jscene-accent;
+    -fx-text-fill: -jscene-text-strong;
+}
+
+.editor-modal-copy-button:hover {
+    -fx-background-color: -jscene-accent-hover;
+    -fx-border-color: -jscene-accent-hover;
 }
 
 .text-input,

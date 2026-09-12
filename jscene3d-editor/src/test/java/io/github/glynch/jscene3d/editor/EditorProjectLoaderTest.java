@@ -150,10 +150,17 @@ final class EditorProjectLoaderTest {
                         EditorLoadingPhase.BUILDING_HIERARCHY);
     }
 
-    /** Reads the engine version filtered into the built editor artifact. */
+    /** Reads complete build information filtered into the built editor artifact. */
     @Test
-    void readsEmbeddedEngineVersion() {
+    void readsEmbeddedBuildInformation() {
+        EditorBuildInfo buildInfo = EditorBuildInfo.current();
+
         assertThat(EditorBuildInfo.engineVersion()).isEqualTo("0.1.0-SNAPSHOT");
+        assertThat(buildInfo.commit()).isNotBlank().doesNotContain("${");
+        assertThat(buildInfo.buildDate()).isNotBlank().doesNotContain("${");
+        assertThat(buildInfo.javafxVersion()).isEqualTo("21.0.12");
+        assertThat(buildInfo.aboutText())
+                .contains("Version: 0.1.0-SNAPSHOT", "Commit:", "Build date: ", "Java: ", "JavaFX: 21.0.12", "OS: ");
     }
 
     /** Composes spatial components while the deliberately missing application provider remains unloaded. */

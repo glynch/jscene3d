@@ -6,9 +6,6 @@ package io.github.glynch.jscene3d.editor.builtin.explorer;
 
 import io.github.glynch.jscene3d.editor.activity.ActivityId;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
-import io.github.glynch.jscene3d.editor.command.CommandId;
-import io.github.glynch.jscene3d.editor.command.EditorCommandContext;
-import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
 import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
@@ -51,9 +48,6 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
 
     /** Stable identity of the built-in Explorer Activity Bar container. */
     public static final ActivityId ACTIVITY_ID = new ActivityId("io.github.glynch.jscene3d.editor.explorer-activity");
-
-    private static final CommandId OPEN_FILE =
-            new CommandId("io.github.glynch.jscene3d.editor.workspace-explorer.open-file");
 
     private static final Comparator<WorkspaceExplorerEntry> ENTRY_ORDER = Comparator.comparing(
                     (WorkspaceExplorerEntry entry) -> entry.kind() == WorkspaceExplorerEntry.Kind.FILE)
@@ -104,11 +98,7 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
         EditorExtensionContext editor = Objects.requireNonNull(context, "context");
         EditorContextCondition<Boolean> projectOpen = EditorContextCondition.isTrue(EditorContextKeys.PROJECT_OPEN);
         WorkspaceExplorerTreeView explorer = new WorkspaceExplorerTreeView(editor.fileTypes());
-        editor.subscriptions()
-                .add(editor.commands()
-                        .register(
-                                new EditorCommandContribution(OPEN_FILE, "Open File"),
-                                invocation -> openFile(invocation, editor.window())));
+        new WorkspaceExplorerCommands().register(editor);
         editor.subscriptions().add(explorer.previewSelectionsWith(editor.window()));
         editor.subscriptions()
                 .add(editor.views()
@@ -163,13 +153,6 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
         }
     }
 
-    private static void openFile(EditorCommandContext invocation, EditorWindow window) {
-        invocation
-                .argument(WorkspaceExplorerEntry.class)
-                .filter(entry -> entry.kind() == WorkspaceExplorerEntry.Kind.FILE)
-                .ifPresent(entry -> window.openFile(entry.path().toUri()));
-    }
-
     private final class WorkspaceDataProvider implements EditorTreeDataProvider<WorkspaceExplorerEntry> {
         private final EditorFileTypes fileTypes;
 
@@ -209,7 +192,7 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
                     Optional.of(tooltip(entry)),
                     Optional.of(icon(entry)),
                     List.of(),
-                    file ? Optional.of(OPEN_FILE) : Optional.empty(),
+                    file ? Optional.of(WorkspaceExplorerCommands.OPEN_FILE) : Optional.empty(),
                     Optional.of(file ? "workspace-file" : "workspace-folder"),
                     collapsibleState);
         }

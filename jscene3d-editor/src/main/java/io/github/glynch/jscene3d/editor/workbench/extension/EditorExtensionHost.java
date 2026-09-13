@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.workbench.extension;
 
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.command.CommandId;
+import io.github.glynch.jscene3d.editor.command.CommandLocationId;
 import io.github.glynch.jscene3d.editor.command.EditorCommand;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
@@ -30,6 +31,7 @@ import io.github.glynch.jscene3d.editor.workbench.appearance.InMemoryEditorAppea
 import io.github.glynch.jscene3d.editor.workbench.command.EditorCommandMenuRegistry;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.file.EditorFileTypeRegistry;
+import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
@@ -184,6 +186,12 @@ public final class EditorExtensionHost implements AutoCloseable {
     public EditorRegistration observeMenus(Consumer<List<EditorMenuSnapshot>> observer) {
         requireOpen();
         return commandMenus.observe(observer);
+    }
+
+    /** Returns commands currently available at an item-oriented command location. */
+    public List<EditorMenuCommandSnapshot> commandsAt(CommandLocationId location, Optional<String> contextValue) {
+        requireOpen();
+        return commandMenus.commandsAt(location, contextValue);
     }
 
     /** Invokes a registered command through the workbench action path. */

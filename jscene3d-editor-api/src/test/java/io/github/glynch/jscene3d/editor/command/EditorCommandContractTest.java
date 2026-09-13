@@ -41,6 +41,7 @@ final class EditorCommandContractTest {
         assertThat(placement.command()).isEqualTo(id);
         assertThat(placement.group()).isEqualTo("default");
         assertThat(placement.order()).isEqualTo(10);
+        assertThat(placement.contextValue()).isEmpty();
         assertThat(messages).singleElement().extracting(EditorMessage::text).isEqualTo("Hello World!");
     }
 
@@ -93,6 +94,9 @@ final class EditorCommandContractTest {
         assertThatThrownBy(() -> new EditorCommandPlacement(command, location, " ", 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("group must not be blank");
+        assertThatThrownBy(() -> new EditorCommandPlacement(command, location, "default", 0, " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("contextValue must not be blank");
         assertThatNullPointerException()
                 .isThrownBy(() -> EditorCommandLocations.viewTitle(null))
                 .withMessage("view");

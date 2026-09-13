@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.builtin.text.SourceEditorExtension;
+import io.github.glynch.jscene3d.editor.command.EditorCommandLocations;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
@@ -23,7 +24,6 @@ import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorFileOpenRequest;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +40,7 @@ final class WorkspaceExplorerExtensionTest {
     /** Contributes one lazy filesystem tree while a project workspace is open. */
     @Test
     void contributesProjectWorkspaceTree() throws IOException {
-        createWorkspace();
+        WorkspaceExplorerTestFixture.create(workspace);
         EditorProjectContext projects = new EditorProjectContext();
         EditorExtensionHost host = new EditorExtensionHost(projects, new EditorSelectionContext());
         List<List<EditorViewContribution>> viewSnapshots = new ArrayList<>();
@@ -97,6 +97,17 @@ final class WorkspaceExplorerExtensionTest {
                 .returns(Optional.of(new EditorIcon(EditorIcons.JAVA, "Java source")), item -> item.icon())
                 .returns(Optional.of("workspace-file"), item -> item.contextValue())
                 .satisfies(item -> assertThat(item.command()).isPresent());
+        String revealTitle = new WorkspaceFileManager(System.getProperty("os.name")).revealCommandTitle();
+        assertThat(host.commandsAt(
+                        EditorCommandLocations.viewItemContext(WorkspaceExplorerExtension.VIEW_ID),
+                        Optional.of("workspace-file")))
+                .extracting(command -> command.contribution().title())
+                .containsExactly("Open", revealTitle);
+        assertThat(host.commandsAt(
+                        EditorCommandLocations.viewItemContext(WorkspaceExplorerExtension.VIEW_ID),
+                        Optional.of("workspace-folder")))
+                .extracting(command -> command.contribution().title())
+                .containsExactly(revealTitle);
         view.selectionModel().orElseThrow().select(Optional.of(javaFile));
         host.execute(view.dataProvider().item(javaFile).command().orElseThrow(), javaFile);
         assertThat(fileRequests)
@@ -116,20 +127,6 @@ final class WorkspaceExplorerExtensionTest {
         assertThat(viewSnapshots.getLast()).isEmpty();
         assertThat(activitySnapshots.getLast()).isEmpty();
         host.close();
-    }
-
-    private void createWorkspace() throws IOException {
-        Files.createDirectories(workspace.resolve("src/main/java/example"));
-        Files.writeString(workspace.resolve("src/main/java/example/Player.java"), "final class Player {}\n");
-        Files.writeString(workspace.resolve("pom.xml"), "<project/>\n");
-        Files.writeString(workspace.resolve("local.env"), "private\n");
-        Files.createDirectories(workspace.resolve("target/classes"));
-        Files.writeString(workspace.resolve("target/classes/Player.class"), "generated\n");
-        Files.createDirectories(workspace.resolve(".git"));
-        Files.writeString(workspace.resolve(".git/config"), "private\n");
-        Files.createDirectories(workspace.resolve(".jscene3d/cache"));
-        Files.writeString(workspace.resolve(".jscene3d/cache/index"), "generated\n");
-        Files.writeString(workspace.resolve(".jscene3d/settings.json"), "{}\n");
     }
 
     private static List<WorkspaceExplorerEntry> children(

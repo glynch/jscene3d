@@ -141,6 +141,13 @@ public final class EditorCommandMenuRegistry
         return once(() -> observers.remove(listener));
     }
 
+    /** Returns the current ordered commands placed for one semantic item context. */
+    public List<EditorMenuCommandSnapshot> commandsAt(CommandLocationId location, Optional<String> contextValue) {
+        requireOpen();
+        return menuCommands(
+                Objects.requireNonNull(location, "location"), Objects.requireNonNull(contextValue, "contextValue"));
+    }
+
     @Override
     public void close() {
         if (closed) {
@@ -164,13 +171,15 @@ public final class EditorCommandMenuRegistry
         return menus.values().stream()
                 .sorted(Comparator.comparingInt(EditorMenuContribution::order)
                         .thenComparing(menu -> menu.location().value()))
-                .map(menu -> new EditorMenuSnapshot(menu, menuCommands(menu.location())))
+                .map(menu -> new EditorMenuSnapshot(menu, menuCommands(menu.location(), Optional.empty())))
                 .toList();
     }
 
-    private List<EditorMenuCommandSnapshot> menuCommands(CommandLocationId location) {
+    private List<EditorMenuCommandSnapshot> menuCommands(
+            CommandLocationId location, Optional<String> invocationContext) {
         return placements.stream()
                 .filter(placement -> placement.location().equals(location))
+                .filter(placement -> matchesContext(placement.contextValue(), invocationContext))
                 .sorted(Comparator.comparingInt(EditorCommandPlacement::order)
                         .thenComparing(placement -> placement.command().value()))
                 .flatMap(placement -> Optional.ofNullable(commands.get(placement.command()))
@@ -178,6 +187,10 @@ public final class EditorCommandMenuRegistry
                                 command.contribution, command.state, placement.group(), placement.order()))
                         .stream())
                 .toList();
+    }
+
+    private static boolean matchesContext(Optional<String> placementContext, Optional<String> invocationContext) {
+        return placementContext.isEmpty() || placementContext.equals(invocationContext);
     }
 
     private void notifyObservers() {

@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsView;
 import io.github.glynch.jscene3d.editor.builtin.extensions.ExtensionsView;
+import io.github.glynch.jscene3d.editor.command.EditorCommandLocations;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
 import io.github.glynch.jscene3d.editor.view.EditorDetailsView;
 import io.github.glynch.jscene3d.editor.view.EditorTreeView;
@@ -63,7 +64,10 @@ final class JavaFxViewRenderer {
     }
 
     private <T> JavaFxRenderedView renderTree(EditorTreeView<T> view) {
-        JavaFxTreeViewAdapter<T> adapter = new JavaFxTreeViewAdapter<>(view, extensions::execute, icons);
+        JavaFxItemContextMenus contextMenus = new JavaFxItemContextMenus(
+                contextValue -> extensions.commandsAt(EditorCommandLocations.viewItemContext(view.id()), contextValue),
+                extensions::execute);
+        JavaFxTreeViewAdapter<T> adapter = new JavaFxTreeViewAdapter<>(view, extensions::execute, icons, contextMenus);
         return standard(view, adapter.node(), adapter::close, adapter::requestFocus);
     }
 

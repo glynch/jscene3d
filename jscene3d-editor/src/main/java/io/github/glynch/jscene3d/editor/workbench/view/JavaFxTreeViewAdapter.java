@@ -40,6 +40,7 @@ import org.jspecify.annotations.Nullable;
 final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
     private final EditorTreeDataProvider<T> provider;
     private final JavaFxIconRenderer icons;
+    private final JavaFxItemContextMenus contextMenus;
     private final Optional<EditorTreeSelectionModel<T>> selectionModel;
     private final TreeView<T> tree = new TreeView<>();
     private final Map<T, TreeItem<T>> renderedItems = new HashMap<>();
@@ -52,12 +53,16 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
 
     /** Creates and begins observing one logical tree view. */
     JavaFxTreeViewAdapter(
-            EditorTreeView<T> view, BiConsumer<CommandId, Object> commandExecutor, JavaFxIconRenderer icons) {
+            EditorTreeView<T> view,
+            BiConsumer<CommandId, Object> commandExecutor,
+            JavaFxIconRenderer icons,
+            JavaFxItemContextMenus contextMenus) {
         EditorTreeView<T> logicalView = Objects.requireNonNull(view, "view");
         this.provider = Objects.requireNonNull(logicalView.dataProvider(), "view.dataProvider()");
         this.selectionModel = Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
         BiConsumer<CommandId, Object> commands = Objects.requireNonNull(commandExecutor, "commandExecutor");
         this.icons = Objects.requireNonNull(icons, "icons");
+        this.contextMenus = Objects.requireNonNull(contextMenus, "contextMenus");
         tree.setShowRoot(false);
         tree.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_VIEW);
         tree.setCellFactory(ignored -> new LogicalTreeCell());
@@ -241,6 +246,7 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
                 setGraphic(null);
                 setTooltip(null);
                 setAccessibleText(null);
+                setContextMenu(null);
                 return;
             }
             EditorTreeItem presentation = provider.item(element);
@@ -277,6 +283,8 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
             setGraphic(row);
             setTooltip(presentation.tooltip().map(Tooltip::new).orElse(null));
             setAccessibleText(accessibleText(presentation));
+            setContextMenu(
+                    contextMenus.create(presentation.contextValue(), element).orElse(null));
         }
 
         private String accessibleText(EditorTreeItem presentation) {

@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.command;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Displays a registered command on one editor-owned interaction surface.
@@ -13,8 +14,10 @@ import java.util.Objects;
  * @param location target menu, toolbar, context menu, or other action surface
  * @param group non-blank group used to insert separators between adjacent command groups
  * @param order ascending presentation order within the group
+ * @param contextValue optional semantic item context required for this placement
  */
-public record EditorCommandPlacement(CommandId command, CommandLocationId location, String group, int order) {
+public record EditorCommandPlacement(
+        CommandId command, CommandLocationId location, String group, int order, Optional<String> contextValue) {
     /** Validates one command placement. */
     public EditorCommandPlacement {
         Objects.requireNonNull(command, "command");
@@ -22,10 +25,26 @@ public record EditorCommandPlacement(CommandId command, CommandLocationId locati
         if (Objects.requireNonNull(group, "group").isBlank()) {
             throw new IllegalArgumentException("group must not be blank");
         }
+        Objects.requireNonNull(contextValue, "contextValue").ifPresent(value -> {
+            if (value.isBlank()) {
+                throw new IllegalArgumentException("contextValue must not be blank");
+            }
+        });
+    }
+
+    /** Creates a placement which is available for every context at its location. */
+    public EditorCommandPlacement(CommandId command, CommandLocationId location, String group, int order) {
+        this(command, location, group, order, Optional.empty());
     }
 
     /** Creates a placement in the default command group. */
     public EditorCommandPlacement(CommandId command, CommandLocationId location, int order) {
         this(command, location, "default", order);
+    }
+
+    /** Creates a placement available only for items with the supplied semantic context value. */
+    public EditorCommandPlacement(
+            CommandId command, CommandLocationId location, String group, int order, String contextValue) {
+        this(command, location, group, order, Optional.of(Objects.requireNonNull(contextValue, "contextValue")));
     }
 }

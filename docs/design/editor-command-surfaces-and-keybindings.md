@@ -53,6 +53,14 @@ remain open design decisions.
 The following catalogue records useful first-party behavior rather than a
 promise to reproduce every Visual Studio Code command.
 
+### Project builds
+
+The Project menu will expose Build Project, Rebuild Project, Cancel Build, Show
+Build Output, and a checked Build Automatically command. These commands and
+their state are defined in
+[Editor project builds](editor-project-builds.md); build adapters and JavaFX
+menus do not implement parallel command behavior.
+
 ### Workspace Explorer
 
 - Open and Open With;

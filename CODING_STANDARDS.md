@@ -150,6 +150,13 @@ threads.
 
 - Every published artifact includes `module-info.java` and remains usable on the
   ordinary classpath.
+- Establish responsibility-based subpackages in the first implementation commit
+  for every new Maven artifact. Do not accumulate unrelated interfaces,
+  coordinators, adapters, process launchers, parsers, persistence, and UI types
+  in the artifact's root package with the intention of reorganizing them later.
+  The root package contains only `package-info.java` and types which genuinely
+  form the artifact's central public interface; tests mirror the responsibility
+  packages they exercise.
 - `jscene3d-core` uses JPMS module name
   `io.github.glynch.jscene3d.core`.
 - `jscene3d-lwjgl` uses JPMS module name

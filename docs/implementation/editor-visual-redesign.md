@@ -279,6 +279,10 @@ Verification:
 - implement the deferred command surfaces and toolkit-independent keybinding
   direction recorded in
   [Editor Command Surfaces and Keybindings](../design/editor-command-surfaces-and-keybindings.md);
+- implement automatic and manual project builds using the lifecycle, menu,
+  diagnostics, output, and package-organization direction recorded in
+  [Editor Project Builds](../design/editor-project-builds.md) before adding
+  Play, Pause, or Stop;
 - implement Hierarchy and Inspector navigation to associated behavior source
   using the language-neutral seam recorded in
   [Editor Source Navigation](../design/editor-source-navigation.md);

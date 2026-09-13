@@ -172,7 +172,9 @@ the protocol permits it.
 File changes outside an open working copy, dynamic watched-file registration,
 multi-root workspaces, and external-change reconciliation remain later design
 work. Maven build-file saves must eventually notify Java support so the project
-model can be refreshed.
+model can be refreshed. Project compilation and runnable build freshness belong
+to the separate [Editor project builds](editor-project-builds.md) module; the
+language-server session is not the editor's project-build coordinator.
 
 ## Monaco bridge
 

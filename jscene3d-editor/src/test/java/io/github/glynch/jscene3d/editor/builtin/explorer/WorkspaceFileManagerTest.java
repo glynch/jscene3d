@@ -6,13 +6,19 @@ package io.github.glynch.jscene3d.editor.builtin.explorer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import org.junit.jupiter.api.Test;
 
 final class WorkspaceFileManagerTest {
     @Test
     void namesTheNativeFileManagerForEachDesktopPlatform() {
-        assertThat(new WorkspaceFileManager("Mac OS X").revealCommandTitle()).isEqualTo("Reveal in Finder");
-        assertThat(new WorkspaceFileManager("Windows 11").revealCommandTitle()).isEqualTo("Reveal in File Explorer");
-        assertThat(new WorkspaceFileManager("Linux").revealCommandTitle()).isEqualTo("Reveal in File Manager");
+        assertThat(new WorkspaceFileManager(OperatingSystem.MACOS).revealCommandTitle())
+                .isEqualTo("Reveal in Finder");
+        assertThat(new WorkspaceFileManager(OperatingSystem.WINDOWS).revealCommandTitle())
+                .isEqualTo("Reveal in File Explorer");
+        assertThat(new WorkspaceFileManager(OperatingSystem.LINUX).revealCommandTitle())
+                .isEqualTo("Reveal in File Manager");
+        assertThat(new WorkspaceFileManager(OperatingSystem.OTHER).revealCommandTitle())
+                .isEqualTo("Reveal in File Manager");
     }
 }

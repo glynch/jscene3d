@@ -8,6 +8,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import io.github.glynch.jscene3d.project.exporting.internal.ApplicationImageMetadata;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -46,7 +47,7 @@ final class MacOsDiskImageExporterTest {
         RecordingDiskImageTool tool = new RecordingDiskImageTool();
         MacOsDiskImageRequest request = request();
 
-        MacOsDiskImage diskImage = new MacOsDiskImageExporter(tool, "Mac OS X").export(request);
+        MacOsDiskImage diskImage = new MacOsDiskImageExporter(tool, OperatingSystem.MACOS).export(request);
 
         assertThat(diskImage.path())
                 .isEqualTo(outputDirectory.resolve("Sample Game-1.2.3.dmg"))
@@ -70,7 +71,7 @@ final class MacOsDiskImageExporterTest {
                 .outputDirectory(outputDirectory)
                 .build();
 
-        new MacOsDiskImageExporter(tool, "Mac OS X").export(request);
+        new MacOsDiskImageExporter(tool, OperatingSystem.MACOS).export(request);
 
         assertThat(tool.backgroundImage()).contains(background.toRealPath());
     }
@@ -85,7 +86,7 @@ final class MacOsDiskImageExporterTest {
         DiskImageTool failingTool = (plan, output, resources) -> {
             throw new IOException("jpackage failed with exit code 1: deliberate failure");
         };
-        MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(failingTool, "Mac OS X");
+        MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(failingTool, OperatingSystem.MACOS);
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(IOException.class)
@@ -98,7 +99,7 @@ final class MacOsDiskImageExporterTest {
     void rejectsUnsupportedHost() {
         MacOsDiskImageRequest request = request();
         RecordingDiskImageTool tool = new RecordingDiskImageTool();
-        MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(tool, "Linux");
+        MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(tool, OperatingSystem.LINUX);
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(UnsupportedOperationException.class)
@@ -111,7 +112,8 @@ final class MacOsDiskImageExporterTest {
     void rejectsMissingApplicationImageMetadata() throws IOException {
         Files.delete(applicationImage.resolve("Contents/app").resolve(ApplicationImageMetadata.PATH));
         MacOsDiskImageRequest request = request();
-        MacOsDiskImageExporter exporter = new MacOsDiskImageExporter(new RecordingDiskImageTool(), "Mac OS X");
+        MacOsDiskImageExporter exporter =
+                new MacOsDiskImageExporter(new RecordingDiskImageTool(), OperatingSystem.MACOS);
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(IOException.class)

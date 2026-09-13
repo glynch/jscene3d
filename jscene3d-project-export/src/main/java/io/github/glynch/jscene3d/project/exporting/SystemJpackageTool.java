@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.exporting;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +50,6 @@ final class SystemJpackageTool implements JpackageTool {
 
     /** Returns the host-specific JDK tool filename. */
     private static String executableName() {
-        return System.getProperty("os.name").startsWith("Windows") ? "jpackage.exe" : "jpackage";
+        return OperatingSystem.current() == OperatingSystem.WINDOWS ? "jpackage.exe" : "jpackage";
     }
 }

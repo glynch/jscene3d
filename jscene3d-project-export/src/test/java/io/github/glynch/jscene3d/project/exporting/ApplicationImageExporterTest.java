@@ -8,6 +8,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import io.github.glynch.jscene3d.project.exporting.internal.ApplicationImageMetadata;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -65,7 +66,7 @@ final class ApplicationImageExporterTest {
         RecordingJpackageTool tool = new RecordingJpackageTool();
         ApplicationImageRequest request = request();
 
-        ApplicationImage image = new ApplicationImageExporter(tool, "Mac OS X").export(request);
+        ApplicationImage image = new ApplicationImageExporter(tool, OperatingSystem.MACOS).export(request);
 
         assertThat(image.root()).isEqualTo(outputDirectory.resolve("Sample Game.app"));
         assertThat(image.launcher()).isEqualTo(image.root().resolve("Contents/MacOS/Sample Game"));
@@ -109,7 +110,7 @@ final class ApplicationImageExporterTest {
         Files.writeString(marker, "existing", UTF_8);
         ApplicationImageRequest request = request();
         JpackageTool failingTool = ignored -> new JpackageToolResult(1, "deliberate failure");
-        ApplicationImageExporter exporter = new ApplicationImageExporter(failingTool, "Mac OS X");
+        ApplicationImageExporter exporter = new ApplicationImageExporter(failingTool, OperatingSystem.MACOS);
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(IOException.class)
@@ -122,7 +123,7 @@ final class ApplicationImageExporterTest {
     void rejectsUnsupportedHost() {
         ApplicationImageRequest request = request();
         RecordingJpackageTool tool = new RecordingJpackageTool();
-        ApplicationImageExporter exporter = new ApplicationImageExporter(tool, "Linux");
+        ApplicationImageExporter exporter = new ApplicationImageExporter(tool, OperatingSystem.LINUX);
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(UnsupportedOperationException.class)
@@ -135,7 +136,8 @@ final class ApplicationImageExporterTest {
     void rejectsMissingDesktopLauncher() throws IOException {
         Files.delete(applicationDirectory.resolve("lib/jscene3d-project-desktop.jar"));
         ApplicationImageRequest request = request();
-        ApplicationImageExporter exporter = new ApplicationImageExporter(new RecordingJpackageTool(), "Mac OS X");
+        ApplicationImageExporter exporter =
+                new ApplicationImageExporter(new RecordingJpackageTool(), OperatingSystem.MACOS);
 
         assertThatThrownBy(() -> exporter.export(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -148,7 +150,7 @@ final class ApplicationImageExporterTest {
         Files.writeString(applicationDirectory.resolve("project/jscene3d.json"), manifestWithoutIcon(), UTF_8);
         RecordingJpackageTool tool = new RecordingJpackageTool();
 
-        new ApplicationImageExporter(tool, "Mac OS X").export(request());
+        new ApplicationImageExporter(tool, OperatingSystem.MACOS).export(request());
 
         assertThat(tool.hasOption("--icon")).isFalse();
     }
@@ -160,7 +162,8 @@ final class ApplicationImageExporterTest {
         Files.write(projectRoot.resolve("branding/sample-game.png"), new byte[] {0, 1, 2, 3});
         Files.writeString(
                 projectRoot.resolve("jscene3d.json"), manifest().replace("sample-game.icns", "sample-game.png"), UTF_8);
-        ApplicationImageExporter exporter = new ApplicationImageExporter(new RecordingJpackageTool(), "Mac OS X");
+        ApplicationImageExporter exporter =
+                new ApplicationImageExporter(new RecordingJpackageTool(), OperatingSystem.MACOS);
         ApplicationImageRequest request = request();
 
         assertThatThrownBy(() -> exporter.export(request))

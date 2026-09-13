@@ -4,23 +4,24 @@
  */
 package io.github.glynch.jscene3d.project.exporting;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.io.IOException;
 import java.util.Objects;
 
 /** Packages a completed macOS application image as an installable disk image. */
 public final class MacOsDiskImageExporter {
     private final DiskImageTool tool;
-    private final String operatingSystemName;
+    private final OperatingSystem operatingSystem;
 
     /** Uses the non-interactive macOS disk-image tool on the current host. */
     public MacOsDiskImageExporter() {
-        this(new SystemDiskImageTool(), System.getProperty("os.name"));
+        this(new SystemDiskImageTool(), OperatingSystem.current());
     }
 
     /** Stores replaceable host dependencies for deterministic contract tests. */
-    MacOsDiskImageExporter(DiskImageTool tool, String operatingSystemName) {
+    MacOsDiskImageExporter(DiskImageTool tool, OperatingSystem operatingSystem) {
         this.tool = Objects.requireNonNull(tool, "tool");
-        this.operatingSystemName = Objects.requireNonNull(operatingSystemName, "operatingSystemName");
+        this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
     }
 
     /**
@@ -32,7 +33,7 @@ public final class MacOsDiskImageExporter {
      * @throws UnsupportedOperationException when the current host is not macOS
      */
     public MacOsDiskImage export(MacOsDiskImageRequest request) throws IOException {
-        MacOsDiskImagePlan plan = MacOsDiskImagePlan.prepare(request, operatingSystemName);
+        MacOsDiskImagePlan plan = MacOsDiskImagePlan.prepare(request, operatingSystem);
         new MacOsDiskImageAssembly(plan, tool).write();
         return new MacOsDiskImage(plan.outputPath());
     }

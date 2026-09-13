@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.exporting;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -17,9 +18,8 @@ final class MacOsPackageValues {
     }
 
     /** Requires a macOS host. */
-    static void requireHost(String operatingSystemName) {
-        String validName = Objects.requireNonNull(operatingSystemName, "operatingSystemName");
-        if (!validName.startsWith("Mac")) {
+    static void requireHost(OperatingSystem operatingSystem) {
+        if (Objects.requireNonNull(operatingSystem, "operatingSystem") != OperatingSystem.MACOS) {
             throw new UnsupportedOperationException("native application export currently supports macOS only");
         }
     }

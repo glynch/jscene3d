@@ -15,6 +15,10 @@
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-project</artifactId>
         </dependency>
         <dependency>

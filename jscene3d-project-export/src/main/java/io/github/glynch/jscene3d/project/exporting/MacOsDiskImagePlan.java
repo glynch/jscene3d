@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.exporting;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import io.github.glynch.jscene3d.project.exporting.internal.ApplicationImageMetadata;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,13 +37,14 @@ final class MacOsDiskImagePlan {
      * Validates one application image and derives all disk-image packaging values.
      *
      * @param request complete disk-image request
-     * @param operatingSystemName host operating-system name
+     * @param operatingSystem host operating-system family
      * @return complete disk-image plan
      * @throws IOException when application-image files cannot be inspected
      */
-    static MacOsDiskImagePlan prepare(MacOsDiskImageRequest request, String operatingSystemName) throws IOException {
+    static MacOsDiskImagePlan prepare(MacOsDiskImageRequest request, OperatingSystem operatingSystem)
+            throws IOException {
         MacOsDiskImageRequest validRequest = Objects.requireNonNull(request, "request");
-        MacOsPackageValues.requireHost(operatingSystemName);
+        MacOsPackageValues.requireHost(operatingSystem);
         Path image = requireApplicationImage(validRequest.applicationImage());
         Optional<Path> background = validRequest.backgroundImage().map(MacOsDiskImagePlan::requireBackgroundImage);
         ApplicationImageMetadata metadata = ApplicationImageMetadata.read(image.resolve("Contents/app"));

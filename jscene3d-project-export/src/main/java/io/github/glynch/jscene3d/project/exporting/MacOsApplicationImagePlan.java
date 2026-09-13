@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.project.exporting;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import io.github.glynch.jscene3d.project.desktop.DesktopProjectLauncher;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.exporting.internal.ApplicationDirectoryMetadata;
@@ -52,14 +53,14 @@ final class MacOsApplicationImagePlan {
      * Validates one application-directory input and derives all macOS packaging values.
      *
      * @param request complete image request
-     * @param operatingSystemName host operating-system name
+     * @param operatingSystem host operating-system family
      * @return complete native-image plan
      * @throws IOException when application-directory files cannot be inspected
      */
-    static MacOsApplicationImagePlan prepare(ApplicationImageRequest request, String operatingSystemName)
+    static MacOsApplicationImagePlan prepare(ApplicationImageRequest request, OperatingSystem operatingSystem)
             throws IOException {
         ApplicationImageRequest validRequest = Objects.requireNonNull(request, "request");
-        MacOsPackageValues.requireHost(operatingSystemName);
+        MacOsPackageValues.requireHost(operatingSystem);
         MacOsPackageValues.requireApplicationVersion(validRequest.applicationVersion());
         Path root = requireApplicationDirectory(validRequest.applicationDirectory());
         ApplicationDirectoryMetadata metadata = ApplicationDirectoryMetadata.read(root);

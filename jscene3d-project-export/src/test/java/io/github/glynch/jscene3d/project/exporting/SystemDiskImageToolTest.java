@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import io.github.glynch.jscene3d.project.exporting.internal.ApplicationImageMetadata;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -94,7 +95,7 @@ final class SystemDiskImageToolTest {
                 .applicationImage(applicationImage)
                 .outputDirectory(outputDirectory)
                 .build();
-        MacOsDiskImagePlan plan = MacOsDiskImagePlan.prepare(request, "Mac OS X");
+        MacOsDiskImagePlan plan = MacOsDiskImagePlan.prepare(request, OperatingSystem.MACOS);
 
         new SystemDiskImageTool(jpackage).create(plan, outputDirectory, resourceDirectory);
 
@@ -123,7 +124,7 @@ final class SystemDiskImageToolTest {
                 .backgroundImage(backgroundImage)
                 .outputDirectory(outputDirectory)
                 .build();
-        return MacOsDiskImagePlan.prepare(request, "Mac OS X");
+        return MacOsDiskImagePlan.prepare(request, OperatingSystem.MACOS);
     }
 
     /** Reads one standard pixel-size metadata value from the staged TIFF. */

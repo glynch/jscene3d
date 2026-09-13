@@ -4,28 +4,25 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.explorer;
 
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.awt.Desktop;
 import java.nio.file.Path;
-import java.util.Locale;
 import java.util.Objects;
 
 /** Provides platform-correct naming and invocation of the desktop file manager. */
 final class WorkspaceFileManager {
-    private final String operatingSystem;
+    private final OperatingSystem operatingSystem;
 
-    WorkspaceFileManager(String operatingSystem) {
-        this.operatingSystem =
-                Objects.requireNonNull(operatingSystem, "operatingSystem").toLowerCase(Locale.ROOT);
+    WorkspaceFileManager(OperatingSystem operatingSystem) {
+        this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
     }
 
     String revealCommandTitle() {
-        if (operatingSystem.contains("mac")) {
-            return "Reveal in Finder";
-        }
-        if (operatingSystem.contains("win")) {
-            return "Reveal in File Explorer";
-        }
-        return "Reveal in File Manager";
+        return switch (operatingSystem) {
+            case MACOS -> "Reveal in Finder";
+            case WINDOWS -> "Reveal in File Explorer";
+            case LINUX, OTHER -> "Reveal in File Manager";
+        };
     }
 
     void reveal(Path path) {

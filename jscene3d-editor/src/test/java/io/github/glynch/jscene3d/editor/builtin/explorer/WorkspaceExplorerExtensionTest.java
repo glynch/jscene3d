@@ -23,6 +23,7 @@ import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorFileOpenRequest;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -97,7 +98,7 @@ final class WorkspaceExplorerExtensionTest {
                 .returns(Optional.of(new EditorIcon(EditorIcons.JAVA, "Java source")), item -> item.icon())
                 .returns(Optional.of("workspace-file"), item -> item.contextValue())
                 .satisfies(item -> assertThat(item.command()).isPresent());
-        String revealTitle = new WorkspaceFileManager(System.getProperty("os.name")).revealCommandTitle();
+        String revealTitle = new WorkspaceFileManager(OperatingSystem.current()).revealCommandTitle();
         assertThat(host.commandsAt(
                         EditorCommandLocations.viewItemContext(WorkspaceExplorerExtension.VIEW_ID),
                         Optional.of("workspace-file")))

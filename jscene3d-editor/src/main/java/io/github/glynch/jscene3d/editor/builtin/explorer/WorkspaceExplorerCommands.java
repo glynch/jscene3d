@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
+import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.util.Objects;
 
 /** Registers item-oriented commands owned by the Workspace Explorer extension. */
@@ -27,7 +28,7 @@ final class WorkspaceExplorerCommands {
     private final WorkspaceFileManager fileManager;
 
     WorkspaceExplorerCommands() {
-        this(new WorkspaceFileManager(System.getProperty("os.name")));
+        this(new WorkspaceFileManager(OperatingSystem.current()));
     }
 
     WorkspaceExplorerCommands(WorkspaceFileManager fileManager) {

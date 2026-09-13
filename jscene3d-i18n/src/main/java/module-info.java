@@ -7,4 +7,5 @@ module io.github.glynch.jscene3d.i18n {
     requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.i18n;
+    exports io.github.glynch.jscene3d.i18n.resourcebundle;
 }

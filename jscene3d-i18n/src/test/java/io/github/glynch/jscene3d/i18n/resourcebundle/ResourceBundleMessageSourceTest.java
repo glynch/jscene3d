@@ -2,12 +2,14 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.i18n;
+package io.github.glynch.jscene3d.i18n.resourcebundle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
+import io.github.glynch.jscene3d.i18n.MessageSource;
+import io.github.glynch.jscene3d.i18n.NoSuchMessageException;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;

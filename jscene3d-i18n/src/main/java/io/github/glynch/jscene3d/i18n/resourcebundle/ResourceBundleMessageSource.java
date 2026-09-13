@@ -2,8 +2,10 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.i18n;
+package io.github.glynch.jscene3d.i18n.resourcebundle;
 
+import io.github.glynch.jscene3d.i18n.MessageSource;
+import io.github.glynch.jscene3d.i18n.NoSuchMessageException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;

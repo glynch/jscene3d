@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessLaunche
 import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.util.Objects;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.Consumer;
 
 /** Creates the bundled JDT LS language support behind the Java extension seam. */
 public final class JdtLanguageSupportFactory {
@@ -17,9 +18,10 @@ public final class JdtLanguageSupportFactory {
     /**
      * Creates Java language support using the staged JDT LS distribution.
      *
+     * @param status lifecycle status consumer
      * @return the server identity and project-scoped language support
      */
-    public static Result create() {
+    public static Result create(Consumer<JdtLanguageServerStatus> status) {
         JdtLanguageServerMetadata metadata = JdtLanguageServerMetadata.load();
         ForkJoinPool executor = ForkJoinPool.commonPool();
         JavaProjectLanguageSupport support = new JavaProjectLanguageSupport(
@@ -27,8 +29,18 @@ public final class JdtLanguageSupportFactory {
                 metadata,
                 OperatingSystem.current(),
                 executor,
-                new LanguageServerProcessLauncher(executor));
+                new LanguageServerProcessLauncher(executor),
+                Objects.requireNonNull(status, "status"),
+                clientVersion());
         return new Result(metadata.version(), support);
+    }
+
+    private static String clientVersion() {
+        return JdtLanguageSupportFactory.class
+                .getModule()
+                .getDescriptor()
+                .rawVersion()
+                .orElse("Development");
     }
 
     /**

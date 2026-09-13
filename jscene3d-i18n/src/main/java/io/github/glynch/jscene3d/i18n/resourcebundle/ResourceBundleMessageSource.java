@@ -18,7 +18,7 @@ import java.util.ResourceBundle;
 /** Resolves messages from one or more ordered Java resource-bundle families. */
 public final class ResourceBundleMessageSource implements MessageSource {
     private final List<String> bundleBaseNames;
-    private final ClassLoader classLoader;
+    private final BundleLoader bundleLoader;
 
     /**
      * Creates a message source using the current thread context class loader.
@@ -36,7 +36,20 @@ public final class ResourceBundleMessageSource implements MessageSource {
      * @param bundleBaseNames ordered bundle family names; earlier families take precedence
      */
     public ResourceBundleMessageSource(ClassLoader classLoader, String... bundleBaseNames) {
-        this.classLoader = Objects.requireNonNull(classLoader, "classLoader");
+        ClassLoader loader = Objects.requireNonNull(classLoader, "classLoader");
+        this.bundleLoader = (baseName, locale) -> ResourceBundle.getBundle(baseName, locale, loader);
+        this.bundleBaseNames = validatedBaseNames(bundleBaseNames);
+    }
+
+    /**
+     * Creates a message source loading bundles owned by a named Java module.
+     *
+     * @param ownerModule module containing the bundle resources
+     * @param bundleBaseNames ordered bundle family names; earlier families take precedence
+     */
+    public ResourceBundleMessageSource(Module ownerModule, String... bundleBaseNames) {
+        Module module = Objects.requireNonNull(ownerModule, "ownerModule");
+        this.bundleLoader = (baseName, locale) -> ResourceBundle.getBundle(baseName, locale, module);
         this.bundleBaseNames = validatedBaseNames(bundleBaseNames);
     }
 
@@ -63,7 +76,7 @@ public final class ResourceBundleMessageSource implements MessageSource {
     private Optional<String> findMessage(String code, Locale locale) {
         for (String baseName : bundleBaseNames) {
             try {
-                ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale, classLoader);
+                ResourceBundle bundle = bundleLoader.load(baseName, locale);
                 if (bundle.containsKey(code)) {
                     return Optional.of(bundle.getString(code));
                 }
@@ -105,5 +118,10 @@ public final class ResourceBundleMessageSource implements MessageSource {
     private static ClassLoader defaultClassLoader() {
         ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
         return contextClassLoader == null ? ResourceBundleMessageSource.class.getClassLoader() : contextClassLoader;
+    }
+
+    @FunctionalInterface
+    private interface BundleLoader {
+        ResourceBundle load(String baseName, Locale locale);
     }
 }

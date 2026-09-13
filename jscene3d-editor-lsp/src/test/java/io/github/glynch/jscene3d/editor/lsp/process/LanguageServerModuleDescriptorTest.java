@@ -11,11 +11,32 @@ import org.junit.jupiter.api.Test;
 
 final class LanguageServerModuleDescriptorTest {
     @Test
-    void exportsOnlyTheProcessLifecycleSeam() {
+    void exportsOnlyTheClientAndProcessLifecycleSeams() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
 
         assertThat(descriptor.exports())
                 .extracting(ModuleDescriptor.Exports::source)
-                .containsExactly("io.github.glynch.jscene3d.editor.lsp.process");
+                .containsExactlyInAnyOrder(
+                        "io.github.glynch.jscene3d.editor.lsp.client", "io.github.glynch.jscene3d.editor.lsp.process");
+    }
+
+    @Test
+    void resolvesTheJsonRuntimeModules() {
+        ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
+
+        assertThat(descriptor.requires())
+                .extracting(ModuleDescriptor.Requires::name)
+                .contains("com.google.gson", "org.eclipse.lsp4j", "org.eclipse.lsp4j.jsonrpc");
+    }
+
+    @Test
+    void reExportsLsp4jTypesUsedByTheClientApi() {
+        ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
+
+        assertThat(descriptor.requires())
+                .filteredOn(requirement -> requirement.name().equals("org.eclipse.lsp4j"))
+                .singleElement()
+                .satisfies(requirement ->
+                        assertThat(requirement.modifiers()).contains(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
     }
 }

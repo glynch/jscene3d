@@ -26,7 +26,7 @@ final class EditorStatusItemRegistry implements EditorStatusBar, AutoCloseable {
     private boolean closed;
 
     @Override
-    public EditorStatusItem create(EditorStatusItemContribution contribution) {
+    public synchronized EditorStatusItem create(EditorStatusItemContribution contribution) {
         requireOpen();
         EditorStatusItemContribution metadata = Objects.requireNonNull(contribution, "contribution");
         StatusItemRegistration item = new StatusItemRegistration(metadata);
@@ -37,13 +37,13 @@ final class EditorStatusItemRegistry implements EditorStatusBar, AutoCloseable {
         return item;
     }
 
-    EditorRegistration observe(Consumer<List<EditorStatusItemSnapshot>> observer) {
+    synchronized EditorRegistration observe(Consumer<List<EditorStatusItemSnapshot>> observer) {
         requireOpen();
         return observers.observe(observer, snapshot());
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         if (closed) {
             return;
         }
@@ -94,17 +94,21 @@ final class EditorStatusItemRegistry implements EditorStatusBar, AutoCloseable {
 
         @Override
         public void update(EditorStatusItemState updated) {
-            requireItemOpen();
-            state = Objects.requireNonNull(updated, "state");
-            notifyObservers();
+            synchronized (EditorStatusItemRegistry.this) {
+                requireItemOpen();
+                state = Objects.requireNonNull(updated, "state");
+                notifyObservers();
+            }
         }
 
         @Override
         public void close() {
-            if (!itemClosed) {
-                itemClosed = true;
-                if (items.remove(id(), this)) {
-                    notifyObservers();
+            synchronized (EditorStatusItemRegistry.this) {
+                if (!itemClosed) {
+                    itemClosed = true;
+                    if (items.remove(id(), this)) {
+                        notifyObservers();
+                    }
                 }
             }
         }

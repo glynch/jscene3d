@@ -4,5 +4,10 @@
  */
 /** Reusable process and protocol support for editor language servers. */
 module io.github.glynch.jscene3d.editor.lsp {
+    requires com.google.gson;
+    requires transitive org.eclipse.lsp4j;
+    requires org.eclipse.lsp4j.jsonrpc;
+
+    exports io.github.glynch.jscene3d.editor.lsp.client;
     exports io.github.glynch.jscene3d.editor.lsp.process;
 }

@@ -95,4 +95,14 @@ final class ResourceBundleMessageSourceTest {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("classLoader");
     }
+
+    @Test
+    void loadsACatalogueOwnedByANamedModule() {
+        MessageSource messages = new ResourceBundleMessageSource(getClass().getModule(), PRIMARY);
+
+        assertThat(messages.getMessage("greeting", Locale.FRENCH, "Graham")).isEqualTo("Bonjour, Graham !");
+        assertThatThrownBy(() -> new ResourceBundleMessageSource((Module) null, PRIMARY))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("ownerModule");
+    }
 }

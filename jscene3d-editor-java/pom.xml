@@ -34,6 +34,14 @@
             <artifactId>jscene3d-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-i18n</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.lsp4j</groupId>
+            <artifactId>org.eclipse.lsp4j.jsonrpc</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

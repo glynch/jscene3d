@@ -12,21 +12,34 @@ import java.util.function.Consumer;
 
 /** Owns synchronous observers for one immutable snapshot type. */
 final class EditorSnapshotObservers<T> {
+    private final Object monitor = new Object();
     private final List<Consumer<T>> observers = new ArrayList<>();
 
     EditorRegistration observe(Consumer<T> observer, T initialSnapshot) {
         Consumer<T> listener = Objects.requireNonNull(observer, "observer");
-        observers.add(listener);
+        synchronized (monitor) {
+            observers.add(listener);
+        }
         listener.accept(Objects.requireNonNull(initialSnapshot, "initialSnapshot"));
-        return EditorRegistrationOnce.of(() -> observers.remove(listener));
+        return EditorRegistrationOnce.of(() -> {
+            synchronized (monitor) {
+                observers.remove(listener);
+            }
+        });
     }
 
     void publish(T snapshot) {
         T current = Objects.requireNonNull(snapshot, "snapshot");
-        List.copyOf(observers).forEach(observer -> observer.accept(current));
+        List<Consumer<T>> currentObservers;
+        synchronized (monitor) {
+            currentObservers = List.copyOf(observers);
+        }
+        currentObservers.forEach(observer -> observer.accept(current));
     }
 
     void clear() {
-        observers.clear();
+        synchronized (monitor) {
+            observers.clear();
+        }
     }
 }

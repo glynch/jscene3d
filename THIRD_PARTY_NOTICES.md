@@ -1,5 +1,24 @@
 # Third-party notices
 
+## Gson
+
+- Creator: Google and contributors
+- Source: [Google Gson](https://github.com/google/gson)
+- Bundled release: `2.14.0`
+- License: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+The editor uses Gson through LSP4J for Language Server Protocol JSON messages.
+
+## Eclipse LSP4J
+
+- Creator: Eclipse Foundation and contributors
+- Source: [Eclipse LSP4J](https://github.com/eclipse-lsp4j/lsp4j)
+- Bundled release: `1.0.0`
+- License: [Eclipse Public License 2.0](https://www.eclipse.org/legal/epl-2.0/)
+
+The editor uses LSP4J as its Java implementation of the Language Server
+Protocol client and JSON-RPC transport.
+
 ## Eclipse JDT Language Server
 
 - Creator: Eclipse Foundation and contributors

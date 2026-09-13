@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -127,6 +128,24 @@ final class ExtensionDescriptorModelTest {
                 .isFalse();
     }
 
+    /** Applies exact array cardinality independently of homogeneous element validation. */
+    @Test
+    void checksFixedArraySize() {
+        PropertyDescriptor vector = PropertyDescriptor.optionalArrayWithDefault(
+                "position",
+                ProjectValueKind.NUMBER,
+                3,
+                numbers("0", "0", "0"),
+                DescriptorPresentation.named("Position"),
+                Map.of());
+
+        assertThat(vector.exactElementCount()).contains(3);
+        assertThat(vector.accepts(numbers("1", "2", "3"))).isTrue();
+        assertThat(vector.accepts(numbers("1", "2"))).isFalse();
+        assertThat(vector.accepts(new ProjectValue.ArrayValue(List.of(new ProjectValue.TextValue("1")))))
+                .isFalse();
+    }
+
     /** Rejects inconsistent descriptor construction. */
     @Test
     void rejectsInvalidDescriptorInvariants() {
@@ -153,7 +172,20 @@ final class ExtensionDescriptorModelTest {
         assertThatThrownBy(() -> PropertyDescriptor.optionalWithDefault(
                         "owner", ProjectValueKind.ENTITY_TARGET, target, PRESENTATION, editorMetadata, noReferences))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> PropertyDescriptor.optionalArray(
+                        "position", ProjectValueKind.NUMBER, 0, PRESENTATION, editorMetadata))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
         assertThatThrownBy(() -> extension(foreignType)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** Creates one numeric array from portable decimal text. */
+    private static ProjectValue.ArrayValue numbers(String... values) {
+        List<ProjectValue> result = new ArrayList<>(values.length);
+        for (String value : values) {
+            result.add(new ProjectValue.NumberValue(new BigDecimal(value)));
+        }
+        return new ProjectValue.ArrayValue(result);
     }
 
     /** Creates one representative registered-type descriptor. */

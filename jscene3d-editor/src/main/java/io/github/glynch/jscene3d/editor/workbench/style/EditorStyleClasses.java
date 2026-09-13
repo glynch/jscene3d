@@ -211,6 +211,14 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_INSPECTOR_VALUE = "editor-inspector-value";
     /** CSS class named {@value}. */
+    public static final String EDITOR_INSPECTOR_VECTOR_AXIS = "editor-inspector-vector-axis";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_INSPECTOR_VECTOR_COMPONENT = "editor-inspector-vector-component";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_INSPECTOR_VECTOR_INPUT = "editor-inspector-vector-input";
+    /** CSS class named {@value}. */
+    public static final String EDITOR_INSPECTOR_VECTOR_VALUE = "editor-inspector-vector-value";
+    /** CSS class named {@value}. */
     public static final String EDITOR_ITEM_DECORATION = "editor-item-decoration";
     /** CSS class named {@value}. */
     public static final String EDITOR_ITEM_DECORATIONS = "editor-item-decorations";

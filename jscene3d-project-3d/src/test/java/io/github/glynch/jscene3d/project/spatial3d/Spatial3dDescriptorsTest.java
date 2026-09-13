@@ -12,10 +12,13 @@ import io.github.glynch.jscene3d.project.component.ComponentSpatialDomain;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
+import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /** Verifies the stable safe descriptor contract for built-in 3D spatial state. */
@@ -44,13 +47,25 @@ final class Spatial3dDescriptorsTest {
 
         assertThat(properties).allSatisfy(property -> {
             assertThat(property.valueKind()).isEqualTo(ProjectValueKind.ARRAY);
+            assertThat(property.elementKind()).contains(ProjectValueKind.NUMBER);
             assertThat(property.isRequired()).isFalse();
             assertThat(property.defaultValue()).isPresent();
         });
-        assertThat(properties.get(0).editorMetadata()).containsEntry("semantic", new ProjectValue.TextValue("vector3"));
+        assertThat(properties)
+                .extracting(PropertyDescriptor::exactElementCount)
+                .containsExactly(Optional.of(3), Optional.of(4), Optional.of(3));
+        assertThat(properties.get(0).editorMetadata())
+                .containsEntry(
+                        PropertyDescriptorKeys.EDITOR_SEMANTIC,
+                        new ProjectValue.TextValue(PropertyEditorSemantics.VECTOR3));
         assertThat(properties.get(1).editorMetadata())
-                .containsEntry("semantic", new ProjectValue.TextValue("quaternion"));
-        assertThat(properties.get(2).editorMetadata()).containsEntry("semantic", new ProjectValue.TextValue("vector3"));
+                .containsEntry(
+                        PropertyDescriptorKeys.EDITOR_SEMANTIC,
+                        new ProjectValue.TextValue(PropertyEditorSemantics.QUATERNION));
+        assertThat(properties.get(2).editorMetadata())
+                .containsEntry(
+                        PropertyDescriptorKeys.EDITOR_SEMANTIC,
+                        new ProjectValue.TextValue(PropertyEditorSemantics.VECTOR3));
         assertThat(array(properties.get(0))).containsExactly(0.0F, 0.0F, 0.0F);
         assertThat(array(properties.get(1))).containsExactly(0.0F, 0.0F, 0.0F, 1.0F);
         assertThat(array(properties.get(2))).containsExactly(1.0F, 1.0F, 1.0F);

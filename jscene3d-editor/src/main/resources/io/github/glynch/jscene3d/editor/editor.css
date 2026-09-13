@@ -763,6 +763,38 @@
     -fx-text-fill: -jscene-text;
 }
 
+.editor-inspector-vector-value {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.editor-inspector-vector-component {
+    -fx-min-width: 0;
+}
+
+.editor-inspector-vector-axis {
+    -fx-min-width: 12px;
+    -fx-text-fill: -jscene-text-muted;
+}
+
+.editor-inspector-vector-input {
+    -fx-alignment: center-right;
+    -fx-background-color: -jscene-field;
+    -fx-background-radius: 3px;
+    -fx-border-color: -jscene-divider;
+    -fx-border-radius: 3px;
+    -fx-border-width: 1px;
+    -fx-min-width: 0;
+    -fx-pref-width: 72px;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-inspector-vector-input:invalid {
+    -fx-border-color: -jscene-error;
+    -fx-border-width: 1.5px;
+}
+
 .editor-inspector-default-value {
     -fx-text-fill: derive(-jscene-text, -8%);
 }

@@ -101,6 +101,7 @@ final class ExtensionCatalogLoaderTest {
                       "id": "targets",
                       "valueKind": "array",
                       "elementKind": "component_target",
+                      "exactElementCount": 1,
                       "required": true,
                       "displayName": "Targets"
                     }
@@ -404,7 +405,8 @@ final class ExtensionCatalogLoaderTest {
                     .contains("\"node-controller\"")
                     .contains("\"componentTypeDescriptor\"")
                     .contains("\"acceptedReferences\"")
-                    .contains("\"elementKind\"");
+                    .contains("\"elementKind\"")
+                    .contains("\"exactElementCount\"");
         }
     }
 
@@ -432,6 +434,7 @@ final class ExtensionCatalogLoaderTest {
 
         assertThat(component.properties()).containsKey(new PropertyId("speed"));
         assertThat(targets.elementKind()).contains(ProjectValueKind.COMPONENT_TARGET);
+        assertThat(targets.exactElementCount()).contains(1);
         assertThat(component.signals()).containsKey(new EndpointId("moved"));
         assertThat(component.actions()).containsKey(new EndpointId("stop"));
         assertThat(component.providedCapabilities()).containsExactly(new CapabilityId("example.game/movement"));

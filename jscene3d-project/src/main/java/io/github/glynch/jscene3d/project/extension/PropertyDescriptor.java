@@ -19,6 +19,7 @@ public final class PropertyDescriptor {
     private final String id;
     private final ProjectValueKind valueKind;
     private final Optional<ProjectValueKind> elementKind;
+    private final Optional<Integer> exactElementCount;
     private final boolean required;
     private final Optional<ProjectValue> defaultValue;
     private final DescriptorPresentation presentation;
@@ -38,6 +39,7 @@ public final class PropertyDescriptor {
         ValueShape validShape = Objects.requireNonNull(valueShape, "valueShape");
         valueKind = validShape.valueKind();
         elementKind = validShape.elementKind();
+        exactElementCount = validShape.exactElementCount();
         this.required = required;
         this.defaultValue = Objects.requireNonNull(defaultValue, "defaultValue");
         this.presentation = Objects.requireNonNull(presentation, "presentation");
@@ -105,6 +107,32 @@ public final class PropertyDescriptor {
     }
 
     /**
+     * Creates a required homogeneous array with an exact element count.
+     *
+     * @param id stable local property identifier
+     * @param elementKind required structural kind for every array element
+     * @param exactElementCount required number of array elements
+     * @param presentation human-readable property metadata
+     * @param editorMetadata generic editor hints
+     * @return required fixed-size homogeneous array property descriptor
+     */
+    public static PropertyDescriptor requiredArray(
+            String id,
+            ProjectValueKind elementKind,
+            int exactElementCount,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editorMetadata) {
+        return new PropertyDescriptor(
+                id,
+                ValueShape.array(elementKind, exactElementCount),
+                true,
+                Optional.empty(),
+                presentation,
+                editorMetadata,
+                Set.of());
+    }
+
+    /**
      * Creates an optional array whose elements all have one structural kind.
      *
      * @param id stable local property identifier
@@ -120,6 +148,32 @@ public final class PropertyDescriptor {
             Map<String, ProjectValue> editorMetadata) {
         return new PropertyDescriptor(
                 id, ValueShape.array(elementKind), false, Optional.empty(), presentation, editorMetadata, Set.of());
+    }
+
+    /**
+     * Creates an optional homogeneous array with an exact element count.
+     *
+     * @param id stable local property identifier
+     * @param elementKind required structural kind for every array element
+     * @param exactElementCount required number of array elements
+     * @param presentation human-readable property metadata
+     * @param editorMetadata generic editor hints
+     * @return optional fixed-size homogeneous array property descriptor
+     */
+    public static PropertyDescriptor optionalArray(
+            String id,
+            ProjectValueKind elementKind,
+            int exactElementCount,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editorMetadata) {
+        return new PropertyDescriptor(
+                id,
+                ValueShape.array(elementKind, exactElementCount),
+                false,
+                Optional.empty(),
+                presentation,
+                editorMetadata,
+                Set.of());
     }
 
     /**
@@ -141,6 +195,34 @@ public final class PropertyDescriptor {
         return new PropertyDescriptor(
                 id,
                 ValueShape.array(elementKind),
+                false,
+                Optional.of(defaultValue),
+                presentation,
+                editorMetadata,
+                Set.of());
+    }
+
+    /**
+     * Creates an optional fixed-size homogeneous array with a default value.
+     *
+     * @param id stable local property identifier
+     * @param elementKind required structural kind for every array element
+     * @param exactElementCount required number of array elements
+     * @param defaultValue default array value
+     * @param presentation human-readable property metadata
+     * @param editorMetadata generic editor hints
+     * @return optional fixed-size homogeneous array property descriptor with a default
+     */
+    public static PropertyDescriptor optionalArrayWithDefault(
+            String id,
+            ProjectValueKind elementKind,
+            int exactElementCount,
+            ProjectValue.ArrayValue defaultValue,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editorMetadata) {
+        return new PropertyDescriptor(
+                id,
+                ValueShape.array(elementKind, exactElementCount),
                 false,
                 Optional.of(defaultValue),
                 presentation,
@@ -230,6 +312,15 @@ public final class PropertyDescriptor {
     }
 
     /**
+     * Returns the exact required array element count, when declared.
+     *
+     * @return optional exact element count
+     */
+    public Optional<Integer> exactElementCount() {
+        return exactElementCount;
+    }
+
+    /**
      * Returns whether authored data must provide this property.
      *
      * @return {@code true} when authored data must provide the property
@@ -290,8 +381,13 @@ public final class PropertyDescriptor {
                     || acceptedReferenceKinds.contains(
                             referenceValue.reference().kind());
         }
-        return !(validValue instanceof ProjectValue.ArrayValue array)
-                || elementKind.isEmpty()
+        if (!(validValue instanceof ProjectValue.ArrayValue array)) {
+            return true;
+        }
+        if (exactElementCount.isPresent() && array.values().size() != exactElementCount.orElseThrow()) {
+            return false;
+        }
+        return elementKind.isEmpty()
                 || array.values().stream()
                         .allMatch(element -> ProjectValueKind.of(element) == elementKind.orElseThrow());
     }
@@ -306,6 +402,7 @@ public final class PropertyDescriptor {
                 && id.equals(descriptor.id)
                 && valueKind == descriptor.valueKind
                 && elementKind.equals(descriptor.elementKind)
+                && exactElementCount.equals(descriptor.exactElementCount)
                 && defaultValue.equals(descriptor.defaultValue)
                 && presentation.equals(descriptor.presentation)
                 && editorMetadata.equals(descriptor.editorMetadata)
@@ -318,6 +415,7 @@ public final class PropertyDescriptor {
                 id,
                 valueKind,
                 elementKind,
+                exactElementCount,
                 required,
                 defaultValue,
                 presentation,
@@ -328,8 +426,9 @@ public final class PropertyDescriptor {
     @Override
     public String toString() {
         return "PropertyDescriptor[id=" + id + ", valueKind=" + valueKind + ", elementKind=" + elementKind
-                + ", required=" + required + ", defaultValue=" + defaultValue + ", presentation=" + presentation
-                + ", editorMetadata=" + editorMetadata + ", acceptedReferenceKinds=" + acceptedReferenceKinds + ']';
+                + ", exactElementCount=" + exactElementCount + ", required=" + required + ", defaultValue="
+                + defaultValue + ", presentation=" + presentation + ", editorMetadata=" + editorMetadata
+                + ", acceptedReferenceKinds=" + acceptedReferenceKinds + ']';
     }
 
     /** Rejects a default inconsistent with this property. */
@@ -345,16 +444,40 @@ public final class PropertyDescriptor {
     }
 
     /** Structural value declaration kept cohesive so constructor arity remains bounded. */
-    private record ValueShape(ProjectValueKind valueKind, Optional<ProjectValueKind> elementKind) {
+    private record ValueShape(
+            ProjectValueKind valueKind, Optional<ProjectValueKind> elementKind, Optional<Integer> exactElementCount) {
+        /** Validates array-only shape constraints. */
+        private ValueShape {
+            Objects.requireNonNull(valueKind, "valueKind");
+            Objects.requireNonNull(elementKind, "elementKind");
+            Objects.requireNonNull(exactElementCount, "exactElementCount");
+            if (exactElementCount.filter(count -> count <= 0).isPresent()) {
+                throw new IllegalArgumentException("exactElementCount must be positive");
+            }
+            if (exactElementCount.isPresent() && valueKind != ProjectValueKind.ARRAY) {
+                throw new IllegalArgumentException("exactElementCount requires an array property");
+            }
+        }
+
         /** Creates one scalar or unconstrained-container declaration. */
         private static ValueShape scalar(ProjectValueKind valueKind) {
-            return new ValueShape(Objects.requireNonNull(valueKind, "valueKind"), Optional.empty());
+            return new ValueShape(Objects.requireNonNull(valueKind, "valueKind"), Optional.empty(), Optional.empty());
         }
 
         /** Creates one homogeneous array declaration. */
         private static ValueShape array(ProjectValueKind elementKind) {
             return new ValueShape(
-                    ProjectValueKind.ARRAY, Optional.of(Objects.requireNonNull(elementKind, "elementKind")));
+                    ProjectValueKind.ARRAY,
+                    Optional.of(Objects.requireNonNull(elementKind, "elementKind")),
+                    Optional.empty());
+        }
+
+        /** Creates one exact-size homogeneous array declaration. */
+        private static ValueShape array(ProjectValueKind elementKind, int exactElementCount) {
+            return new ValueShape(
+                    ProjectValueKind.ARRAY,
+                    Optional.of(Objects.requireNonNull(elementKind, "elementKind")),
+                    Optional.of(exactElementCount));
         }
     }
 }

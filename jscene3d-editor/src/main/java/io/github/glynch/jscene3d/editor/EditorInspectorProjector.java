@@ -22,6 +22,7 @@ import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
@@ -360,13 +361,17 @@ final class EditorInspectorProjector {
     /** Retains structural constraints without teaching the editor component-specific semantics. */
     private static Map<String, String> constraints(PropertyDescriptor descriptor) {
         Map<String, String> constraints = new LinkedHashMap<>();
-        descriptor.elementKind().ifPresent(kind -> constraints.put("Element type", label(kind)));
+        descriptor.elementKind().ifPresent(kind -> constraints.put(PropertyDescriptorKeys.ELEMENT_KIND, label(kind)));
+        descriptor
+                .exactElementCount()
+                .ifPresent(
+                        count -> constraints.put(PropertyDescriptorKeys.EXACT_ELEMENT_COUNT, Integer.toString(count)));
         if (!descriptor.acceptedReferenceKinds().isEmpty()) {
             String accepted = descriptor.acceptedReferenceKinds().stream()
                     .map(kind -> kind.prefix().substring(0, kind.prefix().length() - 1))
                     .sorted()
                     .collect(Collectors.joining(", "));
-            constraints.put("Accepted references", accepted);
+            constraints.put(PropertyDescriptorKeys.ACCEPTED_REFERENCE_KINDS, accepted);
         }
         descriptor.editorMetadata().forEach((key, value) -> constraints.put(key, format(value)));
         return constraints;

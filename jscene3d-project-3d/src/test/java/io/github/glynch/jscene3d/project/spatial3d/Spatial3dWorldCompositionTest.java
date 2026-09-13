@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
+import io.github.glynch.jscene3d.project.asset.AssetDiagnosticCode;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
@@ -146,7 +147,7 @@ final class Spatial3dWorldCompositionTest {
         });
     }
 
-    /** Converts malformed numeric shape into a structured factory diagnostic. */
+    /** Rejects malformed numeric shape through descriptor validation before factory creation. */
     @Test
     void reportsMalformedTransformProperty() throws IOException {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
@@ -157,8 +158,8 @@ final class Spatial3dWorldCompositionTest {
 
         assertThat(result.world()).isEmpty();
         assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo(RuntimeDiagnosticCode.FACTORY_CREATE_FAILED);
-            assertThat(diagnostic.location()).isEqualTo("/roots/0/components/0");
+            assertThat(diagnostic.code()).isEqualTo(AssetDiagnosticCode.COMPONENT_PROPERTY_VALUE_INVALID);
+            assertThat(diagnostic.location()).isEqualTo("/roots/0/components/0/properties/position");
         });
         assertThat(spatial.isClosed()).isFalse();
         spatial.close();

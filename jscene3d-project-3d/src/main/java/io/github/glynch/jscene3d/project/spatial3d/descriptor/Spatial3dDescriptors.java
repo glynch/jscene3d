@@ -15,6 +15,8 @@ import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
+import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
@@ -457,16 +459,20 @@ public final class Spatial3dDescriptors {
 
     /** Describes the unique primary spatial authority. */
     private static ComponentTypeDescriptor transformDescriptor() {
-        PropertyDescriptor position =
-                vectorProperty(POSITION, "Position", "Local XYZ translation", numbers(0.0F, 0.0F, 0.0F), "vector3");
+        PropertyDescriptor position = vectorProperty(
+                POSITION,
+                "Position",
+                "Local XYZ translation",
+                numbers(0.0F, 0.0F, 0.0F),
+                PropertyEditorSemantics.VECTOR3);
         PropertyDescriptor orientation = vectorProperty(
                 ORIENTATION,
                 "Orientation",
                 "Normalized local XYZW quaternion",
                 numbers(0.0F, 0.0F, 0.0F, 1.0F),
-                "quaternion");
-        PropertyDescriptor scale =
-                vectorProperty(SCALE, "Scale", "Local XYZ scale", numbers(1.0F, 1.0F, 1.0F), "vector3");
+                PropertyEditorSemantics.QUATERNION);
+        PropertyDescriptor scale = vectorProperty(
+                SCALE, "Scale", "Local XYZ scale", numbers(1.0F, 1.0F, 1.0F), PropertyEditorSemantics.VECTOR3);
         return ComponentTypeDescriptor.builder(
                         TRANSFORM_TYPE, DescriptorPresentation.described("Transform 3D", "Primary 3D spatial state"))
                 .properties(List.of(position, orientation, scale))
@@ -489,10 +495,18 @@ public final class Spatial3dDescriptors {
 
     /** Describes one transform-attached directional light. */
     private static ComponentTypeDescriptor lightDescriptor() {
-        PropertyDescriptor color =
-                vectorProperty(COLOR, "Color", "Linear-sRGB light color", numbers(1.0F, 1.0F, 1.0F), "color-linear");
-        PropertyDescriptor target =
-                vectorProperty(TARGET, "Target", "World-space target point", numbers(0.0F, 0.0F, 0.0F), "vector3");
+        PropertyDescriptor color = vectorProperty(
+                COLOR,
+                "Color",
+                "Linear-sRGB light color",
+                numbers(1.0F, 1.0F, 1.0F),
+                PropertyEditorSemantics.LINEAR_COLOR);
+        PropertyDescriptor target = vectorProperty(
+                TARGET,
+                "Target",
+                "World-space target point",
+                numbers(0.0F, 0.0F, 0.0F),
+                PropertyEditorSemantics.VECTOR3);
         return presentation(DIRECTIONAL_LIGHT_TYPE, "Directional Light 3D", "Parallel illumination")
                 .properties(List.of(
                         color, numberProperty(INTENSITY, "Intensity", "Linear intensity multiplier", 1.0F), target))
@@ -518,13 +532,18 @@ public final class Spatial3dDescriptors {
                         "Camera-facing rectangle with explicit world-space dimensions and anchor")
                 .properties(List.of(
                         referenceProperty(MATERIAL, "Material", "Immutable unlit material resource"),
-                        vectorProperty(SIZE, "Size", "World-space width and height", numbers(1.0F, 1.0F), "vector2"),
+                        vectorProperty(
+                                SIZE,
+                                "Size",
+                                "World-space width and height",
+                                numbers(1.0F, 1.0F),
+                                PropertyEditorSemantics.VECTOR2),
                         vectorProperty(
                                 ANCHOR,
                                 "Anchor",
                                 "Normalized point held at the entity transform",
                                 numbers(0.5F, 0.5F),
-                                "vector2"),
+                                PropertyEditorSemantics.VECTOR2),
                         textProperty(
                                 ALIGNMENT.value(),
                                 "Alignment",
@@ -609,14 +628,18 @@ public final class Spatial3dDescriptors {
 
     /** Creates one array-backed spatial property with an editor semantic hint. */
     private static PropertyDescriptor vectorProperty(
-            PropertyId id, String name, String description, ProjectValue defaultValue, String editorSemantic) {
-        return PropertyDescriptor.optionalWithDefault(
+            PropertyId id,
+            String name,
+            String description,
+            ProjectValue.ArrayValue defaultValue,
+            String editorSemantic) {
+        return PropertyDescriptor.optionalArrayWithDefault(
                 id.value(),
-                ProjectValueKind.ARRAY,
+                ProjectValueKind.NUMBER,
+                defaultValue.values().size(),
                 defaultValue,
                 DescriptorPresentation.described(name, description),
-                Map.of("semantic", new ProjectValue.TextValue(editorSemantic)),
-                Set.of());
+                Map.of(PropertyDescriptorKeys.EDITOR_SEMANTIC, new ProjectValue.TextValue(editorSemantic)));
     }
 
     /** Creates one portable number. */

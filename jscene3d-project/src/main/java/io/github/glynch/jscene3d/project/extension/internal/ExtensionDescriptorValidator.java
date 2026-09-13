@@ -561,6 +561,8 @@ public final class ExtensionDescriptorValidator {
         String id = fields.requiredLocalId(raw.id(), location + "/id");
         ProjectValueKind valueKind = valueKind(raw.valueKind(), location + "/valueKind");
         Optional<ProjectValueKind> elementKind = elementKind(raw.elementKind(), valueKind, location + "/elementKind");
+        Optional<Integer> exactElementCount =
+                exactElementCount(raw.exactElementCount(), valueKind, elementKind, location + "/exactElementCount");
         boolean required = raw.required() != null && raw.required();
         String displayName = fields.requiredText(raw.displayName(), location + "/displayName");
         Optional<String> description = fields.optionalText(raw.description(), location + "/description");
@@ -569,7 +571,8 @@ public final class ExtensionDescriptorValidator {
                 referenceKinds(raw.acceptedReferences(), valueKind, location + "/acceptedReferences");
         Optional<ProjectValue> defaultValue = optionalValue(raw.defaultValue(), location + "/defaultValue");
         if (defaultValue.isPresent()
-                && !accepts(valueKind, elementKind, acceptedReferences, defaultValue.orElseThrow())) {
+                && !accepts(
+                        valueKind, elementKind, exactElementCount, acceptedReferences, defaultValue.orElseThrow())) {
             diagnostics.error(
                     ExtensionDiagnosticCode.PROPERTY_DEFAULT_INVALID,
                     "defaultValue does not satisfy valueKind and acceptedReferences",
@@ -587,7 +590,8 @@ public final class ExtensionDescriptorValidator {
         }
         DescriptorPresentation metadata = presentation(displayName, description);
         if (elementKind.isPresent()) {
-            return Optional.of(arrayProperty(id, elementKind.orElseThrow(), required, defaultValue, metadata, editor));
+            return Optional.of(arrayProperty(
+                    id, elementKind.orElseThrow(), exactElementCount, required, defaultValue, metadata, editor));
         }
         if (required) {
             return Optional.of(PropertyDescriptor.required(id, valueKind, metadata, editor, acceptedReferences));
@@ -603,16 +607,29 @@ public final class ExtensionDescriptorValidator {
     private static PropertyDescriptor arrayProperty(
             String id,
             ProjectValueKind elementKind,
+            Optional<Integer> exactElementCount,
             boolean required,
             Optional<ProjectValue> defaultValue,
             DescriptorPresentation presentation,
             Map<String, ProjectValue> editor) {
         if (required) {
+            if (exactElementCount.isPresent()) {
+                return PropertyDescriptor.requiredArray(
+                        id, elementKind, exactElementCount.orElseThrow(), presentation, editor);
+            }
             return PropertyDescriptor.requiredArray(id, elementKind, presentation, editor);
         }
         if (defaultValue.isPresent()) {
             ProjectValue.ArrayValue array = (ProjectValue.ArrayValue) defaultValue.orElseThrow();
+            if (exactElementCount.isPresent()) {
+                return PropertyDescriptor.optionalArrayWithDefault(
+                        id, elementKind, exactElementCount.orElseThrow(), array, presentation, editor);
+            }
             return PropertyDescriptor.optionalArrayWithDefault(id, elementKind, array, presentation, editor);
+        }
+        if (exactElementCount.isPresent()) {
+            return PropertyDescriptor.optionalArray(
+                    id, elementKind, exactElementCount.orElseThrow(), presentation, editor);
         }
         return PropertyDescriptor.optionalArray(id, elementKind, presentation, editor);
     }
@@ -736,6 +753,30 @@ public final class ExtensionDescriptorValidator {
             return Optional.empty();
         }
         return Optional.of(parsed);
+    }
+
+    /** Parses an optional positive fixed array size. */
+    private Optional<Integer> exactElementCount(
+            @Nullable Integer value,
+            ProjectValueKind valueKind,
+            Optional<ProjectValueKind> elementKind,
+            String location) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        if (value < 1) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.PROPERTY_KIND_INVALID, "exactElementCount must be positive", location);
+            return Optional.empty();
+        }
+        if (valueKind != ProjectValueKind.ARRAY || elementKind.isEmpty()) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.PROPERTY_KIND_INVALID,
+                    "exactElementCount requires an array elementKind",
+                    location);
+            return Optional.empty();
+        }
+        return Optional.of(value);
     }
 
     /** Parses optional reference namespace constraints. */
@@ -958,6 +999,7 @@ public final class ExtensionDescriptorValidator {
     private static boolean accepts(
             ProjectValueKind kind,
             Optional<ProjectValueKind> elementKind,
+            Optional<Integer> exactElementCount,
             Set<ResourceReference.Kind> referenceKinds,
             ProjectValue value) {
         if (ProjectValueKind.of(value) != kind) {
@@ -967,8 +1009,13 @@ public final class ExtensionDescriptorValidator {
             return referenceKinds.isEmpty()
                     || referenceKinds.contains(reference.reference().kind());
         }
-        return !(value instanceof ProjectValue.ArrayValue array)
-                || elementKind.isEmpty()
+        if (!(value instanceof ProjectValue.ArrayValue array)) {
+            return true;
+        }
+        if (exactElementCount.isPresent() && array.values().size() != exactElementCount.orElseThrow()) {
+            return false;
+        }
+        return elementKind.isEmpty()
                 || array.values().stream()
                         .allMatch(element -> ProjectValueKind.of(element) == elementKind.orElseThrow());
     }

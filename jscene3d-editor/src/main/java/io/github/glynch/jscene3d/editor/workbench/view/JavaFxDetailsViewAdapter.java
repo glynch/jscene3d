@@ -10,13 +10,13 @@ import io.github.glynch.jscene3d.editor.view.EditorDetailsDataProvider;
 import io.github.glynch.jscene3d.editor.view.EditorDetailsView;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
@@ -157,7 +157,7 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
     private static VBox createProperty(EditorDetails.Property property) {
         Label name = new Label(property.displayName());
         name.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_PROPERTY_NAME);
-        Control value = createPropertyValue(property);
+        Region value = createPropertyValue(property);
         value.setMaxWidth(Double.MAX_VALUE);
         value.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_VALUE);
         if (property.origin() == EditorDetails.ValueOrigin.DEFAULT) {
@@ -171,20 +171,23 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
         if (!tooltip.isEmpty()) {
             Tooltip help = new Tooltip(tooltip);
             name.setTooltip(help);
-            value.setTooltip(help);
+            Tooltip.install(value, help);
         }
         VBox row = new VBox(3.0, name, value, metadata);
         row.getStyleClass().add(EditorStyleClasses.EDITOR_INSPECTOR_PROPERTY);
         return row;
     }
 
-    private static Control createPropertyValue(EditorDetails.Property property) {
+    private static Region createPropertyValue(EditorDetails.Property property) {
         if (property.editor().isPresent() && "boolean".equals(property.valueKind())) {
             CheckBox value = new CheckBox();
             value.setSelected(Boolean.parseBoolean(property.value()));
             value.setOnAction(
                     ignored -> property.editor().orElseThrow().setValue(Boolean.toString(value.isSelected())));
             return value;
+        }
+        if (JavaFxNumericVectorEditor.supports(property)) {
+            return new JavaFxNumericVectorEditor(property);
         }
         if (property.editor().isPresent()) {
             return createTextEditor(property);
@@ -242,8 +245,19 @@ final class JavaFxDetailsViewAdapter implements AutoCloseable {
             if (!text.isEmpty()) {
                 text.append('\n');
             }
-            text.append(constraint.getKey()).append(": ").append(constraint.getValue());
+            text.append(constraintLabel(constraint.getKey())).append(": ").append(constraint.getValue());
         }
         return text.toString();
+    }
+
+    /** Converts canonical descriptor keys to presentation-only Inspector labels. */
+    private static String constraintLabel(String key) {
+        return switch (key) {
+            case PropertyDescriptorKeys.ELEMENT_KIND -> "Element type";
+            case PropertyDescriptorKeys.EXACT_ELEMENT_COUNT -> "Element count";
+            case PropertyDescriptorKeys.ACCEPTED_REFERENCE_KINDS -> "Accepted references";
+            case PropertyDescriptorKeys.EDITOR_SEMANTIC -> "Semantic";
+            default -> key;
+        };
     }
 }

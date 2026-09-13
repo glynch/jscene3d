@@ -14,6 +14,8 @@ import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorPropertyEditor;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopy;
 import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopyId;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
+import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.settings.CoreProjectSettings;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import io.github.glynch.jscene3d.telemetry.TelemetryMeasurement;
@@ -373,6 +375,10 @@ final class EditorProjectLoaderTest {
 
         assertThat(position.value()).isEqualTo("[0.0, 0.0, 0.0]");
         assertThat(position.editor()).isPresent();
+        assertThat(position.constraints())
+                .containsEntry(PropertyDescriptorKeys.EDITOR_SEMANTIC, PropertyEditorSemantics.VECTOR3)
+                .containsEntry(PropertyDescriptorKeys.ELEMENT_KIND, "number")
+                .containsEntry(PropertyDescriptorKeys.EXACT_ELEMENT_COUNT, "3");
         EditorPropertyEditor positionEditor = position.editor().orElseThrow();
         assertThatThrownBy(() -> positionEditor.setValue("1, 2, 3"))
                 .isInstanceOf(IllegalArgumentException.class)

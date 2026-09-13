@@ -22,6 +22,7 @@ import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
@@ -71,8 +72,8 @@ final class EditorInspectorProjectorTest {
         assertThat(component.properties().get(1))
                 .returns("asset:player-capsule", EditorDetails.Property::value)
                 .returns(EditorDetails.ValueOrigin.AUTHORED, EditorDetails.Property::origin)
-                .satisfies(
-                        property -> assertThat(property.constraints()).containsEntry("Accepted references", "asset"));
+                .satisfies(property -> assertThat(property.constraints())
+                        .containsEntry(PropertyDescriptorKeys.ACCEPTED_REFERENCE_KINDS, "asset"));
     }
 
     /** Retains authored values and visibly marks a missing exact component descriptor. */

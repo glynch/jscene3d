@@ -376,6 +376,10 @@
             "component_target"
           ]
         },
+        "exactElementCount": {
+          "type": "integer",
+          "minimum": 1
+        },
         "required": {
           "type": "boolean",
           "default": false
@@ -412,6 +416,23 @@
             ]
           },
           "then": {
+            "properties": {
+              "valueKind": {
+                "const": "array"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "exactElementCount"
+            ]
+          },
+          "then": {
+            "required": [
+              "elementKind"
+            ],
             "properties": {
               "valueKind": {
                 "const": "array"

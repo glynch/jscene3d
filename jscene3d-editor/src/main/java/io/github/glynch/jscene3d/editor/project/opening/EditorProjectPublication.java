@@ -4,10 +4,10 @@
  */
 package io.github.glynch.jscene3d.editor.project.opening;
 
-import io.github.glynch.jscene3d.editor.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.util.List;

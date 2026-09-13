@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.project.opening;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

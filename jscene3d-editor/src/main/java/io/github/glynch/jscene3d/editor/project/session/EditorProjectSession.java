@@ -2,9 +2,11 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.project.session;
 
 import io.github.glynch.jscene3d.configuration.definition.SettingKey;
+import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.EditorHierarchyProjection;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.command.EditorUndoRedoEntry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfigurationChange;
@@ -49,7 +51,8 @@ public final class EditorProjectSession {
     private EditorHierarchyNode hierarchy;
 
     /** Stores the validated project data needed by the first authoring views. */
-    EditorProjectSession(Source source, List<ProjectAsset> assets, EditorHierarchyProjection hierarchyProjection) {
+    public EditorProjectSession(
+            Source source, List<ProjectAsset> assets, EditorHierarchyProjection hierarchyProjection) {
         Source validSource = Objects.requireNonNull(source, "source");
         project = validSource.project();
         configuration = validSource.configuration();
@@ -110,27 +113,27 @@ public final class EditorProjectSession {
     }
 
     /** Returns authored definition metadata. */
-    AssetCatalog authoredAssets() {
+    public AssetCatalog authoredAssets() {
         return authoredAssets;
     }
 
     /** Returns safe component and resource metadata. */
-    RegisteredTypeCatalog types() {
+    public RegisteredTypeCatalog types() {
         return types;
     }
 
     /** Returns the combined authored and generated definition resolver. */
-    DefinitionResolver definitions() {
+    public DefinitionResolver definitions() {
         return content.definitions();
     }
 
     /** Returns combined definitions and lazily loaded spatial resources for preview composition. */
-    ProjectContent content() {
+    public ProjectContent content() {
         return content;
     }
 
     /** Returns the current startup-world working-copy content. */
-    WorldDefinition startupWorld() {
+    public WorldDefinition startupWorld() {
         return startupWorld.current();
     }
 
@@ -258,8 +261,18 @@ public final class EditorProjectSession {
         hierarchyChanges.emit(hierarchy);
     }
 
-    /** Groups the immutable loaded inputs from which an editor project session is opened. */
-    record Source(
+    /**
+     * Groups the immutable loaded inputs from which an editor project session is opened.
+     *
+     * @param project validated project descriptor
+     * @param configuration effective project configuration
+     * @param authoredAssets authored asset catalog
+     * @param types registered project type catalog
+     * @param content resolved project content
+     * @param startupWorld loaded startup-world definition
+     * @param startupWorldSource authored startup-world source path
+     */
+    public record Source(
             GameProject project,
             ProjectConfiguration configuration,
             AssetCatalog authoredAssets,
@@ -268,7 +281,7 @@ public final class EditorProjectSession {
             WorldDefinition startupWorld,
             Path startupWorldSource) {
         /** Validates the complete loaded source. */
-        Source {
+        public Source {
             Objects.requireNonNull(project, "project");
             Objects.requireNonNull(configuration, "configuration");
             Objects.requireNonNull(authoredAssets, "authoredAssets");

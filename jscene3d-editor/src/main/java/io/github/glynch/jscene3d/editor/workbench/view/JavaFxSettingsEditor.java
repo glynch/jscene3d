@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.view;
 
-import io.github.glynch.jscene3d.editor.EditorProjectSession;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.workbench.appearance.JavaFxAppearanceSettingsPane;
 import io.github.glynch.jscene3d.editor.workbench.configuration.JavaFxProjectSettingsPane;

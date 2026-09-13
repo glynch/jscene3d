@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.project.opening;
 
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
@@ -38,7 +38,7 @@ public final class EditorProjectOpenTrace {
     }
 
     /** Measures project loading while exposing its operation for detailed child phases. */
-    synchronized <T> T load(Function<TelemetryOperation, T> action) {
+    public synchronized <T> T load(Function<TelemetryOperation, T> action) {
         requireIncomplete();
         Objects.requireNonNull(action, "action");
         TelemetryOperation operation = root.begin("editor.project.load", Map.of());
@@ -60,7 +60,7 @@ public final class EditorProjectOpenTrace {
     }
 
     /** Measures render-thread preview composition. */
-    synchronized <T> T compose(Supplier<T> action) {
+    public synchronized <T> T compose(Supplier<T> action) {
         requireIncomplete();
         Objects.requireNonNull(action, "action");
         TelemetryOperation operation = root.begin("editor.preview.compose", Map.of());
@@ -77,7 +77,7 @@ public final class EditorProjectOpenTrace {
     }
 
     /** Measures the first rendered and presented frame, then completes the trace. */
-    synchronized EditorProjectOpenDurations present(Runnable action) {
+    public synchronized EditorProjectOpenDurations present(Runnable action) {
         requireIncomplete();
         Objects.requireNonNull(action, "action");
         TelemetryOperation operation = root.begin("editor.preview.first-presentation", Map.of());
@@ -122,7 +122,7 @@ public final class EditorProjectOpenTrace {
     }
 
     /** Completes a request superseded before it reaches the viewport. */
-    synchronized void cancel() {
+    public synchronized void cancel() {
         fail("project open was superseded");
     }
 

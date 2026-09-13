@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.editor.builtin.text.JavaFxMonacoEditorProbe;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;

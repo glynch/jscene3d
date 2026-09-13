@@ -8,18 +8,15 @@ import static io.github.glynch.jscene3d.editor.command.EditorCommands.OPEN_DIAGN
 import static io.github.glynch.jscene3d.editor.window.EditorMessageSeverity.ERROR;
 
 import io.github.glynch.jscene3d.editor.EditorDiagnosticCode;
-import io.github.glynch.jscene3d.editor.EditorLoadingPhase;
 import io.github.glynch.jscene3d.editor.EditorPreviewResult;
-import io.github.glynch.jscene3d.editor.EditorProjectLoadResult;
-import io.github.glynch.jscene3d.editor.EditorProjectLoadTask;
-import io.github.glynch.jscene3d.editor.EditorProjectLoader;
-import io.github.glynch.jscene3d.editor.EditorProjectOpenDurations;
-import io.github.glynch.jscene3d.editor.EditorProjectOpenProgress;
-import io.github.glynch.jscene3d.editor.EditorProjectOpenTrace;
-import io.github.glynch.jscene3d.editor.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.EditorWorkspace;
 import io.github.glynch.jscene3d.editor.ViewportController;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadTask;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.telemetry.Telemetry;

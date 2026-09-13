@@ -9,6 +9,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
+import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadProgress;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorPropertyEditor;
@@ -664,7 +669,7 @@ final class EditorProjectLoaderTest {
 
     /** Creates the editor loader under test with this module's resource class loader. */
     private static EditorProjectLoader loader() {
-        return new EditorProjectLoader("0.1.0-SNAPSHOT", EditorProjectLoaderTest.class.getClassLoader());
+        return new EditorProjectLoader("0.1.0-SNAPSHOT", EditorProjectLoaderTest.class.getClassLoader(), List.of());
     }
 
     /** Records background-safe progress callbacks for assertions. */

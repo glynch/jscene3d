@@ -2,8 +2,9 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.project.loading;
 
+import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpenTrace;
 import java.nio.file.Path;
 import java.util.Objects;
 import javafx.application.Platform;

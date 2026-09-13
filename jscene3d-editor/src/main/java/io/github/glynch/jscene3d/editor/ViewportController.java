@@ -6,6 +6,9 @@ package io.github.glynch.jscene3d.editor;
 
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.canvas.events.GLRenderEvent;
+import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpenDurations;
+import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpenTrace;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.render.RenderSurfaceSize;
 import java.util.List;

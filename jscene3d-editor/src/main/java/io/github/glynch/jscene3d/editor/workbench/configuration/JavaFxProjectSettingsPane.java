@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.editor.workbench.configuration;
 import io.github.glynch.jscene3d.configuration.definition.SettingChoice;
 import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
 import io.github.glynch.jscene3d.configuration.definition.SettingValueType;
-import io.github.glynch.jscene3d.editor.EditorProjectSession;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;

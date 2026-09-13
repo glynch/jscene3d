@@ -4,6 +4,9 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.nio.file.Path;
 import java.util.Arrays;

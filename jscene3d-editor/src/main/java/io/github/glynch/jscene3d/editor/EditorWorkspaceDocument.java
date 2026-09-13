@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor;
 
 import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;

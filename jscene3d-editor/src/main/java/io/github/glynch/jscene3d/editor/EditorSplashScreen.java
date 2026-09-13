@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
+import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpenProgress;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.net.URL;
 import java.nio.file.Path;

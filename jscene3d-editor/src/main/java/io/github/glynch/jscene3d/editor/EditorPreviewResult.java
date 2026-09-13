@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpenDurations;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.util.List;
 

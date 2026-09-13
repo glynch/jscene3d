@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.project.loading;
 
 /** One truthful, user-facing phase in editor startup or project opening. */
 public enum EditorLoadingPhase {

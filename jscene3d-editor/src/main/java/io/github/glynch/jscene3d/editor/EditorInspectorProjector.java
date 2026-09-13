@@ -42,11 +42,11 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /** Projects validated project data into immutable, non-executable Inspector data. */
-final class EditorInspectorProjector {
+public final class EditorInspectorProjector {
     private EditorInspectorProjector() {}
 
     /** Projects the opened world root. */
-    static EditorSelection world(WorldDefinition world, Path source, Path projectRoot) {
+    public static EditorSelection world(WorldDefinition world, Path source, Path projectRoot) {
         List<EditorDetails.Property> properties = List.of(
                 textProperty("asset-id", "Asset ID", world.id().toString()),
                 numberProperty("root-count", "Root entities", world.roots().size()),
@@ -64,13 +64,13 @@ final class EditorInspectorProjector {
     }
 
     /** Projects one local or generated entity and its descriptor-backed components. */
-    static EditorSelection entity(
+    public static EditorSelection entity(
             LocalEntity entity, Path source, Path projectRoot, RegisteredTypeCatalog types, boolean generated) {
         return entity(entity, source, projectRoot, types, generated, Optional.empty(), Optional.empty());
     }
 
     /** Projects one local or generated entity with an optional enabled-state edit command. */
-    static EditorSelection entity(
+    public static EditorSelection entity(
             LocalEntity entity,
             Path source,
             Path projectRoot,
@@ -81,7 +81,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects one local or generated entity with optional authored entity/component edit commands. */
-    static EditorSelection entity(
+    public static EditorSelection entity(
             LocalEntity entity,
             Path source,
             Path projectRoot,
@@ -112,7 +112,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects an authored reusable-definition placement and its realized root components. */
-    static EditorSelection placement(
+    public static EditorSelection placement(
             EntityPlacement placement,
             Optional<EntityDefinition> definition,
             Path source,
@@ -123,7 +123,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects an authored placement with an optional enabled-state edit command. */
-    static EditorSelection placement(
+    public static EditorSelection placement(
             EntityPlacement placement,
             Optional<EntityDefinition> definition,
             Path source,
@@ -155,7 +155,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects one reusable entity-definition asset. */
-    static EditorSelection entityDefinition(
+    public static EditorSelection entityDefinition(
             EntityDefinition definition, Path source, Path projectRoot, RegisteredTypeCatalog types) {
         List<EditorDetails.Section> sections = new ArrayList<>();
         sections.add(section(
@@ -183,7 +183,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects one world-definition asset. */
-    static EditorSelection worldDefinition(WorldDefinition world, Path source, Path projectRoot) {
+    public static EditorSelection worldDefinition(WorldDefinition world, Path source, Path projectRoot) {
         EditorDetails view = view(
                 world.name(),
                 "World definition",
@@ -207,7 +207,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects one authoritative source asset declared by the manifest. */
-    static EditorSelection sourceAsset(GameProject.AssetSource asset, Path projectRoot) {
+    public static EditorSelection sourceAsset(GameProject.AssetSource asset, Path projectRoot) {
         List<EditorDetails.Property> properties = new ArrayList<>();
         properties.add(textProperty("identity", "Identity", asset.id()));
         properties.add(textProperty("type", "Type", asset.type()));
@@ -224,7 +224,7 @@ final class EditorInspectorProjector {
     }
 
     /** Projects one deterministic source-import definition and its authored settings. */
-    static EditorSelection importDefinition(ImportDefinition definition, Path projectRoot) {
+    public static EditorSelection importDefinition(ImportDefinition definition, Path projectRoot) {
         List<EditorDetails.Property> properties = new ArrayList<>();
         properties.add(textProperty("identity", "Identity", definition.id()));
         properties.add(textProperty("importer", "Importer", definition.importer()));

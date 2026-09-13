@@ -8,6 +8,7 @@ import com.huskerdev.openglfx.canvas.GLCanvas;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
 import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;

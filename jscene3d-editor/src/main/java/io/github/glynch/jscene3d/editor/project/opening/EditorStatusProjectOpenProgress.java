@@ -2,20 +2,21 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.project.opening;
 
+import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.Consumer;
 
 /** Presents in-session project-opening progress as concise status-bar text. */
-final class EditorStatusProjectOpenProgress implements EditorProjectOpenProgress {
+public final class EditorStatusProjectOpenProgress implements EditorProjectOpenProgress {
     private final Consumer<String> status;
     private String projectName = "Project";
     private EditorLoadingPhase phase = EditorLoadingPhase.READING_MANIFEST;
 
     /** Creates status progress over the workbench's project-status sink. */
-    EditorStatusProjectOpenProgress(Consumer<String> status) {
+    public EditorStatusProjectOpenProgress(Consumer<String> status) {
         this.status = Objects.requireNonNull(status, "status");
     }
 

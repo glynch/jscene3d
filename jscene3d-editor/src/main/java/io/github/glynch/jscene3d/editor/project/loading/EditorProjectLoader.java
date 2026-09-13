@@ -2,11 +2,17 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor;
+package io.github.glynch.jscene3d.editor.project.loading;
 
 import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
 import io.github.glynch.jscene3d.configuration.registry.SettingRegistry;
+import io.github.glynch.jscene3d.editor.EditorComponentPropertyEditor;
+import io.github.glynch.jscene3d.editor.EditorDiagnosticCode;
+import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.EditorHierarchyProjection;
+import io.github.glynch.jscene3d.editor.EditorInspectorProjector;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
+import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;
@@ -106,19 +112,19 @@ public final class EditorProjectLoader {
     }
 
     /** Loads one project and constructs an immutable session when its startup world is usable. */
-    EditorProjectLoadResult load(Path projectDirectory) {
+    public EditorProjectLoadResult load(Path projectDirectory) {
         try (TelemetryOperation operation = Telemetry.disabled().begin("editor.project.load", Map.of())) {
             return load(projectDirectory, operation);
         }
     }
 
     /** Loads one project while recording its material phases beneath the supplied operation. */
-    EditorProjectLoadResult load(Path projectDirectory, TelemetryOperation operation) {
+    public EditorProjectLoadResult load(Path projectDirectory, TelemetryOperation operation) {
         return load(projectDirectory, operation, EditorProjectLoadProgress.NONE);
     }
 
     /** Loads one project while recording telemetry and publishing user-facing phase changes. */
-    EditorProjectLoadResult load(
+    public EditorProjectLoadResult load(
             Path projectDirectory, TelemetryOperation operation, EditorProjectLoadProgress progress) {
         Objects.requireNonNull(operation, "operation");
         Objects.requireNonNull(progress, "progress");
@@ -345,7 +351,7 @@ public final class EditorProjectLoader {
     }
 
     /** Resolves current editor cache, portable publication, then the transitional Maven cache. */
-    static Path resolvePublishedContentRoot(Path projectRoot) {
+    public static Path resolvePublishedContentRoot(Path projectRoot) {
         Path validProjectRoot = Objects.requireNonNull(projectRoot, "projectRoot");
         ProjectSettings settings =
                 new ProjectSettingsLoader().load(validProjectRoot).settings().orElse(ProjectSettings.defaults());

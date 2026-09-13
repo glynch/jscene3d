@@ -10,10 +10,13 @@ import io.github.glynch.jscene3d.editor.command.EditorCommand;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContext;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
+import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistration;
+import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandState;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuContribution;
+import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import java.util.ArrayList;
@@ -27,7 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /** Owns command behavior, state, placements, and complete menu snapshots. */
-public final class EditorCommandMenuRegistry implements AutoCloseable {
+public final class EditorCommandMenuRegistry
+        implements EditorCommandRegistry, EditorCommandPlacementRegistry, EditorMenuRegistry, AutoCloseable {
     private final EditorCommandContext context;
     private final Map<CommandId, CommandRegistration> commands = new LinkedHashMap<>();
     private final List<EditorCommandPlacement> placements = new ArrayList<>();
@@ -53,6 +57,12 @@ public final class EditorCommandMenuRegistry implements AutoCloseable {
         return registration;
     }
 
+    /** Registers one command through the extension-facing command registry. */
+    @Override
+    public EditorCommandRegistration register(EditorCommandContribution contribution, EditorCommand command) {
+        return registerCommand(contribution, command);
+    }
+
     /** Registers one placement for an existing command. */
     public EditorRegistration registerPlacement(EditorCommandPlacement placement) {
         requireOpen();
@@ -73,6 +83,12 @@ public final class EditorCommandMenuRegistry implements AutoCloseable {
         });
     }
 
+    /** Registers one placement through the extension-facing placement registry. */
+    @Override
+    public EditorRegistration register(EditorCommandPlacement placement) {
+        return registerPlacement(placement);
+    }
+
     /** Registers one top-level menu declaration. */
     public EditorRegistration registerMenu(EditorMenuContribution contribution) {
         requireOpen();
@@ -86,6 +102,12 @@ public final class EditorCommandMenuRegistry implements AutoCloseable {
                 notifyObservers();
             }
         });
+    }
+
+    /** Registers one menu through the extension-facing menu registry. */
+    @Override
+    public EditorRegistration register(EditorMenuContribution contribution) {
+        return registerMenu(contribution);
     }
 
     /** Executes an enabled registered command. */

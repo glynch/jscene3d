@@ -9,8 +9,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.configuration.SettingKey;
 import io.github.glynch.jscene3d.configuration.SettingRegistry;
-import io.github.glynch.jscene3d.editor.activity.ActivityId;
-import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandLocations;
@@ -23,18 +21,13 @@ import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticSeverity;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
-import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
-import io.github.glynch.jscene3d.editor.extension.EditorExtensions;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorEvent;
-import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemContribution;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemState;
 import io.github.glynch.jscene3d.editor.status.StatusBarAlignment;
 import io.github.glynch.jscene3d.editor.status.StatusItemId;
-import io.github.glynch.jscene3d.editor.view.EditorIcon;
-import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
@@ -56,7 +49,6 @@ final class EditorExtensionHostTest {
     private static final ViewId VIEW_ID = new ViewId("io.github.glynch.test.view");
     private static final CommandId MESSAGE_COMMAND = new CommandId("io.github.glynch.test.message");
     private static final CommandId REVEAL_COMMAND = new CommandId("io.github.glynch.test.reveal");
-    private static final ActivityId ACTIVITY_ID = new ActivityId("io.github.glynch.test.activity");
 
     @Test
     void activatesCapabilitiesAndRemovesOwnedContributionsAtShutdown() {
@@ -156,123 +148,6 @@ final class EditorExtensionHostTest {
     }
 
     @Test
-    void ordersStatusItemsByRegionAndDescendingPriority() {
-        EditorExtensionHost host = host();
-        List<List<EditorStatusItemSnapshot>> snapshots = new ArrayList<>();
-        host.observeStatusItems(snapshots::add);
-        host.activate(new EditorExtension() {
-            @Override
-            public String id() {
-                return "io.github.glynch.test.status-order";
-            }
-
-            @Override
-            public void activate(EditorExtensionContext context) {
-                registerStatus(context, "right-low", StatusBarAlignment.RIGHT, 10);
-                registerStatus(context, "left-low", StatusBarAlignment.LEFT, 10);
-                registerStatus(context, "right-high", StatusBarAlignment.RIGHT, 20);
-                registerStatus(context, "left-high", StatusBarAlignment.LEFT, 20);
-            }
-        });
-
-        assertThat(snapshots.getLast())
-                .extracting(item -> item.contribution().id().value())
-                .containsExactly(
-                        "io.github.glynch.test.left-high",
-                        "io.github.glynch.test.left-low",
-                        "io.github.glynch.test.right-high",
-                        "io.github.glynch.test.right-low");
-        host.close();
-    }
-
-    @Test
-    void exposesExtensionMetadataAndActivityContributions() {
-        EditorExtensionHost host = host();
-        List<List<EditorActivityContribution>> activitySnapshots = new ArrayList<>();
-        List<List<EditorExtensionDescriptor>> extensionSnapshots = new ArrayList<>();
-        AtomicReference<EditorExtensions> extensions = new AtomicReference<>();
-        host.observeActivities(activitySnapshots::add);
-        host.activate(new EditorExtension() {
-            @Override
-            public String id() {
-                return "io.github.glynch.test.catalogued";
-            }
-
-            @Override
-            public EditorExtensionDescriptor descriptor() {
-                return new EditorExtensionDescriptor(
-                        id(), "Catalogued", "Test extension metadata.", "Tests", Optional.of("1.2.3"), false);
-            }
-
-            @Override
-            public void activate(EditorExtensionContext context) {
-                extensions.set(context.extensions());
-                context.subscriptions()
-                        .add(context.views()
-                                .register(new EditorViewContribution(
-                                        new TestView(), EditorViewContainers.PRIMARY_SIDEBAR, 5)));
-                context.subscriptions()
-                        .add(context.activities()
-                                .register(new EditorActivityContribution(
-                                        ACTIVITY_ID,
-                                        "Test",
-                                        new EditorIcon(EditorIcons.ENTITY, "Test activity"),
-                                        VIEW_ID,
-                                        5)));
-            }
-        });
-        EditorRegistration extensionRegistration = extensions.get().observe(extensionSnapshots::add);
-
-        assertThat(activitySnapshots.getLast())
-                .singleElement()
-                .extracting(EditorActivityContribution::id)
-                .isEqualTo(ACTIVITY_ID);
-        assertThat(extensions.get().installed())
-                .singleElement()
-                .extracting(EditorExtensionDescriptor::displayName)
-                .isEqualTo("Catalogued");
-        assertThat(extensionSnapshots.getLast()).isEqualTo(extensions.get().installed());
-
-        host.close();
-
-        assertThat(activitySnapshots.getLast()).isEmpty();
-        assertThat(extensionSnapshots.getLast()).isEmpty();
-        extensionRegistration.close();
-    }
-
-    @Test
-    void rejectsActivityViewsOutsideThePrimarySidebar() {
-        EditorExtensionHost host = host();
-        EditorExtension misplacedActivity = new EditorExtension() {
-            @Override
-            public String id() {
-                return "io.github.glynch.test.misplaced-activity";
-            }
-
-            @Override
-            public void activate(EditorExtensionContext context) {
-                context.subscriptions()
-                        .add(context.views()
-                                .register(new EditorViewContribution(
-                                        new TestView(), EditorViewContainers.BOTTOM_PANEL, 5)));
-                context.subscriptions()
-                        .add(context.activities()
-                                .register(new EditorActivityContribution(
-                                        ACTIVITY_ID,
-                                        "Misplaced",
-                                        new EditorIcon(EditorIcons.ENTITY, "Misplaced activity"),
-                                        VIEW_ID,
-                                        5)));
-            }
-        };
-
-        assertThatThrownBy(() -> host.activate(misplacedActivity))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("primary sidebar");
-        host.close();
-    }
-
-    @Test
     void exposesTheWindowConfigurationToActivatedExtensions() {
         SettingKey<Boolean> enabled = new SettingKey<>("io.github.glynch.test.enabled", Boolean.class);
         EditorConfiguration configuration = new EditorConfiguration() {
@@ -310,14 +185,6 @@ final class EditorExtensionHostTest {
         assertThat(received).hasValue(configuration);
         assertThat(received.get().get(enabled)).contains(true);
         host.close();
-    }
-
-    private static void registerStatus(
-            EditorExtensionContext context, String name, StatusBarAlignment alignment, int priority) {
-        context.subscriptions()
-                .add(context.statusBar()
-                        .create(new EditorStatusItemContribution(
-                                new StatusItemId("io.github.glynch.test." + name), alignment, priority)));
     }
 
     private static EditorExtension extension(

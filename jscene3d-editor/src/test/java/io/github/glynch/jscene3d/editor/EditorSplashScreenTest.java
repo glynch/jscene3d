@@ -40,17 +40,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Exercises splash visibility against the real JavaFX animation lifecycle. */
 final class EditorSplashScreenTest {
-    @TempDir
-    private Path temporaryDirectory;
-
     /** Starts minimum visibility when the splash can actually be seen, not while its stage is hidden. */
     @Test
-    void startsMinimumVisibilityWhenStageIsShown() throws InterruptedException {
+    void startsMinimumVisibilityWhenStageIsShown(@TempDir Path temporaryDirectory) throws InterruptedException {
         AtomicBoolean visibleAfterObservation = new AtomicBoolean();
         AtomicReference<Throwable> failure = new AtomicReference<>();
         CountDownLatch completed = new CountDownLatch(1);
+        Path monacoProbeSource = temporaryDirectory.resolve("MonacoProbe.java");
 
-        Platform.startup(() -> runVisibilityScenario(temporaryDirectory, visibleAfterObservation, failure, completed));
+        Platform.startup(() -> runVisibilityScenario(monacoProbeSource, visibleAfterObservation, failure, completed));
 
         assertThat(completed.await(12, SECONDS)).isTrue();
         assertThat(failure.get()).isNull();
@@ -59,7 +57,7 @@ final class EditorSplashScreenTest {
 
     /** Runs the staged visibility scenario entirely on the JavaFX application thread. */
     private static void runVisibilityScenario(
-            Path temporaryDirectory,
+            Path monacoProbeSource,
             AtomicBoolean visibleAfterObservation,
             AtomicReference<Throwable> failure,
             CountDownLatch completed) {
@@ -72,7 +70,7 @@ final class EditorSplashScreenTest {
             stage.setScene(scene);
             PauseTransition beforeStageIsShown = new PauseTransition(javafx.util.Duration.seconds(3.1));
             beforeStageIsShown.setOnFinished(ignored ->
-                    showAndObserve(stage, splash, temporaryDirectory, visibleAfterObservation, failure, completed));
+                    showAndObserve(stage, splash, monacoProbeSource, visibleAfterObservation, failure, completed));
             beforeStageIsShown.play();
         } catch (RuntimeException exception) {
             failure.set(exception);
@@ -84,7 +82,7 @@ final class EditorSplashScreenTest {
     private static void showAndObserve(
             Stage stage,
             EditorSplashScreen splash,
-            Path temporaryDirectory,
+            Path monacoProbeSource,
             AtomicBoolean visibleAfterObservation,
             AtomicReference<Throwable> failure,
             CountDownLatch completed) {
@@ -101,7 +99,7 @@ final class EditorSplashScreenTest {
                 finishJavaFxScenario(stage, completed);
                 return;
             }
-            JavaFxMonacoEditorProbe.verify(stage, temporaryDirectory, result -> {
+            JavaFxMonacoEditorProbe.verify(stage, monacoProbeSource, result -> {
                 result.ifPresent(failure::set);
                 finishJavaFxScenario(stage, completed);
             });

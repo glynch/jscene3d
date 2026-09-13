@@ -28,11 +28,9 @@ public final class JavaFxMonacoEditorProbe {
     private JavaFxMonacoEditorProbe() {}
 
     /** Runs the probe on an initialized JavaFX application thread. */
-    public static void verify(Stage stage, Path temporaryDirectory, Consumer<Optional<Throwable>> completion) {
-        Path source = null;
+    public static void verify(Stage stage, Path source, Consumer<Optional<Throwable>> completion) {
         JavaFxMonacoEditor editor = null;
         try {
-            source = temporaryDirectory.resolve("MonacoProbe.java");
             Files.writeString(source, INITIAL_SOURCE);
             EditorTextFileWorkingCopy workingCopy = EditorTextFileWorkingCopy.load(source);
             EditorColorThemeRegistry themes = new EditorColorThemeRegistry(new InMemoryEditorAppearancePreferences());

@@ -5,7 +5,7 @@
 /** Bundled Eclipse JDT Language Server integration for the JScene3D editor. */
 module io.github.glynch.jscene3d.editor.javalanguage {
     requires io.github.glynch.jscene3d.core;
-    requires io.github.glynch.jscene3d.editor.api;
+    requires transitive io.github.glynch.jscene3d.editor.api;
     requires io.github.glynch.jscene3d.editor.lsp;
 
     exports io.github.glynch.jscene3d.editor.javalanguage;

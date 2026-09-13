@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor.javalanguage;
+package io.github.glynch.jscene3d.editor.javalanguage.jdt;
 
 import io.github.glynch.jscene3d.editor.lsp.LanguageServerProcessConfiguration;
 import io.github.glynch.jscene3d.environment.OperatingSystem;

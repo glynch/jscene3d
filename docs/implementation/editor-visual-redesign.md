@@ -273,6 +273,9 @@ Verification:
 - implement the unified searchable User and Project settings experience recorded
   in [Editor Settings Experience](../design/editor-settings-experience.md),
   including direct JSON editing through the shared working-copy model;
+- implement the first Java IDE vertical slice using the architecture and staged
+  delivery recorded in
+  [Editor Language-server Support](../design/editor-language-server-support.md);
 - implement the deferred command surfaces and toolkit-independent keybinding
   direction recorded in
   [Editor Command Surfaces and Keybindings](../design/editor-command-surfaces-and-keybindings.md);

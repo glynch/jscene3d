@@ -88,6 +88,37 @@ The text editor supplies document, cursor, range, and language context. A
 language adapter, such as Java LSP, decides which language commands are
 available and performs their semantic work.
 
+## Command palette
+
+The command palette will be a generic searchable presentation of explicitly
+placed editor commands. It will not implement operations or contain knowledge
+of Java, LSP, project formats, or JavaFX-specific command behavior.
+
+Extensions place suitable registered commands in a command-palette location.
+The palette invokes the same stable command IDs used by menus, context menus,
+toolbars, and keybindings. Internal commands are not exposed merely because they
+are registered.
+
+Search will consider the localized title, category, contributed keywords, and
+stable command ID. Categories permit presentation such as `Java: Restart Java
+Language Server` without requiring every command implementation to construct
+that prefix. Context conditions and command state determine whether a result is
+hidden, disabled with an explanation, or available.
+
+The initial palette should support keyboard navigation, incremental filtering,
+empty and no-results states, and invocation of the selected command. Long-running
+commands report progress through editor facilities rather than freezing or
+keeping the palette open.
+
+The conventional Command/Control+Shift+P shortcut is expected, but it should use
+the same platform-neutral keybinding direction described below. Ranking, recent
+commands, aliases, argument collection, and extension metadata are deferred
+until implementation.
+
+The palette itself is deferred until the first Java LSP integration is working.
+This lets the LSP slice validate its lifecycle and commands before introducing a
+new global command surface.
+
 ## Keybinding direction
 
 Keybindings invoke stable command IDs; they do not point directly at Java
@@ -126,8 +157,9 @@ be embedded in command implementations.
 
 ## Deferred implementation
 
-The current Explorer context invocation is a first vertical slice. The broader
-catalogue, editor and tab context locations, keybinding registry, customization,
-and language-aware commands remain deferred. Their exact interfaces will be
-finalized when each slice is implemented, using the principles in this document
-as constraints rather than treating the lists above as a frozen specification.
+The current Explorer context invocation is a first vertical slice. The command
+palette, broader catalogue, editor and tab context locations, keybinding
+registry, customization, and language-aware commands remain deferred. Their
+exact interfaces will be finalized when each slice is implemented, using the
+principles in this document as constraints rather than treating the lists above
+as a frozen specification.

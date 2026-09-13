@@ -114,8 +114,9 @@ Entity-to-source navigation and LSP share the final navigation adapter but solve
 different lookup problems. The source-reference provider answers which source
 is associated with an authored component. LSP answers where a Java symbol is
 defined and supplies completion, references, rename, diagnostics, and other
-language features.
+language features. The language-server architecture and delivery sequence are
+recorded in
+[Editor Language-server Support](editor-language-server-support.md).
 
 The first source-association design should therefore avoid duplicating a Java
-index. After the lightweight command and documentation work, Java LSP remains
-the next major editor capability.
+index. Java LSP remains the next major editor capability.

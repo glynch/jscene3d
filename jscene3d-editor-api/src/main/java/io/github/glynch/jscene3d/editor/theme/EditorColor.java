@@ -6,7 +6,14 @@ package io.github.glynch.jscene3d.editor.theme;
 
 import java.util.Locale;
 
-/** Toolkit-independent sRGB color with an eight-bit alpha channel. */
+/**
+ * Toolkit-independent sRGB color with an eight-bit alpha channel.
+ *
+ * @param red red channel from 0 through 255
+ * @param green green channel from 0 through 255
+ * @param blue blue channel from 0 through 255
+ * @param alpha alpha channel from 0 through 255
+ */
 public record EditorColor(int red, int green, int blue, int alpha) {
     /** Validates every channel. */
     public EditorColor {
@@ -16,12 +23,24 @@ public record EditorColor(int red, int green, int blue, int alpha) {
         requireChannel(alpha, "alpha");
     }
 
-    /** Creates an opaque color. */
+    /**
+     * Creates an opaque color.
+     *
+     * @param red red channel from 0 through 255
+     * @param green green channel from 0 through 255
+     * @param blue blue channel from 0 through 255
+     * @return opaque color
+     */
     public static EditorColor rgb(int red, int green, int blue) {
         return new EditorColor(red, green, blue, 255);
     }
 
-    /** Parses {@code #RRGGBB} or {@code #RRGGBBAA}. */
+    /**
+     * Parses {@code #RRGGBB} or {@code #RRGGBBAA}.
+     *
+     * @param value hexadecimal color text
+     * @return parsed color
+     */
     public static EditorColor parseHex(String value) {
         if (value == null || value.length() != 7 && value.length() != 9 || value.charAt(0) != '#') {
             throw new IllegalArgumentException("color must use #RRGGBB or #RRGGBBAA");
@@ -37,7 +56,11 @@ public record EditorColor(int red, int green, int blue, int alpha) {
         }
     }
 
-    /** Returns {@code #RRGGBB} for opaque colors and {@code #RRGGBBAA} otherwise. */
+    /**
+     * Returns {@code #RRGGBB} for opaque colors and {@code #RRGGBBAA} otherwise.
+     *
+     * @return hexadecimal color text
+     */
     public String toHex() {
         return alpha == 255
                 ? String.format(Locale.ROOT, "#%02x%02x%02x", red, green, blue)

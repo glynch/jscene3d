@@ -8,6 +8,10 @@ import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 
 /** Owns a registered command and its mutable presentation state. */
 public interface EditorCommandRegistration extends EditorRegistration {
-    /** Replaces the command state observed by every visual placement. */
+    /**
+     * Replaces the command state observed by every visual placement.
+     *
+     * @param state current command state
+     */
     void update(EditorCommandState state);
 }

@@ -31,12 +31,25 @@ public record EditorViewContribution(
         Objects.requireNonNull(condition, "condition");
     }
 
-    /** Creates an unconditionally available view contribution. */
+    /**
+     * Creates an unconditionally available view contribution.
+     *
+     * @param view toolkit-independent logical view
+     * @param container default workbench container
+     * @param order ascending presentation order
+     */
     public EditorViewContribution(EditorView view, ViewContainerId container, int order) {
         this(view, container, order, Optional.empty());
     }
 
-    /** Creates a view contribution controlled by one typed context condition. */
+    /**
+     * Creates a view contribution controlled by one typed context condition.
+     *
+     * @param view toolkit-independent logical view
+     * @param container default workbench container
+     * @param order ascending presentation order
+     * @param condition typed context condition controlling availability
+     */
     public EditorViewContribution(
             EditorView view, ViewContainerId container, int order, EditorContextCondition<?> condition) {
         this(view, container, order, Optional.of(Objects.requireNonNull(condition, "condition")));

@@ -55,17 +55,42 @@ public record EditorActivityContribution(
         Objects.requireNonNull(condition, "condition");
     }
 
-    /** Creates an unconditionally available Activity Bar container. */
+    /**
+     * Creates an unconditionally available Activity Bar container.
+     *
+     * @param id stable activity identity
+     * @param title non-blank user-facing title
+     * @param icon semantic icon and accessible tooltip
+     * @param views ordered primary-sidebar views
+     * @param order ascending Activity Bar presentation order
+     */
     public EditorActivityContribution(ActivityId id, String title, EditorIcon icon, List<ViewId> views, int order) {
         this(id, title, icon, views, order, Optional.empty());
     }
 
-    /** Creates an Activity Bar container which initially contains one primary-side-bar view. */
+    /**
+     * Creates an Activity Bar container which initially contains one primary-side-bar view.
+     *
+     * @param id stable activity identity
+     * @param title non-blank user-facing title
+     * @param icon semantic icon and accessible tooltip
+     * @param view primary-sidebar view
+     * @param order ascending Activity Bar presentation order
+     */
     public EditorActivityContribution(ActivityId id, String title, EditorIcon icon, ViewId view, int order) {
         this(id, title, icon, List.of(Objects.requireNonNull(view, "view")), order, Optional.empty());
     }
 
-    /** Creates a single-view Activity Bar container controlled by one typed context condition. */
+    /**
+     * Creates a single-view Activity Bar container controlled by one typed context condition.
+     *
+     * @param id stable activity identity
+     * @param title non-blank user-facing title
+     * @param icon semantic icon and accessible tooltip
+     * @param view primary-sidebar view
+     * @param order ascending Activity Bar presentation order
+     * @param condition typed context condition controlling availability
+     */
     public EditorActivityContribution(
             ActivityId id, String title, EditorIcon icon, ViewId view, int order, EditorContextCondition<?> condition) {
         this(

@@ -6,7 +6,11 @@ package io.github.glynch.jscene3d.editor.theme;
 
 import static io.github.glynch.jscene3d.editor.internal.EditorIdentifiers.requireNamespacedId;
 
-/** Stable identity of one contributed editor color theme. */
+/**
+ * Stable identity of one contributed editor color theme.
+ *
+ * @param value reverse-domain color-theme identity
+ */
 public record EditorColorThemeId(String value) {
     /** Validates one reverse-domain color-theme identity. */
     public EditorColorThemeId {

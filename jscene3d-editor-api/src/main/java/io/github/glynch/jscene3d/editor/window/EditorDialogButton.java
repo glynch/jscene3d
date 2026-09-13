@@ -16,7 +16,13 @@ import java.util.Objects;
  */
 public record EditorDialogButton(
         EditorDialogButtonId id, String title, EditorDialogButtonRole role, EditorDialogButtonBehavior behavior) {
-    /** Creates a conventional action which closes the dialog. */
+    /**
+     * Creates a conventional action which closes the dialog.
+     *
+     * @param id stable action identity
+     * @param title non-blank user-facing button title
+     * @param role semantic platform presentation role
+     */
     public EditorDialogButton(EditorDialogButtonId id, String title, EditorDialogButtonRole role) {
         this(id, title, role, EditorDialogButtonBehavior.CLOSE);
     }

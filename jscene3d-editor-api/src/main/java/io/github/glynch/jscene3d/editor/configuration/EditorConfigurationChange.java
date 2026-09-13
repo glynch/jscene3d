@@ -19,7 +19,12 @@ public record EditorConfigurationChange(SettingKey<?> key, boolean projectOverri
         Objects.requireNonNull(key, "key");
     }
 
-    /** Returns whether this notification affects the requested typed key. */
+    /**
+     * Returns whether this notification affects the requested typed key.
+     *
+     * @param candidate requested typed setting key
+     * @return whether the key is affected
+     */
     public boolean affects(SettingKey<?> candidate) {
         return key.value().equals(Objects.requireNonNull(candidate, "candidate").value());
     }

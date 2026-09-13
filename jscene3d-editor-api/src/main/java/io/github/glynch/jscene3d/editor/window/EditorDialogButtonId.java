@@ -6,7 +6,11 @@ package io.github.glynch.jscene3d.editor.window;
 
 import static io.github.glynch.jscene3d.editor.internal.EditorIdentifiers.requireNamespacedId;
 
-/** Stable identity returned when a modal-dialog action is selected. */
+/**
+ * Stable identity returned when a modal-dialog action is selected.
+ *
+ * @param value namespaced dialog-action identity
+ */
 public record EditorDialogButtonId(String value) {
     /** Validates one dialog action identity. */
     public EditorDialogButtonId {

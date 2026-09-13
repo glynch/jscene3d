@@ -24,12 +24,22 @@ public record EditorContextCondition<T>(EditorContextKey<T> key, T expectedValue
         }
     }
 
-    /** Creates a condition requiring a Boolean context key to be true. */
+    /**
+     * Creates a condition requiring a Boolean context key to be true.
+     *
+     * @param key Boolean context key
+     * @return condition requiring {@code true}
+     */
     public static EditorContextCondition<Boolean> isTrue(EditorContextKey<Boolean> key) {
         return new EditorContextCondition<>(Objects.requireNonNull(key, "key"), true);
     }
 
-    /** Returns whether the current context value equals the required value. */
+    /**
+     * Returns whether the current context value equals the required value.
+     *
+     * @param values current editor context
+     * @return whether the required value is present
+     */
     public boolean matches(EditorContextValues values) {
         return Objects.requireNonNull(values, "values")
                 .get(key)

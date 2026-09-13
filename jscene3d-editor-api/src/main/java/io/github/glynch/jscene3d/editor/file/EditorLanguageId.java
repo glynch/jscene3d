@@ -6,7 +6,11 @@ package io.github.glynch.jscene3d.editor.file;
 
 import java.util.Objects;
 
-/** Stable language identity passed to the source editor and future language adapters. */
+/**
+ * Stable language identity passed to the source editor and future language adapters.
+ *
+ * @param value non-blank language identity
+ */
 public record EditorLanguageId(String value) {
     /** Validates one non-blank language identity. */
     public EditorLanguageId {

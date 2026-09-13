@@ -6,7 +6,11 @@ package io.github.glynch.jscene3d.editor.file;
 
 import static io.github.glynch.jscene3d.editor.internal.EditorIdentifiers.requireNamespacedId;
 
-/** Stable identity of one contributed workspace file type. */
+/**
+ * Stable identity of one contributed workspace file type.
+ *
+ * @param value reverse-domain file-type identity
+ */
 public record EditorFileTypeId(String value) {
     /** Validates one reverse-domain file-type identity. */
     public EditorFileTypeId {

@@ -32,17 +32,38 @@ public record EditorCommandPlacement(
         });
     }
 
-    /** Creates a placement which is available for every context at its location. */
+    /**
+     * Creates a placement which is available for every context at its location.
+     *
+     * @param command registered command identity
+     * @param location target interaction surface
+     * @param group non-blank presentation group
+     * @param order ascending presentation order
+     */
     public EditorCommandPlacement(CommandId command, CommandLocationId location, String group, int order) {
         this(command, location, group, order, Optional.empty());
     }
 
-    /** Creates a placement in the default command group. */
+    /**
+     * Creates a placement in the default command group.
+     *
+     * @param command registered command identity
+     * @param location target interaction surface
+     * @param order ascending presentation order
+     */
     public EditorCommandPlacement(CommandId command, CommandLocationId location, int order) {
         this(command, location, "default", order);
     }
 
-    /** Creates a placement available only for items with the supplied semantic context value. */
+    /**
+     * Creates a placement available only for items with the supplied semantic context value.
+     *
+     * @param command registered command identity
+     * @param location target interaction surface
+     * @param group non-blank presentation group
+     * @param order ascending presentation order
+     * @param contextValue semantic item context required for availability
+     */
     public EditorCommandPlacement(
             CommandId command, CommandLocationId location, String group, int order, String contextValue) {
         this(command, location, group, order, Optional.of(Objects.requireNonNull(contextValue, "contextValue")));

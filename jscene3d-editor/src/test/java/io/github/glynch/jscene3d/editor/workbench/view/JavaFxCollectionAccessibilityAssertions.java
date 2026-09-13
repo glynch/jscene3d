@@ -30,7 +30,7 @@ public final class JavaFxCollectionAccessibilityAssertions {
     /** Verifies that a categorized collection exposes and initializes its keyboard navigation tree. */
     public static void assertAccessibleProjectCategories() {
         try (JavaFxCollectionViewAdapter<String> adapter = new JavaFxCollectionViewAdapter<>(
-                new TestCollectionView(), ignored -> {}, JavaFxIconRenderer.builtIn())) {
+                new TestCollectionView(), (ignoredCommand, ignoredArgument) -> {}, JavaFxIconRenderer.builtIn())) {
             TreeView<?> navigation = findTree(adapter.node());
 
             assertThat(navigation.getAccessibleText()).isEqualTo("Project categories");

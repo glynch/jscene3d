@@ -98,7 +98,7 @@ final class WorkspaceExplorerExtensionTest {
                 .returns(Optional.of("workspace-file"), item -> item.contextValue())
                 .satisfies(item -> assertThat(item.command()).isPresent());
         view.selectionModel().orElseThrow().select(Optional.of(javaFile));
-        host.execute(view.dataProvider().item(javaFile).command().orElseThrow());
+        host.execute(view.dataProvider().item(javaFile).command().orElseThrow(), javaFile);
         assertThat(fileRequests)
                 .containsExactly(
                         new EditorFileOpenRequest(javaFile.path().toUri(), EditorFileOpenRequest.Disposition.PREVIEW),

@@ -34,6 +34,8 @@ final class EditorCommandContractTest {
 
         command.execute(context);
 
+        assertThat(context.argument()).isEmpty();
+        assertThat(context.argument(String.class)).isEmpty();
         assertThat(contribution.id()).isEqualTo(id);
         assertThat(contribution.title()).isEqualTo("Say Hello");
         assertThat(placement.command()).isEqualTo(id);

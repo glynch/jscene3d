@@ -192,6 +192,12 @@ public final class EditorExtensionHost implements AutoCloseable {
         commandMenus.execute(command);
     }
 
+    /** Invokes a registered command with the exact semantic item involved in the interaction. */
+    public void execute(CommandId command, Object argument) {
+        requireOpen();
+        commandMenus.execute(command, argument);
+    }
+
     /** Requests that the workbench reveal one registered view. */
     public void showView(ViewId view) {
         window.showView(view);

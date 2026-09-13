@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandState;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuContribution;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
+import io.github.glynch.jscene3d.editor.window.EditorWindow;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import java.util.ArrayList;
@@ -112,13 +113,23 @@ public final class EditorCommandMenuRegistry
 
     /** Executes an enabled registered command. */
     public void execute(CommandId command) {
+        execute(command, context);
+    }
+
+    /** Executes an enabled registered command with one semantic invocation argument. */
+    @Override
+    public void execute(CommandId command, Object argument) {
+        execute(command, new ContextualCommandContext(context, argument));
+    }
+
+    private void execute(CommandId command, EditorCommandContext invocation) {
         requireOpen();
         CommandId id = Objects.requireNonNull(command, "command");
         CommandRegistration registered = commands.get(id);
         if (registered == null) {
             throw new IllegalArgumentException("command identity is not registered: " + id);
         }
-        registered.execute();
+        registered.execute(invocation);
     }
 
     /** Observes complete ordered menu snapshots and immediately receives the current state. */
@@ -221,18 +232,36 @@ public final class EditorCommandMenuRegistry
             }
         }
 
-        private void execute() {
+        private void execute(EditorCommandContext invocation) {
             requireRegistrationOpen();
             if (!state.enabled()) {
                 throw new IllegalStateException("command is disabled: " + contribution.id());
             }
-            command.execute(context);
+            command.execute(invocation);
         }
 
         private void requireRegistrationOpen() {
             if (registrationClosed) {
                 throw new IllegalStateException("command registration is closed: " + contribution.id());
             }
+        }
+    }
+
+    private record ContextualCommandContext(EditorCommandContext delegate, Object invocationArgument)
+            implements EditorCommandContext {
+        private ContextualCommandContext {
+            Objects.requireNonNull(delegate, "delegate");
+            Objects.requireNonNull(invocationArgument, "argument");
+        }
+
+        @Override
+        public EditorWindow window() {
+            return delegate.window();
+        }
+
+        @Override
+        public Optional<Object> argument() {
+            return Optional.of(invocationArgument);
         }
     }
 }

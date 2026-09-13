@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.builtin.explorer;
 import io.github.glynch.jscene3d.editor.activity.ActivityId;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.command.CommandId;
+import io.github.glynch.jscene3d.editor.command.EditorCommandContext;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
 import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
@@ -107,7 +108,7 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
                 .add(editor.commands()
                         .register(
                                 new EditorCommandContribution(OPEN_FILE, "Open File"),
-                                ignored -> explorer.openSelection(editor.window())));
+                                invocation -> openFile(invocation, editor.window())));
         editor.subscriptions().add(explorer.previewSelectionsWith(editor.window()));
         editor.subscriptions()
                 .add(editor.views()
@@ -154,19 +155,19 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
             return Optional.of(selectionModel);
         }
 
-        private void openSelection(EditorWindow window) {
-            selectionModel
-                    .selection()
-                    .filter(entry -> entry.kind() == WorkspaceExplorerEntry.Kind.FILE)
-                    .ifPresent(entry -> window.openFile(entry.path().toUri()));
-        }
-
         private EditorRegistration previewSelectionsWith(EditorWindow window) {
             EditorWindow editorWindow = Objects.requireNonNull(window, "window");
             return selectionModel.observe(selection -> selection
                     .filter(entry -> entry.kind() == WorkspaceExplorerEntry.Kind.FILE)
                     .ifPresent(entry -> editorWindow.previewFile(entry.path().toUri())));
         }
+    }
+
+    private static void openFile(EditorCommandContext invocation, EditorWindow window) {
+        invocation
+                .argument(WorkspaceExplorerEntry.class)
+                .filter(entry -> entry.kind() == WorkspaceExplorerEntry.Kind.FILE)
+                .ifPresent(entry -> window.openFile(entry.path().toUri()));
     }
 
     private final class WorkspaceDataProvider implements EditorTreeDataProvider<WorkspaceExplorerEntry> {

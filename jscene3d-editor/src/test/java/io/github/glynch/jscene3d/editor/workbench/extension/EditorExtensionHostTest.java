@@ -38,6 +38,7 @@ import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,7 @@ final class EditorExtensionHostTest {
     private static final ViewId VIEW_ID = new ViewId("io.github.glynch.test.view");
     private static final CommandId MESSAGE_COMMAND = new CommandId("io.github.glynch.test.message");
     private static final CommandId REVEAL_COMMAND = new CommandId("io.github.glynch.test.reveal");
+    private static final CommandId CONTEXT_COMMAND = new CommandId("io.github.glynch.test.context");
 
     @Test
     void activatesCapabilitiesAndRemovesOwnedContributionsAtShutdown() {
@@ -186,6 +188,21 @@ final class EditorExtensionHostTest {
 
         assertThat(received).hasValue(configuration);
         assertThat(received.get().get(enabled)).contains(true);
+        host.close();
+    }
+
+    @Test
+    void suppliesTheExactContextualArgumentToACommandInvocation() {
+        EditorExtensionHost host = host();
+        AtomicReference<Object> received = new AtomicReference<>();
+        host.registerCommand(
+                new EditorCommandContribution(CONTEXT_COMMAND, "Context"),
+                invocation -> received.set(invocation.argument(Path.class).orElseThrow()));
+        Path target = Path.of("src/main/java/example/Player.java");
+
+        host.execute(CONTEXT_COMMAND, target);
+
+        assertThat(received).hasValue(target);
         host.close();
     }
 

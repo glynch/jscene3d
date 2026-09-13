@@ -23,4 +23,13 @@ public interface EditorCommandRegistry {
      * @throws IllegalArgumentException if no command has the supplied identity
      */
     void execute(CommandId command);
+
+    /**
+     * Invokes one registered command with the semantic argument from an item-oriented interaction.
+     *
+     * @param command command identity
+     * @param argument exact logical item or resource involved in the invocation
+     * @throws IllegalArgumentException if no command has the supplied identity
+     */
+    void execute(CommandId command, Object argument);
 }

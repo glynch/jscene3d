@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import javafx.application.Platform;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -54,7 +54,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     private final EditorCollectionDataProvider<T> provider;
     private final List<EditorCollectionCategory> categories;
     private final Optional<EditorCollectionSelectionModel<T>> selectionModel;
-    private final Consumer<CommandId> commandExecutor;
+    private final BiConsumer<CommandId, Object> commandExecutor;
     private final JavaFxIconRenderer icons;
     private final String allItemsLabel;
     private final Optional<EditorIcon> rootIcon;
@@ -85,7 +85,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
 
     /** Creates and begins observing one logical collection view. */
     JavaFxCollectionViewAdapter(
-            EditorCollectionView<T> view, Consumer<CommandId> commandExecutor, JavaFxIconRenderer icons) {
+            EditorCollectionView<T> view, BiConsumer<CommandId, Object> commandExecutor, JavaFxIconRenderer icons) {
         EditorCollectionView<T> logicalView = Objects.requireNonNull(view, "view");
         provider = Objects.requireNonNull(logicalView.dataProvider(), "view.dataProvider()");
         categories = List.copyOf(Objects.requireNonNull(logicalView.categories(), "view.categories()"));
@@ -472,7 +472,7 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     }
 
     private void executeItemCommand(T element) {
-        provider.item(element).command().ifPresent(commandExecutor);
+        provider.item(element).command().ifPresent(command -> commandExecutor.accept(command, element));
     }
 
     private void showFailure(Throwable failure) {

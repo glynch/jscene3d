@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -51,11 +51,12 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
     private int selectionFeedbackSuppressionDepth;
 
     /** Creates and begins observing one logical tree view. */
-    JavaFxTreeViewAdapter(EditorTreeView<T> view, Consumer<CommandId> commandExecutor, JavaFxIconRenderer icons) {
+    JavaFxTreeViewAdapter(
+            EditorTreeView<T> view, BiConsumer<CommandId, Object> commandExecutor, JavaFxIconRenderer icons) {
         EditorTreeView<T> logicalView = Objects.requireNonNull(view, "view");
         this.provider = Objects.requireNonNull(logicalView.dataProvider(), "view.dataProvider()");
         this.selectionModel = Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
-        Consumer<CommandId> commands = Objects.requireNonNull(commandExecutor, "commandExecutor");
+        BiConsumer<CommandId, Object> commands = Objects.requireNonNull(commandExecutor, "commandExecutor");
         this.icons = Objects.requireNonNull(icons, "icons");
         tree.setShowRoot(false);
         tree.getStyleClass().add(EditorStyleClasses.EDITOR_TREE_VIEW);
@@ -92,12 +93,11 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
         tree.requestFocus();
     }
 
-    private void executeSelectedCommand(Consumer<CommandId> commands) {
+    private void executeSelectedCommand(BiConsumer<CommandId, Object> commands) {
         Optional.ofNullable(tree.getSelectionModel().getSelectedItem())
                 .map(TreeItem::getValue)
-                .map(provider::item)
-                .flatMap(EditorTreeItem::command)
-                .ifPresent(commands);
+                .ifPresent(element ->
+                        provider.item(element).command().ifPresent(command -> commands.accept(command, element)));
     }
 
     @Override

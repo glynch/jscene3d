@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.editor.javalanguage.jdt;
 
 import io.github.glynch.jscene3d.editor.language.EditorLanguageProjectSession;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupport;
-import io.github.glynch.jscene3d.editor.lsp.LanguageServerProcessLauncher;
+import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessLauncher;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.nio.file.Files;

@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.editor.javalanguage.jdt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.editor.lsp.LanguageServerProcessConfiguration;
+import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessConfiguration;
 import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;

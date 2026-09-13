@@ -83,6 +83,12 @@ public final class EditorIcons {
     /** Workbench layout customization. */
     public static final EditorIconId LAYOUT = icon("layout");
 
+    /** Switch to a light color theme. */
+    public static final EditorIconId SUN = icon("sun");
+
+    /** Switch to a dark color theme. */
+    public static final EditorIconId MOON = icon("moon");
+
     /** Primary-side-bar visibility. */
     public static final EditorIconId PRIMARY_SIDEBAR = icon("primary-sidebar");
 

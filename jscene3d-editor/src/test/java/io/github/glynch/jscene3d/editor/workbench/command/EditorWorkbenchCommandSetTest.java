@@ -39,6 +39,7 @@ class EditorWorkbenchCommandSetTest {
         EditorExtensionHost host = host();
         AtomicInteger opens = new AtomicInteger();
         AtomicInteger settings = new AtomicInteger();
+        AtomicInteger themeToggles = new AtomicInteger();
         AtomicInteger saves = new AtomicInteger();
         AtomicInteger undoes = new AtomicInteger();
         AtomicInteger redoes = new AtomicInteger();
@@ -59,6 +60,7 @@ class EditorWorkbenchCommandSetTest {
                 new EditorWorkbenchCommandSet.Actions(
                         opens::incrementAndGet,
                         settings::incrementAndGet,
+                        themeToggles::incrementAndGet,
                         saves::incrementAndGet,
                         undoes::incrementAndGet,
                         redoes::incrementAndGet,
@@ -70,10 +72,10 @@ class EditorWorkbenchCommandSetTest {
                 .containsExactly("JScene3D", "File", "Edit");
         assertThat(menu(snapshots.getLast(), "JScene3D").commands())
                 .extracting(item -> item.contribution().title())
-                .containsExactly("About JScene3D", "Settings…", "Quit JScene3D");
+                .containsExactly("About JScene3D", "Settings…", "Toggle Light/Dark Theme", "Quit JScene3D");
         assertThat(menu(snapshots.getLast(), "JScene3D").commands())
                 .extracting(EditorMenuCommandSnapshot::group)
-                .containsExactly("application", "application", "lifecycle");
+                .containsExactly("application", "application", "application", "lifecycle");
         assertThat(command(snapshots.getLast(), EditorCommands.OPEN_PROJECT)
                         .state()
                         .enabled())
@@ -83,7 +85,7 @@ class EditorWorkbenchCommandSetTest {
         assertThat(command(snapshots.getLast(), EditorCommands.OPEN_SETTINGS)
                         .state()
                         .enabled())
-                .isFalse();
+                .isTrue();
 
         assertThatThrownBy(() -> host.execute(EditorCommands.SAVE))
                 .isInstanceOf(IllegalStateException.class)
@@ -92,6 +94,7 @@ class EditorWorkbenchCommandSetTest {
         commands.update(new DocumentCommandState(true, true, true, true));
         host.execute(EditorCommands.OPEN_PROJECT);
         host.execute(EditorCommands.OPEN_SETTINGS);
+        host.execute(EditorCommands.TOGGLE_COLOR_SCHEME);
         host.execute(EditorCommands.SAVE);
         host.execute(EditorCommands.UNDO);
         host.execute(EditorCommands.REDO);
@@ -100,6 +103,7 @@ class EditorWorkbenchCommandSetTest {
 
         assertThat(opens).hasValue(1);
         assertThat(settings).hasValue(1);
+        assertThat(themeToggles).hasValue(1);
         assertThat(saves).hasValue(1);
         assertThat(undoes).hasValue(1);
         assertThat(redoes).hasValue(1);
@@ -166,7 +170,8 @@ class EditorWorkbenchCommandSetTest {
     }
 
     private static EditorWorkbenchCommandSet.Actions emptyActions() {
-        return new EditorWorkbenchCommandSet.Actions(() -> {}, () -> {}, () -> {}, () -> {}, () -> {}, () -> {});
+        return new EditorWorkbenchCommandSet.Actions(
+                () -> {}, () -> {}, () -> {}, () -> {}, () -> {}, () -> {}, () -> {});
     }
 
     private static EditorMenuSnapshot menu(List<EditorMenuSnapshot> menus, String title) {

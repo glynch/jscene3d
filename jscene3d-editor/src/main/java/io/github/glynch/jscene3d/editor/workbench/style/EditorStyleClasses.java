@@ -239,6 +239,8 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_LAYOUT_TOGGLE = "editor-layout-toggle";
     /** CSS class named {@value}. */
+    public static final String EDITOR_THEME_TOGGLE = "editor-theme-toggle";
+    /** CSS class named {@value}. */
     public static final String EDITOR_MENU_BAR = "editor-menu-bar";
     /** CSS class named {@value}. */
     public static final String EDITOR_MODAL = "editor-modal";

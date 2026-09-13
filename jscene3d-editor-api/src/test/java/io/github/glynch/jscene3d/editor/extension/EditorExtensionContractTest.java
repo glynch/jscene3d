@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
+import io.github.glynch.jscene3d.editor.theme.EditorColorThemes;
 import io.github.glynch.jscene3d.editor.view.EditorView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
@@ -131,6 +132,11 @@ final class EditorExtensionContractTest {
 
         @Override
         public EditorFileTypes fileTypes() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EditorColorThemes colorThemes() {
             throw new UnsupportedOperationException();
         }
 

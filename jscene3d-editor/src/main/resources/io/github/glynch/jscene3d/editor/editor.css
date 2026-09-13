@@ -17,13 +17,27 @@
     -jscene-information: #69aef8;
     -jscene-warning: #e2b45e;
     -jscene-error: #ff7182;
+    -jscene-accent-subtle: rgba(117, 98, 243, 0.16);
+    -jscene-accent-muted: rgba(117, 98, 243, 0.22);
+    -jscene-focus-faint: rgba(154, 139, 255, 0.22);
+    -jscene-focus-shadow: rgba(154, 139, 255, 0.28);
+    -jscene-focus-shadow-strong: rgba(154, 139, 255, 0.34);
+    -jscene-text-muted-faint: rgba(142, 151, 168, 0.12);
+    -jscene-text-muted-border: rgba(142, 151, 168, 0.36);
+    -jscene-text-muted-track: rgba(142, 151, 168, 0.28);
+    -jscene-text-muted-overlay: rgba(142, 151, 168, 0.40);
+    -jscene-modal-shadow: rgba(0, 0, 0, 0.58);
+    -jscene-viewport-shade: rgba(6, 9, 15, 0.36);
+    -jscene-viewport-shade-strong: rgba(7, 10, 17, 0.55);
+    -jscene-viewport-shade-soft: rgba(7, 10, 17, 0.30);
+    -jscene-viewport-overlay: rgba(8, 12, 20, 0.90);
 
     -fx-accent: -jscene-accent;
     -fx-background: -jscene-canvas;
     -fx-base: -jscene-panel;
     -fx-control-inner-background: -jscene-panel;
     -fx-focus-color: -jscene-focus;
-    -fx-faint-focus-color: rgba(154, 139, 255, 0.22);
+    -fx-faint-focus-color: -jscene-focus-faint;
     -fx-font-family: "System";
     -fx-font-size: 12px;
     -fx-selection-bar: -jscene-selected;
@@ -118,7 +132,8 @@
     -fx-spacing: 2px;
 }
 
-.editor-layout-button {
+.editor-layout-button,
+.editor-theme-toggle {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-max-height: 30px;
@@ -128,7 +143,8 @@
     -fx-padding: 6px;
 }
 
-.editor-layout-button:hover {
+.editor-layout-button:hover,
+.editor-theme-toggle:hover {
     -fx-background-color: -jscene-hover;
 }
 
@@ -218,7 +234,7 @@
 .combo-box-base:focused,
 .text-input:focused {
     -fx-border-color: -jscene-focus;
-    -fx-effect: dropshadow(gaussian, rgba(154, 139, 255, 0.28), 3, 0, 0, 0);
+    -fx-effect: dropshadow(gaussian, -jscene-focus-shadow, 3, 0, 0, 0);
 }
 
 .button:disabled,
@@ -238,7 +254,7 @@
     -fx-border-color: derive(-jscene-divider, 18%);
     -fx-border-radius: 22px;
     -fx-border-width: 1px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.58), 20, 0.18, 0, 5);
+    -fx-effect: dropshadow(gaussian, -jscene-modal-shadow, 20, 0.18, 0, 5);
     -fx-padding: 24px;
 }
 
@@ -403,7 +419,7 @@
 .editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected {
     -fx-border-color: -jscene-focus -jscene-divider -jscene-canvas -jscene-divider;
     -fx-border-width: 3px 1px 1px 1px;
-    -fx-effect: dropshadow(gaussian, rgba(154, 139, 255, 0.34), 4, 0, 0, 0);
+    -fx-effect: dropshadow(gaussian, -jscene-focus-shadow-strong, 4, 0, 0, 0);
 }
 
 .editor-area-tabs:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
@@ -694,7 +710,7 @@
 }
 
 .editor-generated-badge {
-    -fx-background-color: rgba(142, 151, 168, 0.12);
+    -fx-background-color: -jscene-text-muted-faint;
     -fx-background-radius: 3px;
     -fx-border-color: -jscene-text-muted;
     -fx-border-radius: 3px;
@@ -926,7 +942,7 @@
 }
 
 .editor-view-tabs:focused > .tab-header-area > .headers-region > .tab:selected {
-    -fx-effect: dropshadow(gaussian, rgba(154, 139, 255, 0.34), 4, 0, 0, 0);
+    -fx-effect: dropshadow(gaussian, -jscene-focus-shadow-strong, 4, 0, 0, 0);
 }
 
 .editor-view-tabs:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
@@ -946,7 +962,7 @@
 
 .editor-diagnostic-badge {
     -fx-alignment: center;
-    -fx-background-color: rgba(117, 98, 243, 0.22);
+    -fx-background-color: -jscene-accent-muted;
     -fx-background-radius: 8px;
     -fx-font-size: 10px;
     -fx-min-height: 16px;
@@ -1415,7 +1431,7 @@
 }
 
 .editor-read-only-badge {
-    -fx-background-color: rgba(117, 98, 243, 0.16);
+    -fx-background-color: -jscene-accent-subtle;
     -fx-background-radius: 3px;
     -fx-border-color: -jscene-accent;
     -fx-border-radius: 3px;
@@ -1450,8 +1466,8 @@
 
 .editor-splash-scrim {
     -fx-background-color:
-        linear-gradient(to bottom, rgba(6, 9, 15, 0.36) 0%, transparent 30%, transparent 68%, rgba(7, 10, 17, 0.55) 100%),
-        linear-gradient(to right, rgba(7, 10, 17, 0.30) 0%, transparent 47%);
+        linear-gradient(to bottom, -jscene-viewport-shade 0%, transparent 30%, transparent 68%, -jscene-viewport-shade-strong 100%),
+        linear-gradient(to right, -jscene-viewport-shade-soft 0%, transparent 47%);
 }
 
 .editor-splash-content {
@@ -1480,15 +1496,15 @@
 }
 
 .editor-splash-information {
-    -fx-background-color: rgba(8, 12, 20, 0.90);
-    -fx-border-color: rgba(142, 151, 168, 0.36) transparent transparent transparent;
+    -fx-background-color: -jscene-viewport-overlay;
+    -fx-border-color: -jscene-text-muted-border transparent transparent transparent;
     -fx-border-width: 1px 0 0 0;
     -fx-min-height: 126px;
     -fx-padding: 24px 42px;
 }
 
 .editor-splash-divider {
-    -fx-background-color: rgba(142, 151, 168, 0.40);
+    -fx-background-color: -jscene-text-muted-overlay;
     -fx-min-height: 56px;
     -fx-min-width: 1px;
     -fx-pref-height: 56px;
@@ -1525,7 +1541,7 @@
 }
 
 .editor-splash-progress > .track {
-    -fx-background-color: rgba(142, 151, 168, 0.28);
+    -fx-background-color: -jscene-text-muted-track;
     -fx-background-radius: 4px;
 }
 

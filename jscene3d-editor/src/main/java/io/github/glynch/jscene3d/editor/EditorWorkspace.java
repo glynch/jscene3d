@@ -11,12 +11,9 @@ import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
-import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.activity.EditorActivitySelection;
 import io.github.glynch.jscene3d.editor.workbench.activity.JavaFxActivityBar;
-import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet;
-import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet.DocumentCommandState;
-import io.github.glynch.jscene3d.editor.workbench.dialog.EditorWindowCloseGuard;
+import io.github.glynch.jscene3d.editor.workbench.appearance.JavaFxColorSchemeToggle;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
@@ -26,40 +23,29 @@ import io.github.glynch.jscene3d.editor.workbench.layout.JavaFxWorkbenchRegions;
 import io.github.glynch.jscene3d.editor.workbench.menu.JavaFxMenuBar;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusBarPane;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import io.github.glynch.jscene3d.editor.workbench.view.JavaFxContributedEditors;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxEditorArea;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxPanelPart;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxViewContainer;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
-import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.OverrunStyle;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import org.jspecify.annotations.Nullable;
 
-/** Owns the editor's resizable JavaFX workspace and its visible document state. */
+/** Composes the editor workbench regions and coordinates project presentation. */
 public final class EditorWorkspace extends BorderPane {
-    private static final PseudoClass DIRTY_PSEUDO_CLASS = PseudoClass.getPseudoClass("dirty");
     private static final double TOP_CHROME_MARK_SIZE = 24.0;
 
-    private final EditorSelections selections;
-    private final EditorWindowCloseGuard closeGuard;
     private final Label projectContext = new Label("No project");
-    private final StringProperty previewTitle = new SimpleStringProperty("Empty Preview");
-    private final BooleanProperty previewDirty = new SimpleBooleanProperty(false);
     private final JavaFxPanelPart bottomPanel;
     private final EditorWorkbenchLayout layout;
     private final JavaFxViewContainer primaryViewContainer;
@@ -70,14 +56,12 @@ public final class EditorWorkspace extends BorderPane {
     private final JavaFxLayoutCustomizer layoutCustomizer;
     private final JavaFxLayoutQuickAccess layoutQuickAccess;
     private final JavaFxEditorArea editorArea;
+    private final JavaFxContributedEditors contributedEditors;
+    private final EditorWorkspaceDocument documentController;
     private final JavaFxWorkbenchRegions regions;
     private final EditorStatusBarPane statusBar;
-    private final EditorWorkbenchCommandSet commandSet;
+    private final JavaFxColorSchemeToggle colorSchemeToggle;
     private final JavaFxMenuBar menuBar;
-
-    private EditorRegistration documentRegistration = () -> {};
-    private EditorRegistration dirtyRegistration = () -> {};
-    private @Nullable EditorProjectSession document;
 
     /** Creates the shell around an existing viewport and the real open-project command. */
     EditorWorkspace(
@@ -87,9 +71,7 @@ public final class EditorWorkspace extends BorderPane {
             EditorSelections selections,
             EditorExtensionHost extensions,
             EditorBuildInfo buildInfo) {
-        this.selections = Objects.requireNonNull(selections, "selections");
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
-        closeGuard = new EditorWindowCloseGuard(host::showDialog);
         JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
         layout = new EditorWorkbenchLayout(host);
         activitySelection = new EditorActivitySelection(host, layout, HierarchyExtension.ACTIVITY_ID);
@@ -104,14 +86,8 @@ public final class EditorWorkspace extends BorderPane {
         inspectorPanel
                 .getStyleClass()
                 .addAll(EditorStyleClasses.EDITOR_PANEL, EditorStyleClasses.EDITOR_INSPECTOR_PANEL);
-        editorArea = new JavaFxEditorArea(
-                host,
-                layout,
-                icons,
-                new JavaFxEditorArea.PreviewDescriptor(
-                        previewTitle, previewDirty, createViewportContent(viewportCanvas)),
-                () -> host.execute(EditorCommands.OPEN_PROJECT),
-                this::updateDocumentCommands);
+        editorArea = new JavaFxEditorArea();
+        contributedEditors = new JavaFxContributedEditors(editorArea, host, layout, icons);
         bottomPanel = new JavaFxPanelPart(
                 host,
                 layout,
@@ -132,18 +108,20 @@ public final class EditorWorkspace extends BorderPane {
                 statusBar.node());
         layoutCustomizer = new JavaFxLayoutCustomizer(layout, icons, host::showView);
         layoutQuickAccess = new JavaFxLayoutQuickAccess(layout, icons, layoutCustomizer.button());
-        commandSet = new EditorWorkbenchCommandSet(
-                host,
-                new EditorWorkbenchCommandSet.Actions(
-                        openProject,
-                        this::showProjectSettings,
-                        this::saveDocument,
-                        this::undo,
-                        this::redo,
-                        requestClose),
-                Objects.requireNonNull(buildInfo, "buildInfo").aboutText());
+        documentController = new EditorWorkspaceDocument(
+                new EditorWorkspaceDocument.Context(
+                        host,
+                        Objects.requireNonNull(selections, "selections"),
+                        editorArea,
+                        icons,
+                        createViewportContent(viewportCanvas),
+                        projectContext,
+                        statusBar),
+                new EditorWorkspaceDocument.Actions(openProject, requestClose, buildInfo));
+        colorSchemeToggle = new JavaFxColorSchemeToggle(
+                host.colorThemes(), icons, () -> host.execute(EditorCommands.TOGGLE_COLOR_SCHEME));
         menuBar = new JavaFxMenuBar(host);
-        setTop(createTopChrome(menuBar.node(), layoutQuickAccess.node()));
+        setTop(createTopChrome(menuBar.node(), colorSchemeToggle.button(), layoutQuickAccess.node()));
         setCenter(regions.node());
         getStyleClass().add(EditorStyleClasses.EDITOR_SHELL);
     }
@@ -155,7 +133,7 @@ public final class EditorWorkspace extends BorderPane {
 
     /** Opens the Welcome editor when startup completes without a requested project. */
     void showWelcome() {
-        editorArea.showEmptyWorkspace();
+        documentController.showWelcome();
     }
 
     /** Updates the viewport portion of the status bar. */
@@ -163,65 +141,25 @@ public final class EditorWorkspace extends BorderPane {
         statusBar.showViewportStatus(text);
     }
 
-    /**
-     * Shows that a project directory is being opened without claiming it has loaded.
-     *
-     * @param directory project directory being opened
-     */
+    /** Shows that a project directory is being opened without claiming it has loaded. */
     public void beginOpening(Path directory) {
-        clearSelection();
-        Path normalized = directory.toAbsolutePath().normalize();
-        Path fileName = normalized.getFileName();
-        String candidateName = fileName == null ? normalized.toString() : fileName.toString();
-        projectContext.setText(candidateName);
-        projectContext.setAccessibleText(candidateName);
-        projectContext.setTooltip(new Tooltip(normalized.toString()));
-        setProjectStatus("Opening " + candidateName + "…");
+        documentController.beginOpening(directory);
     }
 
-    /**
-     * Replaces the visible hierarchy, Project content, and preview context atomically.
-     *
-     * @param session completely loaded editor project session
-     */
+    /** Replaces the visible hierarchy, Project content, and preview context atomically. */
     public void showProject(EditorProjectSession session) {
-        clearSelection();
-        documentRegistration.close();
-        dirtyRegistration.close();
-        editorArea.closeProjectSettings();
-        document = Objects.requireNonNull(session, "session");
-        documentRegistration = session.onDidChangeHierarchy().subscribe(ignored -> updateDocumentCommands());
-        dirtyRegistration = session.workingCopies().onDidChangeDirty().subscribe(ignored -> updateDocumentCommands());
-        previewTitle.set(session.hierarchy().label() + " Preview");
-        editorArea.showProjectPreview();
+        documentController.showProject(session);
         activitySelection.revealDefault();
-        updateDocumentCommands();
     }
 
     /** Clears project-owned views after an unsuccessful open. */
     public void clearProject() {
-        clearSelection();
-        documentRegistration.close();
-        dirtyRegistration.close();
-        editorArea.showEmptyWorkspace();
-        documentRegistration = () -> {};
-        dirtyRegistration = () -> {};
-        document = null;
-        projectContext.setText("No project");
-        projectContext.setAccessibleText("No project");
-        projectContext.setTooltip(null);
-        previewTitle.set("Empty Preview");
-        previewDirty.set(false);
-        updateDocumentCommands();
+        documentController.clearProject();
     }
 
-    /**
-     * Updates the concise project portion of the status bar.
-     *
-     * @param text project status text
-     */
+    /** Updates the concise project portion of the status bar. */
     public void setProjectStatus(String text) {
-        statusBar.showProjectStatus(text);
+        documentController.setProjectStatus(text);
     }
 
     /** Completes project presentation with the default project navigation visible. */
@@ -230,41 +168,29 @@ public final class EditorWorkspace extends BorderPane {
         statusBar.showProjectStatus(status);
     }
 
-    /**
-     * Shows an extension message without exposing JavaFX through the extension interface.
-     *
-     * @param message extension message to show
-     */
+    /** Shows an extension message without exposing JavaFX through the extension interface. */
     public void showMessage(EditorMessage message) {
-        statusBar.showMessage(message);
+        documentController.showMessage(message);
     }
 
     /** Confirms or saves dirty resources before an orderly window close. */
     boolean prepareToClose() {
-        EditorProjectSession current = document;
-        int projectDirtyCount = current == null ? 0 : current.workingCopies().dirtyCount();
-        int dirtyCount = projectDirtyCount + editorArea.dirtyFileCount();
-        if (dirtyCount == 0) {
-            return true;
-        }
-        String workspaceName =
-                current == null ? "open files" : current.project().identity().name();
-        return closeGuard.confirmClose(workspaceName, dirtyCount, () -> document == current && trySaveAllResources());
+        return documentController.prepareToClose();
     }
 
     /** Releases workbench adapters before the extension host is closed. */
     void close() {
-        documentRegistration.close();
-        dirtyRegistration.close();
         menuBar.close();
+        colorSchemeToggle.close();
         layoutQuickAccess.close();
         layoutCustomizer.close();
         regions.close();
         activityBar.close();
         activitySelectionRegistration.close();
         activitySelection.close();
+        contributedEditors.close();
+        documentController.close();
         editorArea.close();
-        commandSet.close();
         statusBar.close();
         secondaryViewContainer.close();
         bottomPanel.close();
@@ -272,121 +198,23 @@ public final class EditorWorkspace extends BorderPane {
         layout.close();
     }
 
-    /** Creates compact product, menu, project-context, and command chrome. */
-    private HBox createTopChrome(MenuBar menus, HBox layoutActions) {
+    private HBox createTopChrome(MenuBar menus, Button themeToggle, HBox layoutActions) {
         EditorBrandMark productMark = new EditorBrandMark(TOP_CHROME_MARK_SIZE);
         productMark.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_MARK);
         Label productKind = new Label("EDITOR");
         productKind.getStyleClass().add(EditorStyleClasses.EDITOR_PRODUCT_KIND);
-
-        updateDocumentCommands();
-
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         projectContext.setMaxWidth(300.0);
         projectContext.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
         projectContext.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_CONTEXT);
-        HBox chrome = new HBox(8.0, productMark, productKind, menus, spacer, projectContext, layoutActions);
+        HBox chrome =
+                new HBox(8.0, productMark, productKind, menus, spacer, projectContext, themeToggle, layoutActions);
         chrome.setAlignment(Pos.CENTER_LEFT);
         chrome.getStyleClass().add(EditorStyleClasses.EDITOR_TOP);
         return chrome;
     }
 
-    private void saveDocument() {
-        if (editorArea.hasSelectedFile()) {
-            if (editorArea.saveSelectedFile()) {
-                setProjectStatus("File saved");
-            }
-        } else {
-            trySaveProject();
-        }
-    }
-
-    private boolean trySaveProject() {
-        EditorProjectSession current = document;
-        if (current == null) {
-            return true;
-        }
-        try {
-            current.save();
-            setProjectStatus(current.project().identity().name() + " · saved");
-            return true;
-        } catch (IOException exception) {
-            setProjectStatus("Unable to save " + current.project().identity().name());
-            showMessage(new EditorMessage(
-                    EditorMessageSeverity.ERROR,
-                    "Unable to save the project: "
-                            + Objects.requireNonNullElse(exception.getMessage(), exception.toString())));
-            return false;
-        }
-    }
-
-    private void showProjectSettings() {
-        EditorProjectSession current = document;
-        if (current != null) {
-            editorArea.showProjectSettings(current, this::showMessage);
-        }
-    }
-
-    private void undo() {
-        if (editorArea.hasSelectedFile()) {
-            editorArea.undoSelectedFile();
-            return;
-        }
-        EditorProjectSession current = document;
-        if (current != null) {
-            current.undo();
-        }
-    }
-
-    private void redo() {
-        if (editorArea.hasSelectedFile()) {
-            editorArea.redoSelectedFile();
-            return;
-        }
-        EditorProjectSession current = document;
-        if (current != null) {
-            current.redo();
-        }
-    }
-
-    private void updateDocumentCommands() {
-        EditorProjectSession current = document;
-        boolean projectDirty = current != null && current.isDirty();
-        boolean dirty = editorArea.hasSelectedFile() ? editorArea.isSelectedFileDirty() : projectDirty;
-        boolean worldDirty =
-                current != null && current.startupWorldWorkingCopy().isDirty();
-        previewDirty.set(worldDirty);
-        commandSet.update(new DocumentCommandState(
-                current != null,
-                dirty,
-                editorArea.hasSelectedFile() || current != null && current.canUndo(),
-                editorArea.hasSelectedFile() || current != null && current.canRedo()));
-        if (current != null) {
-            String projectName = current.project().identity().name();
-            projectContext.setText(projectDirty ? projectName + '*' : projectName);
-            projectContext.setAccessibleText(projectDirty ? projectName + ", modified" : projectName);
-            projectContext.pseudoClassStateChanged(DIRTY_PSEUDO_CLASS, projectDirty);
-            if (projectDirty) {
-                setProjectStatus(projectName + " · modified");
-            } else {
-                setProjectStatus(projectName);
-            }
-        } else {
-            projectContext.pseudoClassStateChanged(DIRTY_PSEUDO_CLASS, false);
-        }
-    }
-
-    private boolean trySaveAllResources() {
-        return trySaveProject() && editorArea.saveAllFiles();
-    }
-
-    /** Clears UI and shared selection state before project-owned values are replaced. */
-    private void clearSelection() {
-        selections.clear();
-    }
-
-    /** Creates the scene-preview content hosted by the central editor area. */
     private static StackPane createViewportContent(GLCanvas viewportCanvas) {
         StackPane viewport = new StackPane(viewportCanvas);
         viewport.setMinHeight(EditorWorkspaceLayout.MINIMUM_PREVIEW_HEIGHT);

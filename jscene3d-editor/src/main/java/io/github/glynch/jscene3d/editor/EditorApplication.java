@@ -9,6 +9,7 @@ import static javafx.util.Duration.seconds;
 import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
+import io.github.glynch.jscene3d.editor.builtin.appearance.BuiltinColorThemesExtension;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsExtension;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.ProjectDiagnosticsExtension;
 import io.github.glynch.jscene3d.editor.builtin.explorer.WorkspaceExplorerExtension;
@@ -22,6 +23,9 @@ import io.github.glynch.jscene3d.editor.builtin.text.SourceEditorExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectPublication;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorColorThemeRegistry;
+import io.github.glynch.jscene3d.editor.workbench.appearance.JavaFxEditorThemeAdapter;
+import io.github.glynch.jscene3d.editor.workbench.appearance.JavaPreferencesEditorAppearancePreferences;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.dialog.JavaFxModalDialogs;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -47,11 +51,13 @@ public final class EditorApplication extends Application {
     private final EditorProjectContext projectContext;
     private final EditorSelectionContext selectionContext;
     private final EditorConfigurationContext configurationContext;
+    private final EditorColorThemeRegistry colorThemes;
     private final EditorExtensionHost extensionHost;
 
     private @Nullable GLCanvas canvas;
     private @Nullable EditorWorkspace workspace;
     private @Nullable EditorProjectOpener projectOpener;
+    private @Nullable JavaFxEditorThemeAdapter themeAdapter;
     private boolean disposalRequested;
 
     /** Creates an application instance whose stage is initialized later by JavaFX. */
@@ -64,7 +70,8 @@ public final class EditorApplication extends Application {
         projectContext = new EditorProjectContext();
         selectionContext = new EditorSelectionContext();
         configurationContext = new EditorConfigurationContext();
-        extensionHost = new EditorExtensionHost(projectContext, selectionContext, configurationContext);
+        colorThemes = new EditorColorThemeRegistry(new JavaPreferencesEditorAppearancePreferences());
+        extensionHost = new EditorExtensionHost(projectContext, selectionContext, configurationContext, colorThemes);
     }
 
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
@@ -78,6 +85,7 @@ public final class EditorApplication extends Application {
         GLCanvas viewportCanvas = createCanvas();
         JavaFxModalDialogs dialogs = new JavaFxModalDialogs(stage);
         extensionHost.showDialogsWith(dialogs::show);
+        extensionHost.activate(new BuiltinColorThemesExtension());
         EditorWorkspace editorWorkspace = new EditorWorkspace(
                 viewportCanvas,
                 () -> chooseProject(stage),
@@ -119,7 +127,9 @@ public final class EditorApplication extends Application {
         loadingScreen.phaseStarted(EditorLoadingPhase.PREPARING_VIEWPORT);
 
         stage.setTitle("JScene3D Editor");
-        stage.setScene(createScene(root));
+        Scene scene = createScene(root);
+        themeAdapter = new JavaFxEditorThemeAdapter(root, colorThemes);
+        stage.setScene(scene);
         stage.setMinWidth(800.0);
         stage.setMinHeight(520.0);
         stage.setOnCloseRequest(event -> {
@@ -139,6 +149,7 @@ public final class EditorApplication extends Application {
     public void stop() {
         closeProjectOpener();
         closeWorkspace();
+        closeThemeAdapter();
         extensionHost.close();
         configurationContext.close();
         disposeCanvas();
@@ -237,6 +248,15 @@ public final class EditorApplication extends Application {
     private void closeWorkspace() {
         EditorWorkspace current = workspace;
         workspace = null;
+        if (current != null) {
+            current.close();
+        }
+    }
+
+    /** Detaches the JavaFX appearance adapter before theme contributions are removed. */
+    private void closeThemeAdapter() {
+        JavaFxEditorThemeAdapter current = themeAdapter;
+        themeAdapter = null;
         if (current != null) {
             current.close();
         }

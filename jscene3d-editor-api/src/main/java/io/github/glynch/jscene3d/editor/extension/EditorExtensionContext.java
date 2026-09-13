@@ -15,6 +15,7 @@ import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.status.EditorStatusBar;
+import io.github.glynch.jscene3d.editor.theme.EditorColorThemes;
 import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
 
@@ -98,6 +99,13 @@ public interface EditorExtensionContext {
      * @return workspace file-type registry
      */
     EditorFileTypes fileTypes();
+
+    /**
+     * Returns the registry for declarative editor color-theme contributions.
+     *
+     * @return color-theme contribution registry
+     */
+    EditorColorThemes colorThemes();
 
     /**
      * Returns the read-only lifecycle of the project opened in this editor window.

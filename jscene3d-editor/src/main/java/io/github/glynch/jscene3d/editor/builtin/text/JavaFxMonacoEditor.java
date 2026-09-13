@@ -5,6 +5,9 @@
 package io.github.glynch.jscene3d.editor.builtin.text;
 
 import io.github.glynch.jscene3d.editor.file.EditorLanguageId;
+import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorAppearanceSnapshot;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorColorThemeRegistry;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -18,15 +21,22 @@ import netscape.javascript.JSObject;
 public final class JavaFxMonacoEditor implements AutoCloseable {
     private final WebView view = new WebView();
     private final Bridge bridge;
+    private final EditorRegistration appearanceRegistration;
     private boolean closed;
 
     public JavaFxMonacoEditor(
             EditorTextFileWorkingCopy workingCopy,
             EditorLanguageId language,
+            EditorColorThemeRegistry appearances,
             Runnable stateChanged,
             Consumer<String> initializationFailure,
             Consumer<IOException> saveFailure) {
         bridge = new Bridge(workingCopy, language, stateChanged, initializationFailure, saveFailure);
+        appearanceRegistration = Objects.requireNonNull(appearances, "appearances")
+                .observeAppearance(appearance -> {
+                    bridge.applyAppearance(appearance);
+                    execute("window.applyJavaAppearance && window.applyJavaAppearance()");
+                });
         WebEngine engine = view.getEngine();
         engine.getLoadWorker().stateProperty().addListener((ignored, previous, state) -> {
             if (state == Worker.State.SUCCEEDED && !closed) {
@@ -63,6 +73,7 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
     public void close() {
         if (!closed) {
             closed = true;
+            appearanceRegistration.close();
             bridge.close();
             execute("window.disposeEditor && window.disposeEditor()");
             view.getEngine().load(null);
@@ -83,6 +94,7 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
         private final Consumer<String> initializationFailure;
         private final Consumer<IOException> saveFailure;
         private boolean bridgeClosed;
+        private String appearance = "{}";
 
         private Bridge(
                 EditorTextFileWorkingCopy workingCopy,
@@ -117,6 +129,11 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
             return workingCopy.path().getFileName() + " source editor";
         }
 
+        /** Returns the current resolved appearance as JSON consumed by the bundled Monaco page. */
+        public String appearance() {
+            return appearance;
+        }
+
         /** Receives source changes from Monaco. */
         public void contentChanged(String content) {
             if (!bridgeClosed) {
@@ -149,6 +166,10 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
                 saveFailure.accept(exception);
                 return false;
             }
+        }
+
+        private void applyAppearance(EditorAppearanceSnapshot replacement) {
+            appearance = MonacoAppearanceJson.encode(Objects.requireNonNull(replacement, "replacement"));
         }
 
         private void close() {

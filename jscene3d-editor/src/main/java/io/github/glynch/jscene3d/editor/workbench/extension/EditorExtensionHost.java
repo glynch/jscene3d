@@ -40,6 +40,7 @@ import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemContribution;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItemState;
 import io.github.glynch.jscene3d.editor.status.StatusItemId;
+import io.github.glynch.jscene3d.editor.theme.EditorColorThemes;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.EditorViewRegistry;
@@ -48,6 +49,8 @@ import io.github.glynch.jscene3d.editor.window.EditorDialog;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButtonId;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorWindow;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorColorThemeRegistry;
+import io.github.glynch.jscene3d.editor.workbench.appearance.InMemoryEditorAppearancePreferences;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorCommandMenuRegistry;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.context.EditorContextState;
@@ -89,6 +92,7 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final List<Consumer<ViewId>> viewRequestObservers = new ArrayList<>();
     private final List<Consumer<URI>> fileRequestObservers = new ArrayList<>();
     private final EditorFileTypeRegistry fileTypes = new EditorFileTypeRegistry();
+    private final EditorColorThemeRegistry colorThemes;
     private final Map<StatusItemId, StatusItemRegistration> statusItems = new LinkedHashMap<>();
     private final List<Consumer<List<EditorStatusItemSnapshot>>> statusObservers = new ArrayList<>();
     private final Map<DiagnosticCollectionId, DiagnosticCollectionRegistration> diagnosticCollections =
@@ -107,7 +111,11 @@ public final class EditorExtensionHost implements AutoCloseable {
      * @param selections shared editor selection
      */
     public EditorExtensionHost(EditorProjectContext projects, EditorSelections selections) {
-        this(projects, selections, new EditorConfigurationContext());
+        this(
+                projects,
+                selections,
+                new EditorConfigurationContext(),
+                new EditorColorThemeRegistry(new InMemoryEditorAppearancePreferences()));
     }
 
     /**
@@ -119,9 +127,23 @@ public final class EditorExtensionHost implements AutoCloseable {
      */
     public EditorExtensionHost(
             EditorProjectContext projects, EditorSelections selections, EditorConfiguration configuration) {
+        this(
+                projects,
+                selections,
+                configuration,
+                new EditorColorThemeRegistry(new InMemoryEditorAppearancePreferences()));
+    }
+
+    /** Creates an empty host with live project configuration and user appearance. */
+    public EditorExtensionHost(
+            EditorProjectContext projects,
+            EditorSelections selections,
+            EditorConfiguration configuration,
+            EditorColorThemeRegistry colorThemes) {
         this.projects = Objects.requireNonNull(projects, "projects");
         this.selections = Objects.requireNonNull(selections, "selections");
         this.configuration = Objects.requireNonNull(configuration, "configuration");
+        this.colorThemes = Objects.requireNonNull(colorThemes, "colorThemes");
         projectContextRegistration =
                 this.projects.observe(project -> setContext(EditorContextKeys.PROJECT_OPEN, project.isPresent()));
     }
@@ -223,6 +245,12 @@ public final class EditorExtensionHost implements AutoCloseable {
     public Optional<EditorFileType> resolveFileType(URI resource) {
         requireOpen();
         return fileTypes.resolve(Objects.requireNonNull(resource, "resource"));
+    }
+
+    /** Returns the active appearance and color-theme registry owned by this editor window. */
+    public EditorColorThemeRegistry colorThemes() {
+        requireOpen();
+        return colorThemes;
     }
 
     /**
@@ -624,6 +652,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         @Override
         public EditorFileTypes fileTypes() {
             return fileTypes;
+        }
+
+        @Override
+        public EditorColorThemes colorThemes() {
+            return colorThemes;
         }
 
         @Override

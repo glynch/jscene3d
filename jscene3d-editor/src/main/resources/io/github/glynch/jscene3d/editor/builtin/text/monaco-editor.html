@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JScene3D Source Editor</title>
     <style>
-      html, body, #editor { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0d1420; }
-      #failure { display: none; box-sizing: border-box; padding: 24px; color: #ff8b9a; font: 13px sans-serif; }
+      html, body, #editor { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+      #failure { display: none; box-sizing: border-box; padding: 24px; }
     </style>
     <script src="loader.js"></script>
   </head>
@@ -19,6 +19,26 @@
       let monacoReady = false;
       let attachedBridge;
       let initializationError;
+
+      function applyAppearance(appearance) {
+        if (!monacoReady || !appearance) return;
+        monaco.editor.defineTheme('jscene3d-active', {
+          base: appearance.base,
+          inherit: true,
+          rules: appearance.rules,
+          colors: appearance.colors
+        });
+        monaco.editor.setTheme('jscene3d-active');
+        document.documentElement.style.background = appearance.colors['editor.background'];
+        document.body.style.background = appearance.colors['editor.background'];
+        document.getElementById('failure').style.color = appearance.error;
+        if (editor) {
+          editor.updateOptions({
+            fontFamily: appearance.fontFamily,
+            fontSize: appearance.fontSize
+          });
+        }
+      }
 
       function reportFailure(error) {
         initializationError = String(error && error.message ? error.message : error);
@@ -35,25 +55,14 @@
           const language = String(attachedBridge.language());
           const resource = monaco.Uri.parse(String(attachedBridge.resource()));
           const model = monaco.editor.createModel(String(attachedBridge.initialContent()), language, resource);
-          monaco.editor.defineTheme('jscene3d-dark', {
-            base: 'vs-dark',
-            inherit: true,
-            rules: [],
-            colors: {
-              'editor.background': '#0d1420',
-              'editor.foreground': '#d8dee9',
-              'editorLineNumber.foreground': '#667085',
-              'editorLineNumber.activeForeground': '#c7ced9',
-              'editorCursor.foreground': '#8b6cff',
-              'editor.selectionBackground': '#4e3ca180'
-            }
-          });
+          const appearance = JSON.parse(String(attachedBridge.appearance()));
+          applyAppearance(appearance);
           editor = monaco.editor.create(document.getElementById('editor'), {
             model,
-            theme: 'jscene3d-dark',
+            theme: 'jscene3d-active',
             automaticLayout: true,
-            fontFamily: 'Menlo, Monaco, Consolas, monospace',
-            fontSize: 13,
+            fontFamily: appearance.fontFamily,
+            fontSize: appearance.fontSize,
             minimap: { enabled: true },
             scrollBeyondLastLine: false,
             tabSize: 4,
@@ -75,6 +84,9 @@
         attachedBridge = bridge;
         if (initializationError) attachedBridge.initializationFailed(initializationError);
         initializeEditor();
+      };
+      window.applyJavaAppearance = function () {
+        if (attachedBridge) applyAppearance(JSON.parse(String(attachedBridge.appearance())));
       };
       window.focusEditor = function () { if (editor) editor.focus(); };
       window.runEditorCommand = function (command) {

@@ -33,7 +33,6 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
             new EditorDialogButtonId("io.github.glynch.jscene3d.editor.dialog.about-copy");
 
     private final List<EditorRegistration> registrations = new ArrayList<>();
-    private final EditorCommandRegistration settings;
     private final EditorCommandRegistration save;
     private final EditorCommandRegistration undo;
     private final EditorCommandRegistration redo;
@@ -50,11 +49,16 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
                 EditorCommands.SHOW_ABOUT,
                 "About JScene3D",
                 context -> context.window().showDialog(aboutDialog(editorAboutText)));
-        settings = register(
+        register(
                 host,
                 EditorCommands.OPEN_SETTINGS,
                 "Settings…",
                 ignored -> workbench.openSettings().run());
+        register(
+                host,
+                EditorCommands.TOGGLE_COLOR_SCHEME,
+                "Toggle Light/Dark Theme",
+                ignored -> workbench.toggleColorScheme().run());
         register(
                 host,
                 EditorCommands.QUIT,
@@ -78,7 +82,6 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
     /** Replaces project-dependent command enablement as one coherent state. */
     public void update(DocumentCommandState state) {
         DocumentCommandState current = Objects.requireNonNull(state, "state");
-        settings.update(enabled(current.projectOpen()));
         save.update(enabled(current.dirty()));
         undo.update(enabled(current.canUndo()));
         redo.update(enabled(current.canRedo()));
@@ -108,6 +111,7 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
     private void registerPlacements(EditorExtensionHost host) {
         place(host, EditorCommands.SHOW_ABOUT, EditorCommandLocations.JSCENE3D_MENU, "application", 10);
         place(host, EditorCommands.OPEN_SETTINGS, EditorCommandLocations.JSCENE3D_MENU, "application", 20);
+        place(host, EditorCommands.TOGGLE_COLOR_SCHEME, EditorCommandLocations.JSCENE3D_MENU, "application", 25);
         place(host, EditorCommands.QUIT, EditorCommandLocations.JSCENE3D_MENU, "lifecycle", 30);
         place(host, EditorCommands.OPEN_PROJECT, EditorCommandLocations.FILE_MENU, "file", 10);
         place(host, EditorCommands.SAVE, EditorCommandLocations.FILE_MENU, "file", 20);
@@ -140,11 +144,18 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
 
     /** Workbench behavior invoked by the core command set. */
     public record Actions(
-            Runnable openProject, Runnable openSettings, Runnable save, Runnable undo, Runnable redo, Runnable quit) {
+            Runnable openProject,
+            Runnable openSettings,
+            Runnable toggleColorScheme,
+            Runnable save,
+            Runnable undo,
+            Runnable redo,
+            Runnable quit) {
         /** Validates every required workbench action. */
         public Actions {
             Objects.requireNonNull(openProject, "openProject");
             Objects.requireNonNull(openSettings, "openSettings");
+            Objects.requireNonNull(toggleColorScheme, "toggleColorScheme");
             Objects.requireNonNull(save, "save");
             Objects.requireNonNull(undo, "undo");
             Objects.requireNonNull(redo, "redo");

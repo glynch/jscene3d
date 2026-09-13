@@ -21,6 +21,10 @@ public final class EditorCommands {
     /** Opens the generated settings editor. */
     public static final CommandId OPEN_SETTINGS = new CommandId("io.github.glynch.jscene3d.editor.open-settings");
 
+    /** Switches between the preferred dark and light color-theme families. */
+    public static final CommandId TOGGLE_COLOR_SCHEME =
+            new CommandId("io.github.glynch.jscene3d.editor.toggle-color-scheme");
+
     /** Shows product and runtime build information. */
     public static final CommandId SHOW_ABOUT = new CommandId("io.github.glynch.jscene3d.editor.show-about");
 

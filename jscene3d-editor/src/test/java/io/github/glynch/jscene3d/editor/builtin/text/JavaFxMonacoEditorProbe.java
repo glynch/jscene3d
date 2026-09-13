@@ -4,7 +4,10 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.text;
 
+import io.github.glynch.jscene3d.editor.builtin.appearance.BuiltinColorThemesExtension;
 import io.github.glynch.jscene3d.editor.file.EditorLanguages;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorColorThemeRegistry;
+import io.github.glynch.jscene3d.editor.workbench.appearance.InMemoryEditorAppearancePreferences;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,7 +35,10 @@ public final class JavaFxMonacoEditorProbe {
             source = temporaryDirectory.resolve("MonacoProbe.java");
             Files.writeString(source, INITIAL_SOURCE);
             EditorTextFileWorkingCopy workingCopy = EditorTextFileWorkingCopy.load(source);
-            editor = new JavaFxMonacoEditor(workingCopy, EditorLanguages.JAVA, () -> {}, ignored -> {}, ignored -> {});
+            EditorColorThemeRegistry themes = new EditorColorThemeRegistry(new InMemoryEditorAppearancePreferences());
+            BuiltinColorThemesExtension.registerThemes(themes, ignored -> {});
+            editor = new JavaFxMonacoEditor(
+                    workingCopy, EditorLanguages.JAVA, themes, () -> {}, ignored -> {}, ignored -> {});
             WebView webView = (WebView) editor.node();
             stage.setScene(new Scene(webView, 640.0, 400.0));
             pollUntilReady(webView, workingCopy, System.nanoTime() + TIMEOUT.toNanos(), source, editor, completion);

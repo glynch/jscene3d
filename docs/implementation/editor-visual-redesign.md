@@ -23,6 +23,10 @@ leaving room for an explicit Game mode.
   inline styles.
 - Keep splash copy and progress live even when artwork is rasterized.
 - Test projections headlessly and qualify visual behavior in the native editor.
+- Keep the central editor area as a generic tab surface. Preview, Welcome,
+  Settings, contributed views, and workspace files own their tab lifecycle in
+  separate modules, while the workspace-document coordinator decides which
+  project-owned editors are visible.
 
 ## Slice 1: Theme foundation
 
@@ -266,8 +270,11 @@ Verification:
   contract recorded in
   [Editor Workspace Explorer](../design/editor-workspace-explorer.md), including
   glob validation and live refresh from the existing project-settings system;
-- design theme contributions for dark/light color themes and installable icon
-  themes without exposing JavaFX CSS names as the extension contract;
+- implement the unified searchable User and Project settings experience recorded
+  in [Editor Settings Experience](../design/editor-settings-experience.md),
+  including direct JSON editing through the shared working-copy model;
+- design installable icon-theme contributions independently from the existing
+  toolkit-independent color-theme contract;
 - audit all non-test source files over 300 lines and split orchestration classes
   where cohesive modules can own the extracted policy;
 - design the local extension package and community-registry lifecycle before

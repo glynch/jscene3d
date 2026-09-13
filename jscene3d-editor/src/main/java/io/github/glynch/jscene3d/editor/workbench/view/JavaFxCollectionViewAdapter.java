@@ -13,7 +13,6 @@ import io.github.glynch.jscene3d.editor.view.EditorCollectionSelectionModel;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionSnapshot;
 import io.github.glynch.jscene3d.editor.view.EditorCollectionView;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
-import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.HashMap;
@@ -26,61 +25,27 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import javafx.application.Platform;
 import javafx.geometry.Orientation;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.OverrunStyle;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
-import javafx.scene.control.TextField;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
-import javafx.scene.control.Tooltip;
-import javafx.scene.control.TreeCell;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeView;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.TilePane;
 import javafx.scene.layout.VBox;
-import org.jspecify.annotations.Nullable;
 
-/** Workbench-owned JavaFX adapter for any toolkit-independent collection view contribution. */
+/** Coordinates a logical collection view with focused JavaFX navigation, toolbar, and item-presentation modules. */
 final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
     private final EditorCollectionDataProvider<T> provider;
     private final List<EditorCollectionCategory> categories;
-    private final Optional<EditorCollectionSelectionModel<T>> selectionModel;
-    private final BiConsumer<CommandId, Object> commandExecutor;
-    private final JavaFxIconRenderer icons;
     private final String allItemsLabel;
-    private final Optional<EditorIcon> rootIcon;
-    private final String searchPlaceholder;
+    private final Map<String, EditorCollectionCategory> categoryById;
     private final VBox root = new VBox();
-    private final TreeView<CategoryLocation> navigation = new TreeView<>();
-    private final ListView<T> list = new ListView<>();
-    private final TilePane grid = new TilePane();
-    private final ScrollPane gridScroll = new ScrollPane();
-    private final StackPane content = new StackPane();
-    private final ToggleGroup cardGroup = new ToggleGroup();
-    private final ToggleButton gridView = new ToggleButton();
-    private final ToggleButton listView = new ToggleButton();
-    private final TextField search = new TextField();
-    private final Label breadcrumb = new Label();
-    private final Label empty = new Label();
+    private final JavaFxCollectionItems<T> items;
+    private final JavaFxCollectionNavigation<T> navigation;
+    private final JavaFxCollectionToolbar toolbar;
     private final EditorRegistration dataRegistration;
     private final Optional<EditorRegistration> selectionRegistration;
-    private final Map<String, EditorCollectionCategory> categoryById;
 
     private EditorCollectionSnapshot<T> snapshot =
             new EditorCollectionSnapshot<>("Loading", List.of(), false, "Loading collection…");
     private Optional<String> selectedCategory = Optional.empty();
-    private Optional<T> desiredSelection = Optional.empty();
-    private boolean showingGrid = true;
-    private int selectionFeedbackSuppressionDepth;
     private long generation;
 
     /** Creates and begins observing one logical collection view. */
@@ -89,17 +54,20 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         EditorCollectionView<T> logicalView = Objects.requireNonNull(view, "view");
         provider = Objects.requireNonNull(logicalView.dataProvider(), "view.dataProvider()");
         categories = List.copyOf(Objects.requireNonNull(logicalView.categories(), "view.categories()"));
-        selectionModel = Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
-        this.commandExecutor = Objects.requireNonNull(commandExecutor, "commandExecutor");
-        this.icons = Objects.requireNonNull(icons, "icons");
+        Optional<EditorCollectionSelectionModel<T>> selectionModel =
+                Objects.requireNonNull(logicalView.selectionModel(), "view.selectionModel()");
+        JavaFxIconRenderer iconRenderer = Objects.requireNonNull(icons, "icons");
         allItemsLabel = requireText(logicalView.allItemsLabel(), "view.allItemsLabel()");
-        rootIcon = Objects.requireNonNull(logicalView.rootIcon(), "view.rootIcon()");
-        searchPlaceholder = requireText(logicalView.searchPlaceholder(), "view.searchPlaceholder()");
+        Optional<EditorIcon> rootIcon = Objects.requireNonNull(logicalView.rootIcon(), "view.rootIcon()");
+        String searchPlaceholder = requireText(logicalView.searchPlaceholder(), "view.searchPlaceholder()");
         categoryById = indexCategories(categories);
-        navigation.setAccessibleText(logicalView.title() + " categories");
+        items = new JavaFxCollectionItems<>(provider, selectionModel, commandExecutor, iconRenderer);
+        navigation = new JavaFxCollectionNavigation<>(
+                logicalView.title(), categories, rootIcon, provider, iconRenderer, this::selectCategory);
+        toolbar = new JavaFxCollectionToolbar(searchPlaceholder, iconRenderer, this::refreshItems, items::showGrid);
         configureView();
         dataRegistration = provider.observeChanges(this::reload);
-        selectionRegistration = selectionModel.map(model -> model.observe(this::applySelection));
+        selectionRegistration = selectionModel.map(model -> model.observe(items::select));
         reload();
     }
 
@@ -110,12 +78,10 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
 
     /** Requests keyboard focus for the active collection presentation. */
     void requestFocus() {
-        if (!categories.isEmpty()) {
-            navigation.requestFocus();
-        } else if (showingGrid) {
-            gridScroll.requestFocus();
+        if (categories.isEmpty()) {
+            items.requestFocus();
         } else {
-            list.requestFocus();
+            navigation.requestFocus();
         }
     }
 
@@ -124,53 +90,17 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         dataRegistration.close();
         selectionRegistration.ifPresent(EditorRegistration::close);
         generation++;
-        withoutSelectionFeedback(() -> {
-            list.getItems().clear();
-            grid.getChildren().clear();
-            navigation.setRoot(null);
-        });
+        items.clear();
+        navigation.clear();
     }
 
     private void configureView() {
-        VBox browserContent = new VBox(createToolbar(), content);
-        VBox.setVgrow(content, Priority.ALWAYS);
+        VBox browserContent = new VBox(toolbar.node(), items.node());
+        VBox.setVgrow(items.node(), Priority.ALWAYS);
         browserContent
                 .getStyleClass()
                 .addAll(EditorStyleClasses.EDITOR_COLLECTION_CONTENT, EditorStyleClasses.EDITOR_PROJECT_CONTENT);
-
-        list.setCellFactory(ignored -> new CollectionListCell());
-        list.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_LIST, EditorStyleClasses.EDITOR_ASSET_LIST);
-        list.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
-            if (selectionFeedbackSuppressionDepth == 0 && selected != null) {
-                selectionModel.ifPresent(model -> model.select(Optional.of(selected)));
-            }
-        });
-        list.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
-                Optional.ofNullable(list.getSelectionModel().getSelectedItem()).ifPresent(this::executeItemCommand);
-            }
-        });
-
-        grid.setHgap(8.0);
-        grid.setVgap(8.0);
-        grid.setPrefTileWidth(156.0);
-        grid.setPrefTileHeight(112.0);
-        grid.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_GRID, EditorStyleClasses.EDITOR_ASSET_GRID);
-        gridScroll.setContent(grid);
-        gridScroll.setFitToWidth(true);
-        gridScroll.setPannable(true);
-        gridScroll
-                .getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_GRID_SCROLL, EditorStyleClasses.EDITOR_ASSET_GRID_SCROLL);
-        empty.setWrapText(true);
-        empty.getStyleClass()
-                .addAll(
-                        EditorStyleClasses.EDITOR_EMPTY_DETAIL,
-                        EditorStyleClasses.EDITOR_COLLECTION_EMPTY,
-                        EditorStyleClasses.EDITOR_PROJECT_EMPTY);
-        content.getChildren().setAll(list, gridScroll, empty);
-
-        Node browser = categories.isEmpty() ? browserContent : createCategorizedBrowser(browserContent);
+        Node browser = categories.isEmpty() ? browserContent : categorizedBrowser(browserContent);
         VBox.setVgrow(browser, Priority.ALWAYS);
         root.getChildren().setAll(browser);
         root.getStyleClass()
@@ -178,93 +108,18 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
                         EditorStyleClasses.EDITOR_PANEL,
                         EditorStyleClasses.EDITOR_COLLECTION_PANEL,
                         EditorStyleClasses.EDITOR_PROJECT_PANEL);
-        showPresentation(true);
+        items.showGrid(true);
     }
 
-    private HBox createToolbar() {
-        breadcrumb.setMinWidth(80.0);
-        breadcrumb.setMaxWidth(240.0);
-        breadcrumb.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
-        breadcrumb
-                .getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_BREADCRUMB, EditorStyleClasses.EDITOR_PROJECT_BREADCRUMB);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        ToggleGroup presentations = new ToggleGroup();
-        gridView.setToggleGroup(presentations);
-        listView.setToggleGroup(presentations);
-        configurePresentationButton(gridView, "Grid view", true);
-        configurePresentationButton(listView, "List view", false);
-        gridView.setGraphic(icons.create(new EditorIcon(EditorIcons.GRID, "Grid view")));
-        listView.setGraphic(icons.create(new EditorIcon(EditorIcons.LIST, "List view")));
-        HBox viewButtons = new HBox(gridView, listView);
-        viewButtons
-                .getStyleClass()
-                .addAll(
-                        EditorStyleClasses.EDITOR_COLLECTION_VIEW_BUTTONS,
-                        EditorStyleClasses.EDITOR_PROJECT_VIEW_BUTTONS);
-
-        search.setPromptText(searchPlaceholder);
-        search.setMinWidth(100.0);
-        search.setPrefWidth(180.0);
-        search.setDisable(true);
-        search.getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_SEARCH, EditorStyleClasses.EDITOR_PROJECT_SEARCH);
-        search.textProperty().addListener((ignored, previous, current) -> refreshItems());
-        HBox toolbar = new HBox(8.0, breadcrumb, spacer, viewButtons, search);
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_TOOLBAR, EditorStyleClasses.EDITOR_PROJECT_TOOLBAR);
-        return toolbar;
-    }
-
-    private void configurePresentationButton(ToggleButton button, String name, boolean gridPresentation) {
-        button.setAccessibleText(name);
-        button.setTooltip(new Tooltip(name));
-        button.setOnAction(ignored -> showPresentation(gridPresentation));
-        button.getStyleClass()
-                .addAll(
-                        EditorStyleClasses.EDITOR_COLLECTION_VIEW_TOGGLE,
-                        EditorStyleClasses.EDITOR_PROJECT_VIEW_TOGGLE);
-    }
-
-    private SplitPane createCategorizedBrowser(VBox browserContent) {
-        navigation.setAccessibleHelp(
-                "Use Up and Down Arrow keys to move between categories, Right Arrow to expand, and Left Arrow to collapse");
-        navigation.setCellFactory(ignored -> new CategoryCell());
-        navigation.setShowRoot(true);
-        navigation.setMinWidth(0.0);
-        navigation
-                .getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION_TREE, EditorStyleClasses.EDITOR_PROJECT_TREE);
-        navigation.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
-            if (selectionFeedbackSuppressionDepth == 0 && selected != null) {
-                selectedCategory = selected.getValue().categoryId();
-                refreshItems();
-            }
-        });
-        VBox.setVgrow(navigation, Priority.ALWAYS);
-        Label heading = new Label("Categories");
-        heading.getStyleClass()
-                .addAll(
-                        EditorStyleClasses.EDITOR_COLLECTION_CATEGORIES_HEADING,
-                        EditorStyleClasses.EDITOR_PROJECT_CATEGORIES_HEADING);
-        VBox categoryPane = new VBox(heading, navigation);
-        categoryPane.setMinWidth(180.0);
-        categoryPane.setPrefWidth(230.0);
-        categoryPane
-                .getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION, EditorStyleClasses.EDITOR_PROJECT_NAVIGATION);
-
-        SplitPane browser = new SplitPane(categoryPane, browserContent);
+    private Node categorizedBrowser(Node browserContent) {
+        SplitPane browser = new SplitPane(navigation.node(), browserContent);
         browser.setOrientation(Orientation.HORIZONTAL);
         browser.setDividerPositions(0.22);
         browser.getStyleClass()
                 .addAll(
                         EditorStyleClasses.EDITOR_COLLECTION_BROWSER_SPLIT,
                         EditorStyleClasses.EDITOR_PROJECT_BROWSER_SPLIT);
-        SplitPane.setResizableWithParent(categoryPane, false);
+        SplitPane.setResizableWithParent(navigation.node(), false);
         return browser;
     }
 
@@ -288,54 +143,27 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         snapshot = loaded;
         if (changedRoot) {
             selectedCategory = Optional.empty();
-            search.clear();
+            toolbar.clearSearch();
         }
-        search.setDisable(!snapshot.searchable());
-        empty.setText(snapshot.emptyMessage());
-        rebuildNavigation();
+        toolbar.setSearchable(snapshot.searchable());
+        items.setEmptyMessage(snapshot.emptyMessage());
+        navigation.show(snapshot, selectedCategory);
         refreshItems();
     }
 
-    private void rebuildNavigation() {
-        if (categories.isEmpty()) {
-            return;
-        }
-        withoutSelectionFeedback(() -> {
-            TreeItem<CategoryLocation> rootItem = new TreeItem<>(new CategoryLocation(
-                    snapshot.rootLabel(), Optional.empty(), snapshot.elements().size(), rootIcon));
-            for (EditorCollectionCategory category : categories) {
-                long count = snapshot.elements().stream()
-                        .map(provider::item)
-                        .filter(item -> item.categoryId().equals(Optional.of(category.id())))
-                        .count();
-                rootItem.getChildren()
-                        .add(new TreeItem<>(new CategoryLocation(
-                                category.label(), Optional.of(category.id()), count, category.icon())));
-            }
-            rootItem.setExpanded(true);
-            navigation.setRoot(rootItem);
-            TreeItem<CategoryLocation> selected = rootItem.getChildren().stream()
-                    .filter(item -> item.getValue().categoryId().equals(selectedCategory))
-                    .findFirst()
-                    .orElse(rootItem);
-            navigation.getSelectionModel().select(selected);
-        });
+    private void selectCategory(Optional<String> category) {
+        selectedCategory = Objects.requireNonNull(category, "category");
+        refreshItems();
     }
 
     private void refreshItems() {
         List<T> visible = snapshot.elements().stream().filter(this::visible).toList();
-        withoutSelectionFeedback(() -> {
-            list.getItems().setAll(visible);
-            cardGroup.getToggles().clear();
-            grid.getChildren().setAll(visible.stream().map(this::createCard).toList());
-            synchronizeSelection();
-        });
+        items.show(visible);
         String location = selectedCategory
                 .map(categoryById::get)
                 .map(EditorCollectionCategory::label)
                 .orElse(allItemsLabel);
-        breadcrumb.setText(snapshot.rootLabel() + "  ›  " + location);
-        refreshVisibility(visible.isEmpty());
+        toolbar.showLocation(snapshot.rootLabel(), location);
     }
 
     private boolean visible(T element) {
@@ -343,11 +171,8 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
         if (selectedCategory.isPresent() && !item.categoryId().equals(selectedCategory)) {
             return false;
         }
-        String query = search.getText().strip().toLowerCase(Locale.ROOT);
-        if (query.isEmpty()) {
-            return true;
-        }
-        return searchableText(item).contains(query);
+        String query = toolbar.query().strip().toLowerCase(Locale.ROOT);
+        return query.isEmpty() || searchableText(item).contains(query);
     }
 
     private static String searchableText(EditorCollectionItem item) {
@@ -360,135 +185,11 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
                 .toLowerCase(Locale.ROOT);
     }
 
-    private void showPresentation(boolean showGrid) {
-        showingGrid = showGrid;
-        gridView.setSelected(showGrid);
-        listView.setSelected(!showGrid);
-        refreshVisibility(list.getItems().isEmpty());
-        withoutSelectionFeedback(this::synchronizeSelection);
-    }
-
-    private void refreshVisibility(boolean noVisibleItems) {
-        empty.setManaged(noVisibleItems);
-        empty.setVisible(noVisibleItems);
-        list.setManaged(!noVisibleItems && !showingGrid);
-        list.setVisible(!noVisibleItems && !showingGrid);
-        gridScroll.setManaged(!noVisibleItems && showingGrid);
-        gridScroll.setVisible(!noVisibleItems && showingGrid);
-    }
-
-    private ToggleButton createCard(T element) {
-        EditorCollectionItem item = provider.item(element);
-        ToggleButton card = new ToggleButton();
-        card.setGraphic(createPresentation(item));
-        card.setUserData(element);
-        card.setToggleGroup(cardGroup);
-        card.setMaxWidth(Double.MAX_VALUE);
-        card.setTooltip(item.tooltip().map(Tooltip::new).orElse(null));
-        card.setOnAction(ignored -> selectionModel.ifPresent(model -> model.select(Optional.of(element))));
-        card.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
-                executeItemCommand(element);
-            }
-        });
-        card.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_CARD, EditorStyleClasses.EDITOR_ASSET_CARD);
-        return card;
-    }
-
-    private VBox createPresentation(EditorCollectionItem item) {
-        Label name = new Label(item.label());
-        name.setMinWidth(0.0);
-        name.setMaxWidth(Double.MAX_VALUE);
-        name.setPrefWidth(1.0);
-        name.setTextOverrun(OverrunStyle.ELLIPSIS);
-        name.setTooltip(new Tooltip(item.label()));
-        name.getStyleClass().addAll(EditorStyleClasses.EDITOR_COLLECTION_NAME, EditorStyleClasses.EDITOR_ASSET_NAME);
-        HBox.setHgrow(name, Priority.ALWAYS);
-        HBox heading = new HBox(6.0);
-        item.icon()
-                .map(icon -> icons.create(
-                        icon, EditorStyleClasses.EDITOR_COLLECTION_MARKER, EditorStyleClasses.EDITOR_ASSET_MARKER))
-                .ifPresent(heading.getChildren()::add);
-        heading.getChildren().add(name);
-        heading.setAlignment(Pos.CENTER_LEFT);
-        heading.setMaxWidth(Double.MAX_VALUE);
-
-        Label description = new Label(item.description().orElse(""));
-        description
-                .getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_DESCRIPTION, EditorStyleClasses.EDITOR_ASSET_KIND);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox decorations = new HBox(3.0);
-        decorations.setAlignment(Pos.CENTER_RIGHT);
-        decorations.getStyleClass().add(EditorStyleClasses.EDITOR_ITEM_DECORATIONS);
-        for (EditorIcon decoration : item.decorations()) {
-            decorations
-                    .getChildren()
-                    .add(icons.create(
-                            decoration,
-                            EditorStyleClasses.EDITOR_ITEM_DECORATION,
-                            EditorStyleClasses.EDITOR_COLLECTION_DECORATION));
-        }
-        HBox metadata = new HBox(6.0, description, spacer, decorations);
-        metadata.setAlignment(Pos.CENTER_LEFT);
-        metadata.setMaxWidth(Double.MAX_VALUE);
-
-        Label detail = new Label(item.detail().orElse(""));
-        detail.setMinWidth(0.0);
-        detail.setMaxWidth(Double.MAX_VALUE);
-        detail.setPrefWidth(1.0);
-        detail.setTextOverrun(OverrunStyle.ELLIPSIS);
-        detail.setTooltip(item.tooltip().map(Tooltip::new).orElse(null));
-        detail.getStyleClass()
-                .addAll(EditorStyleClasses.EDITOR_COLLECTION_DETAIL, EditorStyleClasses.EDITOR_ASSET_SOURCE);
-        VBox presentation = new VBox(4.0, heading, metadata, detail);
-        presentation.setMaxWidth(Double.MAX_VALUE);
-        presentation
-                .getStyleClass()
-                .addAll(
-                        EditorStyleClasses.EDITOR_COLLECTION_PRESENTATION,
-                        EditorStyleClasses.EDITOR_ASSET_PRESENTATION);
-        return presentation;
-    }
-
-    private void applySelection(Optional<T> selection) {
-        desiredSelection = Objects.requireNonNull(selection, "selection");
-        runOnApplicationThread(() -> withoutSelectionFeedback(this::synchronizeSelection));
-    }
-
-    private void synchronizeSelection() {
-        Optional<T> visible = desiredSelection.filter(list.getItems()::contains);
-        if (visible.isPresent()) {
-            list.getSelectionModel().select(visible.orElseThrow());
-        } else {
-            list.getSelectionModel().clearSelection();
-        }
-        cardGroup.selectToggle(null);
-        visible.flatMap(selected -> cardGroup.getToggles().stream()
-                        .filter(toggle -> Objects.equals(toggle.getUserData(), selected))
-                        .findFirst())
-                .ifPresent(cardGroup::selectToggle);
-    }
-
-    private void executeItemCommand(T element) {
-        provider.item(element).command().ifPresent(command -> commandExecutor.accept(command, element));
-    }
-
     private void showFailure(Throwable failure) {
         snapshot = new EditorCollectionSnapshot<>(
                 snapshot.rootLabel(), List.of(), false, "Unable to load view: " + failure.getMessage());
-        rebuildNavigation();
+        navigation.show(snapshot, selectedCategory);
         refreshItems();
-    }
-
-    private void withoutSelectionFeedback(Runnable action) {
-        selectionFeedbackSuppressionDepth++;
-        try {
-            action.run();
-        } finally {
-            selectionFeedbackSuppressionDepth--;
-        }
     }
 
     private static Map<String, EditorCollectionCategory> indexCategories(List<EditorCollectionCategory> categories) {
@@ -516,63 +217,4 @@ final class JavaFxCollectionViewAdapter<T> implements AutoCloseable {
             Platform.runLater(action);
         }
     }
-
-    private final class CollectionListCell extends ListCell<T> {
-        private CollectionListCell() {
-            getStyleClass()
-                    .addAll(EditorStyleClasses.EDITOR_COLLECTION_LIST_CELL, EditorStyleClasses.EDITOR_ASSET_LIST_CELL);
-        }
-
-        @Override
-        protected void updateItem(@Nullable T element, boolean cellEmpty) {
-            super.updateItem(element, cellEmpty);
-            setText(null);
-            setGraphic(cellEmpty || element == null ? null : createPresentation(provider.item(element)));
-        }
-    }
-
-    private final class CategoryCell extends TreeCell<CategoryLocation> {
-        private CategoryCell() {
-            getStyleClass()
-                    .addAll(
-                            EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION_CELL,
-                            EditorStyleClasses.EDITOR_PROJECT_TREE_CELL);
-        }
-
-        @Override
-        protected void updateItem(@Nullable CategoryLocation item, boolean cellEmpty) {
-            super.updateItem(item, cellEmpty);
-            if (cellEmpty || item == null) {
-                setText(null);
-                setGraphic(null);
-                return;
-            }
-            Label name = new Label(item.label());
-            name.setMinWidth(0.0);
-            name.setMaxWidth(Double.MAX_VALUE);
-            name.setPrefWidth(1.0);
-            name.setTextOverrun(OverrunStyle.ELLIPSIS);
-            name.setTooltip(new Tooltip(item.label()));
-            HBox.setHgrow(name, Priority.ALWAYS);
-            Label count = new Label(Long.toString(item.count()));
-            count.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_TREE_COUNT);
-            HBox row = new HBox(7.0);
-            item.icon()
-                    .map(icon -> icons.create(
-                            icon,
-                            EditorStyleClasses.EDITOR_COLLECTION_NAVIGATION_ICON,
-                            EditorStyleClasses.EDITOR_PROJECT_TREE_MARKER))
-                    .ifPresent(row.getChildren()::add);
-            row.getChildren().addAll(name, count);
-            row.setAlignment(Pos.CENTER_LEFT);
-            row.setMaxWidth(Double.MAX_VALUE);
-            row.getStyleClass().add(EditorStyleClasses.EDITOR_PROJECT_TREE_ROW);
-            setText(null);
-            setAccessibleText(item.label() + ", " + item.count() + " items");
-            setGraphic(row);
-        }
-    }
-
-    /** One rendered category location; an empty identity denotes the collection root. */
-    private record CategoryLocation(String label, Optional<String> categoryId, long count, Optional<EditorIcon> icon) {}
 }

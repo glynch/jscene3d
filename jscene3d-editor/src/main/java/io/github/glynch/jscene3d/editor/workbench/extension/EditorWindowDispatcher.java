@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.extension;
 
+import io.github.glynch.jscene3d.editor.diagnostic.EditorTextRange;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.window.EditorDialog;
@@ -49,6 +50,13 @@ final class EditorWindowDispatcher implements EditorWindow, AutoCloseable {
         Consumer<EditorFileOpenRequest> listener = Objects.requireNonNull(observer, "observer");
         fileRequestObservers.add(listener);
         return EditorRegistrationOnce.of(() -> fileRequestObservers.remove(listener));
+    }
+
+    void revealFile(URI resource, EditorTextRange selection) {
+        publishFileRequest(new EditorFileOpenRequest(
+                Objects.requireNonNull(resource, "resource"),
+                EditorFileOpenRequest.Disposition.PINNED,
+                Optional.of(Objects.requireNonNull(selection, "selection"))));
     }
 
     void showMessagesWith(Consumer<EditorMessage> sink) {
@@ -106,9 +114,11 @@ final class EditorWindowDispatcher implements EditorWindow, AutoCloseable {
     }
 
     private void publishFileRequest(URI resource, EditorFileOpenRequest.Disposition disposition) {
+        publishFileRequest(new EditorFileOpenRequest(Objects.requireNonNull(resource, "resource"), disposition));
+    }
+
+    private void publishFileRequest(EditorFileOpenRequest request) {
         requireOpen();
-        EditorFileOpenRequest request =
-                new EditorFileOpenRequest(Objects.requireNonNull(resource, "resource"), disposition);
         List.copyOf(fileRequestObservers).forEach(observer -> observer.accept(request));
     }
 }

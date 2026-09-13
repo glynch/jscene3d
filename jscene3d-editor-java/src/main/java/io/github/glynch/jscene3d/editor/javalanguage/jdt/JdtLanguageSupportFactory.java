@@ -4,8 +4,10 @@
  */
 package io.github.glynch.jscene3d.editor.javalanguage.jdt;
 
+import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupport;
 import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessLauncher;
+import io.github.glynch.jscene3d.environment.ApplicationDirectories;
 import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.util.Objects;
 import java.util.concurrent.ForkJoinPool;
@@ -16,22 +18,35 @@ public final class JdtLanguageSupportFactory {
     private JdtLanguageSupportFactory() {}
 
     /**
+     * Returns the bundled language-server version without constructing a project adapter.
+     *
+     * @return bundled JDT LS version
+     */
+    public static String serverVersion() {
+        return JdtLanguageServerMetadata.load().version();
+    }
+
+    /**
      * Creates Java language support using the staged JDT LS distribution.
      *
      * @param status lifecycle status consumer
+     * @param diagnostics diagnostic collection receiving Java language problems
      * @return the server identity and project-scoped language support
      */
-    public static Result create(Consumer<JdtLanguageServerStatus> status) {
+    public static Result create(Consumer<JdtLanguageServerStatus> status, EditorDiagnosticCollection diagnostics) {
         JdtLanguageServerMetadata metadata = JdtLanguageServerMetadata.load();
         ForkJoinPool executor = ForkJoinPool.commonPool();
         JavaProjectLanguageSupport support = new JavaProjectLanguageSupport(
                 new JdtLanguageServerDistributionLocator().locate(),
-                metadata,
-                OperatingSystem.current(),
-                executor,
-                new LanguageServerProcessLauncher(executor),
+                new JavaProjectLanguageSupport.Configuration(
+                        ApplicationDirectories.cache("jscene3d"),
+                        metadata,
+                        OperatingSystem.current(),
+                        executor,
+                        new LanguageServerProcessLauncher(executor),
+                        clientVersion()),
                 Objects.requireNonNull(status, "status"),
-                clientVersion());
+                Objects.requireNonNull(diagnostics, "diagnostics"));
         return new Result(metadata.version(), support);
     }
 

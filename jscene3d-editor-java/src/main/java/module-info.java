@@ -9,6 +9,7 @@ module io.github.glynch.jscene3d.editor.javalanguage {
     requires io.github.glynch.jscene3d.editor.lsp;
     requires io.github.glynch.jscene3d.i18n;
     requires org.eclipse.lsp4j.jsonrpc;
+    requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.editor.javalanguage;
 

@@ -7,15 +7,20 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsView;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.EditorDiagnosticsModel;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticSeverity;
+import io.github.glynch.jscene3d.editor.file.EditorFileType;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIconId;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import java.net.URI;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -43,11 +48,18 @@ final class JavaFxDiagnosticsViewAdapter implements AutoCloseable {
     private final EditorRegistration modelRegistration;
     private boolean closed;
 
-    JavaFxDiagnosticsViewAdapter(DiagnosticsView view, JavaFxIconRenderer icons) {
+    JavaFxDiagnosticsViewAdapter(
+            DiagnosticsView view,
+            JavaFxIconRenderer icons,
+            Function<URI, Optional<EditorFileType>> fileTypes,
+            Consumer<EditorDiagnosticsModel.Item> revealDiagnostic) {
         DiagnosticsView diagnostics = Objects.requireNonNull(view, "view");
         this.icons = Objects.requireNonNull(icons, "icons");
         model = diagnostics.model();
-        tree = new JavaFxDiagnosticTree(icons);
+        tree = new JavaFxDiagnosticTree(
+                icons,
+                Objects.requireNonNull(fileTypes, "fileTypes"),
+                Objects.requireNonNull(revealDiagnostic, "revealDiagnostic"));
         titleGraphic = createTitleGraphic(diagnostics.title());
         configureActions();
         node = createContent();

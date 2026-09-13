@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.javalanguage.jdt;
 
+import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageProjectSession;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupport;
 import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessLauncher;
@@ -21,28 +22,19 @@ import java.util.function.Consumer;
 final class JavaProjectLanguageSupport implements EditorLanguageSupport {
     private static final System.Logger LOGGER = System.getLogger(JavaProjectLanguageSupport.class.getName());
     private final Optional<Path> distributionHome;
-    private final JdtLanguageServerMetadata metadata;
-    private final OperatingSystem operatingSystem;
-    private final Executor executor;
-    private final LanguageServerProcessLauncher launcher;
+    private final Configuration configuration;
     private final Consumer<JdtLanguageServerStatus> status;
-    private final String clientVersion;
+    private final EditorDiagnosticCollection diagnostics;
 
     JavaProjectLanguageSupport(
             Optional<Path> distributionHome,
-            JdtLanguageServerMetadata metadata,
-            OperatingSystem operatingSystem,
-            Executor executor,
-            LanguageServerProcessLauncher launcher,
+            Configuration configuration,
             Consumer<JdtLanguageServerStatus> status,
-            String clientVersion) {
+            EditorDiagnosticCollection diagnostics) {
         this.distributionHome = Objects.requireNonNull(distributionHome, "distributionHome");
-        this.metadata = Objects.requireNonNull(metadata, "metadata");
-        this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
-        this.executor = Objects.requireNonNull(executor, "executor");
-        this.launcher = Objects.requireNonNull(launcher, "launcher");
+        this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.status = Objects.requireNonNull(status, "status");
-        this.clientVersion = Objects.requireNonNull(clientVersion, "clientVersion");
+        this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
     }
 
     @Override
@@ -66,8 +58,15 @@ final class JavaProjectLanguageSupport implements EditorLanguageSupport {
                 projectRoot,
                 project.name(),
                 status,
+                new JdtDiagnosticPublisher(diagnostics),
                 new JdtLanguageProjectSession.Runtime(
-                        distributionHome.orElseThrow(), metadata, operatingSystem, executor, launcher, clientVersion));
+                        distributionHome.orElseThrow(),
+                        configuration.cacheRoot(),
+                        configuration.metadata(),
+                        configuration.operatingSystem(),
+                        configuration.executor(),
+                        configuration.launcher(),
+                        configuration.clientVersion()));
     }
 
     private static boolean isJavaProject(Path projectRoot) {
@@ -83,5 +82,22 @@ final class JavaProjectLanguageSupport implements EditorLanguageSupport {
                 status.accept(JdtLanguageServerStatus.inactive());
             }
         };
+    }
+
+    record Configuration(
+            Path cacheRoot,
+            JdtLanguageServerMetadata metadata,
+            OperatingSystem operatingSystem,
+            Executor executor,
+            LanguageServerProcessLauncher launcher,
+            String clientVersion) {
+        Configuration {
+            Objects.requireNonNull(cacheRoot, "cacheRoot");
+            Objects.requireNonNull(metadata, "metadata");
+            Objects.requireNonNull(operatingSystem, "operatingSystem");
+            Objects.requireNonNull(executor, "executor");
+            Objects.requireNonNull(launcher, "launcher");
+            Objects.requireNonNull(clientVersion, "clientVersion");
+        }
     }
 }

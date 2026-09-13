@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.builtin.diagnostics;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostic;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticSeverity;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
+import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorDiagnosticSnapshot;
 import java.net.URI;
 import java.nio.file.Path;
@@ -17,13 +18,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /** Projects extension-published diagnostics into a deterministic filterable browser. */
 public final class EditorDiagnosticsModel {
     private final List<Runnable> observers;
     private final EnumSet<EditorDiagnosticSeverity> visibleSeverities;
     private List<EditorDiagnosticSnapshot> diagnostics = List.of();
+    private Optional<EditorProject> project = Optional.empty();
     private String query = "";
 
     /** Creates an empty model with every severity visible. */
@@ -39,6 +44,16 @@ public final class EditorDiagnosticsModel {
      */
     public void showDiagnostics(List<EditorDiagnosticSnapshot> replacement) {
         diagnostics = List.copyOf(Objects.requireNonNull(replacement, "replacement"));
+        notifyObservers();
+    }
+
+    /**
+     * Updates the project used to present concise source paths.
+     *
+     * @param current currently opened project, or empty while no project is open
+     */
+    public void showProject(Optional<EditorProject> current) {
+        project = Objects.requireNonNull(current, "current");
         notifyObservers();
     }
 
@@ -130,6 +145,7 @@ public final class EditorDiagnosticsModel {
         String searchable = String.join(
                         " ",
                         diagnostic.code(),
+                        diagnostic.source(),
                         diagnostic.message(),
                         snapshot.source().toString(),
                         diagnostic.location(),
@@ -146,8 +162,32 @@ public final class EditorDiagnosticsModel {
         return new Item(snapshot, details);
     }
 
-    private static Group group(URI source, List<Item> items) {
-        return new Group(source, sourceLabel(source), List.copyOf(items));
+    private Group group(URI source, List<Item> items) {
+        return new Group(source, sourceLabel(source), sourceContext(source), List.copyOf(items));
+    }
+
+    private String sourceContext(URI source) {
+        if (!"file".equalsIgnoreCase(source.getScheme()) || project.isEmpty()) {
+            return "";
+        }
+        try {
+            EditorProject current = project.orElseThrow();
+            if (!"file".equalsIgnoreCase(current.root().getScheme())) {
+                return "";
+            }
+            Path root = Path.of(current.root()).toAbsolutePath().normalize();
+            Path parent = Path.of(source).toAbsolutePath().normalize().getParent();
+            if (parent == null || !parent.startsWith(root)) {
+                return "";
+            }
+            Path relative = root.relativize(parent);
+            String path = StreamSupport.stream(relative.spliterator(), false)
+                    .map(Path::toString)
+                    .collect(Collectors.joining("/"));
+            return path.isEmpty() ? current.name() : current.name() + " • " + path;
+        } catch (IllegalArgumentException ignored) {
+            return "";
+        }
     }
 
     private static String sourceLabel(URI source) {
@@ -198,11 +238,13 @@ public final class EditorDiagnosticsModel {
      *
      * @param source authoritative source URI
      * @param label concise source label
+     * @param context current-project and relative-directory context
      * @param items diagnostics belonging to the source
      */
-    public record Group(URI source, String label, List<Item> items) {
+    public record Group(URI source, String label, String context, List<Item> items) {
         /** Copies one group's ordered diagnostic items. */
         public Group {
+            Objects.requireNonNull(context, "context");
             items = List.copyOf(items);
         }
 
@@ -247,6 +289,31 @@ public final class EditorDiagnosticsModel {
          */
         public EditorDiagnostic diagnostic() {
             return snapshot.diagnostic();
+        }
+
+        /**
+         * Returns compact producer and code text for a problem row.
+         *
+         * @return producer and code, code alone when no producer is available
+         */
+        public String identity() {
+            String source = diagnostic().source();
+            return source.isEmpty()
+                    ? diagnostic().code()
+                    : source + "(" + diagnostic().code() + ")";
+        }
+
+        /**
+         * Returns a compact one-based source range location when available.
+         *
+         * @return compact line and column text, a logical location, or an empty string
+         */
+        public String displayLocation() {
+            return diagnostic()
+                    .range()
+                    .map(range -> "[Ln " + (range.start().line() + 1) + ", Col "
+                            + (range.start().character() + 1) + "]")
+                    .orElse(diagnostic().location());
         }
 
         /**

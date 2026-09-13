@@ -39,4 +39,15 @@ final class LanguageServerModuleDescriptorTest {
                 .satisfies(requirement ->
                         assertThat(requirement.modifiers()).contains(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
     }
+
+    @Test
+    void reExportsEditorApiTypesUsedByTheClientApi() {
+        ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
+
+        assertThat(descriptor.requires())
+                .filteredOn(requirement -> requirement.name().equals("io.github.glynch.jscene3d.editor.api"))
+                .singleElement()
+                .satisfies(requirement ->
+                        assertThat(requirement.modifiers()).contains(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
+    }
 }

@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.lsp.client;
 
+import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
@@ -16,8 +18,18 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.lsp4j.ClientCapabilities;
 import org.eclipse.lsp4j.ClientInfo;
+import org.eclipse.lsp4j.DidChangeTextDocumentParams;
+import org.eclipse.lsp4j.DidCloseTextDocumentParams;
+import org.eclipse.lsp4j.DidOpenTextDocumentParams;
+import org.eclipse.lsp4j.DidSaveTextDocumentParams;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.InitializedParams;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.TextDocumentItem;
+import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
@@ -30,6 +42,7 @@ public final class LspClientSession implements AutoCloseable {
     private final LanguageServer server;
     private final Future<Void> listener;
     private final CompletableFuture<Void> initialized;
+    private CompletableFuture<Void> pendingNotifications;
     private final AtomicBoolean initializedSuccessfully = new AtomicBoolean();
     private final AtomicBoolean shutdownStarted = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -51,6 +64,7 @@ public final class LspClientSession implements AutoCloseable {
         server = launcher.getRemoteProxy();
         listener = launcher.startListening();
         initialized = initialize(initialization);
+        pendingNotifications = initialized;
     }
 
     /**
@@ -98,6 +112,69 @@ public final class LspClientSession implements AutoCloseable {
     }
 
     /**
+     * Sends a versioned text-document open notification after protocol initialization.
+     *
+     * @param document initial open document
+     */
+    public void didOpen(EditorTextDocument document) {
+        EditorTextDocument current = Objects.requireNonNull(document, "document");
+        enqueue(() -> server.getTextDocumentService()
+                .didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(
+                        current.resource().toString(),
+                        current.language().value(),
+                        current.version(),
+                        current.text()))));
+    }
+
+    /**
+     * Sends a versioned incremental text-document change notification in document order.
+     *
+     * @param change document state and ordered incremental edits
+     */
+    public void didChange(EditorTextDocumentChange change) {
+        EditorTextDocumentChange currentChange = Objects.requireNonNull(change, "change");
+        EditorTextDocument current = currentChange.document();
+        enqueue(() -> server.getTextDocumentService()
+                .didChange(new DidChangeTextDocumentParams(
+                        new VersionedTextDocumentIdentifier(current.resource().toString(), current.version()),
+                        currentChange.edits().stream()
+                                .map(edit -> new TextDocumentContentChangeEvent(
+                                        new Range(
+                                                new Position(
+                                                        edit.range().start().line(),
+                                                        edit.range().start().character()),
+                                                new Position(
+                                                        edit.range().end().line(),
+                                                        edit.range().end().character())),
+                                        edit.text()))
+                                .toList())));
+    }
+
+    /**
+     * Sends a successful text-document save notification.
+     *
+     * @param document saved document snapshot
+     */
+    public void didSave(EditorTextDocument document) {
+        EditorTextDocument current = Objects.requireNonNull(document, "document");
+        enqueue(() -> server.getTextDocumentService()
+                .didSave(new DidSaveTextDocumentParams(
+                        new TextDocumentIdentifier(current.resource().toString()), current.text())));
+    }
+
+    /**
+     * Sends a text-document close notification.
+     *
+     * @param document final document snapshot
+     */
+    public void didClose(EditorTextDocument document) {
+        EditorTextDocument current = Objects.requireNonNull(document, "document");
+        enqueue(() -> server.getTextDocumentService()
+                .didClose(new DidCloseTextDocumentParams(
+                        new TextDocumentIdentifier(current.resource().toString()))));
+    }
+
+    /**
      * Requests orderly LSP shutdown and sends the required exit notification.
      *
      * @return asynchronous shutdown-request completion
@@ -109,7 +186,11 @@ public final class LspClientSession implements AutoCloseable {
         if (!initializedSuccessfully.get()) {
             return CompletableFuture.completedFuture(null);
         }
-        return server.shutdown().handle((ignored, failure) -> {
+        CompletableFuture<Void> drained;
+        synchronized (this) {
+            drained = pendingNotifications;
+        }
+        return drained.thenCompose(ignored -> server.shutdown()).handle((ignored, failure) -> {
             server.exit();
             if (failure != null) {
                 throw new LanguageServerProtocolException("Language-server shutdown failed", failure);
@@ -143,5 +224,12 @@ public final class LspClientSession implements AutoCloseable {
             server.initialized(new InitializedParams());
             initializedSuccessfully.set(true);
         });
+    }
+
+    private synchronized void enqueue(Runnable notification) {
+        if (closed.get() || shutdownStarted.get()) {
+            return;
+        }
+        pendingNotifications = pendingNotifications.thenRun(Objects.requireNonNull(notification, "notification"));
     }
 }

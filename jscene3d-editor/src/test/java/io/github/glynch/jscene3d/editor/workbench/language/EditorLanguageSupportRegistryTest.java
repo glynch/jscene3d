@@ -7,15 +7,21 @@ package io.github.glynch.jscene3d.editor.workbench.language;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import io.github.glynch.jscene3d.editor.builtin.text.EditorTextFileWorkingCopy;
 import io.github.glynch.jscene3d.editor.file.EditorLanguageId;
 import io.github.glynch.jscene3d.editor.file.EditorLanguages;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageProjectSession;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupport;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupportContribution;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupportId;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
+import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorWorkingCopyRegistry;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,9 +30,13 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 final class EditorLanguageSupportRegistryTest {
     private static final EditorLanguageSupport JAVA_SUPPORT = ignored -> () -> {};
+
+    @TempDir
+    private Path temporaryDirectory;
 
     @Test
     void resolvesRegisteredSupportAndRemovesItIdempotently() {
@@ -92,6 +102,35 @@ final class EditorLanguageSupportRegistryTest {
         }
     }
 
+    @Test
+    void synchronizesOpenChangeSaveAndCloseWithTheMatchingLanguageSession() throws IOException {
+        MutableProjects projects = new MutableProjects();
+        Path projectRoot = Files.createDirectories(temporaryDirectory.resolve("project"));
+        projects.publish(Optional.of(new EditorProject("project", "Project", projectRoot.toUri())));
+        RecordingSession session = new RecordingSession();
+        EditorWorkingCopyRegistry workingCopies = new EditorWorkingCopyRegistry();
+        Path source = projectRoot.resolve("Example.java");
+        Files.writeString(source, "class Example {}");
+
+        try (EditorLanguageSupportRegistry registry = new EditorLanguageSupportRegistry(projects);
+                var support = registry.register(contribution("java", EditorLanguages.JAVA), ignored -> session);
+                var synchronization = registry.synchronize(workingCopies)) {
+            EditorTextFileWorkingCopy workingCopy = EditorTextFileWorkingCopy.load(source, EditorLanguages.JAVA);
+            try (var registration = workingCopies.register(workingCopy)) {
+                workingCopy.update("class Example {");
+                workingCopy.save();
+            }
+        }
+
+        assertThat(session.events)
+                .containsExactly(
+                        "open:1:class Example {}",
+                        "change:2:class Example {",
+                        "save:2:class Example {",
+                        "close:2:class Example {");
+        assertThat(session.closed).isTrue();
+    }
+
     private static EditorLanguageSupportContribution contribution(String name, EditorLanguageId language) {
         return new EditorLanguageSupportContribution(
                 new EditorLanguageSupportId("io.github.glynch.test." + name), Set.of(language));
@@ -99,6 +138,40 @@ final class EditorLanguageSupportRegistryTest {
 
     private static EditorLanguageProjectSession session() {
         return () -> {};
+    }
+
+    private static final class RecordingSession implements EditorLanguageProjectSession {
+        private final List<String> events = new ArrayList<>();
+        private boolean closed;
+
+        @Override
+        public void didOpen(EditorTextDocument document) {
+            events.add(event("open", document));
+        }
+
+        @Override
+        public void didChange(EditorTextDocumentChange change) {
+            events.add(event("change", change.document()));
+        }
+
+        @Override
+        public void didSave(EditorTextDocument document) {
+            events.add(event("save", document));
+        }
+
+        @Override
+        public void didClose(EditorTextDocument document) {
+            events.add(event("close", document));
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+
+        private static String event(String name, EditorTextDocument document) {
+            return name + ":" + document.version() + ":" + document.text();
+        }
     }
 
     private static final class MutableProjects implements EditorProjects {

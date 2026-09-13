@@ -24,33 +24,39 @@ final class EditorDiagnosticRegistry implements EditorDiagnostics, AutoCloseable
 
     @Override
     public EditorDiagnosticCollection createCollection(DiagnosticCollectionId id) {
-        requireOpen();
-        DiagnosticCollectionId identity = Objects.requireNonNull(id, "id");
-        DiagnosticCollectionRegistration collection = new DiagnosticCollectionRegistration(identity);
-        if (collections.putIfAbsent(identity, collection) != null) {
-            throw new IllegalArgumentException("diagnostic collection identity is already registered: " + identity);
+        synchronized (this) {
+            requireOpen();
+            DiagnosticCollectionId identity = Objects.requireNonNull(id, "id");
+            DiagnosticCollectionRegistration collection = new DiagnosticCollectionRegistration(identity);
+            if (collections.putIfAbsent(identity, collection) != null) {
+                throw new IllegalArgumentException("diagnostic collection identity is already registered: " + identity);
+            }
+            return collection;
         }
-        return collection;
     }
 
     EditorRegistration observe(Consumer<List<EditorDiagnosticSnapshot>> observer) {
-        requireOpen();
+        synchronized (this) {
+            requireOpen();
+        }
         return observers.observe(observer, snapshot());
     }
 
     @Override
     public void close() {
-        if (closed) {
-            return;
+        synchronized (this) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            List.copyOf(collections.values()).forEach(DiagnosticCollectionRegistration::closeFromRegistry);
+            collections.clear();
         }
-        closed = true;
-        List.copyOf(collections.values()).forEach(DiagnosticCollectionRegistration::closeFromRegistry);
-        collections.clear();
         notifyObservers();
         observers.clear();
     }
 
-    private List<EditorDiagnosticSnapshot> snapshot() {
+    private synchronized List<EditorDiagnosticSnapshot> snapshot() {
         return collections.values().stream()
                 .flatMap(collection -> collection.diagnostics.entrySet().stream()
                         .flatMap(entry -> entry.getValue().stream()
@@ -85,51 +91,67 @@ final class EditorDiagnosticRegistry implements EditorDiagnostics, AutoCloseable
 
         @Override
         public void replace(URI source, List<EditorDiagnostic> replacement) {
-            requireCollectionOpen();
-            diagnostics.put(
-                    Objects.requireNonNull(source, "source"),
-                    List.copyOf(Objects.requireNonNull(replacement, "replacement")));
+            synchronized (EditorDiagnosticRegistry.this) {
+                requireCollectionOpen();
+                diagnostics.put(
+                        Objects.requireNonNull(source, "source"),
+                        List.copyOf(Objects.requireNonNull(replacement, "replacement")));
+            }
             notifyObservers();
         }
 
         @Override
         public void replaceAll(Map<URI, List<EditorDiagnostic>> replacement) {
-            requireCollectionOpen();
             Map<URI, List<EditorDiagnostic>> copied = new LinkedHashMap<>();
             Objects.requireNonNull(replacement, "replacement")
                     .forEach((source, items) -> copied.put(
                             Objects.requireNonNull(source, "source"),
                             List.copyOf(Objects.requireNonNull(items, "diagnostics"))));
-            diagnostics.clear();
-            diagnostics.putAll(copied);
+            synchronized (EditorDiagnosticRegistry.this) {
+                requireCollectionOpen();
+                diagnostics.clear();
+                diagnostics.putAll(copied);
+            }
             notifyObservers();
         }
 
         @Override
         public void clear(URI source) {
-            requireCollectionOpen();
-            if (diagnostics.remove(Objects.requireNonNull(source, "source")) != null) {
+            boolean changed;
+            synchronized (EditorDiagnosticRegistry.this) {
+                requireCollectionOpen();
+                changed = diagnostics.remove(Objects.requireNonNull(source, "source")) != null;
+            }
+            if (changed) {
                 notifyObservers();
             }
         }
 
         @Override
         public void clear() {
-            requireCollectionOpen();
-            if (!diagnostics.isEmpty()) {
+            boolean changed;
+            synchronized (EditorDiagnosticRegistry.this) {
+                requireCollectionOpen();
+                changed = !diagnostics.isEmpty();
                 diagnostics.clear();
+            }
+            if (changed) {
                 notifyObservers();
             }
         }
 
         @Override
         public void close() {
-            if (!collectionClosed) {
-                collectionClosed = true;
-                diagnostics.clear();
-                if (collections.remove(id, this)) {
-                    notifyObservers();
+            boolean changed = false;
+            synchronized (EditorDiagnosticRegistry.this) {
+                if (!collectionClosed) {
+                    collectionClosed = true;
+                    diagnostics.clear();
+                    changed = collections.remove(id, this);
                 }
+            }
+            if (changed) {
+                notifyObservers();
             }
         }
 

@@ -10,9 +10,15 @@ import io.github.glynch.jscene3d.editor.language.EditorLanguageSupport;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupportContribution;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupportId;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupports;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
+import io.github.glynch.jscene3d.editor.workingcopy.EditorTextWorkingCopy;
+import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopies;
+import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopy;
+import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopyId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +31,8 @@ public final class EditorLanguageSupportRegistry implements EditorLanguageSuppor
     private final Map<EditorLanguageSupportId, RegisteredSupport> contributions = new LinkedHashMap<>();
     private final Map<EditorLanguageId, RegisteredSupport> languages = new LinkedHashMap<>();
     private final Map<RegisteredSupport, EditorLanguageProjectSession> sessions = new LinkedHashMap<>();
+    private final Map<EditorWorkingCopyId, EditorTextDocument> openDocuments = new LinkedHashMap<>();
+    private final Map<EditorWorkingCopyId, EditorRegistration> textChangeRegistrations = new LinkedHashMap<>();
     private final EditorRegistration projectRegistration;
     private Optional<EditorProject> currentProject = Optional.empty();
 
@@ -64,11 +72,39 @@ public final class EditorLanguageSupportRegistry implements EditorLanguageSuppor
         return registered == null ? Optional.empty() : Optional.of(registered.support());
     }
 
+    /**
+     * Synchronizes registered text working copies with their active language-project sessions.
+     *
+     * @param workingCopies working-copy source
+     * @return removable synchronization registration
+     */
+    public EditorRegistration synchronize(EditorWorkingCopies workingCopies) {
+        EditorWorkingCopies copies = Objects.requireNonNull(workingCopies, "workingCopies");
+        EditorRegistration opened = copies.onDidRegister().subscribe(this::documentOpened);
+        EditorRegistration saved = copies.onDidSave().subscribe(this::documentSaved);
+        EditorRegistration closed = copies.onDidUnregister().subscribe(this::documentClosed);
+        AtomicBoolean active = new AtomicBoolean(true);
+        return () -> {
+            if (active.compareAndSet(true, false)) {
+                closed.close();
+                saved.close();
+                opened.close();
+                List.copyOf(openDocuments.values()).forEach(this::publishClose);
+                textChangeRegistrations.values().forEach(EditorRegistration::close);
+                textChangeRegistrations.clear();
+                openDocuments.clear();
+            }
+        };
+    }
+
     /** Removes every registered language adapter. */
     @Override
     public void close() {
         projectRegistration.close();
         closeSessions();
+        textChangeRegistrations.values().forEach(EditorRegistration::close);
+        textChangeRegistrations.clear();
+        openDocuments.clear();
         contributions.clear();
         languages.clear();
     }
@@ -92,6 +128,9 @@ public final class EditorLanguageSupportRegistry implements EditorLanguageSuppor
     private void openSession(RegisteredSupport registered, EditorProject project) {
         EditorLanguageProjectSession session = registered.support().openProject(project);
         sessions.put(registered, Objects.requireNonNull(session, "language project session"));
+        openDocuments.values().stream()
+                .filter(document -> registered.contribution().languages().contains(document.language()))
+                .forEach(session::didOpen);
     }
 
     private void closeSessions() {
@@ -104,6 +143,57 @@ public final class EditorLanguageSupportRegistry implements EditorLanguageSuppor
         if (session != null) {
             session.close();
         }
+    }
+
+    private void documentOpened(EditorWorkingCopy workingCopy) {
+        if (workingCopy instanceof EditorTextWorkingCopy text) {
+            EditorTextDocument document = snapshot(text);
+            openDocuments.put(text.id(), document);
+            textChangeRegistrations.put(text.id(), text.onDidChangeText().subscribe(this::documentChanged));
+            sessionFor(document.language()).ifPresent(session -> session.didOpen(document));
+        }
+    }
+
+    private void documentChanged(EditorTextDocumentChange change) {
+        EditorTextDocument document = change.document();
+        openDocuments.entrySet().stream()
+                .filter(entry -> entry.getValue().resource().equals(document.resource()))
+                .findFirst()
+                .ifPresent(entry -> openDocuments.put(entry.getKey(), document));
+        sessionFor(document.language()).ifPresent(session -> session.didChange(change));
+    }
+
+    private void documentSaved(EditorWorkingCopy workingCopy) {
+        if (workingCopy instanceof EditorTextWorkingCopy text) {
+            EditorTextDocument document = snapshot(text);
+            openDocuments.put(text.id(), document);
+            sessionFor(document.language()).ifPresent(session -> session.didSave(document));
+        }
+    }
+
+    private void documentClosed(EditorWorkingCopy workingCopy) {
+        EditorRegistration registration = textChangeRegistrations.remove(workingCopy.id());
+        if (registration != null) {
+            registration.close();
+        }
+        EditorTextDocument document = openDocuments.remove(workingCopy.id());
+        if (document != null) {
+            publishClose(document);
+        }
+    }
+
+    private void publishClose(EditorTextDocument document) {
+        sessionFor(document.language()).ifPresent(session -> session.didClose(document));
+    }
+
+    private Optional<EditorLanguageProjectSession> sessionFor(EditorLanguageId language) {
+        RegisteredSupport registered = languages.get(language);
+        return registered == null ? Optional.empty() : Optional.ofNullable(sessions.get(registered));
+    }
+
+    private static EditorTextDocument snapshot(EditorTextWorkingCopy workingCopy) {
+        return new EditorTextDocument(
+                workingCopy.id().resource(), workingCopy.language(), workingCopy.version(), workingCopy.content());
     }
 
     private record RegisteredSupport(EditorLanguageSupportContribution contribution, EditorLanguageSupport support) {}

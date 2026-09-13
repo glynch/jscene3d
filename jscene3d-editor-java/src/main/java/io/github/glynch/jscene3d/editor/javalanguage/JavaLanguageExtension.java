@@ -4,13 +4,14 @@
  */
 package io.github.glynch.jscene3d.editor.javalanguage;
 
+import io.github.glynch.jscene3d.editor.diagnostic.DiagnosticCollectionId;
+import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticCollection;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.file.EditorLanguages;
 import io.github.glynch.jscene3d.editor.javalanguage.jdt.JdtLanguageServerStatus;
 import io.github.glynch.jscene3d.editor.javalanguage.jdt.JdtLanguageSupportFactory;
-import io.github.glynch.jscene3d.editor.language.EditorLanguageSupport;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupportContribution;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageSupportId;
 import io.github.glynch.jscene3d.editor.status.EditorStatusItem;
@@ -33,10 +34,11 @@ public final class JavaLanguageExtension implements EditorExtension {
     private static final String EXTENSION_ID = "io.github.glynch.jscene3d.editor.builtin.java";
     private static final EditorLanguageSupportId SUPPORT_ID = new EditorLanguageSupportId(EXTENSION_ID + ".jdtls");
     private static final StatusItemId STATUS_ID = new StatusItemId(EXTENSION_ID + ".status");
+    private static final DiagnosticCollectionId DIAGNOSTICS_ID =
+            new DiagnosticCollectionId(EXTENSION_ID + ".diagnostics");
     private static final String MESSAGE_BUNDLE = "io.github.glynch.jscene3d.editor.javalanguage.messages";
 
     private final String serverVersion;
-    private final EditorLanguageSupport support;
     private final MessageSource messages;
     private final AtomicReference<EditorStatusItem> statusItem = new AtomicReference<>();
 
@@ -47,10 +49,7 @@ public final class JavaLanguageExtension implements EditorExtension {
 
     private JavaLanguageExtension(MessageSource messages) {
         this.messages = Objects.requireNonNull(messages, "messages");
-        JdtLanguageSupportFactory.Result result = JdtLanguageSupportFactory.create(this::publishStatus);
-        JdtLanguageSupportFactory.Result resolved = Objects.requireNonNull(result, "result");
-        this.serverVersion = resolved.serverVersion();
-        this.support = resolved.support();
+        this.serverVersion = JdtLanguageSupportFactory.serverVersion();
     }
 
     @Override
@@ -78,6 +77,10 @@ public final class JavaLanguageExtension implements EditorExtension {
         item.update(statusPresentation(JdtLanguageServerStatus.inactive()));
         statusItem.set(item);
         editor.subscriptions().add(() -> statusItem.compareAndSet(item, null));
+        EditorDiagnosticCollection diagnostics =
+                editor.subscriptions().add(editor.diagnostics().createCollection(DIAGNOSTICS_ID));
+        var support = JdtLanguageSupportFactory.create(this::publishStatus, diagnostics)
+                .support();
         editor.subscriptions()
                 .add(editor.languageSupports()
                         .register(

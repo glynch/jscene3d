@@ -69,12 +69,14 @@
             insertSpaces: true,
             ariaLabel: String(attachedBridge.accessibleLabel())
           });
-          model.onDidChangeContent(function () {
-            attachedBridge.contentChanged(model.getValue());
+          model.onDidChangeContent(function (event) {
+            attachedBridge.contentChanged(model.getValue(), event.changes);
           });
           editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
             attachedBridge.saveRequested();
           });
+          applyDiagnostics();
+          applySelection();
         } catch (error) {
           reportFailure(error);
         }
@@ -88,6 +90,30 @@
       window.applyJavaAppearance = function () {
         if (attachedBridge) applyAppearance(JSON.parse(String(attachedBridge.appearance())));
       };
+      function applyDiagnostics() {
+        if (!editor || !attachedBridge) return;
+        const severity = {
+          ERROR: monaco.MarkerSeverity.Error,
+          WARNING: monaco.MarkerSeverity.Warning,
+          INFORMATION: monaco.MarkerSeverity.Info,
+          HINT: monaco.MarkerSeverity.Hint
+        };
+        const markers = JSON.parse(String(attachedBridge.diagnostics())).map(function (marker) {
+          marker.severity = severity[marker.severity] || monaco.MarkerSeverity.Error;
+          return marker;
+        });
+        monaco.editor.setModelMarkers(editor.getModel(), 'jscene3d', markers);
+      }
+      function applySelection() {
+        if (!editor || !attachedBridge) return;
+        const range = JSON.parse(String(attachedBridge.selection()));
+        if (!range) return;
+        editor.setSelection(range);
+        editor.revealRangeInCenter(range);
+        editor.focus();
+      }
+      window.applyJavaDiagnostics = applyDiagnostics;
+      window.applyJavaSelection = applySelection;
       window.focusEditor = function () { if (editor) editor.focus(); };
       window.runEditorCommand = function (command) {
         if (editor) editor.trigger('jscene3d', command, null);

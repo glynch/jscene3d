@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistration;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.context.EditorContextKeys;
+import io.github.glynch.jscene3d.editor.diagnostic.EditorTextRange;
 import io.github.glynch.jscene3d.editor.extension.EditorExtension;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
@@ -35,6 +36,7 @@ import io.github.glynch.jscene3d.editor.workbench.language.EditorLanguageSupport
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
+import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopies;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -174,6 +176,32 @@ public final class EditorExtensionHost implements AutoCloseable {
         return diagnostics.observe(observer);
     }
 
+    /**
+     * Observes diagnostics for one exact resource and immediately publishes its current snapshot.
+     *
+     * @param resource exact resource URI
+     * @param observer diagnostic snapshot consumer
+     * @return removable observer registration
+     */
+    public EditorRegistration observeDiagnostics(URI resource, Consumer<List<EditorDiagnosticSnapshot>> observer) {
+        requireOpen();
+        URI source = Objects.requireNonNull(resource, "resource");
+        Consumer<List<EditorDiagnosticSnapshot>> listener = Objects.requireNonNull(observer, "observer");
+        return diagnostics.observe(snapshot -> listener.accept(
+                snapshot.stream().filter(item -> item.source().equals(source)).toList()));
+    }
+
+    /**
+     * Connects one workbench working-copy set to registered language support.
+     *
+     * @param workingCopies working copies to synchronize
+     * @return removable synchronization registration
+     */
+    public EditorRegistration synchronizeLanguages(EditorWorkingCopies workingCopies) {
+        requireOpen();
+        return languageSupports.synchronize(workingCopies);
+    }
+
     /** Routes extension window messages to the workbench presentation. */
     public void showMessagesWith(Consumer<EditorMessage> sink) {
         requireOpen();
@@ -213,6 +241,17 @@ public final class EditorExtensionHost implements AutoCloseable {
     /** Requests that the workbench reveal one registered view. */
     public void showView(ViewId view) {
         window.showView(view);
+    }
+
+    /**
+     * Opens a file and reveals an exact diagnostic source range.
+     *
+     * @param resource source resource
+     * @param range source range to select
+     */
+    public void revealFile(URI resource, EditorTextRange range) {
+        requireOpen();
+        window.revealFile(resource, range);
     }
 
     /** Shows one extension or workbench message through the configured presentation. */

@@ -5,6 +5,8 @@
 package io.github.glynch.jscene3d.editor.javalanguage.jdt;
 
 import io.github.glynch.jscene3d.editor.language.EditorLanguageProjectSession;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
 import io.github.glynch.jscene3d.editor.lsp.client.LanguageServerInitialization;
 import io.github.glynch.jscene3d.editor.lsp.client.LspClientSession;
 import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcess;
@@ -13,13 +15,18 @@ import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessLaunche
 import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 
 /** Asynchronously prepares and launches one project's JDT LS child process. */
 final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
@@ -29,20 +36,75 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean failureReported = new AtomicBoolean();
     private final Consumer<JdtLanguageServerStatus> status;
+    private final JdtDiagnosticPublisher diagnostics;
+    private final Map<URI, EditorTextDocument> openDocuments = new LinkedHashMap<>();
     private final CompletableFuture<LanguageServerProcess> process;
     private final CompletableFuture<LspClientSession> protocol;
+    private @Nullable LspClientSession connection;
 
     JdtLanguageProjectSession(
-            Path projectRoot, String projectName, Consumer<JdtLanguageServerStatus> status, Runtime runtime) {
+            Path projectRoot,
+            String projectName,
+            Consumer<JdtLanguageServerStatus> status,
+            JdtDiagnosticPublisher diagnostics,
+            Runtime runtime) {
         this.status = Objects.requireNonNull(status, "status");
-        JdtLanguageClient languageClient = new JdtLanguageClient(status);
+        this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
+        JdtLanguageClient languageClient = new JdtLanguageClient(status, diagnostics::publish);
         process = CompletableFuture.supplyAsync(() -> prepare(projectRoot, runtime), runtime.executor())
                 .thenCompose(runtime.launcher()::launch)
                 .toCompletableFuture();
         protocol = process.thenApply(
                 running -> connect(running, projectRoot, projectName, runtime.clientVersion(), languageClient));
-        protocol.thenCompose(LspClientSession::initialized).whenComplete(this::protocolInitializationCompleted);
+        protocol.thenCompose(session -> session.initialized().thenApply(ignored -> session))
+                .whenComplete(this::protocolInitializationCompleted);
         process.thenAccept(running -> running.exitCode().whenComplete(this::processExited));
+    }
+
+    @Override
+    public synchronized void didOpen(EditorTextDocument document) {
+        EditorTextDocument current = Objects.requireNonNull(document, "document");
+        openDocuments.put(current.resource(), current);
+        diagnostics.documentVersion(current.resource(), current.version());
+        if (connection != null) {
+            connection.didOpen(current);
+        }
+    }
+
+    @Override
+    public synchronized void didChange(EditorTextDocumentChange change) {
+        EditorTextDocumentChange currentChange = Objects.requireNonNull(change, "change");
+        EditorTextDocument current = currentChange.document();
+        boolean alreadyOpen = openDocuments.containsKey(current.resource());
+        openDocuments.put(current.resource(), current);
+        diagnostics.documentVersion(current.resource(), current.version());
+        if (connection != null) {
+            if (alreadyOpen) {
+                connection.didChange(currentChange);
+            } else {
+                connection.didOpen(current);
+            }
+        }
+    }
+
+    @Override
+    public synchronized void didSave(EditorTextDocument document) {
+        EditorTextDocument current = Objects.requireNonNull(document, "document");
+        openDocuments.put(current.resource(), current);
+        diagnostics.documentVersion(current.resource(), current.version());
+        if (connection != null) {
+            connection.didSave(current);
+        }
+    }
+
+    @Override
+    public synchronized void didClose(EditorTextDocument document) {
+        EditorTextDocument current = Objects.requireNonNull(document, "document");
+        openDocuments.remove(current.resource());
+        diagnostics.documentClosed(current.resource());
+        if (connection != null) {
+            connection.didClose(current);
+        }
     }
 
     @Override
@@ -51,27 +113,29 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
             return;
         }
         status.accept(JdtLanguageServerStatus.inactive());
-        LspClientSession connection = completedValue(protocol);
+        closeDocuments();
+        diagnostics.clear();
+        LspClientSession clientSession = completedValue(protocol);
         LanguageServerProcess running = completedValue(process);
-        if (connection == null || running == null) {
+        if (clientSession == null || running == null) {
             if (running != null) {
                 running.close();
             }
             return;
         }
-        connection
+        clientSession
                 .shutdown()
                 .toCompletableFuture()
                 .orTimeout(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .whenComplete((ignored, failure) -> close(connection, running));
+                .whenComplete((ignored, failure) -> close(clientSession, running));
     }
 
     private static LanguageServerProcessConfiguration prepare(Path projectRoot, Runtime runtime) {
         try {
             JdtLanguageServerDistribution distribution =
                     JdtLanguageServerDistribution.fromHome(runtime.distributionHome(), runtime.operatingSystem());
-            JdtLanguageServerProjectLayout layout =
-                    JdtLanguageServerProjectLayout.prepare(projectRoot, distribution, runtime.metadata());
+            JdtLanguageServerProjectLayout layout = JdtLanguageServerProjectLayout.prepare(
+                    projectRoot, runtime.cacheRoot(), distribution, runtime.metadata());
             return JdtLanguageServerCommand.create(projectRoot, distribution, layout, runtime.operatingSystem());
         } catch (IOException failure) {
             throw new UncheckedIOException("Could not prepare JDT LS for " + projectRoot, failure);
@@ -95,16 +159,33 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
                 languageClient);
     }
 
-    private void protocolInitializationCompleted(Void ignored, Throwable failure) {
+    private void protocolInitializationCompleted(LspClientSession initializedSession, Throwable failure) {
         if (closed.get()) {
             return;
         }
         if (failure == null) {
+            openDocuments(initializedSession);
             return;
         }
         LOGGER.log(System.Logger.Level.ERROR, "Could not initialize Eclipse JDT Language Server", failure);
         reportFailure(failureMessage(failure));
         closeFailedStartup();
+    }
+
+    private synchronized void openDocuments(LspClientSession initializedSession) {
+        if (closed.get()) {
+            return;
+        }
+        connection = Objects.requireNonNull(initializedSession, "initializedSession");
+        List.copyOf(openDocuments.values()).forEach(connection::didOpen);
+    }
+
+    private synchronized void closeDocuments() {
+        if (connection != null) {
+            List.copyOf(openDocuments.values()).forEach(connection::didClose);
+        }
+        openDocuments.clear();
+        connection = null;
     }
 
     private void processExited(Integer exitCode, Throwable failure) {
@@ -116,9 +197,9 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
     }
 
     private void closeFailedStartup() {
-        LspClientSession connection = completedValue(protocol);
-        if (connection != null) {
-            connection.close();
+        LspClientSession clientSession = completedValue(protocol);
+        if (clientSession != null) {
+            clientSession.close();
         }
         LanguageServerProcess running = completedValue(process);
         if (running != null) {
@@ -126,8 +207,8 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
         }
     }
 
-    private static void close(LspClientSession connection, LanguageServerProcess running) {
-        connection.close();
+    private static void close(LspClientSession clientSession, LanguageServerProcess running) {
+        clientSession.close();
         running.close();
     }
 
@@ -155,6 +236,7 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
     /** Runtime dependencies shared by one project's preparation, process and protocol phases. */
     record Runtime(
             Path distributionHome,
+            Path cacheRoot,
             JdtLanguageServerMetadata metadata,
             OperatingSystem operatingSystem,
             Executor executor,
@@ -162,6 +244,7 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
             String clientVersion) {
         Runtime {
             Objects.requireNonNull(distributionHome, "distributionHome");
+            Objects.requireNonNull(cacheRoot, "cacheRoot");
             Objects.requireNonNull(metadata, "metadata");
             Objects.requireNonNull(operatingSystem, "operatingSystem");
             Objects.requireNonNull(executor, "executor");

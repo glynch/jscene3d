@@ -8,6 +8,7 @@ import io.github.glynch.jscene3d.editor.lsp.client.DefaultLanguageClient;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import org.eclipse.lsp4j.PublishDiagnosticsParams;
 
 /** Handles the JDT-specific client protocol and translates it into editor Java status. */
 final class JdtLanguageClient extends DefaultLanguageClient implements JdtLanguageClientProtocol {
@@ -16,10 +17,17 @@ final class JdtLanguageClient extends DefaultLanguageClient implements JdtLangua
     private static final String ERROR = "Error";
 
     private final Consumer<JdtLanguageServerStatus> status;
+    private final Consumer<PublishDiagnosticsParams> diagnostics;
     private final AtomicBoolean ready = new AtomicBoolean();
 
-    JdtLanguageClient(Consumer<JdtLanguageServerStatus> status) {
+    JdtLanguageClient(Consumer<JdtLanguageServerStatus> status, Consumer<PublishDiagnosticsParams> diagnostics) {
         this.status = Objects.requireNonNull(status, "status");
+        this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
+    }
+
+    @Override
+    public void publishDiagnostics(PublishDiagnosticsParams publication) {
+        diagnostics.accept(publication);
     }
 
     @Override

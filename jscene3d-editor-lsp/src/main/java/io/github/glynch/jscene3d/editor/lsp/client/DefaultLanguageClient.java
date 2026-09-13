@@ -27,7 +27,7 @@ public class DefaultLanguageClient implements LanguageClient {
 
     @Override
     public void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
-        // Diagnostic translation is the next vertical-slice step.
+        // Language-specific clients opt into diagnostic translation.
     }
 
     @Override

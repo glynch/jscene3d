@@ -6,14 +6,19 @@ package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.EditorDiagnosticsModel;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticSeverity;
+import io.github.glynch.jscene3d.editor.file.EditorFileType;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIconId;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
+import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
@@ -25,6 +30,8 @@ import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -32,10 +39,33 @@ import org.jspecify.annotations.Nullable;
 
 /** JavaFX diagnostic source tree and occurrence-row presentation. */
 final class JavaFxDiagnosticTree extends TreeView<JavaFxDiagnosticTree.DiagnosticNode> {
-    JavaFxDiagnosticTree(JavaFxIconRenderer icons) {
+    private final Consumer<EditorDiagnosticsModel.Item> reveal;
+
+    JavaFxDiagnosticTree(
+            JavaFxIconRenderer icons,
+            Function<URI, Optional<EditorFileType>> fileTypes,
+            Consumer<EditorDiagnosticsModel.Item> reveal) {
+        this.reveal = Objects.requireNonNull(reveal, "reveal");
         setShowRoot(false);
-        setCellFactory(ignored -> new DiagnosticTreeCell(icons));
+        setCellFactory(ignored -> new DiagnosticTreeCell(icons, fileTypes));
         getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_TREE);
+        setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 1) {
+                revealSelection();
+            }
+        });
+        setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                revealSelection();
+            }
+        });
+    }
+
+    private void revealSelection() {
+        TreeItem<DiagnosticNode> selected = getSelectionModel().getSelectedItem();
+        if (selected != null && selected.getValue() instanceof DiagnosticItemNode(EditorDiagnosticsModel.Item item)) {
+            reveal.accept(item);
+        }
     }
 
     void show(List<EditorDiagnosticsModel.Group> groups) {
@@ -59,9 +89,11 @@ final class JavaFxDiagnosticTree extends TreeView<JavaFxDiagnosticTree.Diagnosti
 
     private static final class DiagnosticTreeCell extends TreeCell<DiagnosticNode> {
         private final JavaFxIconRenderer icons;
+        private final Function<URI, Optional<EditorFileType>> fileTypes;
 
-        private DiagnosticTreeCell(JavaFxIconRenderer icons) {
+        private DiagnosticTreeCell(JavaFxIconRenderer icons, Function<URI, Optional<EditorFileType>> fileTypes) {
             this.icons = Objects.requireNonNull(icons, "icons");
+            this.fileTypes = Objects.requireNonNull(fileTypes, "fileTypes");
             getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_TREE_CELL);
         }
 
@@ -94,28 +126,38 @@ final class JavaFxDiagnosticTree extends TreeView<JavaFxDiagnosticTree.Diagnosti
             EditorDiagnosticSeverity severity = item.diagnostic().severity();
             Node icon = icons.create(new EditorIcon(icon(severity), label(severity)));
             Label message = growableLabel(item.diagnostic().message(), EditorStyleClasses.EDITOR_DIAGNOSTIC_MESSAGE);
-            Label code = new Label(item.diagnostic().code());
+            Label code = new Label(item.identity());
             code.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_CODE);
-            Label location = new Label(item.diagnostic().location());
-            location.setManaged(!item.diagnostic().location().isEmpty());
-            location.setVisible(!item.diagnostic().location().isEmpty());
-            location.setTooltip(new Tooltip("Location: " + item.diagnostic().location()));
+            String displayLocation = item.displayLocation();
+            Label location = new Label(displayLocation);
+            location.setManaged(!displayLocation.isEmpty());
+            location.setVisible(!displayLocation.isEmpty());
+            location.setTooltip(new Tooltip("Location: " + displayLocation));
             location.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_LOCATION);
             return row(icon, message, code, location);
         }
 
-        private static HBox groupGraphic(EditorDiagnosticsModel.Group group) {
+        private HBox groupGraphic(EditorDiagnosticsModel.Group group) {
+            EditorIcon fileIcon = fileTypes
+                    .apply(group.source())
+                    .map(EditorFileType::icon)
+                    .orElseGet(() -> new EditorIcon(EditorIcons.TEXT_FILE, "File"));
+            Node icon = icons.create(fileIcon);
             Label source = new Label(group.label());
             source.setTooltip(new Tooltip(group.source().toString()));
             source.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_SOURCE_NAME);
+            Label context = new Label(group.context());
+            context.setManaged(!group.context().isEmpty());
+            context.setVisible(!group.context().isEmpty());
+            context.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_SOURCE_CONTEXT);
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             Label count = new Label(Long.toString(group.items().size()));
             count.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_GROUP_COUNTS);
-            return row(source, spacer, count);
+            return row(icon, source, context, spacer, count);
         }
 
-        private static HBox detailGraphic(EditorDiagnosticsModel.Detail detail) {
+        private HBox detailGraphic(EditorDiagnosticsModel.Detail detail) {
             Label label = new Label(detail.label());
             label.getStyleClass().add(EditorStyleClasses.EDITOR_DIAGNOSTIC_DETAIL_LABEL);
             Label value = growableLabel(detail.value(), EditorStyleClasses.EDITOR_DIAGNOSTIC_DETAIL_VALUE);
@@ -133,10 +175,11 @@ final class JavaFxDiagnosticTree extends TreeView<JavaFxDiagnosticTree.Diagnosti
             return label;
         }
 
-        private static HBox row(Node... nodes) {
+        private HBox row(Node... nodes) {
             HBox row = new HBox(8.0, nodes);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
+            row.prefWidthProperty().bind(widthProperty().subtract(42.0));
             return row;
         }
 

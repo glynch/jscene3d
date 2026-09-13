@@ -6,11 +6,19 @@ package io.github.glynch.jscene3d.editor.lsp.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.editor.diagnostic.EditorTextPosition;
+import io.github.glynch.jscene3d.editor.diagnostic.EditorTextRange;
+import io.github.glynch.jscene3d.editor.file.EditorLanguages;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
+import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
+import io.github.glynch.jscene3d.editor.language.EditorTextEdit;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -108,6 +116,35 @@ final class LspClientSessionTest {
         }
     }
 
+    @Test
+    void synchronizesVersionedTextDocumentsInNotificationOrder() throws Exception {
+        try (ProtocolPair protocol = new ProtocolPair()) {
+            RecordingTextDocumentService documents = new RecordingTextDocumentService(4);
+            RecordingLanguageServer server = new RecordingLanguageServer(documents);
+            protocol.startServer(server);
+            LanguageServerInitialization initialization =
+                    new LanguageServerInitialization(temporaryDirectory, "Example", "Test Editor", "1.2.3");
+            var resource = temporaryDirectory.resolve("Example.java").toUri();
+
+            try (LspClientSession client =
+                    LspClientSession.connect(protocol.clientInput(), protocol.clientOutput(), initialization)) {
+                client.didOpen(new EditorTextDocument(resource, EditorLanguages.JAVA, 1, "class Example {}"));
+                client.didChange(new EditorTextDocumentChange(
+                        new EditorTextDocument(resource, EditorLanguages.JAVA, 2, "class Example {"),
+                        List.of(new EditorTextEdit(
+                                new EditorTextRange(new EditorTextPosition(0, 15), new EditorTextPosition(0, 16)),
+                                ""))));
+                client.didSave(new EditorTextDocument(resource, EditorLanguages.JAVA, 2, "class Example {"));
+                client.didClose(new EditorTextDocument(resource, EditorLanguages.JAVA, 2, "class Example {"));
+
+                assertThat(documents.received.await(2, TimeUnit.SECONDS)).isTrue();
+                assertThat(documents.notifications)
+                        .containsExactly(
+                                "open:1:class Example {}", "change:2:", "save:class Example {", "close:" + resource);
+            }
+        }
+    }
+
     private static final class ProtocolPair implements AutoCloseable {
         private final PipedInputStream clientInput = new PipedInputStream();
         private final PipedOutputStream serverOutput;
@@ -159,8 +196,16 @@ final class LspClientSessionTest {
         private final CountDownLatch initialized = new CountDownLatch(1);
         private final AtomicBoolean shutdown = new AtomicBoolean();
         private final CountDownLatch exited = new CountDownLatch(1);
-        private final TextDocumentService documents = new InertTextDocumentService();
+        private final TextDocumentService documents;
         private final WorkspaceService workspace = new InertWorkspaceService();
+
+        private RecordingLanguageServer() {
+            this(new InertTextDocumentService());
+        }
+
+        private RecordingLanguageServer(TextDocumentService documents) {
+            this.documents = documents;
+        }
 
         @Override
         public CompletableFuture<InitializeResult> initialize(InitializeParams parameters) {
@@ -192,6 +237,41 @@ final class LspClientSessionTest {
         @Override
         public WorkspaceService getWorkspaceService() {
             return workspace;
+        }
+    }
+
+    private static final class RecordingTextDocumentService implements TextDocumentService {
+        private final List<String> notifications = new CopyOnWriteArrayList<>();
+        private final CountDownLatch received;
+
+        private RecordingTextDocumentService(int expected) {
+            received = new CountDownLatch(expected);
+        }
+
+        @Override
+        public void didOpen(DidOpenTextDocumentParams parameters) {
+            notifications.add("open:" + parameters.getTextDocument().getVersion() + ":"
+                    + parameters.getTextDocument().getText());
+            received.countDown();
+        }
+
+        @Override
+        public void didChange(DidChangeTextDocumentParams parameters) {
+            notifications.add("change:" + parameters.getTextDocument().getVersion() + ":"
+                    + parameters.getContentChanges().getFirst().getText());
+            received.countDown();
+        }
+
+        @Override
+        public void didClose(DidCloseTextDocumentParams parameters) {
+            notifications.add("close:" + parameters.getTextDocument().getUri());
+            received.countDown();
+        }
+
+        @Override
+        public void didSave(DidSaveTextDocumentParams parameters) {
+            notifications.add("save:" + parameters.getText());
+            received.countDown();
         }
     }
 

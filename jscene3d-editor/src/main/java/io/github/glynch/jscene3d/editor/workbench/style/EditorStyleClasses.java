@@ -115,6 +115,8 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_DIAGNOSTIC_SOURCE_NAME = "editor-diagnostic-source-name";
     /** CSS class named {@value}. */
+    public static final String EDITOR_DIAGNOSTIC_SOURCE_CONTEXT = "editor-diagnostic-source-context";
+    /** CSS class named {@value}. */
     public static final String EDITOR_DIAGNOSTIC_TOOLS = "editor-diagnostic-tools";
     /** CSS class named {@value}. */
     public static final String EDITOR_DIAGNOSTIC_TREE = "editor-diagnostic-tree";

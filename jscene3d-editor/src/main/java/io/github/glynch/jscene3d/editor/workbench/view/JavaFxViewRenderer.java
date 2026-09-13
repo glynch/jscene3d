@@ -31,7 +31,11 @@ final class JavaFxViewRenderer {
     JavaFxRenderedView render(EditorView view) {
         EditorView logicalView = Objects.requireNonNull(view, "view");
         if (logicalView instanceof DiagnosticsView diagnosticsView) {
-            JavaFxDiagnosticsViewAdapter adapter = new JavaFxDiagnosticsViewAdapter(diagnosticsView, icons);
+            JavaFxDiagnosticsViewAdapter adapter = new JavaFxDiagnosticsViewAdapter(
+                    diagnosticsView,
+                    icons,
+                    extensions::resolveFileType,
+                    item -> item.diagnostic().range().ifPresent(range -> extensions.revealFile(item.source(), range)));
             return new JavaFxRenderedView(
                     adapter.node(),
                     adapter.titleGraphic(),

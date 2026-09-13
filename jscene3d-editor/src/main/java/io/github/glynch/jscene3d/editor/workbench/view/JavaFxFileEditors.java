@@ -43,6 +43,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
     private final Map<Path, JavaFxOpenFile> openFiles = new LinkedHashMap<>();
     private final EditorWorkingCopyRegistry workingCopies = new EditorWorkingCopyRegistry();
     private final EditorRegistration requestRegistration;
+    private final EditorRegistration languageSynchronization;
     private @Nullable JavaFxOpenFile previewFile;
 
     /** Connects file-open requests to file-type-specific editor tabs. */
@@ -53,6 +54,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
         this.icons = Objects.requireNonNull(icons, "icons");
         this.stateChanged = Objects.requireNonNull(stateChanged, "stateChanged");
         closeGuard = new EditorWindowCloseGuard(extensions::showDialog);
+        languageSynchronization = extensions.synchronizeLanguages(workingCopies);
         requestRegistration = extensions.observeFileRequests(this::openFile);
     }
 
@@ -107,6 +109,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
         JavaFxOpenFile existing = openFiles.get(path);
         if (existing != null) {
             reveal(existing, request.disposition());
+            request.selection().ifPresent(existing::reveal);
             return;
         }
         if (!Files.isRegularFile(path)) {
@@ -123,6 +126,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
             openFiles.put(path, opened);
             area.add(opened.tab(), opened::requestFocus);
             reveal(opened, request.disposition());
+            request.selection().ifPresent(opened::reveal);
             stateChanged.run();
         } catch (IOException | RuntimeException exception) {
             showFileError("Unable to open " + path.getFileName(), exception);
@@ -136,22 +140,22 @@ public final class JavaFxFileEditors implements AutoCloseable {
                 .isPresent()) {
             return createImageEditor(path, resolved.orElseThrow().icon(), pinned);
         }
-        EditorTextFileWorkingCopy workingCopy = EditorTextFileWorkingCopy.load(path);
         EditorFileType type = resolved.filter(candidate -> candidate.kind() == EditorFileKind.TEXT)
                 .orElse(null);
         var language =
                 type == null ? EditorLanguages.PLAIN_TEXT : type.language().orElseThrow();
+        EditorTextFileWorkingCopy workingCopy = EditorTextFileWorkingCopy.load(path, language);
         EditorIcon icon = type == null ? new EditorIcon(EditorIcons.TEXT_FILE, "Text file") : type.icon();
         EditorRegistration registration = workingCopies.register(workingCopy);
         JavaFxMonacoEditor editor = new JavaFxMonacoEditor(
                 workingCopy,
                 language,
-                extensions.colorThemes(),
+                extensions,
                 stateChanged,
                 message -> showFileError("Unable to load " + path.getFileName(), new IOException(message)),
                 exception -> showFileError("Unable to save " + path.getFileName(), exception));
-        JavaFxFileEditorContent content =
-                new JavaFxFileEditorContent(editor.node(), editor::requestFocus, editor::undo, editor::redo, editor);
+        JavaFxFileEditorContent content = new JavaFxFileEditorContent(
+                editor.node(), editor::requestFocus, editor::undo, editor::redo, editor::reveal, editor);
         return createOpenFile(path, icon, content, workingCopy, registration, pinned);
     }
 
@@ -165,7 +169,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
         image.fitWidthProperty().bind(scroll.widthProperty().subtract(48.0));
         image.fitHeightProperty().bind(scroll.heightProperty().subtract(48.0));
         JavaFxFileEditorContent content =
-                new JavaFxFileEditorContent(scroll, scroll::requestFocus, () -> {}, () -> {}, () -> {});
+                new JavaFxFileEditorContent(scroll, scroll::requestFocus, () -> {}, () -> {}, ignored -> {}, () -> {});
         return createOpenFile(path, icon, content, null, () -> {}, pinned);
     }
 
@@ -247,6 +251,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
         List<JavaFxOpenFile> files = List.copyOf(openFiles.values());
         files.forEach(file -> area.remove(file.tab()));
         files.forEach(JavaFxOpenFile::close);
+        languageSynchronization.close();
         openFiles.clear();
         previewFile = null;
     }

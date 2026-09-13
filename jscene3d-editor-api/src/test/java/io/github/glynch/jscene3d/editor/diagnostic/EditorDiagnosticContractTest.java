@@ -43,6 +43,7 @@ final class EditorDiagnosticContractTest {
         mutableDetails.clear();
 
         assertThat(diagnostic.details()).containsExactlyEntriesOf(Map.of("source", "jdt.ls"));
+        assertThat(diagnostic.source()).isEmpty();
         assertThat(diagnostic.range()).isPresent();
         assertThat(EditorDiagnosticSeverity.values())
                 .containsExactly(
@@ -87,6 +88,10 @@ final class EditorDiagnosticContractTest {
                         EditorDiagnosticSeverity.ERROR, " ", "message", "", emptyRange, emptyDetails))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("code must not be blank");
+        assertThatNullPointerException()
+                .isThrownBy(() -> new EditorDiagnostic(
+                        EditorDiagnosticSeverity.ERROR, "code", null, "message", "", emptyRange, emptyDetails))
+                .withMessage("source");
         assertThatThrownBy(() ->
                         new EditorDiagnostic(EditorDiagnosticSeverity.ERROR, "code", " ", "", emptyRange, emptyDetails))
                 .isInstanceOf(IllegalArgumentException.class)

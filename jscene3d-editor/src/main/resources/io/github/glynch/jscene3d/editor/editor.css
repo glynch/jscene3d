@@ -1375,9 +1375,8 @@
 
 .editor-diagnostic-tree-cell {
     -fx-background-color: transparent;
-    -fx-border-color: transparent transparent -jscene-divider transparent;
-    -fx-border-width: 0 0 1px 0;
-    -fx-padding: 4px 8px;
+    -fx-border-color: transparent;
+    -fx-padding: 2px 8px;
 }
 
 .editor-diagnostic-tree-cell:hover {
@@ -1391,7 +1390,7 @@
 .editor-diagnostic-tree-cell.diagnostic-group {
     -fx-background-color: -jscene-panel-raised;
     -fx-font-weight: 600;
-    -fx-padding: 5px 8px;
+    -fx-padding: 3px 8px;
 }
 
 .editor-diagnostic-source-name,
@@ -1401,6 +1400,12 @@
 
 .editor-diagnostic-source-name {
     -fx-font-weight: 600;
+}
+
+.editor-diagnostic-source-context {
+    -fx-font-size: 10px;
+    -fx-font-weight: 400;
+    -fx-text-fill: -jscene-text-muted;
 }
 
 .editor-diagnostic-group-counts,
@@ -1422,7 +1427,7 @@
 
 .editor-diagnostic-tree-cell.diagnostic-detail {
     -fx-background-color: -jscene-chrome;
-    -fx-padding: 4px 10px;
+    -fx-padding: 2px 10px;
 }
 
 .editor-diagnostic-detail-label {

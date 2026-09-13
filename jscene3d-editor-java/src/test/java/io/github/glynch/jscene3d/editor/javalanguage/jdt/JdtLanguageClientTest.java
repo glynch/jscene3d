@@ -22,7 +22,7 @@ final class JdtLanguageClientTest {
     @Test
     void reportsReadyOnlyWhenJdtLsReportsServiceReady() {
         List<JdtLanguageServerStatus> statuses = new ArrayList<>();
-        JdtLanguageClient client = new JdtLanguageClient(statuses::add);
+        JdtLanguageClient client = new JdtLanguageClient(statuses::add, ignored -> {});
 
         client.sendStatusReport(new JdtStatusReport("Starting", "Starting Java Language Server"));
         client.sendStatusReport(new JdtStatusReport("ServiceReady", "ServiceReady"));
@@ -37,7 +37,7 @@ final class JdtLanguageClientTest {
     @Test
     void translatesJdtLsErrorsIntoFailedStatus() {
         List<JdtLanguageServerStatus> statuses = new ArrayList<>();
-        JdtLanguageClient client = new JdtLanguageClient(statuses::add);
+        JdtLanguageClient client = new JdtLanguageClient(statuses::add, ignored -> {});
 
         client.sendStatusReport(new JdtStatusReport("Error", "Could not import project"));
 

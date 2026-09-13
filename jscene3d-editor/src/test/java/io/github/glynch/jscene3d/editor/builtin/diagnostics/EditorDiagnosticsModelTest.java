@@ -9,6 +9,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.glynch.jscene3d.editor.diagnostic.DiagnosticCollectionId;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostic;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnosticSeverity;
+import io.github.glynch.jscene3d.editor.diagnostic.EditorTextPosition;
+import io.github.glynch.jscene3d.editor.diagnostic.EditorTextRange;
+import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorDiagnosticSnapshot;
 import java.net.URI;
 import java.util.List;
@@ -97,6 +100,28 @@ final class EditorDiagnosticsModelTest {
                 .containsExactly(Tuple.tuple("expectedType", "entity"));
         assertThat(item.copyText())
                 .isEqualTo("missing entity [test.code] file:///project/worlds/map01.world.json /entities/0");
+    }
+
+    @Test
+    void presentsProjectContextAndCompactProblemMetadata() {
+        EditorDiagnosticsModel model = new EditorDiagnosticsModel();
+        model.showProject(Optional.of(new EditorProject("project", "Example", URI.create("file:///project/"))));
+        EditorDiagnostic diagnostic = new EditorDiagnostic(
+                EditorDiagnosticSeverity.ERROR,
+                "1610612976",
+                "Java",
+                "Missing semicolon",
+                "2:5",
+                Optional.of(new EditorTextRange(new EditorTextPosition(1, 4), new EditorTextPosition(1, 10))),
+                Map.of());
+        model.showDiagnostics(List.of(new EditorDiagnosticSnapshot(COLLECTION, WORLD, diagnostic)));
+
+        EditorDiagnosticsModel.Group group = model.view().groups().getFirst();
+        EditorDiagnosticsModel.Item item = group.items().getFirst();
+
+        assertThat(group.context()).isEqualTo("Example • worlds");
+        assertThat(item.identity()).isEqualTo("Java(1610612976)");
+        assertThat(item.displayLocation()).isEqualTo("[Ln 2, Col 5]");
     }
 
     private static EditorDiagnosticSnapshot diagnostic(

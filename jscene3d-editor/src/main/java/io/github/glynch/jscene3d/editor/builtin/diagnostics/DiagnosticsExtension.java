@@ -63,6 +63,7 @@ public final class DiagnosticsExtension implements EditorExtension {
     @Override
     public void activate(EditorExtensionContext context) {
         EditorExtensionContext editor = Objects.requireNonNull(context, "context");
+        editor.subscriptions().add(editor.projects().observe(model::showProject));
         editor.subscriptions()
                 .add(editor.views()
                         .register(new EditorViewContribution(

@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.builtin.text.EditorTextFileWorkingCopy;
+import io.github.glynch.jscene3d.editor.diagnostic.EditorTextRange;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
@@ -140,6 +141,10 @@ final class JavaFxOpenFile implements AutoCloseable {
 
     void redo() {
         content.redo().run();
+    }
+
+    void reveal(EditorTextRange range) {
+        content.reveal().accept(Objects.requireNonNull(range, "range"));
     }
 
     private Region createDirtyIndicator() {

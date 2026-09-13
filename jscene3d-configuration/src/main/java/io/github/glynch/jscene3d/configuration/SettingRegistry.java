@@ -28,22 +28,42 @@ public final class SettingRegistry {
         definitions = Collections.unmodifiableMap(new LinkedHashMap<>(indexed));
     }
 
-    /** Creates a deterministic registry in contribution order. */
+    /**
+     * Creates a deterministic registry in contribution order.
+     *
+     * @param contributions setting declarations to register
+     * @return an immutable registry containing the declarations
+     */
     public static SettingRegistry of(Collection<SettingDefinition<?>> contributions) {
         return new SettingRegistry(Objects.requireNonNull(contributions, "contributions"));
     }
 
-    /** Returns declarations in contribution order. */
+    /**
+     * Returns declarations in contribution order.
+     *
+     * @return an immutable list of registered declarations
+     */
     public List<SettingDefinition<?>> definitions() {
         return List.copyOf(definitions.values());
     }
 
-    /** Finds a declaration by its stable textual key. */
+    /**
+     * Finds a declaration by its stable textual key.
+     *
+     * @param key stable textual key
+     * @return the matching declaration, or an empty optional when it is not registered
+     */
     public Optional<SettingDefinition<?>> find(String key) {
         return Optional.ofNullable(definitions.get(Objects.requireNonNull(key, "key")));
     }
 
-    /** Returns and type-checks the declaration for one typed key. */
+    /**
+     * Returns and type-checks the declaration for one typed key.
+     *
+     * @param key typed setting key
+     * @param <T> exposed setting value type
+     * @return the matching type-checked declaration
+     */
     public <T> SettingDefinition<T> require(SettingKey<T> key) {
         SettingKey<T> requested = Objects.requireNonNull(key, "key");
         SettingDefinition<?> definition = find(requested.value())

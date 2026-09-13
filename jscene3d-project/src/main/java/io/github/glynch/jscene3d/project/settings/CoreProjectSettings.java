@@ -37,7 +37,11 @@ public final class CoreProjectSettings {
 
     private CoreProjectSettings() {}
 
-    /** Returns built-in declarations in stable presentation order. */
+    /**
+     * Returns built-in declarations in stable presentation order.
+     *
+     * @return the immutable built-in declaration list
+     */
     public static List<SettingDefinition<?>> definitions() {
         return DEFINITIONS;
     }

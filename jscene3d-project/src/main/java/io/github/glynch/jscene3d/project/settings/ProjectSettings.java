@@ -54,7 +54,11 @@ public record ProjectSettings(
         settings = immutableValues(Objects.requireNonNullElse(settings, Map.of()));
     }
 
-    /** Creates settings with one cache override and the current format envelope. */
+    /**
+     * Creates settings with one cache override and the current format envelope.
+     *
+     * @param cacheLocation project cache location
+     */
     public ProjectSettings(Path cacheLocation) {
         this(
                 CURRENT_SCHEMA_URI,
@@ -64,31 +68,55 @@ public record ProjectSettings(
                         Objects.requireNonNull(cacheLocation, "cacheLocation").toString()));
     }
 
-    /** Returns a document containing no explicit overrides. */
+    /**
+     * Returns a document containing no explicit overrides.
+     *
+     * @return a current-format empty settings document
+     */
     public static ProjectSettings defaults() {
         return new ProjectSettings(CURRENT_SCHEMA_URI, SCHEMA_VERSION, Map.of());
     }
 
-    /** Returns one untyped stored value while preserving unknown extension keys. */
+    /**
+     * Returns one untyped stored value while preserving unknown extension keys.
+     *
+     * @param key stable textual setting key
+     * @return the stored value, or an empty optional when it is not overridden
+     */
     public Optional<Object> value(String key) {
         return Optional.ofNullable(settings.get(Objects.requireNonNull(key, "key")));
     }
 
-    /** Returns a copy with one complete stored override. */
+    /**
+     * Returns a copy with one complete stored override.
+     *
+     * @param key stable textual setting key
+     * @param value Jackson-compatible value to store
+     * @return a settings document containing the override
+     */
     public ProjectSettings with(String key, Object value) {
         LinkedHashMap<String, Object> updated = new LinkedHashMap<>(settings);
         updated.put(Objects.requireNonNull(key, "key"), immutableValue(value));
         return new ProjectSettings(schema, schemaVersion, updated);
     }
 
-    /** Returns a copy without one stored override. */
+    /**
+     * Returns a copy without one stored override.
+     *
+     * @param key stable textual setting key
+     * @return a settings document without the override
+     */
     public ProjectSettings without(String key) {
         LinkedHashMap<String, Object> updated = new LinkedHashMap<>(settings);
         updated.remove(Objects.requireNonNull(key, "key"));
         return new ProjectSettings(schema, schemaVersion, updated);
     }
 
-    /** Compatibility convenience for the built-in cache value. */
+    /**
+     * Compatibility convenience for the built-in cache value.
+     *
+     * @return the configured cache location or its built-in default
+     */
     public Path cacheLocation() {
         Object stored = settings.get(CoreProjectSettings.CACHE_LOCATION.value());
         return stored == null
@@ -96,7 +124,12 @@ public record ProjectSettings(
                 : Path.of((String) stored).normalize();
     }
 
-    /** Resolves the built-in cache value beneath one project root. */
+    /**
+     * Resolves the built-in cache value beneath one project root.
+     *
+     * @param projectRoot project workspace root
+     * @return the normalized absolute cache path
+     */
     public Path resolveCache(Path projectRoot) {
         Path root = Objects.requireNonNull(projectRoot, "projectRoot")
                 .toAbsolutePath()

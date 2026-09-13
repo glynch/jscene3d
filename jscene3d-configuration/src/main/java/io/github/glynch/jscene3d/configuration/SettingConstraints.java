@@ -54,13 +54,24 @@ public record SettingConstraints(
         }
     }
 
-    /** Creates constraints for an enumerated text setting. */
+    /**
+     * Creates constraints for an enumerated text setting.
+     *
+     * @param choices allowed values for the setting
+     * @return constraints containing the supplied choices
+     */
     public static SettingConstraints choices(List<SettingChoice> choices) {
         return new SettingConstraints(
                 Optional.empty(), Optional.empty(), Optional.empty(), choices, Optional.empty(), false);
     }
 
-    /** Creates constraints for one path editor. */
+    /**
+     * Creates constraints for one path editor.
+     *
+     * @param kind expected filesystem target
+     * @param projectRelative whether the path must remain beneath the project root
+     * @return constraints for the requested path kind and scope
+     */
     public static SettingConstraints path(SettingPathKind kind, boolean projectRelative) {
         return new SettingConstraints(
                 Optional.empty(),
@@ -71,7 +82,12 @@ public record SettingConstraints(
                 projectRelative);
     }
 
-    /** Validates one already converted value for its declared value family. */
+    /**
+     * Validates one already converted value for its declared value family.
+     *
+     * @param type declared value family
+     * @param value converted value to validate
+     */
     public void validate(SettingValueType type, Object value) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(value, "value");

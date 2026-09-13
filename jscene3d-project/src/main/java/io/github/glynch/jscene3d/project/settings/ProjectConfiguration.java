@@ -27,7 +27,13 @@ public final class ProjectConfiguration {
     private final ProjectSettingsSaver saver;
     private ProjectSettings settings;
 
-    /** Creates one configuration from an already parsed settings document and declaration registry. */
+    /**
+     * Creates one configuration from an already parsed settings document and declaration registry.
+     *
+     * @param projectRoot project workspace root
+     * @param registry core and extension setting declarations
+     * @param settings parsed settings document
+     */
     public ProjectConfiguration(Path projectRoot, SettingRegistry registry, ProjectSettings settings) {
         this.projectRoot = Objects.requireNonNull(projectRoot, "projectRoot")
                 .toAbsolutePath()
@@ -37,12 +43,22 @@ public final class ProjectConfiguration {
         saver = new ProjectSettingsSaver();
     }
 
-    /** Returns all core and extension setting declarations. */
+    /**
+     * Returns all core and extension setting declarations.
+     *
+     * @return the setting registry used by this configuration
+     */
     public SettingRegistry registry() {
         return registry;
     }
 
-    /** Returns the effective typed value, falling back to the declared default when necessary. */
+    /**
+     * Returns the effective typed value, falling back to the declared default when necessary.
+     *
+     * @param key typed setting key
+     * @param <T> exposed setting value type
+     * @return the effective setting value
+     */
     public <T> T get(SettingKey<T> key) {
         SettingDefinition<T> definition = registry.require(key);
         return settings.value(key.value())
@@ -50,13 +66,25 @@ public final class ProjectConfiguration {
                 .orElse(definition.defaultValue());
     }
 
-    /** Returns whether the shared project document explicitly contains one setting. */
+    /**
+     * Returns whether the shared project document explicitly contains one setting.
+     *
+     * @param key setting key to inspect
+     * @return whether the project document contains an override
+     */
     public boolean isOverridden(SettingKey<?> key) {
         return settings.settings()
                 .containsKey(Objects.requireNonNull(key, "key").value());
     }
 
-    /** Validates and atomically persists one project-scope override. */
+    /**
+     * Validates and atomically persists one project-scope override.
+     *
+     * @param key typed setting key
+     * @param value value to validate and persist
+     * @param <T> exposed setting value type
+     * @throws IOException when the updated document cannot be persisted
+     */
     public <T> void update(SettingKey<T> key, T value) throws IOException {
         SettingDefinition<T> definition = registry.require(key);
         T validated = definition.validate(value);
@@ -66,7 +94,12 @@ public final class ProjectConfiguration {
         settings = updated;
     }
 
-    /** Removes and atomically persists one project-scope override. */
+    /**
+     * Removes and atomically persists one project-scope override.
+     *
+     * @param key setting key to reset
+     * @throws IOException when the updated document cannot be persisted
+     */
     public void reset(SettingKey<?> key) throws IOException {
         registry.require(key);
         ProjectSettings updated = settings.without(key.value());
@@ -74,7 +107,12 @@ public final class ProjectConfiguration {
         settings = updated;
     }
 
-    /** Resolves one effective path setting against the current project root. */
+    /**
+     * Resolves one effective path setting against the current project root.
+     *
+     * @param key typed path setting key
+     * @return the normalized absolute path
+     */
     public Path resolve(SettingKey<Path> key) {
         Path value = get(key);
         return value.isAbsolute()
@@ -82,12 +120,20 @@ public final class ProjectConfiguration {
                 : projectRoot.resolve(value).normalize();
     }
 
-    /** Returns diagnostics produced while resolving stored values. */
+    /**
+     * Returns diagnostics produced while resolving stored values.
+     *
+     * @return an immutable list of current setting diagnostics
+     */
     public List<ProjectDiagnostic> diagnostics() {
         return validateStoredValues();
     }
 
-    /** Returns the current generic settings document, including unknown extension values. */
+    /**
+     * Returns the current generic settings document, including unknown extension values.
+     *
+     * @return the current settings document
+     */
     public ProjectSettings document() {
         return settings;
     }

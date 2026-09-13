@@ -32,17 +32,31 @@ public enum SettingValueType {
         this.valueClass = valueClass;
     }
 
-    /** Returns the Java type exposed by a key using this value family. */
+    /**
+     * Returns the Java type exposed by a key using this value family.
+     *
+     * @return the exposed Java type
+     */
     public Class<?> valueClass() {
         return valueClass;
     }
 
-    /** Parses the lowercase descriptor spelling. */
+    /**
+     * Parses the lowercase descriptor spelling.
+     *
+     * @param value descriptor spelling to parse
+     * @return the matching value family
+     */
     public static SettingValueType parse(String value) {
         return valueOf(Objects.requireNonNull(value, "value").replace('-', '_').toUpperCase(Locale.ROOT));
     }
 
-    /** Converts one Jackson-compatible stored value into this family's typed value. */
+    /**
+     * Converts one Jackson-compatible stored value into this family's typed value.
+     *
+     * @param value stored value to convert
+     * @return the converted typed value
+     */
     public Object convert(Object value) {
         Objects.requireNonNull(value, "value");
         return switch (this) {
@@ -54,7 +68,12 @@ public enum SettingValueType {
         };
     }
 
-    /** Converts one typed value into a Jackson-compatible stored value. */
+    /**
+     * Converts one typed value into a Jackson-compatible stored value.
+     *
+     * @param value typed value to store
+     * @return the Jackson-compatible stored value
+     */
     public Object store(Object value) {
         Object converted = convert(value);
         if (this == PATH) {

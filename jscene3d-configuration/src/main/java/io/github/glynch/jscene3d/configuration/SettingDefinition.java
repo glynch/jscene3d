@@ -58,7 +58,12 @@ public record SettingDefinition<T>(
         Objects.requireNonNull(scope, "scope");
     }
 
-    /** Converts and validates one stored or user-supplied value. */
+    /**
+     * Converts and validates one stored or user-supplied value.
+     *
+     * @param value stored or user-supplied value
+     * @return the converted, validated value
+     */
     public T validate(Object value) {
         if (value == null) {
             throw new IllegalArgumentException("setting value must not be null");

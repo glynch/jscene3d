@@ -8,7 +8,7 @@ import static io.github.glynch.jscene3d.project.internal.Preconditions.requirePr
 import static io.github.glynch.jscene3d.project.internal.Preconditions.requireSemanticVersion;
 import static io.github.glynch.jscene3d.project.internal.Preconditions.requireSemanticVersionRequirement;
 
-import io.github.glynch.jscene3d.configuration.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import java.util.HashSet;

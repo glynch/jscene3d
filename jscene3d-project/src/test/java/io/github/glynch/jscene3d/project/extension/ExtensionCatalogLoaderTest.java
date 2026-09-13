@@ -7,8 +7,8 @@ package io.github.glynch.jscene3d.project.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.glynch.jscene3d.configuration.SettingPathKind;
-import io.github.glynch.jscene3d.configuration.SettingValueType;
+import io.github.glynch.jscene3d.configuration.definition.SettingPathKind;
+import io.github.glynch.jscene3d.configuration.definition.SettingValueType;
 import io.github.glynch.jscene3d.project.component.AttachmentPointId;
 import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;

@@ -2,8 +2,10 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.configuration;
+package io.github.glynch.jscene3d.configuration.registry;
 
+import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;

@@ -4,9 +4,9 @@
  */
 package io.github.glynch.jscene3d.project.settings;
 
-import io.github.glynch.jscene3d.configuration.SettingDefinition;
-import io.github.glynch.jscene3d.configuration.SettingKey;
-import io.github.glynch.jscene3d.configuration.SettingRegistry;
+import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
+import io.github.glynch.jscene3d.configuration.registry.SettingRegistry;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import java.io.IOException;
 import java.nio.file.Path;

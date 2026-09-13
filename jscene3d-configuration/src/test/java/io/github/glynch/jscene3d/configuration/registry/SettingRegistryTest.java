@@ -2,11 +2,17 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.configuration;
+package io.github.glynch.jscene3d.configuration.registry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.configuration.definition.SettingConstraints;
+import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
+import io.github.glynch.jscene3d.configuration.definition.SettingPathKind;
+import io.github.glynch.jscene3d.configuration.definition.SettingScope;
+import io.github.glynch.jscene3d.configuration.definition.SettingValueType;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;

@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.configuration;
+package io.github.glynch.jscene3d.configuration.definition;
 
 /** Intended filesystem target represented by a path setting. */
 public enum SettingPathKind {

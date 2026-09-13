@@ -4,12 +4,12 @@
  */
 package io.github.glynch.jscene3d.project.settings;
 
-import io.github.glynch.jscene3d.configuration.SettingConstraints;
-import io.github.glynch.jscene3d.configuration.SettingDefinition;
-import io.github.glynch.jscene3d.configuration.SettingKey;
-import io.github.glynch.jscene3d.configuration.SettingPathKind;
-import io.github.glynch.jscene3d.configuration.SettingScope;
-import io.github.glynch.jscene3d.configuration.SettingValueType;
+import io.github.glynch.jscene3d.configuration.definition.SettingConstraints;
+import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
+import io.github.glynch.jscene3d.configuration.definition.SettingPathKind;
+import io.github.glynch.jscene3d.configuration.definition.SettingScope;
+import io.github.glynch.jscene3d.configuration.definition.SettingValueType;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;

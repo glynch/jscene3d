@@ -6,5 +6,6 @@
 module io.github.glynch.jscene3d.configuration {
     requires static org.jspecify;
 
-    exports io.github.glynch.jscene3d.configuration;
+    exports io.github.glynch.jscene3d.configuration.definition;
+    exports io.github.glynch.jscene3d.configuration.registry;
 }

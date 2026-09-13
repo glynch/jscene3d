@@ -4,8 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor;
 
-import io.github.glynch.jscene3d.configuration.SettingDefinition;
-import io.github.glynch.jscene3d.configuration.SettingRegistry;
+import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.registry.SettingRegistry;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;

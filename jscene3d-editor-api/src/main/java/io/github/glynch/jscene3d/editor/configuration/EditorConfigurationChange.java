@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.configuration;
 
-import io.github.glynch.jscene3d.configuration.SettingKey;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
 import java.util.Objects;
 
 /**

@@ -4,8 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.configuration;
 
-import io.github.glynch.jscene3d.configuration.SettingKey;
-import io.github.glynch.jscene3d.configuration.SettingRegistry;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
+import io.github.glynch.jscene3d.configuration.registry.SettingRegistry;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorEvent;
 import java.util.Optional;
 

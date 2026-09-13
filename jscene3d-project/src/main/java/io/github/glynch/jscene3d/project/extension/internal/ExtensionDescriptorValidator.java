@@ -8,13 +8,13 @@ import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isPr
 import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isRegisteredTypeId;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.github.glynch.jscene3d.configuration.SettingChoice;
-import io.github.glynch.jscene3d.configuration.SettingConstraints;
-import io.github.glynch.jscene3d.configuration.SettingDefinition;
-import io.github.glynch.jscene3d.configuration.SettingKey;
-import io.github.glynch.jscene3d.configuration.SettingPathKind;
-import io.github.glynch.jscene3d.configuration.SettingScope;
-import io.github.glynch.jscene3d.configuration.SettingValueType;
+import io.github.glynch.jscene3d.configuration.definition.SettingChoice;
+import io.github.glynch.jscene3d.configuration.definition.SettingConstraints;
+import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
+import io.github.glynch.jscene3d.configuration.definition.SettingPathKind;
+import io.github.glynch.jscene3d.configuration.definition.SettingScope;
+import io.github.glynch.jscene3d.configuration.definition.SettingValueType;
 import io.github.glynch.jscene3d.project.component.AttachmentPointId;
 import io.github.glynch.jscene3d.project.component.CapabilityId;
 import io.github.glynch.jscene3d.project.component.ComponentLifecycle;

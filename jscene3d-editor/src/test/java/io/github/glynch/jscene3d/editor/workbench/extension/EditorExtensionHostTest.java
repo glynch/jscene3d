@@ -7,8 +7,8 @@ package io.github.glynch.jscene3d.editor.workbench.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.glynch.jscene3d.configuration.SettingKey;
-import io.github.glynch.jscene3d.configuration.SettingRegistry;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
+import io.github.glynch.jscene3d.configuration.registry.SettingRegistry;
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandLocations;

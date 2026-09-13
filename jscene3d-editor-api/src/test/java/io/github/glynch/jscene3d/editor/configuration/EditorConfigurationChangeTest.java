@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.editor.configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.configuration.SettingKey;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
 import org.junit.jupiter.api.Test;
 
 /** Verifies the extension-facing typed configuration-change contract. */

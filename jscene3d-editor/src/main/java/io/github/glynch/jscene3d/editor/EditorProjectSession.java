@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
-import io.github.glynch.jscene3d.configuration.SettingKey;
+import io.github.glynch.jscene3d.configuration.definition.SettingKey;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.command.EditorUndoRedoEntry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfigurationChange;

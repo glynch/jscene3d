@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.configuration;
+package io.github.glynch.jscene3d.configuration.definition;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;

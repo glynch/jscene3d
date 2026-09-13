@@ -273,6 +273,12 @@ Verification:
 - implement the unified searchable User and Project settings experience recorded
   in [Editor Settings Experience](../design/editor-settings-experience.md),
   including direct JSON editing through the shared working-copy model;
+- implement the deferred command surfaces and toolkit-independent keybinding
+  direction recorded in
+  [Editor Command Surfaces and Keybindings](../design/editor-command-surfaces-and-keybindings.md);
+- implement Hierarchy and Inspector navigation to associated behavior source
+  using the language-neutral seam recorded in
+  [Editor Source Navigation](../design/editor-source-navigation.md);
 - design installable icon-theme contributions independently from the existing
   toolkit-independent color-theme contract;
 - audit all non-test source files over 300 lines and split orchestration classes

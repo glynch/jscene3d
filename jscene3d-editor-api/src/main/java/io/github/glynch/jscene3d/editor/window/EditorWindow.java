@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.window;
 
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import java.net.URI;
 import java.util.Optional;
 
 /** Safe toolkit-independent interaction with the containing editor window. */
@@ -23,6 +24,15 @@ public interface EditorWindow {
      * @throws IllegalArgumentException if no view has the supplied identity
      */
     void showView(ViewId view);
+
+    /**
+     * Opens or reveals an editor for one workspace file.
+     *
+     * @param resource file resource URI
+     */
+    default void openFile(URI resource) {
+        throw new UnsupportedOperationException("this editor window does not support opening files");
+    }
 
     /**
      * Shows one application-modal dialog and returns the selected action.

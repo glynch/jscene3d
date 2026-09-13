@@ -61,6 +61,14 @@
             <artifactId>javafx-graphics</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>monaco-editor</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.huskerdev</groupId>
             <artifactId>openglfx-lwjgl</artifactId>
         </dependency>

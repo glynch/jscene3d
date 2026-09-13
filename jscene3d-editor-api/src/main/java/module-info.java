@@ -13,6 +13,7 @@ module io.github.glynch.jscene3d.editor.api {
     exports io.github.glynch.jscene3d.editor.context;
     exports io.github.glynch.jscene3d.editor.diagnostic;
     exports io.github.glynch.jscene3d.editor.extension;
+    exports io.github.glynch.jscene3d.editor.file;
     exports io.github.glynch.jscene3d.editor.lifecycle;
     exports io.github.glynch.jscene3d.editor.menu;
     exports io.github.glynch.jscene3d.editor.project;

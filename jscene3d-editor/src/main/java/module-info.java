@@ -15,6 +15,9 @@ module io.github.glynch.jscene3d.editor {
     requires java.logging;
     requires javafx.controls;
     requires javafx.graphics;
+    requires javafx.web;
+    requires jdk.jsobject;
+    requires monaco.editor;
     requires openglfx;
     requires openglfx.lwjgl;
     requires openglfx.natives.core.macos;
@@ -25,4 +28,6 @@ module io.github.glynch.jscene3d.editor {
 
     opens io.github.glynch.jscene3d.editor to
             javafx.graphics;
+    opens io.github.glynch.jscene3d.editor.builtin.text to
+            javafx.web;
 }

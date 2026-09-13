@@ -11,6 +11,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
+import io.github.glynch.jscene3d.editor.file.EditorFileTypes;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
@@ -125,6 +126,11 @@ final class EditorExtensionContractTest {
 
         @Override
         public EditorDiagnostics diagnostics() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EditorFileTypes fileTypes() {
             throw new UnsupportedOperationException();
         }
 

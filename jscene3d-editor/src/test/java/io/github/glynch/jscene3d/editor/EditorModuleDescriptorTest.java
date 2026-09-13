@@ -18,7 +18,7 @@ final class EditorModuleDescriptorTest {
     }
 
     @Test
-    void opensItsApplicationPackageOnlyToJavaFx() {
+    void opensOnlyTheUiPackagesToTheirJavaFxModules() {
         ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
 
         assertThat(descriptor.requires())
@@ -28,9 +28,17 @@ final class EditorModuleDescriptorTest {
                         .doesNotContain(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
         assertThat(descriptor.exports()).isEmpty();
         assertThat(descriptor.opens())
+                .allSatisfy(opening -> assertThat(opening.isQualified()).isTrue())
+                .extracting(ModuleDescriptor.Opens::source)
+                .containsExactlyInAnyOrder(
+                        "io.github.glynch.jscene3d.editor", "io.github.glynch.jscene3d.editor.builtin.text");
+        assertThat(descriptor.opens())
+                .filteredOn(opening -> opening.source().equals("io.github.glynch.jscene3d.editor"))
                 .singleElement()
-                .returns("io.github.glynch.jscene3d.editor", ModuleDescriptor.Opens::source)
-                .returns(true, ModuleDescriptor.Opens::isQualified)
                 .satisfies(opening -> assertThat(opening.targets()).containsExactly("javafx.graphics"));
+        assertThat(descriptor.opens())
+                .filteredOn(opening -> opening.source().equals("io.github.glynch.jscene3d.editor.builtin.text"))
+                .singleElement()
+                .satisfies(opening -> assertThat(opening.targets()).containsExactly("javafx.web"));
     }
 }

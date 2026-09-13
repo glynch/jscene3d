@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.editor.builtin.text.JavaFxMonacoEditorProbe;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -37,9 +38,13 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Exercises splash visibility against the real JavaFX animation lifecycle. */
 final class EditorSplashScreenTest {
+    @TempDir
+    private Path temporaryDirectory;
+
     /** Starts minimum visibility when the splash can actually be seen, not while its stage is hidden. */
     @Test
     void startsMinimumVisibilityWhenStageIsShown() throws InterruptedException {
@@ -47,16 +52,19 @@ final class EditorSplashScreenTest {
         AtomicReference<Throwable> failure = new AtomicReference<>();
         CountDownLatch completed = new CountDownLatch(1);
 
-        Platform.startup(() -> runVisibilityScenario(visibleAfterObservation, failure, completed));
+        Platform.startup(() -> runVisibilityScenario(temporaryDirectory, visibleAfterObservation, failure, completed));
 
-        assertThat(completed.await(6, SECONDS)).isTrue();
+        assertThat(completed.await(12, SECONDS)).isTrue();
         assertThat(failure.get()).isNull();
         assertThat(visibleAfterObservation).isTrue();
     }
 
     /** Runs the staged visibility scenario entirely on the JavaFX application thread. */
     private static void runVisibilityScenario(
-            AtomicBoolean visibleAfterObservation, AtomicReference<Throwable> failure, CountDownLatch completed) {
+            Path temporaryDirectory,
+            AtomicBoolean visibleAfterObservation,
+            AtomicReference<Throwable> failure,
+            CountDownLatch completed) {
         Platform.setImplicitExit(false);
         try {
             EditorSplashScreen splash = new EditorSplashScreen("test", new EditorSplashTiming(Duration.ofSeconds(3)));
@@ -65,8 +73,8 @@ final class EditorSplashScreenTest {
             EditorTheme.install(scene);
             stage.setScene(scene);
             PauseTransition beforeStageIsShown = new PauseTransition(javafx.util.Duration.seconds(3.1));
-            beforeStageIsShown.setOnFinished(
-                    ignored -> showAndObserve(stage, splash, visibleAfterObservation, failure, completed));
+            beforeStageIsShown.setOnFinished(ignored ->
+                    showAndObserve(stage, splash, temporaryDirectory, visibleAfterObservation, failure, completed));
             beforeStageIsShown.play();
         } catch (RuntimeException exception) {
             failure.set(exception);
@@ -78,6 +86,7 @@ final class EditorSplashScreenTest {
     private static void showAndObserve(
             Stage stage,
             EditorSplashScreen splash,
+            Path temporaryDirectory,
             AtomicBoolean visibleAfterObservation,
             AtomicReference<Throwable> failure,
             CountDownLatch completed) {
@@ -91,15 +100,23 @@ final class EditorSplashScreenTest {
                 assertProductionPresentation(splash);
             } catch (RuntimeException | AssertionError exception) {
                 failure.set(exception);
-            } finally {
-                completed.countDown();
-                Platform.runLater(() -> {
-                    stage.close();
-                    Platform.exit();
-                });
+                finishJavaFxScenario(stage, completed);
+                return;
             }
+            JavaFxMonacoEditorProbe.verify(stage, temporaryDirectory, result -> {
+                result.ifPresent(failure::set);
+                finishJavaFxScenario(stage, completed);
+            });
         });
         observation.play();
+    }
+
+    private static void finishJavaFxScenario(Stage stage, CountDownLatch completed) {
+        completed.countDown();
+        Platform.runLater(() -> {
+            stage.close();
+            Platform.exit();
+        });
     }
 
     /** Checks packaged artwork and live loading data. */
@@ -140,10 +157,9 @@ final class EditorSplashScreenTest {
                         extensions,
                         layout,
                         JavaFxIconRenderer.builtIn(),
-                        previewTitle,
-                        previewDirty,
-                        previewContent,
-                        () -> openProjectRequested.set(true))) {
+                        new JavaFxEditorArea.PreviewDescriptor(previewTitle, previewDirty, previewContent),
+                        () -> openProjectRequested.set(true),
+                        () -> {})) {
             Tab preview = editorArea.node().getTabs().getFirst();
             assertThat(editorArea.node().getTabs())
                     .singleElement()

@@ -64,12 +64,14 @@ final class EditorExtensionHostTest {
         List<List<EditorViewContribution>> viewSnapshots = new ArrayList<>();
         List<EditorMessage> messages = new ArrayList<>();
         List<ViewId> viewRequests = new ArrayList<>();
+        List<URI> fileRequests = new ArrayList<>();
         List<List<EditorStatusItemSnapshot>> statusSnapshots = new ArrayList<>();
         List<List<EditorDiagnosticSnapshot>> diagnosticSnapshots = new ArrayList<>();
         AtomicReference<EditorStatusItem> status = new AtomicReference<>();
         AtomicReference<EditorDiagnosticCollection> diagnostics = new AtomicReference<>();
         host.observeViews(viewSnapshots::add);
         host.observeViewRequests(viewRequests::add);
+        host.observeFileRequests(fileRequests::add);
         host.observeStatusItems(statusSnapshots::add);
         host.observeDiagnostics(diagnosticSnapshots::add);
         host.showMessagesWith(messages::add);
@@ -77,6 +79,8 @@ final class EditorExtensionHostTest {
         host.activate(extension(status, diagnostics));
         host.execute(MESSAGE_COMMAND);
         host.execute(REVEAL_COMMAND);
+        host.activate(fileOpeningExtension());
+        host.execute(new CommandId("io.github.glynch.test.open-file"));
 
         assertThat(viewSnapshots.getLast())
                 .singleElement()
@@ -84,6 +88,7 @@ final class EditorExtensionHostTest {
                 .isEqualTo(VIEW_ID);
         assertThat(messages).containsExactly(new EditorMessage(EditorMessageSeverity.INFORMATION, "Hello"));
         assertThat(viewRequests).containsExactly(VIEW_ID);
+        assertThat(fileRequests).containsExactly(URI.create("file:///workspace/pom.xml"));
         assertThat(statusSnapshots.getLast())
                 .singleElement()
                 .extracting(item -> item.state().text())
@@ -365,6 +370,26 @@ final class EditorExtensionHostTest {
                                 Map.of())));
                 diagnostics.set(context.subscriptions().add(collection));
                 assertThat(context.projects().current()).isEmpty();
+            }
+        };
+    }
+
+    private static EditorExtension fileOpeningExtension() {
+        return new EditorExtension() {
+            @Override
+            public String id() {
+                return "io.github.glynch.test.file-opening";
+            }
+
+            @Override
+            public void activate(EditorExtensionContext context) {
+                CommandId openFile = new CommandId("io.github.glynch.test.open-file");
+                context.subscriptions()
+                        .add(context.commands()
+                                .register(
+                                        new EditorCommandContribution(openFile, "Open file"),
+                                        invocation ->
+                                                invocation.window().openFile(URI.create("file:///workspace/pom.xml"))));
             }
         };
     }

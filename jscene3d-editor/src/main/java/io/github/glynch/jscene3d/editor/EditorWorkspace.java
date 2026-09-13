@@ -108,10 +108,10 @@ public final class EditorWorkspace extends BorderPane {
                 host,
                 layout,
                 icons,
-                previewTitle,
-                previewDirty,
-                createViewportContent(viewportCanvas),
-                () -> host.execute(EditorCommands.OPEN_PROJECT));
+                new JavaFxEditorArea.PreviewDescriptor(
+                        previewTitle, previewDirty, createViewportContent(viewportCanvas)),
+                () -> host.execute(EditorCommands.OPEN_PROJECT),
+                this::updateDocumentCommands);
         bottomPanel = new JavaFxPanelPart(
                 host,
                 layout,
@@ -242,13 +242,14 @@ public final class EditorWorkspace extends BorderPane {
     /** Confirms or saves dirty resources before an orderly window close. */
     boolean prepareToClose() {
         EditorProjectSession current = document;
-        if (current == null || !current.isDirty()) {
+        int projectDirtyCount = current == null ? 0 : current.workingCopies().dirtyCount();
+        int dirtyCount = projectDirtyCount + editorArea.dirtyFileCount();
+        if (dirtyCount == 0) {
             return true;
         }
-        return closeGuard.confirmClose(
-                current.project().identity().name(),
-                current.workingCopies().dirtyCount(),
-                () -> document == current && trySaveDocument());
+        String workspaceName =
+                current == null ? "open files" : current.project().identity().name();
+        return closeGuard.confirmClose(workspaceName, dirtyCount, () -> document == current && trySaveAllResources());
     }
 
     /** Releases workbench adapters before the extension host is closed. */
@@ -256,7 +257,6 @@ public final class EditorWorkspace extends BorderPane {
         documentRegistration.close();
         dirtyRegistration.close();
         menuBar.close();
-        commandSet.close();
         layoutQuickAccess.close();
         layoutCustomizer.close();
         regions.close();
@@ -264,6 +264,7 @@ public final class EditorWorkspace extends BorderPane {
         activitySelectionRegistration.close();
         activitySelection.close();
         editorArea.close();
+        commandSet.close();
         statusBar.close();
         secondaryViewContainer.close();
         bottomPanel.close();
@@ -292,10 +293,16 @@ public final class EditorWorkspace extends BorderPane {
     }
 
     private void saveDocument() {
-        trySaveDocument();
+        if (editorArea.hasSelectedFile()) {
+            if (editorArea.saveSelectedFile()) {
+                setProjectStatus("File saved");
+            }
+        } else {
+            trySaveProject();
+        }
     }
 
-    private boolean trySaveDocument() {
+    private boolean trySaveProject() {
         EditorProjectSession current = document;
         if (current == null) {
             return true;
@@ -322,6 +329,10 @@ public final class EditorWorkspace extends BorderPane {
     }
 
     private void undo() {
+        if (editorArea.hasSelectedFile()) {
+            editorArea.undoSelectedFile();
+            return;
+        }
         EditorProjectSession current = document;
         if (current != null) {
             current.undo();
@@ -329,6 +340,10 @@ public final class EditorWorkspace extends BorderPane {
     }
 
     private void redo() {
+        if (editorArea.hasSelectedFile()) {
+            editorArea.redoSelectedFile();
+            return;
+        }
         EditorProjectSession current = document;
         if (current != null) {
             current.redo();
@@ -337,18 +352,22 @@ public final class EditorWorkspace extends BorderPane {
 
     private void updateDocumentCommands() {
         EditorProjectSession current = document;
-        boolean dirty = current != null && current.isDirty();
+        boolean projectDirty = current != null && current.isDirty();
+        boolean dirty = editorArea.hasSelectedFile() ? editorArea.isSelectedFileDirty() : projectDirty;
         boolean worldDirty =
                 current != null && current.startupWorldWorkingCopy().isDirty();
         previewDirty.set(worldDirty);
         commandSet.update(new DocumentCommandState(
-                current != null, dirty, current != null && current.canUndo(), current != null && current.canRedo()));
+                current != null,
+                dirty,
+                editorArea.hasSelectedFile() || current != null && current.canUndo(),
+                editorArea.hasSelectedFile() || current != null && current.canRedo()));
         if (current != null) {
             String projectName = current.project().identity().name();
-            projectContext.setText(dirty ? projectName + '*' : projectName);
-            projectContext.setAccessibleText(dirty ? projectName + ", modified" : projectName);
-            projectContext.pseudoClassStateChanged(DIRTY_PSEUDO_CLASS, dirty);
-            if (dirty) {
+            projectContext.setText(projectDirty ? projectName + '*' : projectName);
+            projectContext.setAccessibleText(projectDirty ? projectName + ", modified" : projectName);
+            projectContext.pseudoClassStateChanged(DIRTY_PSEUDO_CLASS, projectDirty);
+            if (projectDirty) {
                 setProjectStatus(projectName + " · modified");
             } else {
                 setProjectStatus(projectName);
@@ -356,6 +375,10 @@ public final class EditorWorkspace extends BorderPane {
         } else {
             projectContext.pseudoClassStateChanged(DIRTY_PSEUDO_CLASS, false);
         }
+    }
+
+    private boolean trySaveAllResources() {
+        return trySaveProject() && editorArea.saveAllFiles();
     }
 
     /** Clears UI and shared selection state before project-owned values are replaced. */

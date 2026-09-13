@@ -26,6 +26,27 @@ public final class EditorIcons {
     /** Source asset owned by the project. */
     public static final EditorIconId SOURCE_ASSET = icon("source-asset");
 
+    /** Ordinary filesystem folder. */
+    public static final EditorIconId FOLDER = icon("folder");
+
+    /** Generic editable text file. */
+    public static final EditorIconId TEXT_FILE = icon("text-file");
+
+    /** Java source file. */
+    public static final EditorIconId JAVA = icon("java");
+
+    /** JSON document. */
+    public static final EditorIconId JSON = icon("json");
+
+    /** XML document. */
+    public static final EditorIconId XML = icon("xml");
+
+    /** Maven project descriptor. */
+    public static final EditorIconId MAVEN = icon("maven");
+
+    /** Raster image. */
+    public static final EditorIconId IMAGE = icon("image");
+
     /** Import definition. */
     public static final EditorIconId IMPORT = icon("import");
 

@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
+import io.github.glynch.jscene3d.editor.file.EditorFileTypes;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
@@ -90,6 +91,13 @@ public interface EditorExtensionContext {
      * @return diagnostic collection factory
      */
     EditorDiagnostics diagnostics();
+
+    /**
+     * Returns the registry used to classify workspace files for icons and editor selection.
+     *
+     * @return workspace file-type registry
+     */
+    EditorFileTypes fileTypes();
 
     /**
      * Returns the read-only lifecycle of the project opened in this editor window.

@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
+import io.github.glynch.jscene3d.editor.builtin.text.SourceEditorExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
@@ -21,6 +22,7 @@ import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -43,11 +45,14 @@ final class WorkspaceExplorerExtensionTest {
         EditorExtensionHost host = new EditorExtensionHost(projects, new EditorSelectionContext());
         List<List<EditorViewContribution>> viewSnapshots = new ArrayList<>();
         List<List<EditorActivityContribution>> activitySnapshots = new ArrayList<>();
+        List<URI> fileRequests = new ArrayList<>();
         host.observeViews(viewSnapshots::add);
         host.observeActivities(activitySnapshots::add);
+        host.observeFileRequests(fileRequests::add);
 
         WorkspaceExplorerExclusionPolicy exclusions = WorkspaceExplorerExclusionPolicy.defaults()
                 .plus(WorkspaceExplorerExclusionPolicy.of(Set.of(), Set.of("local.env"), Set.of()));
+        host.activate(new SourceEditorExtension());
         host.activate(new WorkspaceExplorerExtension(projects, exclusions));
         assertThat(viewSnapshots.getLast()).isEmpty();
         assertThat(activitySnapshots.getLast()).isEmpty();
@@ -89,9 +94,15 @@ final class WorkspaceExplorerExtensionTest {
         assertThat(view.dataProvider().item(javaFile))
                 .returns(EditorTreeItemCollapsibleState.NONE, item -> item.collapsibleState())
                 .returns(Optional.of("src/main/java/example/Player.java"), item -> item.tooltip())
-                .returns(Optional.of(new EditorIcon(EditorIcons.SOURCE_ASSET, "File")), item -> item.icon())
+                .returns(Optional.of(new EditorIcon(EditorIcons.JAVA, "Java source")), item -> item.icon())
                 .returns(Optional.of("workspace-file"), item -> item.contextValue())
-                .returns(Optional.empty(), item -> item.command());
+                .satisfies(item -> assertThat(item.command()).isPresent());
+        view.selectionModel().orElseThrow().select(Optional.of(javaFile));
+        host.execute(view.dataProvider().item(javaFile).command().orElseThrow());
+        assertThat(fileRequests).containsExactly(javaFile.path().toUri());
+
+        WorkspaceExplorerEntry pom = named(rootChildren, "pom.xml");
+        assertThat(view.dataProvider().item(pom).icon()).contains(new EditorIcon(EditorIcons.MAVEN, "Maven project"));
 
         WorkspaceExplorerEntry editorState = named(rootChildren, ".jscene3d");
         assertThat(children(view, editorState))

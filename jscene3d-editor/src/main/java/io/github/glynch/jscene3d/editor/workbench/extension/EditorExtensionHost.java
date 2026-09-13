@@ -27,6 +27,8 @@ import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionDescriptor;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensions;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.file.EditorFileType;
+import io.github.glynch.jscene3d.editor.file.EditorFileTypes;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuContribution;
@@ -49,6 +51,7 @@ import io.github.glynch.jscene3d.editor.window.EditorWindow;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorCommandMenuRegistry;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.context.EditorContextState;
+import io.github.glynch.jscene3d.editor.workbench.file.EditorFileTypeRegistry;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
 import java.net.URI;
@@ -84,6 +87,8 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final Map<ViewId, EditorViewContribution> views = new LinkedHashMap<>();
     private final List<Consumer<List<EditorViewContribution>>> viewObservers = new ArrayList<>();
     private final List<Consumer<ViewId>> viewRequestObservers = new ArrayList<>();
+    private final List<Consumer<URI>> fileRequestObservers = new ArrayList<>();
+    private final EditorFileTypeRegistry fileTypes = new EditorFileTypeRegistry();
     private final Map<StatusItemId, StatusItemRegistration> statusItems = new LinkedHashMap<>();
     private final List<Consumer<List<EditorStatusItemSnapshot>>> statusObservers = new ArrayList<>();
     private final Map<DiagnosticCollectionId, DiagnosticCollectionRegistration> diagnosticCollections =
@@ -202,6 +207,25 @@ public final class EditorExtensionHost implements AutoCloseable {
     }
 
     /**
+     * Observes requests to open or reveal workspace files.
+     *
+     * @param observer synchronous file-open observer
+     * @return removable listener registration
+     */
+    public EditorRegistration observeFileRequests(Consumer<URI> observer) {
+        requireOpen();
+        Consumer<URI> listener = Objects.requireNonNull(observer, "observer");
+        fileRequestObservers.add(listener);
+        return once(() -> fileRequestObservers.remove(listener));
+    }
+
+    /** Resolves the contributed type for one workspace file. */
+    public Optional<EditorFileType> resolveFileType(URI resource) {
+        requireOpen();
+        return fileTypes.resolve(Objects.requireNonNull(resource, "resource"));
+    }
+
+    /**
      * Observes the complete ordered status-item snapshot.
      *
      * <p>The listener immediately receives the current snapshot and is notified after every item
@@ -278,6 +302,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         window.showView(view);
     }
 
+    /** Shows one extension or workbench message through the configured presentation. */
+    public void showMessage(EditorMessage message) {
+        window.showMessage(message);
+    }
+
     /** Shows one toolkit-independent application-modal dialog. */
     public Optional<EditorDialogButtonId> showDialog(EditorDialog dialog) {
         return window.showDialog(dialog);
@@ -308,6 +337,7 @@ public final class EditorExtensionHost implements AutoCloseable {
         activityObservers.clear();
         viewObservers.clear();
         viewRequestObservers.clear();
+        fileRequestObservers.clear();
         statusObservers.clear();
         diagnosticObservers.clear();
     }
@@ -592,6 +622,11 @@ public final class EditorExtensionHost implements AutoCloseable {
         }
 
         @Override
+        public EditorFileTypes fileTypes() {
+            return fileTypes;
+        }
+
+        @Override
         public EditorProjects projects() {
             return projects;
         }
@@ -624,6 +659,13 @@ public final class EditorExtensionHost implements AutoCloseable {
                 throw new IllegalStateException("view is not available in the current editor context: " + id);
             }
             List.copyOf(viewRequestObservers).forEach(observer -> observer.accept(id));
+        }
+
+        @Override
+        public void openFile(URI resource) {
+            requireOpen();
+            URI requested = Objects.requireNonNull(resource, "resource");
+            List.copyOf(fileRequestObservers).forEach(observer -> observer.accept(requested));
         }
 
         @Override

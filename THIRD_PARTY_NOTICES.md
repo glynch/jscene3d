@@ -1,5 +1,16 @@
 # Third-party notices
 
+## Monaco Editor
+
+- Creator: Microsoft Corporation and contributors
+- Source: [Microsoft/monaco-editor](https://github.com/microsoft/monaco-editor)
+- Copyright: Microsoft Corporation and contributors
+- License: [MIT](https://github.com/microsoft/monaco-editor/blob/main/LICENSE.txt)
+- Bundled dependency: `org.webjars.npm:monaco-editor`
+
+JScene3D embeds Monaco Editor in its JavaFX source-editor view. The WebJar includes
+the upstream MIT licence with the distributed resources.
+
 ## Visual Studio Code Codicons
 
 - Asset: Selected 16-pixel product icon vector paths

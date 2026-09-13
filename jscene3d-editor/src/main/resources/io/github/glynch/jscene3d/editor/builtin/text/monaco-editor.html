@@ -1,0 +1,103 @@
+<!doctype html>
+<!-- Copyright 2026 Graham Lynch; SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JScene3D Source Editor</title>
+    <style>
+      html, body, #editor { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0d1420; }
+      #failure { display: none; box-sizing: border-box; padding: 24px; color: #ff8b9a; font: 13px sans-serif; }
+    </style>
+    <script src="loader.js"></script>
+  </head>
+  <body>
+    <div id="editor"></div>
+    <div id="failure" role="alert"></div>
+    <script>
+      let editor;
+      let monacoReady = false;
+      let attachedBridge;
+      let initializationError;
+
+      function reportFailure(error) {
+        initializationError = String(error && error.message ? error.message : error);
+        document.getElementById('editor').style.display = 'none';
+        const failure = document.getElementById('failure');
+        failure.textContent = 'Unable to load the source editor: ' + initializationError;
+        failure.style.display = 'block';
+        if (attachedBridge) attachedBridge.initializationFailed(initializationError);
+      }
+
+      function initializeEditor() {
+        if (!monacoReady || !attachedBridge || editor || initializationError) return;
+        try {
+          const language = String(attachedBridge.language());
+          const resource = monaco.Uri.parse(String(attachedBridge.resource()));
+          const model = monaco.editor.createModel(String(attachedBridge.initialContent()), language, resource);
+          monaco.editor.defineTheme('jscene3d-dark', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [],
+            colors: {
+              'editor.background': '#0d1420',
+              'editor.foreground': '#d8dee9',
+              'editorLineNumber.foreground': '#667085',
+              'editorLineNumber.activeForeground': '#c7ced9',
+              'editorCursor.foreground': '#8b6cff',
+              'editor.selectionBackground': '#4e3ca180'
+            }
+          });
+          editor = monaco.editor.create(document.getElementById('editor'), {
+            model,
+            theme: 'jscene3d-dark',
+            automaticLayout: true,
+            fontFamily: 'Menlo, Monaco, Consolas, monospace',
+            fontSize: 13,
+            minimap: { enabled: true },
+            scrollBeyondLastLine: false,
+            tabSize: 4,
+            insertSpaces: true,
+            ariaLabel: String(attachedBridge.accessibleLabel())
+          });
+          model.onDidChangeContent(function () {
+            attachedBridge.contentChanged(model.getValue());
+          });
+          editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
+            attachedBridge.saveRequested();
+          });
+        } catch (error) {
+          reportFailure(error);
+        }
+      }
+
+      window.attachJavaBridge = function (bridge) {
+        attachedBridge = bridge;
+        if (initializationError) attachedBridge.initializationFailed(initializationError);
+        initializeEditor();
+      };
+      window.focusEditor = function () { if (editor) editor.focus(); };
+      window.runEditorCommand = function (command) {
+        if (editor) editor.trigger('jscene3d', command, null);
+      };
+      window.disposeEditor = function () {
+        if (editor) {
+          const model = editor.getModel();
+          editor.dispose();
+          if (model) model.dispose();
+          editor = undefined;
+        }
+      };
+
+      if (typeof require !== 'function') {
+        reportFailure('The bundled Monaco loader was not available');
+      } else {
+        require.config({ paths: { vs: '.' } });
+        require(['vs/editor/editor.main'], function () {
+          monacoReady = true;
+          initializeEditor();
+        }, reportFailure);
+      }
+    </script>
+  </body>
+</html>

@@ -14,9 +14,11 @@ import io.github.glynch.jscene3d.editor.builtin.diagnostics.ProjectDiagnosticsEx
 import io.github.glynch.jscene3d.editor.builtin.explorer.WorkspaceExplorerExtension;
 import io.github.glynch.jscene3d.editor.builtin.extensions.ExtensionsExtension;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
+import io.github.glynch.jscene3d.editor.builtin.image.ImageViewerExtension;
 import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
 import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
+import io.github.glynch.jscene3d.editor.builtin.text.SourceEditorExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectPublication;
@@ -86,6 +88,8 @@ public final class EditorApplication extends Application {
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
         extensionHost.activate(projectDiagnostics);
+        extensionHost.activate(new SourceEditorExtension());
+        extensionHost.activate(new ImageViewerExtension());
         extensionHost.activate(new WorkspaceExplorerExtension(projectContext));
         extensionHost.activate(new HierarchyExtension(projectContext));
         extensionHost.activate(new ExtensionsExtension());

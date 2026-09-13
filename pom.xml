@@ -90,6 +90,7 @@
         <kotlin.version>2.1.0</kotlin.version>
         <lwjgl.version>3.4.3</lwjgl.version>
         <javafx.version>21.0.12</javafx.version>
+        <monaco-editor.version>0.55.1</monaco-editor.version>
         <openglfx.version>4.2.3</openglfx.version>
         <nullaway.version>0.14.0</nullaway.version>
         <node.version>v24.18.0</node.version>
@@ -183,6 +184,16 @@
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-graphics</artifactId>
                 <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-web</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.webjars.npm</groupId>
+                <artifactId>monaco-editor</artifactId>
+                <version>${monaco-editor.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.huskerdev</groupId>

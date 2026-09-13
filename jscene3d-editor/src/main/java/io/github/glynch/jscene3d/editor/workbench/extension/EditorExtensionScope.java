@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensionContext;
 import io.github.glynch.jscene3d.editor.extension.EditorExtensions;
 import io.github.glynch.jscene3d.editor.file.EditorFileTypes;
+import io.github.glynch.jscene3d.editor.language.EditorLanguageSupports;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
@@ -36,6 +37,7 @@ final class EditorExtensionScope implements EditorExtensionContext {
             EditorWindow window,
             EditorDiagnostics diagnostics,
             EditorFileTypes fileTypes,
+            EditorLanguageSupports languageSupports,
             EditorColorThemes colorThemes,
             EditorProjects projects,
             EditorSelections selections) {
@@ -51,6 +53,7 @@ final class EditorExtensionScope implements EditorExtensionContext {
             Objects.requireNonNull(window, "window");
             Objects.requireNonNull(diagnostics, "diagnostics");
             Objects.requireNonNull(fileTypes, "fileTypes");
+            Objects.requireNonNull(languageSupports, "languageSupports");
             Objects.requireNonNull(colorThemes, "colorThemes");
             Objects.requireNonNull(projects, "projects");
             Objects.requireNonNull(selections, "selections");
@@ -118,6 +121,11 @@ final class EditorExtensionScope implements EditorExtensionContext {
     @Override
     public EditorFileTypes fileTypes() {
         return capabilities.fileTypes();
+    }
+
+    @Override
+    public EditorLanguageSupports languageSupports() {
+        return capabilities.languageSupports();
     }
 
     @Override

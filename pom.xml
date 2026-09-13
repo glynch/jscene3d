@@ -47,6 +47,8 @@
         <module>jscene3d-project-desktop</module>
         <module>jscene3d-project-export</module>
         <module>jscene3d-editor-api</module>
+        <module>jscene3d-editor-lsp</module>
+        <module>jscene3d-editor-java</module>
         <module>jscene3d-editor</module>
         <module>jscene3d-audio</module>
         <module>jscene3d-lwjgl</module>
@@ -269,6 +271,16 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-editor-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-editor-lsp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-editor-java</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

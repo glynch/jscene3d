@@ -31,6 +31,7 @@ import io.github.glynch.jscene3d.editor.workbench.appearance.InMemoryEditorAppea
 import io.github.glynch.jscene3d.editor.workbench.command.EditorCommandMenuRegistry;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.file.EditorFileTypeRegistry;
+import io.github.glynch.jscene3d.editor.workbench.language.EditorLanguageSupportRegistry;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.status.EditorStatusItemSnapshot;
@@ -49,6 +50,7 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final EditorContributionRegistry contributions = new EditorContributionRegistry();
     private final EditorExtensionCatalog catalog = new EditorExtensionCatalog();
     private final EditorFileTypeRegistry fileTypes = new EditorFileTypeRegistry();
+    private final EditorLanguageSupportRegistry languageSupports = new EditorLanguageSupportRegistry();
     private final EditorColorThemeRegistry colorThemes;
     private final EditorStatusItemRegistry statusItems = new EditorStatusItemRegistry();
     private final EditorDiagnosticRegistry diagnostics = new EditorDiagnosticRegistry();
@@ -97,6 +99,7 @@ public final class EditorExtensionHost implements AutoCloseable {
                 window,
                 diagnostics,
                 fileTypes,
+                languageSupports,
                 colorThemes,
                 projectContext,
                 Objects.requireNonNull(selections, "selections"));
@@ -236,6 +239,7 @@ public final class EditorExtensionHost implements AutoCloseable {
         commandMenus.close();
         statusItems.close();
         diagnostics.close();
+        languageSupports.close();
         window.close();
     }
 

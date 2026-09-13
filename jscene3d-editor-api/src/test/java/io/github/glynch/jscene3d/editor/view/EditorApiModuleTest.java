@@ -26,6 +26,7 @@ final class EditorApiModuleTest {
                         "io.github.glynch.jscene3d.editor.diagnostic",
                         "io.github.glynch.jscene3d.editor.extension",
                         "io.github.glynch.jscene3d.editor.file",
+                        "io.github.glynch.jscene3d.editor.language",
                         "io.github.glynch.jscene3d.editor.lifecycle",
                         "io.github.glynch.jscene3d.editor.menu",
                         "io.github.glynch.jscene3d.editor.project",

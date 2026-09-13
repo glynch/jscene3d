@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandRegistry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorDiagnostics;
 import io.github.glynch.jscene3d.editor.file.EditorFileTypes;
+import io.github.glynch.jscene3d.editor.language.EditorLanguageSupports;
 import io.github.glynch.jscene3d.editor.lifecycle.ExtensionSubscriptions;
 import io.github.glynch.jscene3d.editor.menu.EditorMenuRegistry;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
@@ -99,6 +100,13 @@ public interface EditorExtensionContext {
      * @return workspace file-type registry
      */
     EditorFileTypes fileTypes();
+
+    /**
+     * Returns the registry for project-scoped language support.
+     *
+     * @return language-support contribution registry
+     */
+    EditorLanguageSupports languageSupports();
 
     /**
      * Returns the registry for declarative editor color-theme contributions.

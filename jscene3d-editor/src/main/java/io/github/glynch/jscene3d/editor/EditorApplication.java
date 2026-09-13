@@ -21,6 +21,7 @@ import io.github.glynch.jscene3d.editor.builtin.project.ProjectExtension;
 import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
 import io.github.glynch.jscene3d.editor.builtin.text.SourceEditorExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.javalanguage.JavaLanguageExtension;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectPublication;
 import io.github.glynch.jscene3d.editor.workbench.appearance.EditorColorThemeRegistry;
@@ -96,6 +97,7 @@ public final class EditorApplication extends Application {
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
         extensionHost.activate(projectDiagnostics);
+        extensionHost.activate(new JavaLanguageExtension());
         extensionHost.activate(new SourceEditorExtension());
         extensionHost.activate(new ImageViewerExtension());
         extensionHost.activate(new WorkspaceExplorerExtension(projectContext));

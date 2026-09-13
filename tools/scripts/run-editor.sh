@@ -6,6 +6,7 @@ SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIRECTORY="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd)"
 EDITOR_TARGET_DIRECTORY="${PROJECT_DIRECTORY}/jscene3d-editor/target"
 EDITOR_MODULE_PATH="${EDITOR_TARGET_DIRECTORY}/editor-module-path"
+JDTLS_DIRECTORY="${PROJECT_DIRECTORY}/jscene3d-editor-java/target/jdtls"
 
 "${PROJECT_DIRECTORY}/mvnw" \
     -f "${PROJECT_DIRECTORY}/pom.xml" \
@@ -30,6 +31,7 @@ JAVA_EXECUTABLE="$(command -v java)"
 
 exec "${JAVA_EXECUTABLE}" \
     -Dprism.vsync=false \
+    -Djscene3d.jdtls.home="${JDTLS_DIRECTORY}" \
     --module-path "${EDITOR_JARS[0]}:${EDITOR_MODULE_PATH}" \
     --add-exports=javafx.graphics/com.sun.prism=openglfx \
     --add-exports=javafx.graphics/com.sun.javafx.scene.layout=openglfx \

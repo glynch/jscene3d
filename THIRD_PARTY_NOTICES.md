@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Eclipse JDT Language Server
+
+- Creator: Eclipse Foundation and contributors
+- Source: [Eclipse JDT Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls)
+- Bundled release: `1.61.0` (`jdt-language-server-1.61.0-202609031315.tar.gz`)
+- SHA-256: `338e7e73d61836651ba2453919a0d34fa763eb4e7c03342092309bffb8934c64`
+- License: [Eclipse Public License 2.0](https://www.eclipse.org/legal/epl-2.0/)
+
+The editor build downloads this exact archive from the Eclipse project,
+verifies its checksum, and stages it without modifying the bundled server
+files. The upstream archive contains its license and notice material.
+
 ## Monaco Editor
 
 - Creator: Microsoft Corporation and contributors

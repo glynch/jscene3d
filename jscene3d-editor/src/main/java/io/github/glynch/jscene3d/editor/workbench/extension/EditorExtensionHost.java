@@ -50,7 +50,7 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final EditorContributionRegistry contributions = new EditorContributionRegistry();
     private final EditorExtensionCatalog catalog = new EditorExtensionCatalog();
     private final EditorFileTypeRegistry fileTypes = new EditorFileTypeRegistry();
-    private final EditorLanguageSupportRegistry languageSupports = new EditorLanguageSupportRegistry();
+    private final EditorLanguageSupportRegistry languageSupports;
     private final EditorColorThemeRegistry colorThemes;
     private final EditorStatusItemRegistry statusItems = new EditorStatusItemRegistry();
     private final EditorDiagnosticRegistry diagnostics = new EditorDiagnosticRegistry();
@@ -87,6 +87,7 @@ public final class EditorExtensionHost implements AutoCloseable {
             EditorColorThemeRegistry colorThemes) {
         EditorProjectContext projectContext = Objects.requireNonNull(projects, "projects");
         this.colorThemes = Objects.requireNonNull(colorThemes, "colorThemes");
+        languageSupports = new EditorLanguageSupportRegistry(projectContext);
         capabilities = new EditorExtensionScope.Capabilities(
                 contributions,
                 contributions,

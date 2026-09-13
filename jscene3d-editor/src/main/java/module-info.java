@@ -6,6 +6,7 @@
 module io.github.glynch.jscene3d.editor {
     requires io.github.glynch.jscene3d.core;
     requires io.github.glynch.jscene3d.editor.api;
+    requires io.github.glynch.jscene3d.editor.javalanguage;
     requires io.github.glynch.jscene3d.game;
     requires io.github.glynch.jscene3d.lwjgl;
     requires io.github.glynch.jscene3d.project.importing;

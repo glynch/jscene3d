@@ -106,6 +106,7 @@
         <maven.compiler.version>3.15.0</maven.compiler.version>
         <maven.deploy.version>3.1.4</maven.deploy.version>
         <maven.dependency.version>3.10.0</maven.dependency.version>
+        <download.maven.version>2.1.0</download.maven.version>
         <maven.enforcer.version>3.6.3</maven.enforcer.version>
         <maven.failsafe.version>3.5.6</maven.failsafe.version>
         <maven.install.version>3.1.4</maven.install.version>
@@ -449,6 +450,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
                     <version>${maven.dependency.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>io.github.download-maven-plugin</groupId>
+                    <artifactId>download-maven-plugin</artifactId>
+                    <version>${download.maven.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

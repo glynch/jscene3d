@@ -12,6 +12,14 @@
     <name>JScene3D Editor Java Support</name>
     <description>Bundled Java language support for the JScene3D editor.</description>
 
+    <properties>
+        <jdtls.version>1.61.0</jdtls.version>
+        <jdtls.archive>jdt-language-server-1.61.0-202609031315.tar.gz</jdtls.archive>
+        <jdtls.sha256>338e7e73d61836651ba2453919a0d34fa763eb4e7c03342092309bffb8934c64</jdtls.sha256>
+        <jdtls.url>https://download.eclipse.org/jdtls/milestones/${jdtls.version}/${jdtls.archive}</jdtls.url>
+        <jdtls.stage.skip>true</jdtls.stage.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.github.glynch</groupId>
@@ -21,5 +29,81 @@
             <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-editor-lsp</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <configuration>
+                    <propertiesEncoding>UTF-8</propertiesEncoding>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>io.github.download-maven-plugin</groupId>
+                <artifactId>download-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>stage-jdt-language-server</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <uri>${jdtls.url}</uri>
+                            <sha256>${jdtls.sha256}</sha256>
+                            <alwaysVerifyChecksum>true</alwaysVerifyChecksum>
+                            <outputDirectory>${project.build.directory}/jdtls</outputDirectory>
+                            <outputFileName>${jdtls.archive}</outputFileName>
+                            <unpack>true</unpack>
+                            <unpackWhenChanged>true</unpackWhenChanged>
+                            <skip>${jdtls.stage.skip}</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>stage-jdtls</id>
+            <properties>
+                <jdtls.stage.skip>false</jdtls.stage.skip>
+            </properties>
+        </profile>
+        <profile>
+            <id>prepare-editor-run</id>
+            <properties>
+                <jdtls.stage.skip>false</jdtls.stage.skip>
+            </properties>
+        </profile>
+        <profile>
+            <id>editor-distribution-macos-arm64</id>
+            <properties>
+                <jdtls.stage.skip>false</jdtls.stage.skip>
+            </properties>
+        </profile>
+    </profiles>
 </project>

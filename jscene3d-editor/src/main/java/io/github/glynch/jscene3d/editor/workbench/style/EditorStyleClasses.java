@@ -133,6 +133,8 @@ public final class EditorStyleClasses {
     /** CSS class named {@value}. */
     public static final String EDITOR_EDITOR_TAB_DIRTY = "editor-editor-tab-dirty";
     /** CSS class named {@value}. */
+    public static final String EDITOR_EDITOR_TAB_PREVIEW = "editor-editor-tab-preview";
+    /** CSS class named {@value}. */
     public static final String EDITOR_EDITOR_TAB_TITLE = "editor-editor-tab-title";
     /** CSS class named {@value}. */
     public static final String EDITOR_AREA_TABS = "editor-area-tabs";

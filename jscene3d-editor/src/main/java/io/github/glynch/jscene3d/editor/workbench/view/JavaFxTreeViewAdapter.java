@@ -30,6 +30,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -67,11 +68,13 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
         });
         tree.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2) {
-                Optional.ofNullable(tree.getSelectionModel().getSelectedItem())
-                        .map(TreeItem::getValue)
-                        .map(provider::item)
-                        .flatMap(EditorTreeItem::command)
-                        .ifPresent(commands);
+                executeSelectedCommand(commands);
+            }
+        });
+        tree.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                executeSelectedCommand(commands);
+                event.consume();
             }
         });
         dataRegistration = provider.observeChanges(ignored -> reload());
@@ -87,6 +90,14 @@ final class JavaFxTreeViewAdapter<T> implements AutoCloseable {
     /** Requests keyboard focus for this rendered tree. */
     void requestFocus() {
         tree.requestFocus();
+    }
+
+    private void executeSelectedCommand(Consumer<CommandId> commands) {
+        Optional.ofNullable(tree.getSelectionModel().getSelectedItem())
+                .map(TreeItem::getValue)
+                .map(provider::item)
+                .flatMap(EditorTreeItem::command)
+                .ifPresent(commands);
     }
 
     @Override

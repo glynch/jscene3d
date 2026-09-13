@@ -465,6 +465,10 @@
     -fx-text-fill: -jscene-text;
 }
 
+.editor-editor-tab-preview {
+    -fx-font-style: italic;
+}
+
 .editor-editor-tab-dirty {
     -fx-background-color: -jscene-warning;
     -fx-background-radius: 999px;

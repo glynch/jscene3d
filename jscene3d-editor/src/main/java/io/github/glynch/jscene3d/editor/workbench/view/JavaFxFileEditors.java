@@ -16,10 +16,10 @@ import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.dialog.EditorWindowCloseGuard;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.extension.EditorFileOpenRequest;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorWorkingCopyRegistry;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -43,6 +43,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
     private final Map<Path, JavaFxOpenFile> openFiles = new LinkedHashMap<>();
     private final EditorWorkingCopyRegistry workingCopies = new EditorWorkingCopyRegistry();
     private final EditorRegistration requestRegistration;
+    private @Nullable JavaFxOpenFile previewFile;
 
     /** Connects file-open requests to file-type-specific editor tabs. */
     public JavaFxFileEditors(
@@ -93,10 +94,10 @@ public final class JavaFxFileEditors implements AutoCloseable {
         selectedFile().ifPresent(JavaFxOpenFile::redo);
     }
 
-    private void openFile(URI resource) {
+    private void openFile(EditorFileOpenRequest request) {
         Path path;
         try {
-            path = Path.of(Objects.requireNonNull(resource, "resource"))
+            path = Path.of(Objects.requireNonNull(request, "request").resource())
                     .toAbsolutePath()
                     .normalize();
         } catch (IllegalArgumentException exception) {
@@ -105,7 +106,7 @@ public final class JavaFxFileEditors implements AutoCloseable {
         }
         JavaFxOpenFile existing = openFiles.get(path);
         if (existing != null) {
-            area.select(existing.tab());
+            reveal(existing, request.disposition());
             return;
         }
         if (!Files.isRegularFile(path)) {
@@ -113,21 +114,27 @@ public final class JavaFxFileEditors implements AutoCloseable {
             return;
         }
         try {
-            JavaFxOpenFile opened = createFileEditor(path, extensions.resolveFileType(path.toUri()));
+            boolean pinned = request.disposition() == EditorFileOpenRequest.Disposition.PINNED;
+            JavaFxOpenFile opened = createFileEditor(path, extensions.resolveFileType(path.toUri()), pinned);
+            if (!pinned) {
+                discardPreview();
+                previewFile = opened;
+            }
             openFiles.put(path, opened);
             area.add(opened.tab(), opened::requestFocus);
-            area.select(opened.tab());
+            reveal(opened, request.disposition());
             stateChanged.run();
         } catch (IOException | RuntimeException exception) {
             showFileError("Unable to open " + path.getFileName(), exception);
         }
     }
 
-    private JavaFxOpenFile createFileEditor(Path path, Optional<EditorFileType> resolved) throws IOException {
+    private JavaFxOpenFile createFileEditor(Path path, Optional<EditorFileType> resolved, boolean pinned)
+            throws IOException {
         if (resolved.map(EditorFileType::kind)
                 .filter(EditorFileKind.IMAGE::equals)
                 .isPresent()) {
-            return createImageEditor(path, resolved.orElseThrow().icon());
+            return createImageEditor(path, resolved.orElseThrow().icon(), pinned);
         }
         EditorTextFileWorkingCopy workingCopy = EditorTextFileWorkingCopy.load(path);
         EditorFileType type = resolved.filter(candidate -> candidate.kind() == EditorFileKind.TEXT)
@@ -145,10 +152,10 @@ public final class JavaFxFileEditors implements AutoCloseable {
                 exception -> showFileError("Unable to save " + path.getFileName(), exception));
         JavaFxFileEditorContent content =
                 new JavaFxFileEditorContent(editor.node(), editor::requestFocus, editor::undo, editor::redo, editor);
-        return openFile(path, icon, content, workingCopy, registration);
+        return createOpenFile(path, icon, content, workingCopy, registration, pinned);
     }
 
-    private JavaFxOpenFile createImageEditor(Path path, EditorIcon icon) {
+    private JavaFxOpenFile createImageEditor(Path path, EditorIcon icon, boolean pinned) {
         ImageView image = new ImageView(new Image(path.toUri().toString(), true));
         image.setPreserveRatio(true);
         image.setSmooth(true);
@@ -159,31 +166,64 @@ public final class JavaFxFileEditors implements AutoCloseable {
         image.fitHeightProperty().bind(scroll.heightProperty().subtract(48.0));
         JavaFxFileEditorContent content =
                 new JavaFxFileEditorContent(scroll, scroll::requestFocus, () -> {}, () -> {}, () -> {});
-        return openFile(path, icon, content, null, () -> {});
+        return createOpenFile(path, icon, content, null, () -> {}, pinned);
     }
 
-    private JavaFxOpenFile openFile(
+    private JavaFxOpenFile createOpenFile(
             Path path,
             EditorIcon icon,
             JavaFxFileEditorContent content,
             @Nullable EditorTextFileWorkingCopy workingCopy,
-            EditorRegistration registration) {
+            EditorRegistration registration,
+            boolean pinned) {
         return new JavaFxOpenFile(
                 path,
                 icon,
                 icons,
                 content,
+                pinned,
                 new JavaFxOpenFile.Lifecycle(
                         workingCopy,
                         registration,
                         closeGuard,
                         stateChanged,
                         extensions::showMessage,
+                        this::filePinned,
                         this::removeFile));
+    }
+
+    private void reveal(JavaFxOpenFile file, EditorFileOpenRequest.Disposition disposition) {
+        if (disposition == EditorFileOpenRequest.Disposition.PINNED) {
+            if (!file.isPinned()) {
+                file.pin();
+            }
+            area.select(file.tab());
+        } else {
+            area.preview(file.tab());
+        }
+    }
+
+    private void discardPreview() {
+        JavaFxOpenFile discarded = previewFile;
+        previewFile = null;
+        if (discarded != null && openFiles.remove(discarded.path(), discarded)) {
+            area.removePreview(discarded.tab());
+            discarded.close();
+        }
+    }
+
+    private void filePinned(JavaFxOpenFile file) {
+        if (previewFile == file) {
+            previewFile = null;
+            stateChanged.run();
+        }
     }
 
     private void removeFile(JavaFxOpenFile file) {
         if (openFiles.remove(file.path(), file)) {
+            if (previewFile == file) {
+                previewFile = null;
+            }
             file.close();
             stateChanged.run();
         }
@@ -208,5 +248,6 @@ public final class JavaFxFileEditors implements AutoCloseable {
         files.forEach(file -> area.remove(file.tab()));
         files.forEach(JavaFxOpenFile::close);
         openFiles.clear();
+        previewFile = null;
     }
 }

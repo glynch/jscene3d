@@ -34,14 +34,12 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -110,6 +108,7 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
                         .register(
                                 new EditorCommandContribution(OPEN_FILE, "Open File"),
                                 ignored -> explorer.openSelection(editor.window())));
+        editor.subscriptions().add(explorer.previewSelectionsWith(editor.window()));
         editor.subscriptions()
                 .add(editor.views()
                         .register(new EditorViewContribution(
@@ -160,6 +159,13 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
                     .selection()
                     .filter(entry -> entry.kind() == WorkspaceExplorerEntry.Kind.FILE)
                     .ifPresent(entry -> window.openFile(entry.path().toUri()));
+        }
+
+        private EditorRegistration previewSelectionsWith(EditorWindow window) {
+            EditorWindow editorWindow = Objects.requireNonNull(window, "window");
+            return selectionModel.observe(selection -> selection
+                    .filter(entry -> entry.kind() == WorkspaceExplorerEntry.Kind.FILE)
+                    .ifPresent(entry -> editorWindow.previewFile(entry.path().toUri())));
         }
     }
 
@@ -240,38 +246,6 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
                             .resolve(entry.path().toUri())
                             .map(EditorFileType::icon)
                             .orElseGet(() -> new EditorIcon(EditorIcons.TEXT_FILE, "File"));
-            };
-        }
-    }
-
-    private static final class ExplorerSelectionModel implements EditorTreeSelectionModel<WorkspaceExplorerEntry> {
-        private final List<Consumer<Optional<WorkspaceExplorerEntry>>> observers = new ArrayList<>();
-        private Optional<WorkspaceExplorerEntry> selection = Optional.empty();
-
-        @Override
-        public Optional<WorkspaceExplorerEntry> selection() {
-            return selection;
-        }
-
-        @Override
-        public void select(Optional<WorkspaceExplorerEntry> selected) {
-            Optional<WorkspaceExplorerEntry> replacement = Objects.requireNonNull(selected, "selection");
-            if (!selection.equals(replacement)) {
-                selection = replacement;
-                List.copyOf(observers).forEach(observer -> observer.accept(selection));
-            }
-        }
-
-        @Override
-        public EditorRegistration observe(Consumer<Optional<WorkspaceExplorerEntry>> listener) {
-            Consumer<Optional<WorkspaceExplorerEntry>> observer = Objects.requireNonNull(listener, "listener");
-            observers.add(observer);
-            observer.accept(selection);
-            AtomicBoolean active = new AtomicBoolean(true);
-            return () -> {
-                if (active.compareAndSet(true, false)) {
-                    observers.remove(observer);
-                }
             };
         }
     }

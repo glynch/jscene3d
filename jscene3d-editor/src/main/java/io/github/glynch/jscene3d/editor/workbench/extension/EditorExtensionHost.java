@@ -138,8 +138,8 @@ public final class EditorExtensionHost implements AutoCloseable {
         return window.observeViewRequests(observer);
     }
 
-    /** Observes requests to open or reveal workspace files. */
-    public EditorRegistration observeFileRequests(Consumer<URI> observer) {
+    /** Observes requests to preview or open workspace files. */
+    public EditorRegistration observeFileRequests(Consumer<EditorFileOpenRequest> observer) {
         requireOpen();
         return window.observeFileRequests(observer);
     }

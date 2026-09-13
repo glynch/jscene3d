@@ -31,16 +31,20 @@ final class JavaFxOpenFile implements AutoCloseable {
             EditorWindowCloseGuard closeGuard,
             Runnable stateChanged,
             Consumer<EditorMessage> messages,
+            Consumer<JavaFxOpenFile> pinned,
             Consumer<JavaFxOpenFile> removed) {}
 
     private final Path path;
     private final Tab tab = new Tab();
+    private final Label title;
     private final JavaFxFileEditorContent content;
     private final @Nullable EditorTextFileWorkingCopy workingCopy;
     private final EditorRegistration workingCopyRegistration;
     private final EditorRegistration dirtyPresentationRegistration;
     private final Runnable stateChanged;
     private final Consumer<EditorMessage> messages;
+    private final Consumer<JavaFxOpenFile> pinListener;
+    private boolean pinned;
     private boolean closed;
 
     JavaFxOpenFile(
@@ -48,6 +52,7 @@ final class JavaFxOpenFile implements AutoCloseable {
             EditorIcon icon,
             JavaFxIconRenderer icons,
             JavaFxFileEditorContent content,
+            boolean pinned,
             Lifecycle lifecycle) {
         Lifecycle owner = Objects.requireNonNull(lifecycle, "lifecycle");
         this.path = Objects.requireNonNull(path, "path");
@@ -57,10 +62,13 @@ final class JavaFxOpenFile implements AutoCloseable {
                 Objects.requireNonNull(owner.workingCopyRegistration(), "workingCopyRegistration");
         this.stateChanged = Objects.requireNonNull(owner.stateChanged(), "stateChanged");
         this.messages = Objects.requireNonNull(owner.messages(), "messages");
+        this.pinListener = Objects.requireNonNull(owner.pinned(), "pinned");
+        this.pinned = pinned;
 
         Region dirty = createDirtyIndicator();
-        Label title = new Label(path.getFileName().toString());
+        title = new Label(path.getFileName().toString());
         title.getStyleClass().add(EditorStyleClasses.EDITOR_EDITOR_TAB_TITLE);
+        updatePinnedPresentation();
         HBox graphic = new HBox(7.0, Objects.requireNonNull(icons, "icons").create(icon), title, dirty);
         graphic.setAlignment(Pos.CENTER_LEFT);
         graphic.getStyleClass().add(EditorStyleClasses.EDITOR_EDITOR_TAB);
@@ -69,6 +77,11 @@ final class JavaFxOpenFile implements AutoCloseable {
         tab.setGraphic(graphic);
         tab.setContent(content.node());
         tab.setClosable(true);
+        graphic.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                pin();
+            }
+        });
         dirtyPresentationRegistration = observeDirtyPresentation(dirty);
         tab.setOnCloseRequest(event -> {
             if (!confirmClose(Objects.requireNonNull(owner.closeGuard(), "closeGuard"))) {
@@ -89,6 +102,18 @@ final class JavaFxOpenFile implements AutoCloseable {
 
     boolean isDirty() {
         return workingCopy != null && workingCopy.isDirty();
+    }
+
+    boolean isPinned() {
+        return pinned;
+    }
+
+    void pin() {
+        if (!pinned) {
+            pinned = true;
+            updatePinnedPresentation();
+            pinListener.accept(this);
+        }
     }
 
     boolean save() {
@@ -127,13 +152,26 @@ final class JavaFxOpenFile implements AutoCloseable {
     private EditorRegistration observeDirtyPresentation(Region dirty) {
         return workingCopy == null
                 ? () -> {}
-                : workingCopy.onDidChangeDirty().subscribe(ignored -> updateDirtyIndicator(dirty));
+                : workingCopy.onDidChangeDirty().subscribe(ignored -> {
+                    updateDirtyIndicator(dirty);
+                    if (isDirty()) {
+                        pin();
+                    }
+                });
     }
 
     private void updateDirtyIndicator(Region dirty) {
         boolean dirtyState = isDirty();
         dirty.setVisible(dirtyState);
         dirty.setManaged(dirtyState);
+    }
+
+    private void updatePinnedPresentation() {
+        if (pinned) {
+            title.getStyleClass().remove(EditorStyleClasses.EDITOR_EDITOR_TAB_PREVIEW);
+        } else if (!title.getStyleClass().contains(EditorStyleClasses.EDITOR_EDITOR_TAB_PREVIEW)) {
+            title.getStyleClass().add(EditorStyleClasses.EDITOR_EDITOR_TAB_PREVIEW);
+        }
     }
 
     private boolean confirmClose(EditorWindowCloseGuard closeGuard) {

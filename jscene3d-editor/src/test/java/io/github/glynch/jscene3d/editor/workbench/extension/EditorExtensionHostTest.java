@@ -56,7 +56,7 @@ final class EditorExtensionHostTest {
         List<List<EditorViewContribution>> viewSnapshots = new ArrayList<>();
         List<EditorMessage> messages = new ArrayList<>();
         List<ViewId> viewRequests = new ArrayList<>();
-        List<URI> fileRequests = new ArrayList<>();
+        List<EditorFileOpenRequest> fileRequests = new ArrayList<>();
         List<List<EditorStatusItemSnapshot>> statusSnapshots = new ArrayList<>();
         List<List<EditorDiagnosticSnapshot>> diagnosticSnapshots = new ArrayList<>();
         AtomicReference<EditorStatusItem> status = new AtomicReference<>();
@@ -80,7 +80,9 @@ final class EditorExtensionHostTest {
                 .isEqualTo(VIEW_ID);
         assertThat(messages).containsExactly(new EditorMessage(EditorMessageSeverity.INFORMATION, "Hello"));
         assertThat(viewRequests).containsExactly(VIEW_ID);
-        assertThat(fileRequests).containsExactly(URI.create("file:///workspace/pom.xml"));
+        assertThat(fileRequests)
+                .containsExactly(new EditorFileOpenRequest(
+                        URI.create("file:///workspace/pom.xml"), EditorFileOpenRequest.Disposition.PINNED));
         assertThat(statusSnapshots.getLast())
                 .singleElement()
                 .extracting(item -> item.state().text())

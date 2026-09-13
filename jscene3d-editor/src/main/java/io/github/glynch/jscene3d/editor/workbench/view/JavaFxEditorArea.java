@@ -20,6 +20,7 @@ public final class JavaFxEditorArea implements AutoCloseable {
     private final TabPane tabs = new TabPane();
     private final Map<Tab, Runnable> focusRequests = new IdentityHashMap<>();
     private final List<Runnable> selectionObservers = new ArrayList<>();
+    private int focusSuppressionDepth;
 
     /** Creates an empty editor area. */
     public JavaFxEditorArea() {
@@ -28,7 +29,9 @@ public final class JavaFxEditorArea implements AutoCloseable {
         tabs.getStyleClass().add(EditorStyleClasses.EDITOR_AREA_TABS);
         tabs.getSelectionModel().selectedItemProperty().addListener((ignored, previous, selected) -> {
             List.copyOf(selectionObservers).forEach(Runnable::run);
-            requestFocus(selected);
+            if (focusSuppressionDepth == 0) {
+                requestFocus(selected);
+            }
         });
     }
 
@@ -62,9 +65,17 @@ public final class JavaFxEditorArea implements AutoCloseable {
         }
     }
 
+    void preview(Tab tab) {
+        withoutFocusRequests(() -> tabs.getSelectionModel().select(tab));
+    }
+
     void remove(Tab tab) {
         focusRequests.remove(tab);
         tabs.getTabs().remove(tab);
+    }
+
+    void removePreview(Tab tab) {
+        withoutFocusRequests(() -> remove(tab));
     }
 
     boolean contains(Tab tab) {
@@ -86,6 +97,15 @@ public final class JavaFxEditorArea implements AutoCloseable {
         Runnable request = focusRequests.get(tab);
         if (request != null) {
             request.run();
+        }
+    }
+
+    private void withoutFocusRequests(Runnable action) {
+        focusSuppressionDepth++;
+        try {
+            action.run();
+        } finally {
+            focusSuppressionDepth--;
         }
     }
 

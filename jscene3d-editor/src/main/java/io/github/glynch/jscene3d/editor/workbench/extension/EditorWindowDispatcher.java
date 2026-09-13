@@ -28,7 +28,7 @@ final class EditorWindowDispatcher implements EditorWindow, AutoCloseable {
 
     private final EditorContributionRegistry contributions;
     private final List<Consumer<ViewId>> viewRequestObservers = new ArrayList<>();
-    private final List<Consumer<URI>> fileRequestObservers = new ArrayList<>();
+    private final List<Consumer<EditorFileOpenRequest>> fileRequestObservers = new ArrayList<>();
     private Consumer<EditorMessage> messageSink = DEFAULT_MESSAGE_SINK;
     private Function<EditorDialog, Optional<EditorDialogButtonId>> dialogSink = DEFAULT_DIALOG_SINK;
     private boolean closed;
@@ -44,9 +44,9 @@ final class EditorWindowDispatcher implements EditorWindow, AutoCloseable {
         return EditorRegistrationOnce.of(() -> viewRequestObservers.remove(listener));
     }
 
-    EditorRegistration observeFileRequests(Consumer<URI> observer) {
+    EditorRegistration observeFileRequests(Consumer<EditorFileOpenRequest> observer) {
         requireOpen();
-        Consumer<URI> listener = Objects.requireNonNull(observer, "observer");
+        Consumer<EditorFileOpenRequest> listener = Objects.requireNonNull(observer, "observer");
         fileRequestObservers.add(listener);
         return EditorRegistrationOnce.of(() -> fileRequestObservers.remove(listener));
     }
@@ -76,9 +76,12 @@ final class EditorWindowDispatcher implements EditorWindow, AutoCloseable {
 
     @Override
     public void openFile(URI resource) {
-        requireOpen();
-        URI requested = Objects.requireNonNull(resource, "resource");
-        List.copyOf(fileRequestObservers).forEach(observer -> observer.accept(requested));
+        publishFileRequest(resource, EditorFileOpenRequest.Disposition.PINNED);
+    }
+
+    @Override
+    public void previewFile(URI resource) {
+        publishFileRequest(resource, EditorFileOpenRequest.Disposition.PREVIEW);
     }
 
     @Override
@@ -100,5 +103,12 @@ final class EditorWindowDispatcher implements EditorWindow, AutoCloseable {
         if (closed) {
             throw new IllegalStateException("window dispatcher is closed");
         }
+    }
+
+    private void publishFileRequest(URI resource, EditorFileOpenRequest.Disposition disposition) {
+        requireOpen();
+        EditorFileOpenRequest request =
+                new EditorFileOpenRequest(Objects.requireNonNull(resource, "resource"), disposition);
+        List.copyOf(fileRequestObservers).forEach(observer -> observer.accept(request));
     }
 }

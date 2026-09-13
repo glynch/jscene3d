@@ -26,12 +26,23 @@ public interface EditorWindow {
     void showView(ViewId view);
 
     /**
-     * Opens or reveals an editor for one workspace file.
+     * Opens or reveals a pinned editor for one workspace file and requests editor focus.
      *
      * @param resource file resource URI
      */
     default void openFile(URI resource) {
         throw new UnsupportedOperationException("this editor window does not support opening files");
+    }
+
+    /**
+     * Previews one workspace file without taking focus from the requesting view.
+     *
+     * <p>A later preview may replace this editor until the file is explicitly opened or modified.
+     *
+     * @param resource file resource URI
+     */
+    default void previewFile(URI resource) {
+        openFile(resource);
     }
 
     /**

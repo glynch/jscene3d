@@ -20,9 +20,9 @@ import io.github.glynch.jscene3d.editor.view.EditorTreeView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.extension.EditorFileOpenRequest;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -45,7 +45,7 @@ final class WorkspaceExplorerExtensionTest {
         EditorExtensionHost host = new EditorExtensionHost(projects, new EditorSelectionContext());
         List<List<EditorViewContribution>> viewSnapshots = new ArrayList<>();
         List<List<EditorActivityContribution>> activitySnapshots = new ArrayList<>();
-        List<URI> fileRequests = new ArrayList<>();
+        List<EditorFileOpenRequest> fileRequests = new ArrayList<>();
         host.observeViews(viewSnapshots::add);
         host.observeActivities(activitySnapshots::add);
         host.observeFileRequests(fileRequests::add);
@@ -99,7 +99,10 @@ final class WorkspaceExplorerExtensionTest {
                 .satisfies(item -> assertThat(item.command()).isPresent());
         view.selectionModel().orElseThrow().select(Optional.of(javaFile));
         host.execute(view.dataProvider().item(javaFile).command().orElseThrow());
-        assertThat(fileRequests).containsExactly(javaFile.path().toUri());
+        assertThat(fileRequests)
+                .containsExactly(
+                        new EditorFileOpenRequest(javaFile.path().toUri(), EditorFileOpenRequest.Disposition.PREVIEW),
+                        new EditorFileOpenRequest(javaFile.path().toUri(), EditorFileOpenRequest.Disposition.PINNED));
 
         WorkspaceExplorerEntry pom = named(rootChildren, "pom.xml");
         assertThat(view.dataProvider().item(pom).icon()).contains(new EditorIcon(EditorIcons.MAVEN, "Maven project"));

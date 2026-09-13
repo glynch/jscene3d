@@ -262,8 +262,10 @@ Verification:
   currently describes a focused category label as text inside a table and
   directs users to navigate with Control-Option plus an arrow key, which makes
   ordinary tree navigation difficult to discover;
-- add `.jscene3d/settings.json` project settings before persisting layout or
-  extension settings;
+- implement the settings-backed Workspace Explorer inclusion and exclusion
+  contract recorded in
+  [Editor Workspace Explorer](../design/editor-workspace-explorer.md), including
+  glob validation and live refresh from the existing project-settings system;
 - design theme contributions for dark/light color themes and installable icon
   themes without exposing JavaFX CSS names as the extension contract;
 - audit all non-test source files over 300 lines and split orchestration classes

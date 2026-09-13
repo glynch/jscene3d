@@ -8,10 +8,16 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /** One project-contained filesystem entry presented by the Workspace Explorer. */
-record WorkspaceExplorerEntry(Path path, String label, Kind kind) {
+record WorkspaceExplorerEntry(Path workspaceRoot, Path path, String label, Kind kind) {
     /** Validates one normalized absolute workspace entry. */
     WorkspaceExplorerEntry {
+        workspaceRoot = Objects.requireNonNull(workspaceRoot, "workspaceRoot")
+                .toAbsolutePath()
+                .normalize();
         path = Objects.requireNonNull(path, "path").toAbsolutePath().normalize();
+        if (!path.startsWith(workspaceRoot)) {
+            throw new IllegalArgumentException("path must remain inside workspaceRoot");
+        }
         if (Objects.requireNonNull(label, "label").isBlank()) {
             throw new IllegalArgumentException("label must not be blank");
         }

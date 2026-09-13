@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -45,7 +46,9 @@ final class WorkspaceExplorerExtensionTest {
         host.observeViews(viewSnapshots::add);
         host.observeActivities(activitySnapshots::add);
 
-        host.activate(new WorkspaceExplorerExtension(projects));
+        WorkspaceExplorerExclusionPolicy exclusions = WorkspaceExplorerExclusionPolicy.defaults()
+                .plus(WorkspaceExplorerExclusionPolicy.of(Set.of(), Set.of("local.env"), Set.of()));
+        host.activate(new WorkspaceExplorerExtension(projects, exclusions));
         assertThat(viewSnapshots.getLast()).isEmpty();
         assertThat(activitySnapshots.getLast()).isEmpty();
 
@@ -105,6 +108,7 @@ final class WorkspaceExplorerExtensionTest {
         Files.createDirectories(workspace.resolve("src/main/java/example"));
         Files.writeString(workspace.resolve("src/main/java/example/Player.java"), "final class Player {}\n");
         Files.writeString(workspace.resolve("pom.xml"), "<project/>\n");
+        Files.writeString(workspace.resolve("local.env"), "private\n");
         Files.createDirectories(workspace.resolve("target/classes"));
         Files.writeString(workspace.resolve("target/classes/Player.class"), "generated\n");
         Files.createDirectories(workspace.resolve(".git"));

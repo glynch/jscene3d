@@ -51,6 +51,7 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
             .thenComparing(entry -> entry.path().toString());
 
     private final EditorProjects projects;
+    private final WorkspaceExplorerExclusionPolicy exclusions;
 
     /**
      * Creates the built-in Explorer over the editor's current-project lifecycle.
@@ -58,7 +59,18 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
      * @param projects current project workspace
      */
     public WorkspaceExplorerExtension(EditorProjects projects) {
+        this(projects, WorkspaceExplorerExclusionPolicy.defaults());
+    }
+
+    /**
+     * Creates the built-in Explorer with additional workspace exclusion policy sources already composed.
+     *
+     * @param projects current project workspace
+     * @param exclusions exclusions applied to workspace entries
+     */
+    public WorkspaceExplorerExtension(EditorProjects projects, WorkspaceExplorerExclusionPolicy exclusions) {
         this.projects = Objects.requireNonNull(projects, "projects");
+        this.exclusions = Objects.requireNonNull(exclusions, "exclusions");
     }
 
     @Override
@@ -132,7 +144,7 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
             if (entry.kind() == WorkspaceExplorerEntry.Kind.FILE) {
                 return CompletableFuture.completedFuture(List.of());
             }
-            return CompletableFuture.supplyAsync(() -> childrenOf(entry.path()));
+            return CompletableFuture.supplyAsync(() -> childrenOf(entry));
         }
 
         @Override
@@ -163,63 +175,38 @@ public final class WorkspaceExplorerExtension implements EditorExtension {
             return projects.observe(ignored -> observer.accept(Optional.empty()));
         }
 
+        private List<WorkspaceExplorerEntry> childrenOf(WorkspaceExplorerEntry parent) {
+            try (Stream<Path> children = Files.list(parent.path())) {
+                return children.filter(path -> exclusions.includes(parent.workspaceRoot(), path))
+                        .map(path -> entry(parent.workspaceRoot(), path))
+                        .sorted(ENTRY_ORDER)
+                        .toList();
+            } catch (IOException exception) {
+                throw new UncheckedIOException("Unable to read workspace directory: " + parent.path(), exception);
+            }
+        }
+
         private String tooltip(WorkspaceExplorerEntry entry) {
             if (entry.kind() == WorkspaceExplorerEntry.Kind.WORKSPACE) {
                 return entry.path().toString();
             }
-            return projects.current()
-                    .map(EditorProject::root)
-                    .map(Path::of)
-                    .map(Path::toAbsolutePath)
-                    .map(Path::normalize)
-                    .filter(entry.path()::startsWith)
-                    .map(root -> root.relativize(entry.path()).toString())
-                    .orElseGet(() -> entry.path().toString());
+            return entry.workspaceRoot().relativize(entry.path()).toString();
         }
     }
 
     private static WorkspaceExplorerEntry workspaceEntry(EditorProject project) {
         EditorProject workspace = Objects.requireNonNull(project, "project");
-        return new WorkspaceExplorerEntry(
-                Path.of(workspace.root()), workspace.name(), WorkspaceExplorerEntry.Kind.WORKSPACE);
+        Path root = Path.of(workspace.root()).toAbsolutePath().normalize();
+        return new WorkspaceExplorerEntry(root, root, workspace.name(), WorkspaceExplorerEntry.Kind.WORKSPACE);
     }
 
-    private static List<WorkspaceExplorerEntry> childrenOf(Path directory) {
-        try (Stream<Path> children = Files.list(directory)) {
-            return children.filter(WorkspaceExplorerExtension::isVisible)
-                    .map(WorkspaceExplorerExtension::entry)
-                    .sorted(ENTRY_ORDER)
-                    .toList();
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Unable to read workspace directory: " + directory, exception);
-        }
-    }
-
-    private static WorkspaceExplorerEntry entry(Path path) {
+    private static WorkspaceExplorerEntry entry(Path workspaceRoot, Path path) {
         Path absolute = path.toAbsolutePath().normalize();
         Path fileName = absolute.getFileName();
         WorkspaceExplorerEntry.Kind kind = Files.isDirectory(absolute, LinkOption.NOFOLLOW_LINKS)
                 ? WorkspaceExplorerEntry.Kind.DIRECTORY
                 : WorkspaceExplorerEntry.Kind.FILE;
-        return new WorkspaceExplorerEntry(absolute, fileName == null ? absolute.toString() : fileName.toString(), kind);
-    }
-
-    private static boolean isVisible(Path path) {
-        if (Files.isSymbolicLink(path)) {
-            return false;
-        }
-        Path fileName = path.getFileName();
-        if (fileName == null) {
-            return true;
-        }
-        String name = fileName.toString();
-        if (name.equals(".git") || name.equals("target") || name.equals(".DS_Store")) {
-            return false;
-        }
-        Path parent = path.getParent();
-        return !name.equals("cache")
-                || parent == null
-                || parent.getFileName() == null
-                || !parent.getFileName().toString().equals(".jscene3d");
+        return new WorkspaceExplorerEntry(
+                workspaceRoot, absolute, fileName == null ? absolute.toString() : fileName.toString(), kind);
     }
 }

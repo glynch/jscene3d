@@ -6,7 +6,6 @@ package io.github.glynch.jscene3d.editor.builtin.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
@@ -19,6 +18,7 @@ import io.github.glynch.jscene3d.editor.view.EditorIcons;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.net.URI;
 import java.nio.file.Path;

@@ -4,11 +4,11 @@
  */
 package io.github.glynch.jscene3d.editor.extension.project;
 
-import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
 import io.github.glynch.jscene3d.editor.project.EditorProjects;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor;
 
+import io.github.glynch.jscene3d.editor.project.checking.EditorProjectCheck;
 import javafx.application.Application;
 
 /** Named-module entry point for the JScene3D editor application. */

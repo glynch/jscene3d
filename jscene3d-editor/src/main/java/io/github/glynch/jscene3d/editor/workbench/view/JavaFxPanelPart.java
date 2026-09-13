@@ -21,8 +21,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.DoubleBinaryOperator;
 import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
-import javafx.collections.ListChangeListener;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.AccessibleRole;
@@ -46,7 +44,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
     private final JavaFxViewRenderer renderer;
     private final double minimumHeight;
     private final double preferredHeight;
-    private final DoubleBinaryOperator dividerPosition;
+    private final JavaFxPanelDivider divider;
     private final VBox node = new VBox();
     private final HBox tabs = new HBox();
     private final StackPane actions = new StackPane();
@@ -54,10 +52,6 @@ public final class JavaFxPanelPart implements AutoCloseable {
     private final Button collapse = new Button("×");
     private final Map<ViewId, JavaFxRenderedView> renderedViews = new LinkedHashMap<>();
     private final Map<ViewId, ToggleButton> tabButtons = new LinkedHashMap<>();
-    private @Nullable SplitPane splitPane;
-    private SplitPane.@Nullable Divider observedDivider;
-    private final ChangeListener<Number> dividerPositionListener;
-    private final ListChangeListener<SplitPane.Divider> dividerListListener;
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
     private List<ViewId> availableViews = List.of();
@@ -94,10 +88,9 @@ public final class JavaFxPanelPart implements AutoCloseable {
         }
         this.minimumHeight = minimumHeight;
         this.preferredHeight = preferredHeight;
-        this.dividerPosition = Objects.requireNonNull(dividerPosition, "dividerPosition");
         expandedHeight = preferredHeight;
-        dividerPositionListener = (ignored, previous, current) -> rememberExpandedHeight(current.doubleValue());
-        dividerListListener = ignored -> observeDivider();
+        divider = new JavaFxPanelDivider(
+                minimumHeight, dividerPosition, () -> expanded, height -> expandedHeight = height);
         configureNode();
         viewRegistration = workbenchLayout.observeViews(this::showPlacements);
         requestRegistration = host.observeViewRequests(this::reveal);
@@ -118,13 +111,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
      * @param owner vertical split pane that owns the panel
      */
     public void attach(SplitPane owner) {
-        SplitPane candidate = Objects.requireNonNull(owner, "owner");
-        if (splitPane != null) {
-            throw new IllegalStateException("panel is already attached");
-        }
-        splitPane = candidate;
-        candidate.getDividers().addListener(dividerListListener);
-        observeDivider();
+        divider.attach(owner);
     }
 
     @Override
@@ -135,11 +122,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
         closed = true;
         requestRegistration.close();
         viewRegistration.close();
-        SplitPane owner = splitPane;
-        if (owner != null) {
-            owner.getDividers().removeListener(dividerListListener);
-        }
-        replaceObservedDivider(null);
+        divider.close();
         closeRenderedViews();
         availableViews = List.of();
         node.getChildren().clear();
@@ -245,7 +228,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
         collapse.setManaged(true);
         collapse.setVisible(true);
         showSelected();
-        Platform.runLater(() -> moveDivider(expandedHeight));
+        Platform.runLater(() -> divider.moveToHeight(expandedHeight));
     }
 
     private void collapse() {
@@ -266,7 +249,7 @@ public final class JavaFxPanelPart implements AutoCloseable {
         node.setPrefHeight(HEADER_HEIGHT);
         node.setMaxHeight(HEADER_HEIGHT);
         updateTabs();
-        Platform.runLater(() -> moveDivider(HEADER_HEIGHT));
+        Platform.runLater(() -> divider.moveToHeight(HEADER_HEIGHT));
     }
 
     private void showSelected() {
@@ -304,43 +287,5 @@ public final class JavaFxPanelPart implements AutoCloseable {
                     tabButtons.get(target).requestFocus();
                     event.consume();
                 });
-    }
-
-    private void moveDivider(double panelHeight) {
-        SplitPane owner = splitPane;
-        if (owner != null && owner.getHeight() > 0.0) {
-            owner.setDividerPositions(dividerPosition.applyAsDouble(owner.getHeight(), panelHeight));
-        }
-    }
-
-    private void observeDivider() {
-        SplitPane owner = splitPane;
-        SplitPane.Divider divider = owner == null || owner.getDividers().isEmpty()
-                ? null
-                : owner.getDividers().getFirst();
-        replaceObservedDivider(divider);
-    }
-
-    private void rememberExpandedHeight(double dividerPositionValue) {
-        SplitPane owner = splitPane;
-        if (expanded && owner != null && owner.getHeight() > 0.0) {
-            double height = owner.getHeight() * (1.0 - dividerPositionValue);
-            if (height >= minimumHeight) {
-                expandedHeight = height;
-            }
-        }
-    }
-
-    private void replaceObservedDivider(SplitPane.@Nullable Divider replacement) {
-        if (observedDivider == replacement) {
-            return;
-        }
-        if (observedDivider != null) {
-            observedDivider.positionProperty().removeListener(dividerPositionListener);
-        }
-        observedDivider = replacement;
-        if (replacement != null) {
-            replacement.positionProperty().addListener(dividerPositionListener);
-        }
     }
 }

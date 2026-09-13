@@ -4,7 +4,6 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.hierarchy;
 
-import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.activity.ActivityId;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.context.EditorContextCondition;
@@ -27,6 +26,7 @@ import io.github.glynch.jscene3d.editor.view.EditorTreeView;
 import io.github.glynch.jscene3d.editor.view.EditorViewContainers;
 import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewId;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

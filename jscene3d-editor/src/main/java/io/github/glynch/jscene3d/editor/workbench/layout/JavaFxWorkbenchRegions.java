@@ -4,7 +4,6 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.layout;
 
-import io.github.glynch.jscene3d.editor.EditorWorkspaceLayout;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxPanelPart;

@@ -6,9 +6,10 @@ package io.github.glynch.jscene3d.editor;
 
 import static javafx.util.Duration.seconds;
 
-import com.huskerdev.grapl.gl.GLProfile;
 import com.huskerdev.openglfx.canvas.GLCanvas;
-import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
+import io.github.glynch.jscene3d.editor.application.EditorBuildInfo;
+import io.github.glynch.jscene3d.editor.application.EditorExtensionPath;
+import io.github.glynch.jscene3d.editor.application.EditorTelemetryLogger;
 import io.github.glynch.jscene3d.editor.builtin.appearance.BuiltinColorThemesExtension;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsExtension;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.ProjectDiagnosticsExtension;
@@ -22,6 +23,8 @@ import io.github.glynch.jscene3d.editor.builtin.status.SelectionStatusExtension;
 import io.github.glynch.jscene3d.editor.builtin.text.SourceEditorExtension;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
 import io.github.glynch.jscene3d.editor.javalanguage.JavaLanguageExtension;
+import io.github.glynch.jscene3d.editor.preview.OpenGlFxViewport;
+import io.github.glynch.jscene3d.editor.preview.ViewportController;
 import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpenProgress;
@@ -29,13 +32,17 @@ import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpenProgres
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectOpener;
 import io.github.glynch.jscene3d.editor.project.opening.EditorProjectPublication;
 import io.github.glynch.jscene3d.editor.project.opening.EditorStatusProjectOpenProgress;
+import io.github.glynch.jscene3d.editor.workbench.EditorWorkspace;
 import io.github.glynch.jscene3d.editor.workbench.appearance.EditorColorThemeRegistry;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorTheme;
 import io.github.glynch.jscene3d.editor.workbench.appearance.JavaFxEditorThemeAdapter;
 import io.github.glynch.jscene3d.editor.workbench.appearance.JavaPreferencesEditorAppearancePreferences;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.dialog.JavaFxModalDialogs;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
+import io.github.glynch.jscene3d.editor.workbench.splash.EditorSplashScreen;
+import io.github.glynch.jscene3d.editor.workbench.splash.EditorSplashTiming;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
@@ -88,7 +95,7 @@ public final class EditorApplication extends Application {
         EditorSplashTiming splashTiming =
                 EditorSplashTiming.fromNamedArguments(getParameters().getNamed());
         EditorSplashScreen loadingScreen = new EditorSplashScreen(buildInfo.version(), splashTiming);
-        GLCanvas viewportCanvas = createCanvas();
+        GLCanvas viewportCanvas = OpenGlFxViewport.createCanvas();
         JavaFxModalDialogs dialogs = new JavaFxModalDialogs(stage);
         extensionHost.showDialogsWith(dialogs::show);
         extensionHost.activate(new BuiltinColorThemesExtension());
@@ -127,7 +134,7 @@ public final class EditorApplication extends Application {
                 controller,
                 projectOpenProgress(startupProjectRequested, loadingScreen, editorWorkspace),
                 stage::setTitle);
-        installViewportEvents(viewportCanvas, controller);
+        OpenGlFxViewport.installEvents(viewportCanvas, controller);
 
         StackPane root = new StackPane(editorWorkspace, loadingScreen);
         root.getStyleClass().add(EditorStyleClasses.EDITOR_ROOT);
@@ -167,35 +174,6 @@ public final class EditorApplication extends Application {
         Scene scene = new Scene(root, 1280.0, 780.0);
         EditorTheme.install(scene);
         return scene;
-    }
-
-    /** Creates a core-profile OpenGLFX canvas configured for the renderer baseline. */
-    private static GLCanvas createCanvas() {
-        GLCanvas.Builder.ContextDescription.New context = new GLCanvas.Builder.ContextDescription.New()
-                .setProfile(GLProfile.CORE)
-                .setMajorVersion(3)
-                .setMinorVersion(3);
-        GLCanvas result = new GLCanvas.Builder()
-                .setExecutor(LWJGLExecutor.LWJGL_MODULE)
-                .setContextDescription(context)
-                .setFlipY(false)
-                .setMSAA(0)
-                .setSwapBuffers(2)
-                .setFps(60.0)
-                .build();
-        result.setMinSize(1.0, 1.0);
-        result.setPrefSize(800.0, 600.0);
-        result.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        result.setFocusTraversable(true);
-        return result;
-    }
-
-    /** Installs rendering and focus callbacks on the viewport. */
-    private void installViewportEvents(GLCanvas viewportCanvas, ViewportController controller) {
-        viewportCanvas.addOnRenderEvent(controller::render);
-        viewportCanvas.addOnDisposeEvent(ignored -> controller.dispose());
-        viewportCanvas.focusedProperty().addListener((ignored, oldValue, focused) -> controller.setFocused(focused));
-        viewportCanvas.setOnMousePressed(ignored -> viewportCanvas.requestFocus());
     }
 
     /** Opens the directory chooser and loads the selected project without starting it. */

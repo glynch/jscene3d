@@ -11,7 +11,6 @@ import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewContainerId;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -30,8 +29,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
             EditorViewContainers.BOTTOM_PANEL);
 
     private final Map<ViewId, ViewContainerId> overrides = new LinkedHashMap<>();
-    private final List<Consumer<List<EditorViewPlacement>>> observers = new ArrayList<>();
-    private final List<Consumer<EditorWorkbenchLayoutState>> stateObservers = new ArrayList<>();
+    private final EditorWorkbenchLayoutObservers observers = new EditorWorkbenchLayoutObservers();
     private final Set<EditorWorkbenchPart> visibleParts = EnumSet.allOf(EditorWorkbenchPart.class);
     private final EditorRegistration sourceRegistration;
     private final EditorRegistration activityRegistration;
@@ -66,10 +64,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
      */
     public EditorRegistration observeViews(Consumer<List<EditorViewPlacement>> observer) {
         requireOpen();
-        Consumer<List<EditorViewPlacement>> listener = Objects.requireNonNull(observer, "observer");
-        observers.add(listener);
-        listener.accept(snapshot());
-        return once(() -> observers.remove(listener));
+        return observers.observeViews(observer, snapshot());
     }
 
     /**
@@ -82,10 +77,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
      */
     public EditorRegistration observe(Consumer<EditorWorkbenchLayoutState> observer) {
         requireOpen();
-        Consumer<EditorWorkbenchLayoutState> listener = Objects.requireNonNull(observer, "observer");
-        stateObservers.add(listener);
-        listener.accept(state());
-        return once(() -> stateObservers.remove(listener));
+        return observers.observeState(observer, state());
     }
 
     /**
@@ -245,7 +237,6 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
         activityViews = Set.of();
         overrides.clear();
         observers.clear();
-        stateObservers.clear();
         visibleParts.clear();
     }
 
@@ -301,8 +292,7 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
     }
 
     private void notifyViewObservers() {
-        List<EditorViewPlacement> placementSnapshot = snapshot();
-        List.copyOf(observers).forEach(observer -> observer.accept(placementSnapshot));
+        observers.publishViews(snapshot());
     }
 
     private EditorWorkbenchLayoutState state() {
@@ -322,27 +312,12 @@ public final class EditorWorkbenchLayout implements AutoCloseable {
     }
 
     private void notifyStateObservers() {
-        EditorWorkbenchLayoutState current = state();
-        List.copyOf(stateObservers).forEach(observer -> observer.accept(current));
+        observers.publishState(state());
     }
 
     private void requireOpen() {
         if (closed) {
             throw new IllegalStateException("workbench layout is closed");
         }
-    }
-
-    private static EditorRegistration once(Runnable removal) {
-        return new EditorRegistration() {
-            private boolean removed;
-
-            @Override
-            public void close() {
-                if (!removed) {
-                    removed = true;
-                    removal.run();
-                }
-            }
-        };
     }
 }

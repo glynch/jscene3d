@@ -4,12 +4,12 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.dialog;
 
-import io.github.glynch.jscene3d.editor.EditorTheme;
 import io.github.glynch.jscene3d.editor.window.EditorDialog;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButton;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButtonBehavior;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButtonId;
 import io.github.glynch.jscene3d.editor.window.EditorDialogButtonRole;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorTheme;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.Objects;
 import java.util.Optional;

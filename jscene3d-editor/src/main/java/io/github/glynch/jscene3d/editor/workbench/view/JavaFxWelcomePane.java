@@ -4,9 +4,9 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.view;
 
-import io.github.glynch.jscene3d.editor.EditorBrandMark;
 import io.github.glynch.jscene3d.editor.view.EditorIcon;
 import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.workbench.appearance.EditorBrandMark;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.Objects;

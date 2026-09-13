@@ -5,12 +5,12 @@
 package io.github.glynch.jscene3d.editor.project.session;
 
 import io.github.glynch.jscene3d.configuration.definition.SettingKey;
-import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
-import io.github.glynch.jscene3d.editor.EditorHierarchyProjection;
 import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.command.EditorUndoRedoEntry;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfigurationChange;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorEvent;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjector;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorEventSource;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorWorkingCopyRegistry;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorWorldWorkingCopy;
@@ -42,7 +42,7 @@ public final class EditorProjectSession {
     private final RegisteredTypeCatalog types;
     private final ProjectContent content;
     private final List<ProjectAsset> assets;
-    private final EditorHierarchyProjection hierarchyProjection;
+    private final EditorHierarchyProjector hierarchyProjector;
     private final EditorWorkingCopyRegistry workingCopies = new EditorWorkingCopyRegistry();
     private final EditorWorldWorkingCopy startupWorld;
     private final EditorEventSource<EditorHierarchyNode> hierarchyChanges = new EditorEventSource<>();
@@ -50,9 +50,14 @@ public final class EditorProjectSession {
 
     private EditorHierarchyNode hierarchy;
 
-    /** Stores the validated project data needed by the first authoring views. */
-    public EditorProjectSession(
-            Source source, List<ProjectAsset> assets, EditorHierarchyProjection hierarchyProjection) {
+    /**
+     * Stores the validated project data needed by the first authoring views.
+     *
+     * @param source loaded project inputs
+     * @param assets validated project assets
+     * @param hierarchyProjector projector used to rebuild the Hierarchy after authored edits
+     */
+    public EditorProjectSession(Source source, List<ProjectAsset> assets, EditorHierarchyProjector hierarchyProjector) {
         Source validSource = Objects.requireNonNull(source, "source");
         project = validSource.project();
         configuration = validSource.configuration();
@@ -60,7 +65,7 @@ public final class EditorProjectSession {
         types = validSource.types();
         content = validSource.content();
         this.assets = List.copyOf(assets);
-        this.hierarchyProjection = Objects.requireNonNull(hierarchyProjection, "hierarchyProjection");
+        this.hierarchyProjector = Objects.requireNonNull(hierarchyProjector, "hierarchyProjector");
         startupWorld = new EditorWorldWorkingCopy(validSource.startupWorldSource(), validSource.startupWorld());
         workingCopies.register(startupWorld);
         startupWorld.onDidChangeContent().subscribe(ignored -> refreshProjection());
@@ -249,7 +254,7 @@ public final class EditorProjectSession {
     }
 
     private EditorHierarchyNode projectHierarchy() {
-        return hierarchyProjection.project(
+        return hierarchyProjector.project(
                 startupWorld.current(),
                 startupWorld.modifiedEntityIds(),
                 startupWorld::setEntityEnabled,

@@ -7,7 +7,6 @@ package io.github.glynch.jscene3d.editor.workbench.layout;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.glynch.jscene3d.editor.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.activity.ActivityId;
 import io.github.glynch.jscene3d.editor.activity.EditorActivityContribution;
 import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
@@ -27,6 +26,7 @@ import io.github.glynch.jscene3d.editor.view.EditorViewContribution;
 import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.view.ViewKindId;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
 import java.net.URI;
 import java.util.ArrayList;

@@ -11,6 +11,7 @@ import com.huskerdev.openglfx.canvas.GLCanvas;
 import com.huskerdev.openglfx.lwjgl.LWJGLExecutor;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.DiagnosticsExtension;
 import io.github.glynch.jscene3d.editor.builtin.diagnostics.ProjectDiagnosticsExtension;
+import io.github.glynch.jscene3d.editor.builtin.explorer.WorkspaceExplorerExtension;
 import io.github.glynch.jscene3d.editor.builtin.extensions.ExtensionsExtension;
 import io.github.glynch.jscene3d.editor.builtin.hierarchy.HierarchyExtension;
 import io.github.glynch.jscene3d.editor.builtin.inspector.InspectorExtension;
@@ -85,6 +86,7 @@ public final class EditorApplication extends Application {
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
         extensionHost.activate(projectDiagnostics);
+        extensionHost.activate(new WorkspaceExplorerExtension(projectContext));
         extensionHost.activate(new HierarchyExtension(projectContext));
         extensionHost.activate(new ExtensionsExtension());
         extensionHost.activate(new ProjectExtension(projectContext));

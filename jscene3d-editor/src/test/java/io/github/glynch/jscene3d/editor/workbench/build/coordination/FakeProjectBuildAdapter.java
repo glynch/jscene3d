@@ -6,6 +6,8 @@ package io.github.glynch.jscene3d.editor.workbench.build.coordination;
 
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildAdapter;
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildExecution;
+import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildResult;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -30,7 +32,10 @@ final class FakeProjectBuildAdapter implements ProjectBuildAdapter {
     }
 
     void completeActive(ProjectBuildOutcome outcome) {
-        executions.getLast().completion.complete(outcome);
+        executions
+                .getLast()
+                .completion
+                .complete(new ProjectBuildResult(outcome, List.of("fixture-build"), "", "", Duration.ZERO));
     }
 
     void failActive(Throwable failure) {
@@ -39,7 +44,7 @@ final class FakeProjectBuildAdapter implements ProjectBuildAdapter {
 
     private static final class Execution implements ProjectBuildExecution {
         private final ProjectBuildRequest request;
-        private final CompletableFuture<ProjectBuildOutcome> completion = new CompletableFuture<>();
+        private final CompletableFuture<ProjectBuildResult> completion = new CompletableFuture<>();
         private boolean cancelled;
 
         private Execution(ProjectBuildRequest request) {
@@ -51,7 +56,7 @@ final class FakeProjectBuildAdapter implements ProjectBuildAdapter {
         }
 
         @Override
-        public CompletableFuture<ProjectBuildOutcome> completion() {
+        public CompletableFuture<ProjectBuildResult> completion() {
             return completion;
         }
 

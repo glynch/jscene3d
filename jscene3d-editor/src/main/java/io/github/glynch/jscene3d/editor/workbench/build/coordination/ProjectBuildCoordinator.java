@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.workbench.build.coordination;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildAdapter;
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildExecution;
+import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -195,11 +196,11 @@ public final class ProjectBuildCoordinator implements AutoCloseable {
                 execution.cancel();
             }
         }
-        execution.completion().whenComplete((outcome, failure) -> complete(request, outcome, failure));
+        execution.completion().whenComplete((result, failure) -> complete(request, result, failure));
     }
 
     private void complete(
-            ProjectBuildRequest request, @Nullable ProjectBuildOutcome outcome, @Nullable Throwable failure) {
+            ProjectBuildRequest request, @Nullable ProjectBuildResult result, @Nullable Throwable failure) {
         ProjectBuildRequest followUp = null;
         synchronized (this) {
             if (closed || !request.equals(activeRequest)) {
@@ -208,6 +209,7 @@ public final class ProjectBuildCoordinator implements AutoCloseable {
             activeRequest = null;
             activeExecution = null;
             cancellationRequested = false;
+            ProjectBuildOutcome outcome = result == null ? null : result.outcome();
             if (failure == null && outcome == ProjectBuildOutcome.SUCCEEDED) {
                 successfulRevision = request.revision();
             }

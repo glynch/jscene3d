@@ -4,17 +4,16 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.build.execution;
 
-import io.github.glynch.jscene3d.editor.workbench.build.coordination.ProjectBuildOutcome;
 import java.util.concurrent.CompletionStage;
 
 /** One cancellable asynchronous build-system execution. */
 public interface ProjectBuildExecution {
     /**
-     * Returns the terminal outcome notification.
+     * Returns the complete terminal build result.
      *
-     * @return asynchronous terminal outcome
+     * @return asynchronous terminal result
      */
-    CompletionStage<ProjectBuildOutcome> completion();
+    CompletionStage<ProjectBuildResult> completion();
 
     /** Requests cancellation of the complete build process. */
     void cancel();

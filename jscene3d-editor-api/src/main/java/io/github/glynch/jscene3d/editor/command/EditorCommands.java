@@ -34,5 +34,22 @@ public final class EditorCommands {
     /** Opens and focuses the editor Diagnostics view. */
     public static final CommandId OPEN_DIAGNOSTICS = new CommandId("io.github.glynch.jscene3d.editor.open-diagnostics");
 
+    /** Requests an ordinary development build of the open project. */
+    public static final CommandId BUILD_PROJECT = new CommandId("io.github.glynch.jscene3d.editor.build-project");
+
+    /** Requests a clean development build of the open project. */
+    public static final CommandId REBUILD_PROJECT = new CommandId("io.github.glynch.jscene3d.editor.rebuild-project");
+
+    /** Cancels the build currently running for the open project. */
+    public static final CommandId CANCEL_BUILD = new CommandId("io.github.glynch.jscene3d.editor.cancel-build");
+
+    /** Opens the output produced by project builds. */
+    public static final CommandId SHOW_BUILD_OUTPUT =
+            new CommandId("io.github.glynch.jscene3d.editor.show-build-output");
+
+    /** Toggles automatic builds for the open workspace. */
+    public static final CommandId TOGGLE_AUTOMATIC_BUILD =
+            new CommandId("io.github.glynch.jscene3d.editor.toggle-automatic-build");
+
     private EditorCommands() {}
 }

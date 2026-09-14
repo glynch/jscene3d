@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.editor.command.CommandLocationId;
 import io.github.glynch.jscene3d.editor.command.EditorCommand;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContext;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
+import io.github.glynch.jscene3d.editor.command.EditorCommandKind;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacementRegistry;
 import io.github.glynch.jscene3d.editor.command.EditorCommandRegistration;
@@ -229,6 +230,9 @@ public final class EditorCommandMenuRegistry
             requireOpen();
             requireRegistrationOpen();
             EditorCommandState updated = Objects.requireNonNull(replacement, "state");
+            if (contribution.kind() == EditorCommandKind.ACTION && updated.selected()) {
+                throw new IllegalArgumentException("action command cannot be selected: " + contribution.id());
+            }
             if (!state.equals(updated)) {
                 state = updated;
                 notifyObservers();

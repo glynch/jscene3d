@@ -13,6 +13,8 @@ import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandLocations;
 import io.github.glynch.jscene3d.editor.command.EditorCommandPlacement;
+import io.github.glynch.jscene3d.editor.command.EditorCommandRegistration;
+import io.github.glynch.jscene3d.editor.command.EditorCommandState;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfiguration;
 import io.github.glynch.jscene3d.editor.configuration.EditorConfigurationChange;
 import io.github.glynch.jscene3d.editor.diagnostic.DiagnosticCollectionId;
@@ -203,6 +205,20 @@ final class EditorExtensionHostTest {
         host.execute(CONTEXT_COMMAND, target);
 
         assertThat(received).hasValue(target);
+        host.close();
+    }
+
+    @Test
+    void rejectsSelectedStateForOrdinaryActionCommands() {
+        EditorExtensionHost host = host();
+        EditorCommandRegistration registration =
+                host.registerCommand(new EditorCommandContribution(CONTEXT_COMMAND, "Context"), ignored -> {});
+        EditorCommandState selected = new EditorCommandState(true, true);
+
+        assertThatThrownBy(() -> registration.update(selected))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("action command cannot be selected: " + CONTEXT_COMMAND);
+
         host.close();
     }
 

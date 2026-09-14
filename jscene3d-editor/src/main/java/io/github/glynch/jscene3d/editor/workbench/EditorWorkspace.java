@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.editor.workbench.activity.EditorActivitySelecti
 import io.github.glynch.jscene3d.editor.workbench.activity.JavaFxActivityBar;
 import io.github.glynch.jscene3d.editor.workbench.appearance.EditorBrandMark;
 import io.github.glynch.jscene3d.editor.workbench.appearance.JavaFxColorSchemeToggle;
+import io.github.glynch.jscene3d.editor.workbench.build.preference.WorkspaceBuildPreferences;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
 import io.github.glynch.jscene3d.editor.workbench.layout.EditorWorkbenchLayout;
@@ -74,6 +75,7 @@ public final class EditorWorkspace extends BorderPane {
             Runnable requestClose,
             EditorSelections selections,
             EditorExtensionHost extensions,
+            WorkspaceBuildPreferences buildPreferences,
             EditorBuildInfo buildInfo) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
         JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
@@ -121,7 +123,11 @@ public final class EditorWorkspace extends BorderPane {
                         createViewportContent(viewportCanvas),
                         projectContext,
                         statusBar),
-                new EditorWorkspaceDocument.Actions(openProject, requestClose, buildInfo));
+                new EditorWorkspaceDocument.Actions(
+                        openProject,
+                        requestClose,
+                        Objects.requireNonNull(buildPreferences, "buildPreferences"),
+                        buildInfo));
         colorSchemeToggle = new JavaFxColorSchemeToggle(
                 host.colorThemes(), icons, () -> host.execute(EditorCommands.TOGGLE_COLOR_SCHEME));
         menuBar = new JavaFxMenuBar(host);

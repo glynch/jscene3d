@@ -38,6 +38,7 @@ final class EditorCommandContractTest {
         assertThat(context.argument(String.class)).isEmpty();
         assertThat(contribution.id()).isEqualTo(id);
         assertThat(contribution.title()).isEqualTo("Say Hello");
+        assertThat(contribution.kind()).isEqualTo(EditorCommandKind.ACTION);
         assertThat(placement.command()).isEqualTo(id);
         assertThat(placement.group()).isEqualTo("default");
         assertThat(placement.order()).isEqualTo(10);
@@ -83,6 +84,9 @@ final class EditorCommandContractTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("title must not be blank");
         assertThatNullPointerException()
+                .isThrownBy(() -> new EditorCommandContribution(command, "Test", null))
+                .withMessage("kind");
+        assertThatNullPointerException()
                 .isThrownBy(() -> new EditorCommandPlacement(null, location, 0))
                 .withMessage("command");
         assertThatNullPointerException()
@@ -100,6 +104,18 @@ final class EditorCommandContractTest {
         assertThatNullPointerException()
                 .isThrownBy(() -> EditorCommandLocations.viewTitle(null))
                 .withMessage("view");
+    }
+
+    @Test
+    void representsCheckableCommandPresentationIndependentlyFromEnablement() {
+        CommandId id = new CommandId("io.github.glynch.test.toggle");
+        EditorCommandContribution contribution =
+                new EditorCommandContribution(id, "Toggle Test", EditorCommandKind.TOGGLE);
+
+        assertThat(contribution.kind()).isEqualTo(EditorCommandKind.TOGGLE);
+        assertThat(new EditorCommandState(false, true))
+                .extracting(EditorCommandState::enabled, EditorCommandState::selected)
+                .containsExactly(false, true);
     }
 
     @SuppressWarnings("NullAway") // Deliberate null verifies public boundary validation.

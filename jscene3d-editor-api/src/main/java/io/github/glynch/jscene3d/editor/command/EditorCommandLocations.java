@@ -21,6 +21,10 @@ public final class EditorCommandLocations {
     public static final CommandLocationId EDIT_MENU =
             new CommandLocationId("io.github.glynch.jscene3d.editor.edit-menu");
 
+    /** Commands displayed in the editor's Project menu. */
+    public static final CommandLocationId PROJECT_MENU =
+            new CommandLocationId("io.github.glynch.jscene3d.editor.project-menu");
+
     /** Commands displayed in the viewport-local toolbar. */
     public static final CommandLocationId VIEWPORT_TOOLBAR =
             new CommandLocationId("io.github.glynch.jscene3d.editor.viewport-toolbar");

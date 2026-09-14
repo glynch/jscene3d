@@ -1,6 +1,6 @@
 # Editor project builds
 
-Status: accepted direction recorded on 2026-09-14; implementation has not begun.
+Status: accepted direction recorded on 2026-09-14; implementation is in progress.
 
 ## Purpose
 

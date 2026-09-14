@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.workbench.menu;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
+import io.github.glynch.jscene3d.editor.command.EditorCommandKind;
 import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -12,6 +13,7 @@ import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
@@ -62,10 +64,18 @@ public final class JavaFxMenuBar implements AutoCloseable {
     }
 
     private MenuItem createItem(EditorMenuCommandSnapshot snapshot) {
-        MenuItem item = new MenuItem(snapshot.contribution().title());
+        MenuItem item = snapshot.contribution().kind() == EditorCommandKind.TOGGLE
+                ? checkedItem(snapshot)
+                : new MenuItem(snapshot.contribution().title());
         item.setDisable(!snapshot.state().enabled());
         item.setOnAction(ignored -> extensions.execute(snapshot.contribution().id()));
         accelerator(snapshot.contribution().id()).ifPresent(item::setAccelerator);
+        return item;
+    }
+
+    private static CheckMenuItem checkedItem(EditorMenuCommandSnapshot snapshot) {
+        CheckMenuItem item = new CheckMenuItem(snapshot.contribution().title());
+        item.setSelected(snapshot.state().selected());
         return item;
     }
 

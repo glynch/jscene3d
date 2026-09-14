@@ -33,6 +33,10 @@
         </dependency>
         <dependency>
             <groupId>io.github.glynch</groupId>
+            <artifactId>jscene3d-i18n</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.glynch</groupId>
             <artifactId>jscene3d-editor-java</artifactId>
         </dependency>
         <dependency>

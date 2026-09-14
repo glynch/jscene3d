@@ -5,12 +5,14 @@
 package io.github.glynch.jscene3d.editor.workbench.view;
 
 import io.github.glynch.jscene3d.editor.command.CommandId;
+import io.github.glynch.jscene3d.editor.command.EditorCommandKind;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
@@ -47,10 +49,18 @@ final class JavaFxItemContextMenus {
     }
 
     private MenuItem createItem(EditorMenuCommandSnapshot snapshot, Object argument) {
-        MenuItem item = new MenuItem(snapshot.contribution().title());
+        MenuItem item = snapshot.contribution().kind() == EditorCommandKind.TOGGLE
+                ? checkedItem(snapshot)
+                : new MenuItem(snapshot.contribution().title());
         item.setDisable(!snapshot.state().enabled());
         item.setOnAction(
                 ignored -> commandExecutor.accept(snapshot.contribution().id(), argument));
+        return item;
+    }
+
+    private static CheckMenuItem checkedItem(EditorMenuCommandSnapshot snapshot) {
+        CheckMenuItem item = new CheckMenuItem(snapshot.contribution().title());
+        item.setSelected(snapshot.state().selected());
         return item;
     }
 }

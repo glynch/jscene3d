@@ -37,6 +37,8 @@ import io.github.glynch.jscene3d.editor.workbench.appearance.EditorColorThemeReg
 import io.github.glynch.jscene3d.editor.workbench.appearance.EditorTheme;
 import io.github.glynch.jscene3d.editor.workbench.appearance.JavaFxEditorThemeAdapter;
 import io.github.glynch.jscene3d.editor.workbench.appearance.JavaPreferencesEditorAppearancePreferences;
+import io.github.glynch.jscene3d.editor.workbench.build.preference.JavaPreferencesWorkspaceBuildPreferences;
+import io.github.glynch.jscene3d.editor.workbench.build.preference.WorkspaceBuildPreferences;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.dialog.JavaFxModalDialogs;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
@@ -65,6 +67,7 @@ public final class EditorApplication extends Application {
     private final EditorSelectionContext selectionContext;
     private final EditorConfigurationContext configurationContext;
     private final EditorColorThemeRegistry colorThemes;
+    private final WorkspaceBuildPreferences buildPreferences;
     private final EditorExtensionHost extensionHost;
 
     private @Nullable GLCanvas canvas;
@@ -84,6 +87,7 @@ public final class EditorApplication extends Application {
         selectionContext = new EditorSelectionContext();
         configurationContext = new EditorConfigurationContext();
         colorThemes = new EditorColorThemeRegistry(new JavaPreferencesEditorAppearancePreferences());
+        buildPreferences = new JavaPreferencesWorkspaceBuildPreferences();
         extensionHost = new EditorExtensionHost(projectContext, selectionContext, configurationContext, colorThemes);
     }
 
@@ -105,6 +109,7 @@ public final class EditorApplication extends Application {
                 this::requestClose,
                 selectionContext,
                 extensionHost,
+                buildPreferences,
                 buildInfo);
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();

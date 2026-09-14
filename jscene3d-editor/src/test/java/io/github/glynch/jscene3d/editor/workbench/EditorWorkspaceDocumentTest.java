@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.editor.application.EditorBuildInfo;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.workbench.build.preference.InMemoryWorkspaceBuildPreferences;
 import io.github.glynch.jscene3d.editor.workbench.configuration.EditorConfigurationContext;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import io.github.glynch.jscene3d.editor.workbench.icon.JavaFxIconRenderer;
@@ -50,7 +51,10 @@ final class EditorWorkspaceDocumentTest {
                                 new Label("No project"),
                                 statusBar),
                         new EditorWorkspaceDocument.Actions(
-                                () -> openProjectRequested.set(true), () -> {}, EditorBuildInfo.current()))) {
+                                () -> openProjectRequested.set(true),
+                                () -> {},
+                                new InMemoryWorkspaceBuildPreferences(),
+                                EditorBuildInfo.current()))) {
             Tab preview = editorArea.node().getTabs().getFirst();
             assertThat(preview.getContent()).isSameAs(previewContent);
             assertThat(preview.getText()).isEqualTo("Empty Preview");

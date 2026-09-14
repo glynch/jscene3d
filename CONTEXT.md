@@ -288,6 +288,36 @@ The versioned project-level asset that identifies a game project, its startup
 World Definition, enabled modules, asset roots, and project-wide configuration.
 _Avoid_: World Definition, world, entity hierarchy
 
+**Project Setting**:
+A portable authored configuration value shared by collaborators through a game
+project. It is not developer-specific editor state.
+_Avoid_: User Setting, Workspace Preference, Workspace State
+
+**User Setting**:
+A private intentional editor preference belonging to one developer and applied
+across workspaces, such as the selected color theme or editor font.
+_Avoid_: Project Setting, Workspace State
+
+**Workspace Preference**:
+A private intentional editor preference belonging to one developer for one game
+project, such as whether that workspace builds automatically.
+_Avoid_: Project Setting, Workspace State
+
+**Workspace State**:
+Private automatically captured workbench presentation used to restore one
+developer's experience of one game project, such as open tabs and panel layout.
+_Avoid_: Project Setting, Workspace Preference, Session State
+
+**Session State**:
+Transient state belonging to one running editor process, such as an active build
+or language-server connection. It is recreated rather than restored.
+_Avoid_: Workspace State, Recovery Data
+
+**Recovery Data**:
+Private temporary data retained specifically to recover unsaved work after an
+abnormal editor termination.
+_Avoid_: Workspace State, saved project content
+
 **World Definition**:
 An authored asset describing one World's settings and its locally authored or
 reusable root-entity placements.

@@ -10,6 +10,12 @@ the same values. This document extends the project-only decision in
 [ADR 0031](../adr/0031-generate-settings-from-shared-declarations.md); it does not
 describe functionality that is already implemented.
 
+The ownership and persistence differences between declared settings, automatic
+workspace restoration, transient session data, and future recovery data are
+defined in [Editor Settings and Workspace State](editor-settings-and-state.md).
+Open tabs and workbench layout are not settings and do not belong in either
+settings document.
+
 ## Settings scopes
 
 The Settings editor will expose two explicit scopes:
@@ -18,6 +24,10 @@ The Settings editor will expose two explicit scopes:
   loaded. Appearance, source-editor font, and minimap visibility belong here.
 - **Project** settings apply only to the loaded project and continue to use
   `<project>/.jscene3d/settings.json`.
+
+A later **Workspace** scope may expose private per-workspace preferences such as
+**Build Automatically**. That scope remains distinct from automatically captured
+Workspace state.
 
 Each `SettingDefinition` will declare the scopes in which it is valid. A setting
 may support User, Project, or both scopes. When both are supported, a project

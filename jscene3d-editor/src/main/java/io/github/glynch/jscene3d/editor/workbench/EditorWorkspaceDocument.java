@@ -11,8 +11,8 @@ import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
-import io.github.glynch.jscene3d.editor.workbench.build.command.EditorProjectBuildCommandSet;
 import io.github.glynch.jscene3d.editor.workbench.build.preference.WorkspaceBuildPreferences;
+import io.github.glynch.jscene3d.editor.workbench.build.session.EditorProjectBuildSession;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet.DocumentCommandState;
 import io.github.glynch.jscene3d.editor.workbench.dialog.EditorWindowCloseGuard;
@@ -67,7 +67,7 @@ final class EditorWorkspaceDocument implements AutoCloseable {
     private final JavaFxSettingsEditor settingsEditor;
     private final JavaFxFileEditors fileEditors;
     private final EditorWorkbenchCommandSet commandSet;
-    private final EditorProjectBuildCommandSet buildCommandSet;
+    private final EditorProjectBuildSession buildSession;
     private final EditorRegistration selectionRegistration;
 
     private EditorRegistration documentRegistration = () -> {};
@@ -99,10 +99,8 @@ final class EditorWorkspaceDocument implements AutoCloseable {
                         this::redo,
                         commands.requestClose()),
                 Objects.requireNonNull(commands.buildInfo(), "buildInfo").aboutText());
-        buildCommandSet = new EditorProjectBuildCommandSet(
-                host,
-                Objects.requireNonNull(commands.buildPreferences(), "buildPreferences"),
-                EditorProjectBuildCommandSet.Actions.unavailable());
+        buildSession = new EditorProjectBuildSession(
+                host, Objects.requireNonNull(commands.buildPreferences(), "buildPreferences"));
         selectionRegistration = area.observeSelectionChanged(this::updateCommands);
         previewEditor.show();
     }
@@ -131,7 +129,7 @@ final class EditorWorkspaceDocument implements AutoCloseable {
         dirtyRegistration.close();
         settingsEditor.close();
         document = Objects.requireNonNull(session, "session");
-        buildCommandSet.openWorkspace(session.project().root());
+        buildSession.openWorkspace(session.project().root());
         documentRegistration = session.onDidChangeHierarchy().subscribe(ignored -> updateCommands());
         dirtyRegistration = session.workingCopies().onDidChangeDirty().subscribe(ignored -> updateCommands());
         previewTitle.set(session.hierarchy().label() + " Preview");
@@ -149,7 +147,7 @@ final class EditorWorkspaceDocument implements AutoCloseable {
         documentRegistration = () -> {};
         dirtyRegistration = () -> {};
         document = null;
-        buildCommandSet.closeWorkspace();
+        buildSession.closeWorkspace();
         projectContext.setText("No project");
         projectContext.setAccessibleText("No project");
         projectContext.setTooltip(null);
@@ -268,7 +266,7 @@ final class EditorWorkspaceDocument implements AutoCloseable {
         settingsEditor.close();
         welcomeEditor.close();
         previewEditor.close();
-        buildCommandSet.close();
+        buildSession.close();
         commandSet.close();
     }
 }

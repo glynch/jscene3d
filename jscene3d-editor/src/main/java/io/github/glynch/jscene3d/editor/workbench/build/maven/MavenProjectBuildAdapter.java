@@ -56,9 +56,26 @@ public final class MavenProjectBuildAdapter implements ProjectBuildAdapter {
         Objects.requireNonNull(request, "request");
         List<String> command = command(request.kind());
         try {
+            if (request.kind() == ProjectBuildKind.CLEAN) {
+                return startRebuild(command);
+            }
             return MavenBuildExecution.start(projectRoot, command);
         } catch (IOException failure) {
             throw new UncheckedIOException("could not start Maven wrapper in " + projectRoot, failure);
+        }
+    }
+
+    private ProjectBuildExecution startRebuild(List<String> command) throws IOException {
+        MavenBuildOutputBackup backup = MavenBuildOutputBackup.capture(projectRoot);
+        try {
+            return new MavenRebuildExecution(MavenBuildExecution.start(projectRoot, command), backup);
+        } catch (IOException | RuntimeException failure) {
+            try {
+                backup.rollback();
+            } catch (IOException rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
+            throw failure;
         }
     }
 
@@ -74,7 +91,7 @@ public final class MavenProjectBuildAdapter implements ProjectBuildAdapter {
         if (kind == ProjectBuildKind.CLEAN) {
             command.add("clean");
         }
-        command.add("compile");
+        command.add("process-classes");
         return List.copyOf(command);
     }
 

@@ -75,6 +75,10 @@ final class MavenBuildTestProject {
         Files.createFile(root.resolve("fail-build"));
     }
 
+    void failCleanBuild() throws IOException {
+        Files.createFile(root.resolve("fail-clean-build"));
+    }
+
     void blockBuild() throws IOException {
         Files.createFile(root.resolve("block-build"));
     }
@@ -123,6 +127,10 @@ final class MavenBuildTestProject {
         return Files.readAllLines(invocations);
     }
 
+    Path compiledOutput() {
+        return root.resolve("target/classes/fixture.class");
+    }
+
     private static String unixWrapper() {
         return """
                 #!/bin/sh
@@ -132,12 +140,21 @@ final class MavenBuildTestProject {
                   printf '[ERROR] Example.java:[4,9] cannot find symbol\\n' >&2
                   exit 1
                 fi
+                case " $* " in
+                  *" clean "*) rm -rf target ;;
+                esac
+                if [ -f fail-clean-build ]; then
+                  printf 'fixture clean compilation failed\n'
+                  exit 1
+                fi
                 if [ -f block-build ]; then
                   (trap '' TERM; while :; do sleep 1; done) &
                   child=$!
                   printf '%s\\n' "$child" > blocking-child.pid
                   wait "$child"
                 fi
+                mkdir -p target/classes
+                printf '%s\n' "$*" > target/classes/fixture.class
                 printf 'fixture build completed\\n'
                 printf 'fixture build details\\n' >&2
                 """;

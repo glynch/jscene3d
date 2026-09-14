@@ -44,7 +44,7 @@ final class MavenProjectBuildAdapterTest {
                 .get(5, SECONDS);
 
         assertThat(result.outcome()).isEqualTo(ProjectBuildOutcome.SUCCEEDED);
-        assertThat(project.invocations()).containsExactly("compile");
+        assertThat(project.invocations()).containsExactly("process-classes");
     }
 
     @Test
@@ -58,7 +58,7 @@ final class MavenProjectBuildAdapterTest {
                 .get(5, SECONDS);
 
         assertThat(result.outcome()).isEqualTo(ProjectBuildOutcome.SUCCEEDED);
-        assertThat(result.command()).endsWith("compile");
+        assertThat(result.command()).endsWith("process-classes");
         assertThat(result.command()).contains(project.wrapper().toString());
         assertThat(result.standardOutput()).contains("fixture build completed");
         assertThat(result.standardError()).contains("fixture build details");
@@ -66,7 +66,7 @@ final class MavenProjectBuildAdapterTest {
     }
 
     @Test
-    void executesCleanBuildIntentAsCleanCompile(@TempDir Path temporaryDirectory) throws Exception {
+    void executesCleanBuildIntentThroughGeneratedProjectContent(@TempDir Path temporaryDirectory) throws Exception {
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
         MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
 
@@ -76,7 +76,8 @@ final class MavenProjectBuildAdapterTest {
                 .get(5, SECONDS);
 
         assertThat(result.outcome()).isEqualTo(ProjectBuildOutcome.SUCCEEDED);
-        assertThat(project.invocations()).containsExactly("clean compile");
+        assertThat(project.invocations()).containsExactly("clean process-classes");
+        assertThat(project.compiledOutput()).hasContent("clean process-classes\n");
     }
 
     @Test
@@ -114,5 +115,54 @@ final class MavenProjectBuildAdapterTest {
         } finally {
             child.destroyForcibly();
         }
+    }
+
+    @Test
+    void cancellingCleanBuildPreservesThePreviousCompiledOutput(@TempDir Path temporaryDirectory) throws Exception {
+        assumeFalse(OperatingSystem.current() == OperatingSystem.WINDOWS);
+        MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        adapter.start(new ProjectBuildRequest(6, ProjectBuildKind.INCREMENTAL))
+                .completion()
+                .toCompletableFuture()
+                .get(5, SECONDS);
+        String previousOutput = Files.readString(project.compiledOutput());
+        project.blockBuild();
+        ProjectBuildExecution execution = adapter.start(new ProjectBuildRequest(7, ProjectBuildKind.CLEAN));
+        ProcessHandle child = project.awaitBlockingChild();
+
+        try {
+            assertThat(project.compiledOutput()).doesNotExist();
+
+            execution.cancel();
+            ProjectBuildResult result =
+                    execution.completion().toCompletableFuture().get(5, SECONDS);
+
+            assertThat(result.outcome()).isEqualTo(ProjectBuildOutcome.CANCELLED);
+            assertThat(project.compiledOutput()).hasContent(previousOutput);
+        } finally {
+            child.destroyForcibly();
+        }
+    }
+
+    @Test
+    void failedCleanBuildPreservesThePreviousCompiledOutput(@TempDir Path temporaryDirectory) throws Exception {
+        assumeFalse(OperatingSystem.current() == OperatingSystem.WINDOWS);
+        MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        adapter.start(new ProjectBuildRequest(8, ProjectBuildKind.INCREMENTAL))
+                .completion()
+                .toCompletableFuture()
+                .get(5, SECONDS);
+        String previousOutput = Files.readString(project.compiledOutput());
+        project.failCleanBuild();
+
+        ProjectBuildResult result = adapter.start(new ProjectBuildRequest(9, ProjectBuildKind.CLEAN))
+                .completion()
+                .toCompletableFuture()
+                .get(5, SECONDS);
+
+        assertThat(result.outcome()).isEqualTo(ProjectBuildOutcome.FAILED);
+        assertThat(project.compiledOutput()).hasContent(previousOutput);
     }
 }

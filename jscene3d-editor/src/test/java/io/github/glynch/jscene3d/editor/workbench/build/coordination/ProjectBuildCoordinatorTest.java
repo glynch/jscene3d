@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildAdapter;
+import io.github.glynch.jscene3d.editor.workbench.build.testing.ControllableProjectBuildAdapter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
@@ -28,7 +29,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void completesManualBuildForCurrentSavedRevision() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
         List<ProjectBuildPhase> phases = new ArrayList<>();
         coordinator.observe(snapshot -> phases.add(snapshot.phase()));
@@ -52,7 +53,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void keepsSavedChangesStaleUntilManuallyBuiltWhenAutomaticBuildIsDisabled() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
 
         coordinator.savedBuildRelevantChange();
@@ -70,7 +71,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void coalescesChangesDuringAnAutomaticBuildIntoOneNewestRevisionFollowUp() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, true);
 
         coordinator.savedBuildRelevantChange();
@@ -97,7 +98,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void preservesCleanIntentWhenRequestsAreCoalescedBehindAnActiveBuild() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
 
         coordinator.request(ProjectBuildKind.INCREMENTAL);
@@ -117,7 +118,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void cancellationReturnsToStaleWithoutStartingAQueuedFollowUp() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, true);
         coordinator.savedBuildRelevantChange();
         coordinator.savedBuildRelevantChange();
@@ -136,7 +137,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void enablingAutomaticBuildBringsAStaleSavedRevisionCurrent() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
         coordinator.savedBuildRelevantChange();
 
@@ -164,7 +165,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void retainsTheLastSuccessfulRevisionAfterANewerBuildFails() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
         coordinator.request(ProjectBuildKind.INCREMENTAL);
         adapter.completeActive(ProjectBuildOutcome.SUCCEEDED);
@@ -179,7 +180,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void reportsExceptionalAdapterCompletionAsFailure() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
         coordinator.request(ProjectBuildKind.INCREMENTAL);
 
@@ -190,7 +191,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void cancelledRebuildKeepsAnIndependentlyCurrentSuccessfulRevision() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
         coordinator.request(ProjectBuildKind.INCREMENTAL);
         adapter.completeActive(ProjectBuildOutcome.SUCCEEDED);
@@ -205,7 +206,7 @@ final class ProjectBuildCoordinatorTest {
 
     @Test
     void closingCancelsTheActiveBuildAndIsolatesLateCompletion() {
-        FakeProjectBuildAdapter adapter = new FakeProjectBuildAdapter();
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);
         List<ProjectBuildSnapshot> snapshots = new ArrayList<>();
         coordinator.observe(snapshots::add);

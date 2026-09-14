@@ -2,8 +2,10 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.editor.workbench.build.coordination;
+package io.github.glynch.jscene3d.editor.workbench.build.testing;
 
+import io.github.glynch.jscene3d.editor.workbench.build.coordination.ProjectBuildOutcome;
+import io.github.glynch.jscene3d.editor.workbench.build.coordination.ProjectBuildRequest;
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildAdapter;
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildExecution;
 import io.github.glynch.jscene3d.editor.workbench.build.execution.ProjectBuildResult;
@@ -12,8 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/** Controllable build-process adapter used at the coordinator test seam. */
-final class FakeProjectBuildAdapter implements ProjectBuildAdapter {
+/** Controllable build-process adapter shared by build integration tests. */
+public final class ControllableProjectBuildAdapter implements ProjectBuildAdapter {
     private final List<Execution> executions = new ArrayList<>();
 
     @Override
@@ -23,22 +25,26 @@ final class FakeProjectBuildAdapter implements ProjectBuildAdapter {
         return execution;
     }
 
-    List<ProjectBuildRequest> requests() {
+    /** Returns build requests in execution order. */
+    public List<ProjectBuildRequest> requests() {
         return executions.stream().map(Execution::request).toList();
     }
 
-    boolean activeBuildWasCancelled() {
+    /** Reports whether the latest build received cancellation. */
+    public boolean activeBuildWasCancelled() {
         return executions.getLast().cancelled;
     }
 
-    void completeActive(ProjectBuildOutcome outcome) {
+    /** Completes the latest build with the requested outcome. */
+    public void completeActive(ProjectBuildOutcome outcome) {
         executions
                 .getLast()
                 .completion
                 .complete(new ProjectBuildResult(outcome, List.of("fixture-build"), "", "", Duration.ZERO));
     }
 
-    void failActive(Throwable failure) {
+    /** Completes the latest build exceptionally. */
+    public void failActive(Throwable failure) {
         executions.getLast().completion.completeExceptionally(failure);
     }
 

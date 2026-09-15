@@ -93,7 +93,16 @@ final class MavenProjectBuildAdapterTest {
 
         assertThat(result.outcome()).isEqualTo(ProjectBuildOutcome.FAILED);
         assertThat(result.standardOutput()).contains("fixture compilation failed");
-        assertThat(result.standardError()).contains("[ERROR] Example.java:[4,9] cannot find symbol");
+        assertThat(result.standardError())
+                .contains("[ERROR] src/main/java/example/Example.java:[4,9] cannot find symbol");
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.source())
+                    .isEqualTo(project.root()
+                            .resolve("src/main/java/example/Example.java")
+                            .toUri());
+            assertThat(diagnostic.diagnostic().message()).isEqualTo("cannot find symbol");
+            assertThat(diagnostic.diagnostic().location()).isEqualTo("4:9");
+        });
     }
 
     @Test

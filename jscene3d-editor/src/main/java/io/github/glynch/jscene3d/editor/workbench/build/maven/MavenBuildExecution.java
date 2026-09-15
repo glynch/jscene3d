@@ -29,6 +29,7 @@ final class MavenBuildExecution implements ProjectBuildExecution {
     private static final Duration FORCED_TERMINATION_TIMEOUT = Duration.ofSeconds(2);
 
     private final Process process;
+    private final Path projectRoot;
     private final List<String> command;
     private final long startedAtNanos = System.nanoTime();
     private final AtomicReference<@Nullable CompletableFuture<Void>> cancellation = new AtomicReference<>();
@@ -36,18 +37,19 @@ final class MavenBuildExecution implements ProjectBuildExecution {
     private final CompletableFuture<String> standardError;
     private final CompletableFuture<ProjectBuildResult> completion = new CompletableFuture<>();
 
-    private MavenBuildExecution(Process process, List<String> command) {
+    private MavenBuildExecution(Process process, Path projectRoot, List<String> command) {
         this.process = process;
+        this.projectRoot = projectRoot;
         this.command = command;
         standardOutput = read(process.getInputStream(), "jscene3d-maven-stdout");
         standardError = read(process.getErrorStream(), "jscene3d-maven-stderr");
-        Thread.ofVirtual().name("jscene3d-maven-build").start(this::await);
+        CompletableFuture.runAsync(this::await);
     }
 
     static MavenBuildExecution start(Path projectRoot, List<String> command) throws IOException {
         Process process =
                 new ProcessBuilder(command).directory(projectRoot.toFile()).start();
-        return new MavenBuildExecution(process, List.copyOf(command));
+        return new MavenBuildExecution(process, projectRoot.toAbsolutePath().normalize(), List.copyOf(command));
     }
 
     @Override
@@ -63,7 +65,7 @@ final class MavenBuildExecution implements ProjectBuildExecution {
         }
         List<ProcessHandle> processTree = Stream.concat(process.descendants(), Stream.of(process.toHandle()))
                 .toList();
-        Thread.ofVirtual().name("jscene3d-maven-cancellation").start(() -> terminate(processTree, termination));
+        CompletableFuture.runAsync(() -> terminate(processTree, termination));
     }
 
     private void await() {
@@ -74,12 +76,15 @@ final class MavenBuildExecution implements ProjectBuildExecution {
                 termination.join();
             }
             ProjectBuildOutcome outcome = outcome(exitCode, termination != null);
+            String output = standardOutput.join();
+            String error = standardError.join();
             completion.complete(new ProjectBuildResult(
                     outcome,
                     command,
-                    standardOutput.join(),
-                    standardError.join(),
-                    Duration.ofNanos(System.nanoTime() - startedAtNanos)));
+                    output,
+                    error,
+                    Duration.ofNanos(System.nanoTime() - startedAtNanos),
+                    MavenBuildDiagnostics.parse(projectRoot, output, error)));
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             completion.completeExceptionally(failure);
@@ -89,15 +94,13 @@ final class MavenBuildExecution implements ProjectBuildExecution {
     }
 
     private static CompletableFuture<String> read(InputStream input, String threadName) {
-        CompletableFuture<String> content = new CompletableFuture<>();
-        Thread.ofVirtual().name(threadName).start(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             try (input) {
-                content.complete(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+                return new String(input.readAllBytes(), StandardCharsets.UTF_8);
             } catch (IOException failure) {
-                content.completeExceptionally(new UncheckedIOException(failure));
+                throw new UncheckedIOException(threadName, failure);
             }
         });
-        return content;
     }
 
     private static ProjectBuildOutcome outcome(int exitCode, boolean cancelled) {

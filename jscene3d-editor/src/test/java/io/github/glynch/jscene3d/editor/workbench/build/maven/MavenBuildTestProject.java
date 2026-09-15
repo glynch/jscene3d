@@ -137,7 +137,7 @@ final class MavenBuildTestProject {
                 printf '%s\\n' "$*" >> wrapper-invocations.txt
                 if [ -f fail-build ]; then
                   printf 'fixture compilation failed\\n'
-                  printf '[ERROR] Example.java:[4,9] cannot find symbol\\n' >&2
+                  printf '[ERROR] src/main/java/example/Example.java:[4,9] cannot find symbol\\n' >&2
                   exit 1
                 fi
                 case " $* " in
@@ -166,7 +166,7 @@ final class MavenBuildTestProject {
                 echo %*>> wrapper-invocations.txt
                 if exist fail-build (
                   echo fixture compilation failed
-                  echo [ERROR] Example.java:[4,9] cannot find symbol 1>&2
+                  echo [ERROR] src/main/java/example/Example.java:[4,9] cannot find symbol 1>&2
                   exit /b 1
                 )
                 echo fixture build completed

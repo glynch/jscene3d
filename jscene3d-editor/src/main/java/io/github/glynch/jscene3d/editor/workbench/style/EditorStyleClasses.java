@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.editor.workbench.style;
 /** Central vocabulary for CSS classes assigned by the JavaFX editor workbench. */
 public final class EditorStyleClasses {
     /** CSS class named {@value}. */
+    public static final String EDITOR_OUTPUT_CHANNEL = "editor-output-channel";
+    /** CSS class named {@value}. */
     public static final String EDITOR_ACTIVITY_BAR = "editor-activity-bar";
     /** CSS class named {@value}. */
     public static final String EDITOR_ACTIVITY_BUTTON = "editor-activity-button";

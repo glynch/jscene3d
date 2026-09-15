@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 public final class ProjectBuildCoordinator implements AutoCloseable {
     private final ProjectBuildAdapter adapter;
     private final List<Consumer<ProjectBuildSnapshot>> observers = new ArrayList<>();
+    private final List<Consumer<ProjectBuildCompletion>> completionObservers = new ArrayList<>();
 
     private ProjectBuildPhase phase = ProjectBuildPhase.UNKNOWN;
     private long savedRevision;
@@ -63,6 +64,19 @@ public final class ProjectBuildCoordinator implements AutoCloseable {
         observers.add(listener);
         listener.accept(snapshot());
         return () -> removeObserver(listener);
+    }
+
+    /**
+     * Observes terminal build results published after this registration.
+     *
+     * @param observer completion observer
+     * @return registration which stops subsequent notifications when closed
+     */
+    public synchronized EditorRegistration observeCompletions(Consumer<ProjectBuildCompletion> observer) {
+        Consumer<ProjectBuildCompletion> listener = Objects.requireNonNull(observer, "observer");
+        ensureOpen();
+        completionObservers.add(listener);
+        return () -> removeCompletionObserver(listener);
     }
 
     /**
@@ -172,6 +186,7 @@ public final class ProjectBuildCoordinator implements AutoCloseable {
         }
         closed = true;
         observers.clear();
+        completionObservers.clear();
         if (activeExecution != null) {
             activeExecution.cancel();
         }
@@ -210,6 +225,7 @@ public final class ProjectBuildCoordinator implements AutoCloseable {
             activeExecution = null;
             cancellationRequested = false;
             ProjectBuildOutcome outcome = result == null ? null : result.outcome();
+            publishCompletion(request, result, failure);
             if (failure == null && outcome == ProjectBuildOutcome.SUCCEEDED) {
                 successfulRevision = request.revision();
             }
@@ -263,6 +279,20 @@ public final class ProjectBuildCoordinator implements AutoCloseable {
 
     private synchronized void removeObserver(Consumer<ProjectBuildSnapshot> observer) {
         observers.remove(observer);
+    }
+
+    private synchronized void removeCompletionObserver(Consumer<ProjectBuildCompletion> observer) {
+        completionObservers.remove(observer);
+    }
+
+    private void publishCompletion(
+            ProjectBuildRequest request, @Nullable ProjectBuildResult result, @Nullable Throwable failure) {
+        Throwable terminalFailure =
+                failure == null ? new IllegalStateException("build adapter completed without a result") : failure;
+        ProjectBuildCompletion completion = result == null
+                ? ProjectBuildCompletion.failed(request, terminalFailure)
+                : ProjectBuildCompletion.completed(request, result);
+        List.copyOf(completionObservers).forEach(observer -> observer.accept(completion));
     }
 
     private void ensureOpen() {

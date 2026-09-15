@@ -1023,6 +1023,22 @@
     -fx-padding: 0;
 }
 
+.editor-output-channel {
+    -fx-background-color: -jscene-panel;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-font-family: "Monospaced";
+    -fx-font-size: 11px;
+    -fx-highlight-fill: -jscene-selected;
+    -fx-highlight-text-fill: -jscene-text-strong;
+    -fx-padding: 4px;
+    -fx-text-fill: -jscene-text;
+}
+
+.editor-output-channel .content {
+    -fx-background-color: -jscene-panel;
+}
+
 .editor-project-browser-split,
 .editor-project-content,
 .editor-project-browser-split > .split-pane-divider {

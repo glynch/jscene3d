@@ -10,12 +10,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.glynch.jscene3d.editor.command.CommandId;
 import io.github.glynch.jscene3d.editor.command.EditorCommands;
 import io.github.glynch.jscene3d.editor.extension.project.EditorProjectContext;
+import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
+import io.github.glynch.jscene3d.editor.view.ViewId;
 import io.github.glynch.jscene3d.editor.workbench.build.coordination.ProjectBuildKind;
 import io.github.glynch.jscene3d.editor.workbench.build.coordination.ProjectBuildOutcome;
 import io.github.glynch.jscene3d.editor.workbench.build.coordination.ProjectBuildRequest;
 import io.github.glynch.jscene3d.editor.workbench.build.preference.InMemoryWorkspaceBuildPreferences;
+import io.github.glynch.jscene3d.editor.workbench.build.presentation.ProjectBuildFeedbackExtension;
 import io.github.glynch.jscene3d.editor.workbench.build.testing.ControllableProjectBuildAdapter;
 import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuCommandSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.menu.EditorMenuSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.selection.EditorSelectionContext;
@@ -34,52 +40,83 @@ final class EditorProjectBuildSessionTest {
         List<List<EditorMenuSnapshot>> snapshots = new ArrayList<>();
         Path workspace = Path.of("projects/example").toAbsolutePath().normalize();
 
-        try (EditorExtensionHost host = host();
-                EditorProjectBuildSession session = new EditorProjectBuildSession(
-                        host, preferences, ignored -> Optional.of(adapter), Runnable::run)) {
-            host.observeMenus(snapshots::add);
+        try (EditorExtensionHost host = host()) {
+            ProjectBuildFeedbackExtension feedback = feedback(host);
+            try (EditorProjectBuildSession session = new EditorProjectBuildSession(
+                    host, preferences, feedback, ignored -> Optional.of(adapter), Runnable::run)) {
+                host.observeMenus(snapshots::add);
 
-            session.openWorkspace(workspace);
+                session.openWorkspace(workspace);
 
-            assertThat(adapter.requests()).containsExactly(new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL));
-            assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
-                            .state()
-                            .enabled())
-                    .isFalse();
-            assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
-                            .state()
-                            .enabled())
-                    .isTrue();
+                assertThat(adapter.requests())
+                        .containsExactly(new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL));
+                assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
+                                .state()
+                                .enabled())
+                        .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
+                                .state()
+                                .enabled())
+                        .isTrue();
 
-            adapter.completeActive(ProjectBuildOutcome.SUCCEEDED);
+                adapter.completeActive(ProjectBuildOutcome.SUCCEEDED);
 
-            assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
-                            .state()
-                            .enabled())
-                    .isTrue();
-            assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
-                            .state()
-                            .enabled())
-                    .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
+                                .state()
+                                .enabled())
+                        .isTrue();
+                assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
+                                .state()
+                                .enabled())
+                        .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.SHOW_BUILD_OUTPUT)
+                                .state()
+                                .enabled())
+                        .isTrue();
 
-            host.execute(EditorCommands.BUILD_PROJECT);
+                host.execute(EditorCommands.BUILD_PROJECT);
 
-            assertThat(adapter.requests())
-                    .containsExactly(
-                            new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL),
-                            new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL));
+                assertThat(adapter.requests())
+                        .containsExactly(
+                                new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL),
+                                new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL));
 
-            host.execute(EditorCommands.CANCEL_BUILD);
+                host.execute(EditorCommands.CANCEL_BUILD);
 
-            assertThat(adapter.activeBuildWasCancelled()).isTrue();
-            adapter.completeActive(ProjectBuildOutcome.CANCELLED);
-            host.execute(EditorCommands.REBUILD_PROJECT);
+                assertThat(adapter.activeBuildWasCancelled()).isTrue();
+                adapter.completeActive(ProjectBuildOutcome.CANCELLED);
+                host.execute(EditorCommands.REBUILD_PROJECT);
 
-            assertThat(adapter.requests())
-                    .containsExactly(
-                            new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL),
-                            new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL),
-                            new ProjectBuildRequest(0, ProjectBuildKind.CLEAN));
+                assertThat(adapter.requests())
+                        .containsExactly(
+                                new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL),
+                                new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL),
+                                new ProjectBuildRequest(0, ProjectBuildKind.CLEAN));
+            }
+        }
+    }
+
+    @Test
+    void opensTheRegisteredBuildOutputViewAfterACompletedBuild() {
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
+        InMemoryWorkspaceBuildPreferences preferences = new InMemoryWorkspaceBuildPreferences();
+        EditorProjectContext projects = new EditorProjectContext();
+        List<ViewId> requestedViews = new ArrayList<>();
+        Path workspace = Path.of("projects/build-output").toAbsolutePath().normalize();
+
+        try (EditorExtensionHost host = host(projects)) {
+            ProjectBuildFeedbackExtension feedback = feedback(host);
+            try (EditorProjectBuildSession session = new EditorProjectBuildSession(
+                    host, preferences, feedback, ignored -> Optional.of(adapter), Runnable::run)) {
+                host.observeViewRequests(requestedViews::add);
+                showProject(projects, workspace);
+                session.openWorkspace(workspace);
+                adapter.completeActive(ProjectBuildOutcome.SUCCEEDED);
+
+                host.execute(EditorCommands.SHOW_BUILD_OUTPUT);
+
+                assertThat(requestedViews).containsExactly(ProjectBuildFeedbackExtension.OUTPUT_VIEW_ID);
+            }
         }
     }
 
@@ -91,23 +128,26 @@ final class EditorProjectBuildSessionTest {
         Path workspace = Path.of("projects/manual-build").toAbsolutePath().normalize();
         preferences.saveAutomaticBuild(workspace, false);
 
-        try (EditorExtensionHost host = host();
-                EditorProjectBuildSession session = new EditorProjectBuildSession(
-                        host, preferences, ignored -> Optional.of(adapter), Runnable::run)) {
-            host.observeMenus(snapshots::add);
+        try (EditorExtensionHost host = host()) {
+            ProjectBuildFeedbackExtension feedback = feedback(host);
+            try (EditorProjectBuildSession session = new EditorProjectBuildSession(
+                    host, preferences, feedback, ignored -> Optional.of(adapter), Runnable::run)) {
+                host.observeMenus(snapshots::add);
 
-            session.openWorkspace(workspace);
+                session.openWorkspace(workspace);
 
-            assertThat(adapter.requests()).isEmpty();
-            assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
-                            .state()
-                            .enabled())
-                    .isTrue();
+                assertThat(adapter.requests()).isEmpty();
+                assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
+                                .state()
+                                .enabled())
+                        .isTrue();
 
-            host.execute(EditorCommands.TOGGLE_AUTOMATIC_BUILD);
+                host.execute(EditorCommands.TOGGLE_AUTOMATIC_BUILD);
 
-            assertThat(adapter.requests()).containsExactly(new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL));
-            assertThat(preferences.automaticBuild(workspace)).isTrue();
+                assertThat(adapter.requests())
+                        .containsExactly(new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL));
+                assertThat(preferences.automaticBuild(workspace)).isTrue();
+            }
         }
     }
 
@@ -116,26 +156,29 @@ final class EditorProjectBuildSessionTest {
         ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         List<List<EditorMenuSnapshot>> snapshots = new ArrayList<>();
 
-        try (EditorExtensionHost host = host();
-                EditorProjectBuildSession session = new EditorProjectBuildSession(
-                        host,
-                        new InMemoryWorkspaceBuildPreferences(),
-                        ignored -> Optional.of(adapter),
-                        Runnable::run)) {
-            host.observeMenus(snapshots::add);
-            session.openWorkspace(Path.of("projects/closing"));
+        try (EditorExtensionHost host = host()) {
+            ProjectBuildFeedbackExtension feedback = feedback(host);
+            try (EditorProjectBuildSession session = new EditorProjectBuildSession(
+                    host,
+                    new InMemoryWorkspaceBuildPreferences(),
+                    feedback,
+                    ignored -> Optional.of(adapter),
+                    Runnable::run)) {
+                host.observeMenus(snapshots::add);
+                session.openWorkspace(Path.of("projects/closing"));
 
-            session.closeWorkspace();
+                session.closeWorkspace();
 
-            assertThat(adapter.activeBuildWasCancelled()).isTrue();
-            assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
-                            .state()
-                            .enabled())
-                    .isFalse();
-            assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
-                            .state()
-                            .enabled())
-                    .isFalse();
+                assertThat(adapter.activeBuildWasCancelled()).isTrue();
+                assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
+                                .state()
+                                .enabled())
+                        .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
+                                .state()
+                                .enabled())
+                        .isFalse();
+            }
         }
     }
 
@@ -143,25 +186,31 @@ final class EditorProjectBuildSessionTest {
     void keepsBuildCommandsUnavailableForAnUnsupportedWorkspace() {
         List<List<EditorMenuSnapshot>> snapshots = new ArrayList<>();
 
-        try (EditorExtensionHost host = host();
-                EditorProjectBuildSession session = new EditorProjectBuildSession(
-                        host, new InMemoryWorkspaceBuildPreferences(), ignored -> Optional.empty(), Runnable::run)) {
-            host.observeMenus(snapshots::add);
+        try (EditorExtensionHost host = host()) {
+            ProjectBuildFeedbackExtension feedback = feedback(host);
+            try (EditorProjectBuildSession session = new EditorProjectBuildSession(
+                    host,
+                    new InMemoryWorkspaceBuildPreferences(),
+                    feedback,
+                    ignored -> Optional.empty(),
+                    Runnable::run)) {
+                host.observeMenus(snapshots::add);
 
-            session.openWorkspace(Path.of("projects/unsupported"));
+                session.openWorkspace(Path.of("projects/unsupported"));
 
-            assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
-                            .state()
-                            .enabled())
-                    .isFalse();
-            assertThat(command(snapshots.getLast(), EditorCommands.REBUILD_PROJECT)
-                            .state()
-                            .enabled())
-                    .isFalse();
-            assertThat(command(snapshots.getLast(), EditorCommands.TOGGLE_AUTOMATIC_BUILD)
-                            .state()
-                            .enabled())
-                    .isTrue();
+                assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
+                                .state()
+                                .enabled())
+                        .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.REBUILD_PROJECT)
+                                .state()
+                                .enabled())
+                        .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.TOGGLE_AUTOMATIC_BUILD)
+                                .state()
+                                .enabled())
+                        .isTrue();
+            }
         }
     }
 
@@ -171,34 +220,42 @@ final class EditorProjectBuildSessionTest {
         List<Runnable> queuedUpdates = new ArrayList<>();
         List<List<EditorMenuSnapshot>> snapshots = new ArrayList<>();
 
-        try (EditorExtensionHost host = host();
-                EditorProjectBuildSession session = new EditorProjectBuildSession(
-                        host,
-                        new InMemoryWorkspaceBuildPreferences(),
-                        ignored -> Optional.of(adapter),
-                        queuedUpdates::add)) {
-            host.observeMenus(snapshots::add);
-            session.openWorkspace(Path.of("projects/closing-before-ui-update"));
-            session.closeWorkspace();
+        try (EditorExtensionHost host = host()) {
+            ProjectBuildFeedbackExtension feedback = feedback(host);
+            try (EditorProjectBuildSession session = new EditorProjectBuildSession(
+                    host,
+                    new InMemoryWorkspaceBuildPreferences(),
+                    feedback,
+                    ignored -> Optional.of(adapter),
+                    queuedUpdates::add)) {
+                host.observeMenus(snapshots::add);
+                session.openWorkspace(Path.of("projects/closing-before-ui-update"));
+                session.closeWorkspace();
 
-            queuedUpdates.forEach(Runnable::run);
+                queuedUpdates.forEach(Runnable::run);
 
-            assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
-                            .state()
-                            .enabled())
-                    .isFalse();
-            assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
-                            .state()
-                            .enabled())
-                    .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.BUILD_PROJECT)
+                                .state()
+                                .enabled())
+                        .isFalse();
+                assertThat(command(snapshots.getLast(), EditorCommands.CANCEL_BUILD)
+                                .state()
+                                .enabled())
+                        .isFalse();
+            }
         }
     }
 
     @Test
     void rejectsOpeningAWorkspaceAfterTheSessionCloses() {
         try (EditorExtensionHost host = host()) {
+            ProjectBuildFeedbackExtension feedback = feedback(host);
             EditorProjectBuildSession session = new EditorProjectBuildSession(
-                    host, new InMemoryWorkspaceBuildPreferences(), ignored -> Optional.empty(), Runnable::run);
+                    host,
+                    new InMemoryWorkspaceBuildPreferences(),
+                    feedback,
+                    ignored -> Optional.empty(),
+                    Runnable::run);
             session.close();
             session.close();
             Path workspace = Path.of("projects/closed");
@@ -218,6 +275,29 @@ final class EditorProjectBuildSessionTest {
     }
 
     private static EditorExtensionHost host() {
-        return new EditorExtensionHost(new EditorProjectContext(), new EditorSelectionContext());
+        return host(new EditorProjectContext());
+    }
+
+    private static EditorExtensionHost host(EditorProjectContext projects) {
+        return new EditorExtensionHost(projects, new EditorSelectionContext());
+    }
+
+    private static ProjectBuildFeedbackExtension feedback(EditorExtensionHost host) {
+        ProjectBuildFeedbackExtension feedback = new ProjectBuildFeedbackExtension();
+        host.activate(feedback);
+        return feedback;
+    }
+
+    private static void showProject(EditorProjectContext projects, Path workspace) {
+        EditorSelection selection = new EditorSelection(EditorSelectionKinds.WORLD, "world", Optional.empty());
+        EditorHierarchyNode hierarchy = new EditorHierarchyNode(
+                EditorHierarchyNode.Kind.WORLD,
+                "World",
+                Optional.empty(),
+                Optional.empty(),
+                true,
+                selection,
+                List.of());
+        projects.showProject(new EditorProject("project", "Project", workspace.toUri()), hierarchy, List.of());
     }
 }

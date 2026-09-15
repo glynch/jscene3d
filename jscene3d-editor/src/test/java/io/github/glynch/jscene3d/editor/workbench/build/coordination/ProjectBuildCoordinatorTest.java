@@ -164,6 +164,28 @@ final class ProjectBuildCoordinatorTest {
     }
 
     @Test
+    void publishesNormalAndExceptionalTerminalCompletions() {
+        ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
+        coordinator = new ProjectBuildCoordinator(adapter, false);
+        List<ProjectBuildCompletion> completions = new ArrayList<>();
+        coordinator.observeCompletions(completions::add);
+
+        coordinator.request(ProjectBuildKind.INCREMENTAL);
+        adapter.completeActive(ProjectBuildOutcome.SUCCEEDED);
+        coordinator.request(ProjectBuildKind.CLEAN);
+        adapter.failActive(new IllegalStateException("build process exited unexpectedly"));
+
+        assertThat(completions).hasSize(2);
+        assertThat(completions.getFirst().request())
+                .isEqualTo(new ProjectBuildRequest(0, ProjectBuildKind.INCREMENTAL));
+        assertThat(completions.getFirst().result()).isPresent();
+        assertThat(completions.getLast().request()).isEqualTo(new ProjectBuildRequest(0, ProjectBuildKind.CLEAN));
+        Throwable failure = completions.getLast().failure().orElseThrow();
+        assertThat(failure).isInstanceOf(IllegalStateException.class);
+        assertThat(failure.getMessage()).isEqualTo("build process exited unexpectedly");
+    }
+
+    @Test
     void retainsTheLastSuccessfulRevisionAfterANewerBuildFails() {
         ControllableProjectBuildAdapter adapter = new ControllableProjectBuildAdapter();
         coordinator = new ProjectBuildCoordinator(adapter, false);

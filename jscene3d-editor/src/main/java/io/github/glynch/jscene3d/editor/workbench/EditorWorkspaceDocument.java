@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.editor.selection.EditorSelections;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;
 import io.github.glynch.jscene3d.editor.window.EditorMessageSeverity;
 import io.github.glynch.jscene3d.editor.workbench.build.preference.WorkspaceBuildPreferences;
+import io.github.glynch.jscene3d.editor.workbench.build.presentation.ProjectBuildFeedbackExtension;
 import io.github.glynch.jscene3d.editor.workbench.build.session.EditorProjectBuildSession;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet;
 import io.github.glynch.jscene3d.editor.workbench.command.EditorWorkbenchCommandSet.DocumentCommandState;
@@ -99,8 +100,10 @@ final class EditorWorkspaceDocument implements AutoCloseable {
                         this::redo,
                         commands.requestClose()),
                 Objects.requireNonNull(commands.buildInfo(), "buildInfo").aboutText());
+        ProjectBuildFeedbackExtension buildFeedback = new ProjectBuildFeedbackExtension();
+        host.activate(buildFeedback);
         buildSession = new EditorProjectBuildSession(
-                host, Objects.requireNonNull(commands.buildPreferences(), "buildPreferences"));
+                host, Objects.requireNonNull(commands.buildPreferences(), "buildPreferences"), buildFeedback);
         selectionRegistration = area.observeSelectionChanged(this::updateCommands);
         previewEditor.show();
     }

@@ -36,7 +36,11 @@ public final class EditorLanguageSupportRegistry implements EditorLanguageSuppor
     private final EditorRegistration projectRegistration;
     private Optional<EditorProject> currentProject = Optional.empty();
 
-    /** Creates a registry coupled to the owning editor window's project lifecycle. */
+    /**
+     * Creates a registry coupled to the owning editor window's project lifecycle.
+     *
+     * @param projects active-project service
+     */
     public EditorLanguageSupportRegistry(EditorProjects projects) {
         projectRegistration = Objects.requireNonNull(projects, "projects").observe(this::projectChanged);
     }

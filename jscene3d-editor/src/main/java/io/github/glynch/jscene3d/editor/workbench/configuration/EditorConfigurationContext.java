@@ -25,7 +25,14 @@ public final class EditorConfigurationContext implements EditorConfiguration, Au
     private EditorRegistration sessionRegistration = () -> {};
     private @Nullable EditorProjectSession session;
 
-    /** Publishes one fully loaded project's setting registry and effective values. */
+    /** Creates an empty window-scoped configuration context. */
+    public EditorConfigurationContext() {}
+
+    /**
+     * Publishes one fully loaded project's setting registry and effective values.
+     *
+     * @param replacement loaded project session
+     */
     public void showProject(EditorProjectSession replacement) {
         sessionRegistration.close();
         session = Objects.requireNonNull(replacement, "replacement");

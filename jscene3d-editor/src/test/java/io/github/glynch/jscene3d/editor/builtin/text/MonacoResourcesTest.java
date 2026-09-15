@@ -6,8 +6,11 @@ package io.github.glynch.jscene3d.editor.builtin.text;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import org.junit.jupiter.api.Test;
 
 final class MonacoResourcesTest {
@@ -23,5 +26,26 @@ final class MonacoResourcesTest {
         assertThat(MonacoResources.baseUrl())
                 .isEqualTo(loader.getParent().toUri().toString());
         assertThat(loader.getParent().getFileName().toString()).contains(MonacoResources.VERSION);
+        assertOwnerOnlyPermissions(loader.getParent());
+    }
+
+    @Test
+    void removesAndRecreatesTheStagedDistribution() throws Exception {
+        Path firstDistribution = Path.of(MonacoResources.loader().toURI()).getParent();
+
+        MonacoResources.close();
+
+        assertThat(firstDistribution).doesNotExist();
+        Path secondDistribution = Path.of(MonacoResources.loader().toURI()).getParent();
+        assertThat(secondDistribution).isDirectory().isNotEqualTo(firstDistribution);
+        MonacoResources.close();
+        assertThat(secondDistribution).doesNotExist();
+    }
+
+    private static void assertOwnerOnlyPermissions(Path directory) throws IOException {
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            assertThat(Files.getPosixFilePermissions(directory))
+                    .containsExactlyInAnyOrderElementsOf(PosixFilePermissions.fromString("rwx------"));
+        }
     }
 }

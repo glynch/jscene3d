@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.ForkJoinPool;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -36,7 +37,7 @@ final class MavenProjectBuildAdapterTest {
     @Test
     void executesIncrementalBuildWithProjectWrapper(@TempDir Path temporaryDirectory) throws Exception {
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
-        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root(), ForkJoinPool.commonPool());
 
         ProjectBuildResult result = adapter.start(new ProjectBuildRequest(7, ProjectBuildKind.INCREMENTAL))
                 .completion()
@@ -50,7 +51,7 @@ final class MavenProjectBuildAdapterTest {
     @Test
     void preservesCommandOutputAndDuration(@TempDir Path temporaryDirectory) throws Exception {
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
-        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root(), ForkJoinPool.commonPool());
 
         ProjectBuildResult result = adapter.start(new ProjectBuildRequest(3, ProjectBuildKind.INCREMENTAL))
                 .completion()
@@ -68,7 +69,7 @@ final class MavenProjectBuildAdapterTest {
     @Test
     void executesCleanBuildIntentThroughGeneratedProjectContent(@TempDir Path temporaryDirectory) throws Exception {
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
-        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root(), ForkJoinPool.commonPool());
 
         ProjectBuildResult result = adapter.start(new ProjectBuildRequest(4, ProjectBuildKind.CLEAN))
                 .completion()
@@ -84,7 +85,7 @@ final class MavenProjectBuildAdapterTest {
     void reportsWrapperFailureAndPreservesItsOutput(@TempDir Path temporaryDirectory) throws Exception {
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
         project.failBuild();
-        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root(), ForkJoinPool.commonPool());
 
         ProjectBuildResult result = adapter.start(new ProjectBuildRequest(5, ProjectBuildKind.INCREMENTAL))
                 .completion()
@@ -110,7 +111,7 @@ final class MavenProjectBuildAdapterTest {
         assumeFalse(OperatingSystem.current() == OperatingSystem.WINDOWS);
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
         project.blockBuild();
-        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root(), ForkJoinPool.commonPool());
         ProjectBuildExecution execution = adapter.start(new ProjectBuildRequest(6, ProjectBuildKind.INCREMENTAL));
         ProcessHandle child = project.awaitBlockingChild();
 
@@ -130,7 +131,7 @@ final class MavenProjectBuildAdapterTest {
     void cancellingCleanBuildPreservesThePreviousCompiledOutput(@TempDir Path temporaryDirectory) throws Exception {
         assumeFalse(OperatingSystem.current() == OperatingSystem.WINDOWS);
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
-        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root(), ForkJoinPool.commonPool());
         adapter.start(new ProjectBuildRequest(6, ProjectBuildKind.INCREMENTAL))
                 .completion()
                 .toCompletableFuture()
@@ -158,7 +159,7 @@ final class MavenProjectBuildAdapterTest {
     void failedCleanBuildPreservesThePreviousCompiledOutput(@TempDir Path temporaryDirectory) throws Exception {
         assumeFalse(OperatingSystem.current() == OperatingSystem.WINDOWS);
         MavenBuildTestProject project = MavenBuildTestProject.create(temporaryDirectory);
-        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root());
+        MavenProjectBuildAdapter adapter = new MavenProjectBuildAdapter(project.root(), ForkJoinPool.commonPool());
         adapter.start(new ProjectBuildRequest(8, ProjectBuildKind.INCREMENTAL))
                 .completion()
                 .toCompletableFuture()

@@ -63,9 +63,16 @@ import java.util.function.Consumer;
 /** Contributes the built-in dark and light palettes through the public theme contract. */
 public final class BuiltinColorThemesExtension implements EditorExtension {
     private static final String EXTENSION_ID = "io.github.glynch.jscene3d.editor.builtin.color-themes";
+
+    /** Built-in dark theme identity. */
     public static final EditorColorThemeId DARK = new EditorColorThemeId("io.github.glynch.jscene3d.editor.theme.dark");
+
+    /** Built-in light theme identity. */
     public static final EditorColorThemeId LIGHT =
             new EditorColorThemeId("io.github.glynch.jscene3d.editor.theme.light");
+
+    /** Creates the built-in color-theme extension. */
+    public BuiltinColorThemesExtension() {}
 
     @Override
     public String id() {
@@ -88,7 +95,12 @@ public final class BuiltinColorThemesExtension implements EditorExtension {
         registerThemes(editor.colorThemes(), editor.subscriptions()::add);
     }
 
-    /** Registers both built-in themes through the same boundary used by external extensions. */
+    /**
+     * Registers both built-in themes through the same boundary used by external extensions.
+     *
+     * @param themes color-theme registry
+     * @param registrations owner receiving contribution registrations
+     */
     public static void registerThemes(EditorColorThemes themes, Consumer<EditorRegistration> registrations) {
         EditorColorThemes registry = Objects.requireNonNull(themes, "themes");
         Consumer<EditorRegistration> owner = Objects.requireNonNull(registrations, "registrations");

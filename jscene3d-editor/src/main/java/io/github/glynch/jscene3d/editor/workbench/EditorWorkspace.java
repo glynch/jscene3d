@@ -34,6 +34,7 @@ import io.github.glynch.jscene3d.editor.workbench.view.JavaFxPanelPart;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxViewContainer;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -71,13 +72,14 @@ public final class EditorWorkspace extends BorderPane {
     /** Creates the shell around an existing viewport and the real open-project command. */
     public EditorWorkspace(
             GLCanvas viewportCanvas,
-            Runnable openProject,
-            Runnable requestClose,
+            Actions actions,
             EditorSelections selections,
             EditorExtensionHost extensions,
             WorkspaceBuildPreferences buildPreferences,
-            EditorBuildInfo buildInfo) {
+            EditorBuildInfo buildInfo,
+            Executor buildExecutor) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
+        Actions commands = Objects.requireNonNull(actions, "actions");
         JavaFxIconRenderer icons = JavaFxIconRenderer.builtIn();
         layout = new EditorWorkbenchLayout(host);
         activitySelection = new EditorActivitySelection(host, layout, HierarchyExtension.ACTIVITY_ID);
@@ -124,16 +126,31 @@ public final class EditorWorkspace extends BorderPane {
                         projectContext,
                         statusBar),
                 new EditorWorkspaceDocument.Actions(
-                        openProject,
-                        requestClose,
+                        commands.openProject(),
+                        commands.requestClose(),
                         Objects.requireNonNull(buildPreferences, "buildPreferences"),
-                        buildInfo));
+                        buildInfo,
+                        Objects.requireNonNull(buildExecutor, "buildExecutor")));
         colorSchemeToggle = new JavaFxColorSchemeToggle(
                 host.colorThemes(), icons, () -> host.execute(EditorCommands.TOGGLE_COLOR_SCHEME));
         menuBar = new JavaFxMenuBar(host);
         setTop(createTopChrome(menuBar.node(), colorSchemeToggle.button(), layoutQuickAccess.node()));
         setCenter(regions.node());
         getStyleClass().add(EditorStyleClasses.EDITOR_SHELL);
+    }
+
+    /**
+     * Application actions exposed by the workspace shell.
+     *
+     * @param openProject opens a project chooser
+     * @param requestClose requests application shutdown
+     */
+    public record Actions(Runnable openProject, Runnable requestClose) {
+        /** Validates workspace actions. */
+        public Actions {
+            Objects.requireNonNull(openProject, "openProject");
+            Objects.requireNonNull(requestClose, "requestClose");
+        }
     }
 
     /** Applies bounded initial divider positions after the stage has completed its first layout. */

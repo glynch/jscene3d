@@ -13,7 +13,15 @@ import io.github.glynch.jscene3d.editor.theme.EditorSyntaxTokenId;
 import java.util.Map;
 import java.util.Objects;
 
-/** Complete effective theme after inheritance has been resolved. */
+/**
+ * Complete effective theme after inheritance has been resolved.
+ *
+ * @param id stable theme identity
+ * @param label display label
+ * @param kind light or dark theme kind
+ * @param colors resolved workbench colors by token
+ * @param syntaxStyles resolved source syntax styles by token
+ */
 public record EditorResolvedColorTheme(
         EditorColorThemeId id,
         String label,

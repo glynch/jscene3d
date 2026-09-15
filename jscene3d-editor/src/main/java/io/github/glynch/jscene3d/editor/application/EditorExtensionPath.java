@@ -11,11 +11,16 @@ import java.util.List;
 
 /** Locates installed extension artifacts whose descriptors are safe for the editor to inspect. */
 public final class EditorExtensionPath {
+    /** System property containing platform-separated extension paths. */
     public static final String PROPERTY = "jscene3d.editor.extensionPath";
 
     private EditorExtensionPath() {}
 
-    /** Returns configured artifact files and directories in declaration order. */
+    /**
+     * Returns configured artifact files and directories in declaration order.
+     *
+     * @return normalized configured extension paths
+     */
     public static List<Path> configured() {
         String configured = System.getProperty(PROPERTY, "");
         if (configured.isBlank()) {

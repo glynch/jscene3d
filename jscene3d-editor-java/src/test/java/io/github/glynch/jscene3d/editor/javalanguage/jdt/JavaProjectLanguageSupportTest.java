@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -89,6 +90,7 @@ final class JavaProjectLanguageSupportTest {
                 new JdtLanguageServerMetadata("1.61.0", "archive", "sha", "source"),
                 OperatingSystem.MACOS,
                 executor,
+                ForkJoinPool.commonPool(),
                 new LanguageServerProcessLauncher(executor),
                 "test");
     }

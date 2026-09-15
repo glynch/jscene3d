@@ -12,7 +12,11 @@ import javafx.scene.image.ImageView;
 public final class EditorBrandMark extends ImageView {
     private static final String MARK_RESOURCE = "/io/github/glynch/jscene3d/editor/splash/jscene3d-mark.png";
 
-    /** Creates an accessible, non-interactive mark at the requested square size. */
+    /**
+     * Creates an accessible, non-interactive mark at the requested square size.
+     *
+     * @param size requested width and height in pixels
+     */
     public EditorBrandMark(double size) {
         super(loadMark());
         setFitWidth(size);

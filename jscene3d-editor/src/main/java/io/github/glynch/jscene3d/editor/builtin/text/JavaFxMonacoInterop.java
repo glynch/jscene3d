@@ -9,17 +9,25 @@ import io.github.glynch.jscene3d.editor.diagnostic.EditorTextRange;
 import io.github.glynch.jscene3d.editor.language.EditorTextEdit;
 import java.util.ArrayList;
 import java.util.List;
+import javafx.scene.web.WebEngine;
 import netscape.javascript.JSObject;
 
-/** Converts Monaco's native change array into toolkit-independent incremental text edits. */
-final class MonacoTextEdits {
-    private MonacoTextEdits() {}
+/** Contains the JavaFX-specific JavaScript interop required by the Monaco bridge. */
+@AllowJavaFxWebInterop
+final class JavaFxMonacoInterop {
+    private JavaFxMonacoInterop() {}
 
-    static List<EditorTextEdit> from(JSObject changes) {
-        int length = number(changes, "length");
+    static void attachBridge(WebEngine engine, Object bridge) {
+        object(engine.executeScript("window"), "window").setMember("javaBridge", bridge);
+        engine.executeScript("window.attachJavaBridge(javaBridge)");
+    }
+
+    static List<EditorTextEdit> textEdits(Object changes) {
+        JSObject array = object(changes, "changes");
+        int length = number(array, "length");
         List<EditorTextEdit> edits = new ArrayList<>(length);
         for (int index = 0; index < length; index++) {
-            JSObject change = object(changes.getSlot(index), "change");
+            JSObject change = object(array.getSlot(index), "change");
             JSObject range = object(change.getMember("range"), "range");
             edits.add(new EditorTextEdit(
                     new EditorTextRange(

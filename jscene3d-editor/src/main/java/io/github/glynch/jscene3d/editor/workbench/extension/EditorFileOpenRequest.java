@@ -9,7 +9,13 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Workbench-internal request to preview or permanently open a workspace file. */
+/**
+ * Workbench-internal request to preview or permanently open a workspace file.
+ *
+ * @param resource canonical file resource
+ * @param disposition preview or pinned editor disposition
+ * @param selection initial text selection, when requested
+ */
 public record EditorFileOpenRequest(URI resource, Disposition disposition, Optional<EditorTextRange> selection) {
     /** How the requested editor participates in the current file session. */
     public enum Disposition {
@@ -27,7 +33,12 @@ public record EditorFileOpenRequest(URI resource, Disposition disposition, Optio
         Objects.requireNonNull(selection, "selection");
     }
 
-    /** Creates a file request without an initial source selection. */
+    /**
+     * Creates a file request without an initial source selection.
+     *
+     * @param resource canonical file resource
+     * @param disposition preview or pinned editor disposition
+     */
     public EditorFileOpenRequest(URI resource, Disposition disposition) {
         this(resource, disposition, Optional.empty());
     }

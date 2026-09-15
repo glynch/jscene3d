@@ -28,6 +28,7 @@ import io.github.glynch.jscene3d.editor.workbench.view.JavaFxWelcomeEditor;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -53,7 +54,8 @@ final class EditorWorkspaceDocument implements AutoCloseable {
             Runnable openProject,
             Runnable requestClose,
             WorkspaceBuildPreferences buildPreferences,
-            EditorBuildInfo buildInfo) {}
+            EditorBuildInfo buildInfo,
+            Executor buildExecutor) {}
 
     private static final PseudoClass DIRTY_PSEUDO_CLASS = PseudoClass.getPseudoClass("dirty");
 
@@ -103,7 +105,10 @@ final class EditorWorkspaceDocument implements AutoCloseable {
         ProjectBuildFeedbackExtension buildFeedback = new ProjectBuildFeedbackExtension();
         host.activate(buildFeedback);
         buildSession = new EditorProjectBuildSession(
-                host, Objects.requireNonNull(commands.buildPreferences(), "buildPreferences"), buildFeedback);
+                host,
+                Objects.requireNonNull(commands.buildPreferences(), "buildPreferences"),
+                buildFeedback,
+                Objects.requireNonNull(commands.buildExecutor(), "buildExecutor"));
         selectionRegistration = area.observeSelectionChanged(this::updateCommands);
         previewEditor.show();
     }

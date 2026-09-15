@@ -11,7 +11,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Properties;
 
-/** Immutable build and runtime identity displayed by the editor and used for project compatibility checks. */
+/**
+ * Immutable build and runtime identity displayed by the editor and used for project compatibility checks.
+ *
+ * @param version editor version
+ * @param commit source-control commit identity
+ * @param buildDate build timestamp
+ * @param javaVersion Java runtime version
+ * @param javafxVersion JavaFX runtime version
+ * @param operatingSystem operating-system identity
+ */
 public record EditorBuildInfo(
         String version,
         String commit,
@@ -23,6 +32,7 @@ public record EditorBuildInfo(
     private static final String RESOURCE = "/io/github/glynch/jscene3d/editor/editor-build.properties";
     private static final EditorBuildInfo CURRENT = readCurrent();
 
+    /** Validates and normalizes the build identity. */
     public EditorBuildInfo {
         version = requireValue(version, "version");
         commit = requireValue(commit, "commit");
@@ -32,17 +42,29 @@ public record EditorBuildInfo(
         operatingSystem = requireValue(operatingSystem, "operatingSystem");
     }
 
-    /** Returns build and runtime identity for this editor process. */
+    /**
+     * Returns build and runtime identity for this editor process.
+     *
+     * @return current editor build identity
+     */
     public static EditorBuildInfo current() {
         return CURRENT;
     }
 
-    /** Returns the engine version against which opened projects are validated. */
+    /**
+     * Returns the engine version against which opened projects are validated.
+     *
+     * @return current engine version
+     */
     public static String engineVersion() {
         return CURRENT.version();
     }
 
-    /** Formats the complete copyable About diagnostic text. */
+    /**
+     * Formats the complete copyable About diagnostic text.
+     *
+     * @return multi-line About text
+     */
     public String aboutText() {
         return String.join(
                 System.lineSeparator(),

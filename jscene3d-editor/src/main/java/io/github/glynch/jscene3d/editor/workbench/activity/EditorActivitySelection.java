@@ -46,7 +46,11 @@ public final class EditorActivitySelection implements AutoCloseable {
         viewRequestRegistration = host.observeViewRequests(this::revealView);
     }
 
-    /** Returns the current immutable selection and membership snapshot. */
+    /**
+     * Returns the current immutable selection and membership snapshot.
+     *
+     * @return current activity selection state
+     */
     public EditorActivitySelectionState current() {
         requireOpen();
         return state();
@@ -83,7 +87,12 @@ public final class EditorActivitySelection implements AutoCloseable {
         notifyObservers();
     }
 
-    /** Observes selection state and immediately receives the current snapshot. */
+    /**
+     * Observes selection state and immediately receives the current snapshot.
+     *
+     * @param observer selection-state observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observe(Consumer<EditorActivitySelectionState> observer) {
         requireOpen();
         Consumer<EditorActivitySelectionState> listener = Objects.requireNonNull(observer, "observer");

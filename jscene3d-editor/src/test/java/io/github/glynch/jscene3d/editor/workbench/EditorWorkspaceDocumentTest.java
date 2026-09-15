@@ -18,6 +18,7 @@ import io.github.glynch.jscene3d.editor.workbench.style.EditorStyleClasses;
 import io.github.glynch.jscene3d.editor.workbench.view.JavaFxEditorArea;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -54,7 +55,8 @@ final class EditorWorkspaceDocumentTest {
                                 () -> openProjectRequested.set(true),
                                 () -> {},
                                 new InMemoryWorkspaceBuildPreferences(),
-                                EditorBuildInfo.current()))) {
+                                EditorBuildInfo.current(),
+                                ForkJoinPool.commonPool()))) {
             Tab preview = editorArea.node().getTabs().getFirst();
             assertThat(preview.getContent()).isSameAs(previewContent);
             assertThat(preview.getText()).isEqualTo("Empty Preview");

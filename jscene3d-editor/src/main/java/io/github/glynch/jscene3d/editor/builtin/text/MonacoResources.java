@@ -4,20 +4,20 @@
  */
 package io.github.glynch.jscene3d.editor.builtin.text;
 
+import io.github.glynch.jscene3d.io.TemporaryWorkspace;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.JarURLConnection;
 import java.net.URL;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import org.jspecify.annotations.Nullable;
 
 /** Stages the pinned Monaco WebJar as ordinary files that JavaFX WebKit can load. */
 final class MonacoResources {
@@ -25,20 +25,37 @@ final class MonacoResources {
     private static final String CONFIGURATION = "monaco.properties";
     private static final String EDITOR_PAGE = "monaco-editor.html";
     private static final String WEBJAR_ROOT = "META-INF/resources/webjars/monaco-editor/" + VERSION + "/min/vs/";
-    private static final Distribution DISTRIBUTION = prepareDistribution();
+    private static @Nullable Distribution distribution;
 
     private MonacoResources() {}
 
     static URL loader() {
-        return DISTRIBUTION.loader();
+        return distribution().loader();
     }
 
     static URL editorPage() {
-        return DISTRIBUTION.editorPage();
+        return distribution().editorPage();
     }
 
     static String baseUrl() {
-        return DISTRIBUTION.root().toUri().toString();
+        return distribution().root().toUri().toString();
+    }
+
+    static synchronized void close() {
+        Distribution current = distribution;
+        distribution = null;
+        if (current != null) {
+            closeWorkspace(current.workspace());
+        }
+    }
+
+    private static synchronized Distribution distribution() {
+        Distribution current = distribution;
+        if (current == null) {
+            current = prepareDistribution();
+            distribution = current;
+        }
+        return current;
     }
 
     private static Distribution prepareDistribution() {
@@ -49,18 +66,18 @@ final class MonacoResources {
         if (!"jar".equals(packagedLoader.getProtocol())) {
             throw new IllegalStateException("Bundled Monaco distribution is not packaged in a WebJar");
         }
-        Path root = null;
+        TemporaryWorkspace workspace = null;
         try {
-            root = Files.createTempDirectory("jscene3d-monaco-" + VERSION + "-");
+            workspace = TemporaryWorkspace.create("jscene3d-monaco-" + VERSION + "-");
+            Path root = workspace.root();
             extractWebJar(packagedLoader, root);
             copyEditorPage(root);
-            registerCleanup(root);
             return new Distribution(
-                    root,
+                    workspace,
                     root.resolve("loader.js").toUri().toURL(),
                     root.resolve(EDITOR_PAGE).toUri().toURL());
         } catch (IOException exception) {
-            deleteTree(root);
+            closeWorkspace(workspace);
             throw new IllegalStateException("Bundled Monaco distribution could not be prepared", exception);
         }
     }
@@ -110,35 +127,20 @@ final class MonacoResources {
         return properties.getProperty("version");
     }
 
-    private static void registerCleanup(Path root) {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> deleteTree(root), "jscene3d-monaco-cleanup"));
-    }
-
-    private static void deleteTree(Path root) {
-        if (root == null) {
+    private static void closeWorkspace(@Nullable TemporaryWorkspace workspace) {
+        if (workspace == null) {
             return;
         }
         try {
-            Files.walkFileTree(root, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                    Files.deleteIfExists(file);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(Path directory, IOException failure) throws IOException {
-                    if (failure != null) {
-                        throw failure;
-                    }
-                    Files.deleteIfExists(directory);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException ignored) {
+            workspace.close();
+        } catch (UncheckedIOException ignored) {
             // Best-effort cleanup of a process-private temporary directory.
         }
     }
 
-    private record Distribution(Path root, URL loader, URL editorPage) {}
+    private record Distribution(TemporaryWorkspace workspace, URL loader, URL editorPage) {
+        private Path root() {
+            return workspace.root();
+        }
+    }
 }

@@ -9,7 +9,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable outcome of composing one editor-only spatial world preview. */
+/**
+ * Immutable outcome of composing one editor-only spatial world preview.
+ *
+ * @param preview successfully composed preview, when available
+ * @param diagnostics ordered composition diagnostics
+ */
 public record EditorWorldPreviewLoadResult(Optional<EditorWorldPreview> preview, List<ProjectDiagnostic> diagnostics) {
     /** Copies one preview result and its ordered diagnostics. */
     public EditorWorldPreviewLoadResult {

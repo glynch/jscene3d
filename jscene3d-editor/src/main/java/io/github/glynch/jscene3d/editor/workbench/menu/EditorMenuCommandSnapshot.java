@@ -8,7 +8,14 @@ import io.github.glynch.jscene3d.editor.command.EditorCommandContribution;
 import io.github.glynch.jscene3d.editor.command.EditorCommandState;
 import java.util.Objects;
 
-/** Immutable command metadata and state rendered inside one top-level menu. */
+/**
+ * Immutable command metadata and state rendered inside one top-level menu.
+ *
+ * @param contribution command metadata
+ * @param state current command state
+ * @param group menu grouping identity
+ * @param order order within the group
+ */
 public record EditorMenuCommandSnapshot(
         EditorCommandContribution contribution, EditorCommandState state, String group, int order) {
     /** Validates one complete menu-command snapshot. */

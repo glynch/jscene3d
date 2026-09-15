@@ -6,9 +6,16 @@ package io.github.glynch.jscene3d.editor.workbench.appearance;
 
 import java.util.Objects;
 
-/** Current resolved color theme and source-editor typography. */
+/**
+ * Current resolved color theme and source-editor typography.
+ *
+ * @param colorTheme resolved workbench color theme
+ * @param editorFontFamily source-editor font family
+ * @param editorFontSize source-editor font size in pixels
+ */
 public record EditorAppearanceSnapshot(
         EditorResolvedColorTheme colorTheme, String editorFontFamily, int editorFontSize) {
+    /** Validates the resolved appearance. */
     public EditorAppearanceSnapshot {
         Objects.requireNonNull(colorTheme, "colorTheme");
         if (Objects.requireNonNull(editorFontFamily, "editorFontFamily").isBlank()) {

@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -54,8 +55,13 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
         process = CompletableFuture.supplyAsync(() -> prepare(projectRoot, runtime), runtime.executor())
                 .thenCompose(runtime.launcher()::launch)
                 .toCompletableFuture();
-        protocol = process.thenApply(
-                running -> connect(running, projectRoot, projectName, runtime.clientVersion(), languageClient));
+        protocol = process.thenApply(running -> connect(
+                running,
+                projectRoot,
+                projectName,
+                runtime.clientVersion(),
+                languageClient,
+                runtime.protocolExecutor()));
         protocol.thenCompose(session -> session.initialized().thenApply(ignored -> session))
                 .whenComplete(this::protocolInitializationCompleted);
         process.thenAccept(running -> running.exitCode().whenComplete(this::processExited));
@@ -147,7 +153,8 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
             Path projectRoot,
             String projectName,
             String clientVersion,
-            JdtLanguageClient languageClient) {
+            JdtLanguageClient languageClient,
+            ExecutorService protocolExecutor) {
         if (closed.get()) {
             running.close();
             throw new IllegalStateException("Java language session was closed during startup");
@@ -156,7 +163,8 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
                 running.serverOutput(),
                 running.serverInput(),
                 new LanguageServerInitialization(projectRoot, projectName, "JScene3D Editor", clientVersion),
-                languageClient);
+                languageClient,
+                protocolExecutor);
     }
 
     private void protocolInitializationCompleted(LspClientSession initializedSession, Throwable failure) {
@@ -240,6 +248,7 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
             JdtLanguageServerMetadata metadata,
             OperatingSystem operatingSystem,
             Executor executor,
+            ExecutorService protocolExecutor,
             LanguageServerProcessLauncher launcher,
             String clientVersion) {
         Runtime {
@@ -248,6 +257,7 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
             Objects.requireNonNull(metadata, "metadata");
             Objects.requireNonNull(operatingSystem, "operatingSystem");
             Objects.requireNonNull(executor, "executor");
+            Objects.requireNonNull(protocolExecutor, "protocolExecutor");
             Objects.requireNonNull(launcher, "launcher");
             Objects.requireNonNull(clientVersion, "clientVersion");
         }

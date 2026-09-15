@@ -119,6 +119,15 @@
         </resources>
         <plugins>
             <plugin>
+                <groupId>de.thetaphi</groupId>
+                <artifactId>forbiddenapis</artifactId>
+                <configuration>
+                    <suppressAnnotations>
+                        <suppressAnnotation>io.github.glynch.jscene3d.editor.builtin.text.AllowJavaFxWebInterop</suppressAnnotation>
+                    </suppressAnnotations>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>io.github.git-commit-id</groupId>
                 <artifactId>git-commit-id-maven-plugin</artifactId>
                 <executions>

@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.editor.workbench.extension.EditorExtensionHost;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javafx.application.Platform;
@@ -43,16 +44,19 @@ public final class EditorProjectBuildSession implements AutoCloseable {
      *
      * @param extensions workbench command and menu host
      * @param preferences per-workspace build preferences
+     * @param feedback build status and output presenter
+     * @param buildExecutor caller-owned executor used to observe Maven processes
      */
     public EditorProjectBuildSession(
             EditorExtensionHost extensions,
             WorkspaceBuildPreferences preferences,
-            ProjectBuildFeedbackExtension feedback) {
+            ProjectBuildFeedbackExtension feedback,
+            Executor buildExecutor) {
         this(
                 extensions,
                 preferences,
                 feedback,
-                EditorProjectBuildSession::selectAdapter,
+                projectRoot -> selectAdapter(projectRoot, buildExecutor),
                 EditorProjectBuildSession::dispatch);
     }
 
@@ -194,9 +198,9 @@ public final class EditorProjectBuildSession implements AutoCloseable {
         return new ProjectBuildCommandAvailability(true, building, outputAvailable);
     }
 
-    private static Optional<ProjectBuildAdapter> selectAdapter(Path projectRoot) {
+    private static Optional<ProjectBuildAdapter> selectAdapter(Path projectRoot, Executor executor) {
         return MavenProjectBuildAdapter.supports(projectRoot)
-                ? Optional.of(new MavenProjectBuildAdapter(projectRoot))
+                ? Optional.of(new MavenProjectBuildAdapter(projectRoot, Objects.requireNonNull(executor, "executor")))
                 : Optional.empty();
     }
 

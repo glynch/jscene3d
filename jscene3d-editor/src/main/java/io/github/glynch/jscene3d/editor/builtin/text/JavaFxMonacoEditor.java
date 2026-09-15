@@ -20,7 +20,6 @@ import javafx.concurrent.Worker;
 import javafx.scene.Node;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
-import netscape.javascript.JSObject;
 
 /** JavaFX WebView adapter hosting Monaco over one text-file working copy. */
 public final class JavaFxMonacoEditor implements AutoCloseable {
@@ -80,9 +79,7 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
         WebEngine engine = view.getEngine();
         engine.getLoadWorker().stateProperty().addListener((ignored, previous, state) -> {
             if (state == Worker.State.SUCCEEDED && !closed) {
-                JSObject window = (JSObject) engine.executeScript("window");
-                window.setMember("javaBridge", bridge);
-                engine.executeScript("window.attachJavaBridge(javaBridge)");
+                JavaFxMonacoInterop.attachBridge(engine, bridge);
             }
         });
         engine.load(MonacoResources.editorPage().toExternalForm());
@@ -211,9 +208,9 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
         }
 
         /** Receives source changes from Monaco. */
-        public void contentChanged(String content, JSObject changes) {
+        public void contentChanged(String content, Object changes) {
             if (!bridgeClosed) {
-                workingCopy.update(content, MonacoTextEdits.from(Objects.requireNonNull(changes, "changes")));
+                workingCopy.update(content, JavaFxMonacoInterop.textEdits(Objects.requireNonNull(changes, "changes")));
                 stateChanged.run();
             }
         }

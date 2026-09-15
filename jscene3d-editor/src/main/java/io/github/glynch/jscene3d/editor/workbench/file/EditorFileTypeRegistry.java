@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class EditorFileTypeRegistry implements EditorFileTypes {
     private final Map<EditorFileTypeId, EditorFileType> fileTypes = new LinkedHashMap<>();
 
+    /** Creates an empty file-type registry. */
+    public EditorFileTypeRegistry() {}
+
     @Override
     public EditorRegistration register(EditorFileType fileType) {
         EditorFileType contribution = Objects.requireNonNull(fileType, "fileType");

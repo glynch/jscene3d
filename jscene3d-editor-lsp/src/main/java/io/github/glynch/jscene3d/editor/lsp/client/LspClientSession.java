@@ -13,7 +13,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.lsp4j.ClientCapabilities;
@@ -38,7 +37,6 @@ import org.eclipse.lsp4j.services.LanguageServer;
 
 /** Owns the JSON-RPC transport and initialization lifecycle for one language-server connection. */
 public final class LspClientSession implements AutoCloseable {
-    private final ExecutorService protocolExecutor;
     private final LanguageServer server;
     private final Future<Void> listener;
     private final CompletableFuture<Void> initialized;
@@ -53,13 +51,13 @@ public final class LspClientSession implements AutoCloseable {
             LanguageServerInitialization initialization,
             LanguageClient languageClient,
             ExecutorService protocolExecutor) {
-        this.protocolExecutor = Objects.requireNonNull(protocolExecutor, "protocolExecutor");
+        ExecutorService executor = Objects.requireNonNull(protocolExecutor, "protocolExecutor");
         Launcher<LanguageServer> launcher = new LSPLauncher.Builder<LanguageServer>()
                 .setLocalService(Objects.requireNonNull(languageClient, "languageClient"))
                 .setRemoteInterface(LanguageServer.class)
                 .setInput(Objects.requireNonNull(serverOutput, "serverOutput"))
                 .setOutput(Objects.requireNonNull(serverInput, "serverInput"))
-                .setExecutorService(protocolExecutor)
+                .setExecutorService(executor)
                 .create();
         server = launcher.getRemoteProxy();
         listener = launcher.startListening();
@@ -73,11 +71,15 @@ public final class LspClientSession implements AutoCloseable {
      * @param serverOutput language-server standard output read by the client
      * @param serverInput language-server standard input written by the client
      * @param initialization workspace and client identity sent with the initialize request
+     * @param protocolExecutor caller-owned executor for JSON-RPC protocol work
      * @return the connected client session
      */
     public static LspClientSession connect(
-            InputStream serverOutput, OutputStream serverInput, LanguageServerInitialization initialization) {
-        return connect(serverOutput, serverInput, initialization, new DefaultLanguageClient());
+            InputStream serverOutput,
+            OutputStream serverInput,
+            LanguageServerInitialization initialization,
+            ExecutorService protocolExecutor) {
+        return connect(serverOutput, serverInput, initialization, new DefaultLanguageClient(), protocolExecutor);
     }
 
     /**
@@ -87,19 +89,21 @@ public final class LspClientSession implements AutoCloseable {
      * @param serverInput language-server standard input written by the client
      * @param initialization workspace and client identity sent with the initialize request
      * @param languageClient standard and language-specific client callbacks
+     * @param protocolExecutor caller-owned executor for JSON-RPC protocol work
      * @return the connected client session
      */
     public static LspClientSession connect(
             InputStream serverOutput,
             OutputStream serverInput,
             LanguageServerInitialization initialization,
-            LanguageClient languageClient) {
+            LanguageClient languageClient,
+            ExecutorService protocolExecutor) {
         return new LspClientSession(
                 serverOutput,
                 serverInput,
                 Objects.requireNonNull(initialization, "initialization"),
                 Objects.requireNonNull(languageClient, "languageClient"),
-                Executors.newVirtualThreadPerTaskExecutor());
+                Objects.requireNonNull(protocolExecutor, "protocolExecutor"));
     }
 
     /**
@@ -206,7 +210,6 @@ public final class LspClientSession implements AutoCloseable {
             return;
         }
         listener.cancel(true);
-        protocolExecutor.shutdownNow();
     }
 
     private CompletableFuture<Void> initialize(LanguageServerInitialization initialization) {

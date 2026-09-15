@@ -8,7 +8,12 @@ import io.github.glynch.jscene3d.editor.menu.EditorMenuContribution;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable top-level menu and ordered command snapshot. */
+/**
+ * Immutable top-level menu and ordered command snapshot.
+ *
+ * @param contribution top-level menu metadata
+ * @param commands ordered menu commands
+ */
 public record EditorMenuSnapshot(EditorMenuContribution contribution, List<EditorMenuCommandSnapshot> commands) {
     /** Copies one complete top-level menu snapshot. */
     public EditorMenuSnapshot {

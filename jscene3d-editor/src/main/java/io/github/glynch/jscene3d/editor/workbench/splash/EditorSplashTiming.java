@@ -8,7 +8,11 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 
-/** Controls minimum cold-start splash visibility without delaying editor work. */
+/**
+ * Controls minimum cold-start splash visibility without delaying editor work.
+ *
+ * @param startupMinimumVisibility minimum splash visibility after it is displayed
+ */
 public record EditorSplashTiming(Duration startupMinimumVisibility) {
     public static final String MINIMUM_SECONDS_ARGUMENT = "splash-minimum-seconds";
     private static final Duration DEFAULT_STARTUP_MINIMUM_VISIBILITY = Duration.ofSeconds(2);

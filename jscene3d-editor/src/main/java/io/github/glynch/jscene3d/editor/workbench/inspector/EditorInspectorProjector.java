@@ -37,7 +37,14 @@ import java.util.function.Consumer;
 public final class EditorInspectorProjector {
     private EditorInspectorProjector() {}
 
-    /** Projects the opened world root. */
+    /**
+     * Projects the opened world root.
+     *
+     * @param world world definition
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @return immutable world selection
+     */
     public static EditorSelection world(WorldDefinition world, Path source, Path projectRoot) {
         List<EditorDetails.Property> properties = List.of(
                 textProperty("asset-id", "Asset ID", world.id().toString()),
@@ -55,13 +62,32 @@ public final class EditorInspectorProjector {
         return selection(EditorSelectionKinds.WORLD, source, world.id().toString(), details);
     }
 
-    /** Projects one local or generated entity and its descriptor-backed components. */
+    /**
+     * Projects one local or generated entity and its descriptor-backed components.
+     *
+     * @param entity entity to project
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @param types registered component types
+     * @param generated whether the entity was generated
+     * @return immutable entity selection
+     */
     public static EditorSelection entity(
             LocalEntity entity, Path source, Path projectRoot, RegisteredTypeCatalog types, boolean generated) {
         return entity(entity, source, projectRoot, types, generated, Optional.empty(), Optional.empty());
     }
 
-    /** Projects one local or generated entity with an optional enabled-state edit command. */
+    /**
+     * Projects one local or generated entity with an optional enabled-state edit command.
+     *
+     * @param entity entity to project
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @param types registered component types
+     * @param generated whether the entity was generated
+     * @param enabledEditor optional enabled-state editor
+     * @return immutable entity selection
+     */
     public static EditorSelection entity(
             LocalEntity entity,
             Path source,
@@ -72,7 +98,18 @@ public final class EditorInspectorProjector {
         return entity(entity, source, projectRoot, types, generated, enabledEditor, Optional.empty());
     }
 
-    /** Projects one local or generated entity with optional authored entity/component edit commands. */
+    /**
+     * Projects one local or generated entity with optional authored entity/component edit commands.
+     *
+     * @param entity entity to project
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @param types registered component types
+     * @param generated whether the entity was generated
+     * @param enabledEditor optional enabled-state editor
+     * @param componentEditor optional component-property editor
+     * @return immutable entity selection
+     */
     public static EditorSelection entity(
             LocalEntity entity,
             Path source,
@@ -103,7 +140,17 @@ public final class EditorInspectorProjector {
         return selection(kind, source, entity.id().toString(), details);
     }
 
-    /** Projects an authored reusable-definition placement and its realized root components. */
+    /**
+     * Projects an authored reusable-definition placement and its realized root components.
+     *
+     * @param placement placement to project
+     * @param definition resolved reusable definition, when available
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @param types registered component types
+     * @param generated whether the placement was generated
+     * @return immutable placement selection
+     */
     public static EditorSelection placement(
             EntityPlacement placement,
             Optional<EntityDefinition> definition,
@@ -114,7 +161,18 @@ public final class EditorInspectorProjector {
         return placement(placement, definition, source, projectRoot, types, generated, Optional.empty());
     }
 
-    /** Projects an authored placement with an optional enabled-state edit command. */
+    /**
+     * Projects an authored placement with an optional enabled-state edit command.
+     *
+     * @param placement placement to project
+     * @param definition resolved reusable definition, when available
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @param types registered component types
+     * @param generated whether the placement was generated
+     * @param enabledEditor optional enabled-state editor
+     * @return immutable placement selection
+     */
     public static EditorSelection placement(
             EntityPlacement placement,
             Optional<EntityDefinition> definition,
@@ -146,7 +204,15 @@ public final class EditorInspectorProjector {
         return selection(EditorSelectionKinds.PLACEMENT, source, placement.id().toString(), details);
     }
 
-    /** Projects one reusable entity-definition asset. */
+    /**
+     * Projects one reusable entity-definition asset.
+     *
+     * @param definition entity definition
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @param types registered component types
+     * @return immutable asset selection
+     */
     public static EditorSelection entityDefinition(
             EntityDefinition definition, Path source, Path projectRoot, RegisteredTypeCatalog types) {
         List<EditorDetails.Section> sections = new ArrayList<>();
@@ -174,7 +240,14 @@ public final class EditorInspectorProjector {
         return selection(EditorSelectionKinds.ASSET, source, definition.id().toString(), details);
     }
 
-    /** Projects one world-definition asset. */
+    /**
+     * Projects one world-definition asset.
+     *
+     * @param world world definition
+     * @param source source file
+     * @param projectRoot project root used to relativize source paths
+     * @return immutable asset selection
+     */
     public static EditorSelection worldDefinition(WorldDefinition world, Path source, Path projectRoot) {
         EditorDetails details = view(
                 world.name(),
@@ -198,7 +271,13 @@ public final class EditorInspectorProjector {
         return selection(EditorSelectionKinds.ASSET, source, world.id().toString(), details);
     }
 
-    /** Projects one authoritative source asset declared by the manifest. */
+    /**
+     * Projects one authoritative source asset declared by the manifest.
+     *
+     * @param asset source asset
+     * @param projectRoot project root used to relativize source paths
+     * @return immutable asset selection
+     */
     public static EditorSelection sourceAsset(GameProject.AssetSource asset, Path projectRoot) {
         List<EditorDetails.Property> properties = new ArrayList<>();
         properties.add(textProperty("identity", "Identity", asset.id()));
@@ -215,7 +294,13 @@ public final class EditorInspectorProjector {
         return selection(EditorSelectionKinds.ASSET, asset.path(), asset.id(), details);
     }
 
-    /** Projects one deterministic source-import definition and its authored settings. */
+    /**
+     * Projects one deterministic source-import definition and its authored settings.
+     *
+     * @param definition source-import definition
+     * @param projectRoot project root used to relativize source paths
+     * @return immutable asset selection
+     */
     public static EditorSelection importDefinition(ImportDefinition definition, Path projectRoot) {
         List<EditorDetails.Property> properties = new ArrayList<>();
         properties.add(textProperty("identity", "Identity", definition.id()));

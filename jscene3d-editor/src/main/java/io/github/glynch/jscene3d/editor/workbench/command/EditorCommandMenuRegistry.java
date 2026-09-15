@@ -41,12 +41,22 @@ public final class EditorCommandMenuRegistry
     private final List<Consumer<List<EditorMenuSnapshot>>> observers = new ArrayList<>();
     private boolean closed;
 
-    /** Creates an empty registry with the context supplied to command executions. */
+    /**
+     * Creates an empty registry with the context supplied to command executions.
+     *
+     * @param context command execution context
+     */
     public EditorCommandMenuRegistry(EditorCommandContext context) {
         this.context = Objects.requireNonNull(context, "context");
     }
 
-    /** Registers one command and returns its state and lifecycle handle. */
+    /**
+     * Registers one command and returns its state and lifecycle handle.
+     *
+     * @param contribution command metadata
+     * @param command command implementation
+     * @return state and lifecycle registration
+     */
     public EditorCommandRegistration registerCommand(EditorCommandContribution contribution, EditorCommand command) {
         requireOpen();
         EditorCommandContribution metadata = Objects.requireNonNull(contribution, "contribution");
@@ -65,7 +75,12 @@ public final class EditorCommandMenuRegistry
         return registerCommand(contribution, command);
     }
 
-    /** Registers one placement for an existing command. */
+    /**
+     * Registers one placement for an existing command.
+     *
+     * @param placement command placement
+     * @return placement lifecycle registration
+     */
     public EditorRegistration registerPlacement(EditorCommandPlacement placement) {
         requireOpen();
         EditorCommandPlacement registered = Objects.requireNonNull(placement, "placement");
@@ -91,7 +106,12 @@ public final class EditorCommandMenuRegistry
         return registerPlacement(placement);
     }
 
-    /** Registers one top-level menu declaration. */
+    /**
+     * Registers one top-level menu declaration.
+     *
+     * @param contribution menu metadata
+     * @return menu lifecycle registration
+     */
     public EditorRegistration registerMenu(EditorMenuContribution contribution) {
         requireOpen();
         EditorMenuContribution registered = Objects.requireNonNull(contribution, "contribution");
@@ -133,7 +153,12 @@ public final class EditorCommandMenuRegistry
         registered.execute(invocation);
     }
 
-    /** Observes complete ordered menu snapshots and immediately receives the current state. */
+    /**
+     * Observes complete ordered menu snapshots and immediately receives the current state.
+     *
+     * @param observer menu observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observe(Consumer<List<EditorMenuSnapshot>> observer) {
         requireOpen();
         Consumer<List<EditorMenuSnapshot>> listener = Objects.requireNonNull(observer, "observer");
@@ -142,7 +167,13 @@ public final class EditorCommandMenuRegistry
         return once(() -> observers.remove(listener));
     }
 
-    /** Returns the current ordered commands placed for one semantic item context. */
+    /**
+     * Returns the current ordered commands placed for one semantic item context.
+     *
+     * @param location command location
+     * @param contextValue semantic context value, when present
+     * @return ordered matching commands
+     */
     public List<EditorMenuCommandSnapshot> commandsAt(CommandLocationId location, Optional<String> contextValue) {
         requireOpen();
         return menuCommands(

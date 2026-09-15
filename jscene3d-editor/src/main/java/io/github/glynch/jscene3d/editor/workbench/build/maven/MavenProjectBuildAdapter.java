@@ -16,19 +16,22 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 
 /** Executes development builds through a Maven project's own wrapper. */
 public final class MavenProjectBuildAdapter implements ProjectBuildAdapter {
     private final Path projectRoot;
     private final OperatingSystem operatingSystem;
+    private final Executor executor;
 
     /**
      * Creates an adapter for a Maven project on the current operating system.
      *
      * @param projectRoot directory containing the Maven project descriptor
+     * @param executor caller-owned executor used to drain and observe Maven processes
      */
-    public MavenProjectBuildAdapter(Path projectRoot) {
-        this(projectRoot, OperatingSystem.current());
+    public MavenProjectBuildAdapter(Path projectRoot, Executor executor) {
+        this(projectRoot, OperatingSystem.current(), executor);
     }
 
     /**
@@ -44,11 +47,12 @@ public final class MavenProjectBuildAdapter implements ProjectBuildAdapter {
         return Files.isRegularFile(root.resolve("pom.xml"));
     }
 
-    MavenProjectBuildAdapter(Path projectRoot, OperatingSystem operatingSystem) {
+    MavenProjectBuildAdapter(Path projectRoot, OperatingSystem operatingSystem, Executor executor) {
         this.projectRoot = Objects.requireNonNull(projectRoot, "projectRoot")
                 .toAbsolutePath()
                 .normalize();
         this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
+        this.executor = Objects.requireNonNull(executor, "executor");
     }
 
     @Override
@@ -59,7 +63,7 @@ public final class MavenProjectBuildAdapter implements ProjectBuildAdapter {
             if (request.kind() == ProjectBuildKind.CLEAN) {
                 return startRebuild(command);
             }
-            return MavenBuildExecution.start(projectRoot, command);
+            return MavenBuildExecution.start(projectRoot, command, executor);
         } catch (IOException failure) {
             throw new UncheckedIOException("could not start Maven wrapper in " + projectRoot, failure);
         }
@@ -68,7 +72,7 @@ public final class MavenProjectBuildAdapter implements ProjectBuildAdapter {
     private ProjectBuildExecution startRebuild(List<String> command) throws IOException {
         MavenBuildOutputBackup backup = MavenBuildOutputBackup.capture(projectRoot);
         try {
-            return new MavenRebuildExecution(MavenBuildExecution.start(projectRoot, command), backup);
+            return new MavenRebuildExecution(MavenBuildExecution.start(projectRoot, command, executor), backup);
         } catch (IOException | RuntimeException failure) {
             try {
                 backup.rollback();

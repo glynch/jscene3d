@@ -12,9 +12,16 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-/** Owns listener mutation and event delivery without exposing an emit operation to subscribers. */
+/**
+ * Owns listener mutation and event delivery without exposing an emit operation to subscribers.
+ *
+ * @param <T> event payload type
+ */
 public final class EditorEventSource<T> implements EditorEvent<T> {
     private final List<Consumer<? super T>> listeners = new CopyOnWriteArrayList<>();
+
+    /** Creates an event source without subscribers. */
+    public EditorEventSource() {}
 
     @Override
     public EditorRegistration subscribe(Consumer<? super T> listener) {
@@ -28,7 +35,11 @@ public final class EditorEventSource<T> implements EditorEvent<T> {
         };
     }
 
-    /** Delivers one non-null event to a stable listener snapshot. */
+    /**
+     * Delivers one non-null event to a stable listener snapshot.
+     *
+     * @param event event payload
+     */
     public void emit(T event) {
         T payload = Objects.requireNonNull(event, "event");
         listeners.forEach(listener -> listener.accept(payload));

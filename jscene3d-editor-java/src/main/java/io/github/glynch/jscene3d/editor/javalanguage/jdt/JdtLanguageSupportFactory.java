@@ -10,7 +10,7 @@ import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessLaunche
 import io.github.glynch.jscene3d.environment.ApplicationDirectories;
 import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.util.Objects;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 /** Creates the bundled JDT LS language support behind the Java extension seam. */
@@ -31,19 +31,24 @@ public final class JdtLanguageSupportFactory {
      *
      * @param status lifecycle status consumer
      * @param diagnostics diagnostic collection receiving Java language problems
+     * @param executor caller-owned executor for JDT LS startup and protocol work
      * @return the server identity and project-scoped language support
      */
-    public static Result create(Consumer<JdtLanguageServerStatus> status, EditorDiagnosticCollection diagnostics) {
+    public static Result create(
+            Consumer<JdtLanguageServerStatus> status,
+            EditorDiagnosticCollection diagnostics,
+            ExecutorService executor) {
         JdtLanguageServerMetadata metadata = JdtLanguageServerMetadata.load();
-        ForkJoinPool executor = ForkJoinPool.commonPool();
+        ExecutorService backgroundExecutor = Objects.requireNonNull(executor, "executor");
         JavaProjectLanguageSupport support = new JavaProjectLanguageSupport(
                 new JdtLanguageServerDistributionLocator().locate(),
                 new JavaProjectLanguageSupport.Configuration(
                         ApplicationDirectories.cache("jscene3d"),
                         metadata,
                         OperatingSystem.current(),
-                        executor,
-                        new LanguageServerProcessLauncher(executor),
+                        backgroundExecutor,
+                        backgroundExecutor,
+                        new LanguageServerProcessLauncher(backgroundExecutor),
                         clientVersion()),
                 Objects.requireNonNull(status, "status"),
                 Objects.requireNonNull(diagnostics, "diagnostics"));

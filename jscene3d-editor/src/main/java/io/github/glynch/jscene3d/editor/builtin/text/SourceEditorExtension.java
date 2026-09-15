@@ -42,6 +42,7 @@ public final class SourceEditorExtension implements EditorExtension {
     @Override
     public void activate(EditorExtensionContext context) {
         EditorExtensionContext editor = Objects.requireNonNull(context, "context");
+        editor.subscriptions().add(MonacoResources::close);
         editor.subscriptions()
                 .add(editor.fileTypes()
                         .register(textType(

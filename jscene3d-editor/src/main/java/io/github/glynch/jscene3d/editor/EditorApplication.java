@@ -50,6 +50,8 @@ import io.github.glynch.jscene3d.telemetry.Telemetry;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -69,6 +71,8 @@ public final class EditorApplication extends Application {
     private final EditorColorThemeRegistry colorThemes;
     private final WorkspaceBuildPreferences buildPreferences;
     private final EditorExtensionHost extensionHost;
+    private final ExecutorService projectLoadingExecutor;
+    private final ExecutorService backgroundExecutor;
 
     private @Nullable GLCanvas canvas;
     private @Nullable EditorWorkspace workspace;
@@ -89,6 +93,8 @@ public final class EditorApplication extends Application {
         colorThemes = new EditorColorThemeRegistry(new JavaPreferencesEditorAppearancePreferences());
         buildPreferences = new JavaPreferencesWorkspaceBuildPreferences();
         extensionHost = new EditorExtensionHost(projectContext, selectionContext, configurationContext, colorThemes);
+        projectLoadingExecutor = Executors.newSingleThreadExecutor();
+        backgroundExecutor = Executors.newCachedThreadPool();
     }
 
     /** Constructs the editor shell and installs its OpenGLFX viewport. */
@@ -105,16 +111,16 @@ public final class EditorApplication extends Application {
         extensionHost.activate(new BuiltinColorThemesExtension());
         EditorWorkspace editorWorkspace = new EditorWorkspace(
                 viewportCanvas,
-                () -> chooseProject(stage),
-                this::requestClose,
+                new EditorWorkspace.Actions(() -> chooseProject(stage), this::requestClose),
                 selectionContext,
                 extensionHost,
                 buildPreferences,
-                buildInfo);
+                buildInfo,
+                backgroundExecutor);
         extensionHost.showMessagesWith(editorWorkspace::showMessage);
         ProjectDiagnosticsExtension projectDiagnostics = new ProjectDiagnosticsExtension();
         extensionHost.activate(projectDiagnostics);
-        extensionHost.activate(new JavaLanguageExtension());
+        extensionHost.activate(new JavaLanguageExtension(backgroundExecutor));
         extensionHost.activate(new SourceEditorExtension());
         extensionHost.activate(new ImageViewerExtension());
         extensionHost.activate(new WorkspaceExplorerExtension(projectContext));
@@ -137,8 +143,9 @@ public final class EditorApplication extends Application {
                 new EditorProjectPublication(projectContext, projectDiagnostics::showDiagnostics, configurationContext),
                 editorWorkspace,
                 controller,
-                projectOpenProgress(startupProjectRequested, loadingScreen, editorWorkspace),
-                stage::setTitle);
+                new EditorProjectOpener.Presentation(
+                        projectOpenProgress(startupProjectRequested, loadingScreen, editorWorkspace), stage::setTitle),
+                projectLoadingExecutor);
         OpenGlFxViewport.installEvents(viewportCanvas, controller);
 
         StackPane root = new StackPane(editorWorkspace, loadingScreen);
@@ -172,6 +179,8 @@ public final class EditorApplication extends Application {
         extensionHost.close();
         configurationContext.close();
         disposeCanvas();
+        projectLoadingExecutor.shutdownNow();
+        backgroundExecutor.shutdown();
     }
 
     /** Creates the editor scene and installs its packaged visual theme. */

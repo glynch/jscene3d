@@ -14,9 +14,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -31,25 +33,28 @@ final class MavenBuildExecution implements ProjectBuildExecution {
     private final Process process;
     private final Path projectRoot;
     private final List<String> command;
+    private final Executor executor;
     private final long startedAtNanos = System.nanoTime();
     private final AtomicReference<@Nullable CompletableFuture<Void>> cancellation = new AtomicReference<>();
     private final CompletableFuture<String> standardOutput;
     private final CompletableFuture<String> standardError;
     private final CompletableFuture<ProjectBuildResult> completion = new CompletableFuture<>();
 
-    private MavenBuildExecution(Process process, Path projectRoot, List<String> command) {
+    private MavenBuildExecution(Process process, Path projectRoot, List<String> command, Executor executor) {
         this.process = process;
         this.projectRoot = projectRoot;
         this.command = command;
-        standardOutput = read(process.getInputStream(), "jscene3d-maven-stdout");
-        standardError = read(process.getErrorStream(), "jscene3d-maven-stderr");
-        CompletableFuture.runAsync(this::await);
+        this.executor = Objects.requireNonNull(executor, "executor");
+        standardOutput = read(process.getInputStream(), "Maven standard output", executor);
+        standardError = read(process.getErrorStream(), "Maven standard error", executor);
+        CompletableFuture.runAsync(this::await, executor);
     }
 
-    static MavenBuildExecution start(Path projectRoot, List<String> command) throws IOException {
+    static MavenBuildExecution start(Path projectRoot, List<String> command, Executor executor) throws IOException {
         Process process =
                 new ProcessBuilder(command).directory(projectRoot.toFile()).start();
-        return new MavenBuildExecution(process, projectRoot.toAbsolutePath().normalize(), List.copyOf(command));
+        return new MavenBuildExecution(
+                process, projectRoot.toAbsolutePath().normalize(), List.copyOf(command), executor);
     }
 
     @Override
@@ -65,7 +70,7 @@ final class MavenBuildExecution implements ProjectBuildExecution {
         }
         List<ProcessHandle> processTree = Stream.concat(process.descendants(), Stream.of(process.toHandle()))
                 .toList();
-        CompletableFuture.runAsync(() -> terminate(processTree, termination));
+        CompletableFuture.runAsync(() -> terminate(processTree, termination), executor);
     }
 
     private void await() {
@@ -93,14 +98,16 @@ final class MavenBuildExecution implements ProjectBuildExecution {
         }
     }
 
-    private static CompletableFuture<String> read(InputStream input, String threadName) {
-        return CompletableFuture.supplyAsync(() -> {
-            try (input) {
-                return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-            } catch (IOException failure) {
-                throw new UncheckedIOException(threadName, failure);
-            }
-        });
+    private static CompletableFuture<String> read(InputStream input, String source, Executor executor) {
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    try (input) {
+                        return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+                    } catch (IOException failure) {
+                        throw new UncheckedIOException("Could not read " + source, failure);
+                    }
+                },
+                executor);
     }
 
     private static ProjectBuildOutcome outcome(int exitCode, boolean cancelled) {

@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -65,6 +66,7 @@ final class JavaProjectLanguageSupport implements EditorLanguageSupport {
                         configuration.metadata(),
                         configuration.operatingSystem(),
                         configuration.executor(),
+                        configuration.protocolExecutor(),
                         configuration.launcher(),
                         configuration.clientVersion()));
     }
@@ -89,6 +91,7 @@ final class JavaProjectLanguageSupport implements EditorLanguageSupport {
             JdtLanguageServerMetadata metadata,
             OperatingSystem operatingSystem,
             Executor executor,
+            ExecutorService protocolExecutor,
             LanguageServerProcessLauncher launcher,
             String clientVersion) {
         Configuration {
@@ -96,6 +99,7 @@ final class JavaProjectLanguageSupport implements EditorLanguageSupport {
             Objects.requireNonNull(metadata, "metadata");
             Objects.requireNonNull(operatingSystem, "operatingSystem");
             Objects.requireNonNull(executor, "executor");
+            Objects.requireNonNull(protocolExecutor, "protocolExecutor");
             Objects.requireNonNull(launcher, "launcher");
             Objects.requireNonNull(clientVersion, "clientVersion");
         }

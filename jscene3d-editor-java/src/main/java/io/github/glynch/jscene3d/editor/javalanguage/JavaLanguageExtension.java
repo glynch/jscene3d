@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** Built-in extension contributing project-scoped Java support backed by Eclipse JDT LS. */
@@ -40,15 +41,21 @@ public final class JavaLanguageExtension implements EditorExtension {
 
     private final String serverVersion;
     private final MessageSource messages;
+    private final ExecutorService executor;
     private final AtomicReference<EditorStatusItem> statusItem = new AtomicReference<>();
 
-    /** Creates Java support from the checksum-verified distribution staged by the editor build. */
-    public JavaLanguageExtension() {
-        this(new ResourceBundleMessageSource(JavaLanguageExtension.class.getModule(), MESSAGE_BUNDLE));
+    /**
+     * Creates Java support from the checksum-verified distribution staged by the editor build.
+     *
+     * @param executor caller-owned executor for JDT LS startup and protocol work
+     */
+    public JavaLanguageExtension(ExecutorService executor) {
+        this(new ResourceBundleMessageSource(JavaLanguageExtension.class.getModule(), MESSAGE_BUNDLE), executor);
     }
 
-    private JavaLanguageExtension(MessageSource messages) {
+    private JavaLanguageExtension(MessageSource messages, ExecutorService executor) {
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.executor = Objects.requireNonNull(executor, "executor");
         this.serverVersion = JdtLanguageSupportFactory.serverVersion();
     }
 
@@ -79,7 +86,7 @@ public final class JavaLanguageExtension implements EditorExtension {
         editor.subscriptions().add(() -> statusItem.compareAndSet(item, null));
         EditorDiagnosticCollection diagnostics =
                 editor.subscriptions().add(editor.diagnostics().createCollection(DIAGNOSTICS_ID));
-        var support = JdtLanguageSupportFactory.create(this::publishStatus, diagnostics)
+        var support = JdtLanguageSupportFactory.create(this::publishStatus, diagnostics, executor)
                 .support();
         editor.subscriptions()
                 .add(editor.languageSupports()

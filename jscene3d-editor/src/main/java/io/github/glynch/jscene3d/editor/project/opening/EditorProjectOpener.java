@@ -27,8 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -38,7 +37,7 @@ public final class EditorProjectOpener implements AutoCloseable {
 
     private final Telemetry telemetry;
     private final EditorProjectLoader loader;
-    private final ExecutorService executor;
+    private final Executor executor;
     private final EditorProjectPublication publication;
     private final EditorWorkspace workspace;
     private final ViewportController viewport;
@@ -55,8 +54,8 @@ public final class EditorProjectOpener implements AutoCloseable {
      * @param publication extension-facing project and diagnostic publication
      * @param workspace visible editor workbench
      * @param viewport editor preview controller
-     * @param progress supplies a presentation appropriate to each project-opening context
-     * @param windowTitle window-title sink
+     * @param presentation project-opening presentation callbacks
+     * @param executor caller-owned executor for project loading
      */
     public EditorProjectOpener(
             Telemetry telemetry,
@@ -64,16 +63,31 @@ public final class EditorProjectOpener implements AutoCloseable {
             EditorProjectPublication publication,
             EditorWorkspace workspace,
             ViewportController viewport,
-            Supplier<EditorProjectOpenProgress> progress,
-            Consumer<String> windowTitle) {
+            Presentation presentation,
+            Executor executor) {
         this.telemetry = Objects.requireNonNull(telemetry, "telemetry");
         this.loader = Objects.requireNonNull(loader, "loader");
-        executor = Executors.newSingleThreadExecutor();
+        this.executor = Objects.requireNonNull(executor, "executor");
         this.publication = Objects.requireNonNull(publication, "publication");
         this.workspace = Objects.requireNonNull(workspace, "workspace");
         this.viewport = Objects.requireNonNull(viewport, "viewport");
-        this.progress = Objects.requireNonNull(progress, "progress");
-        this.windowTitle = Objects.requireNonNull(windowTitle, "windowTitle");
+        Presentation callbacks = Objects.requireNonNull(presentation, "presentation");
+        this.progress = callbacks.progress();
+        this.windowTitle = callbacks.windowTitle();
+    }
+
+    /**
+     * Presentation callbacks used while opening projects.
+     *
+     * @param progress supplies a presentation appropriate to each project-opening context
+     * @param windowTitle window-title sink
+     */
+    public record Presentation(Supplier<EditorProjectOpenProgress> progress, Consumer<String> windowTitle) {
+        /** Validates project-opening presentation callbacks. */
+        public Presentation {
+            Objects.requireNonNull(progress, "progress");
+            Objects.requireNonNull(windowTitle, "windowTitle");
+        }
     }
 
     /**
@@ -97,12 +111,11 @@ public final class EditorProjectOpener implements AutoCloseable {
         executor.execute(task);
     }
 
-    /** Stops accepting project work and interrupts a load that is still in progress. */
+    /** Detaches project-opening observers; the caller retains executor ownership. */
     @Override
     public void close() {
         previewRefreshRegistration.close();
         previewRefreshRegistration = () -> {};
-        executor.shutdownNow();
     }
 
     /** Applies background-loaded editor state and queues its preview on the OpenGL thread. */

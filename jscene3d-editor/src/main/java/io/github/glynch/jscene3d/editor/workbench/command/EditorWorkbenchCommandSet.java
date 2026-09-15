@@ -142,7 +142,17 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
                                 EditorDialogButtonBehavior.COPY_CONTENT)));
     }
 
-    /** Workbench behavior invoked by the core command set. */
+    /**
+     * Workbench behavior invoked by the core command set.
+     *
+     * @param openProject opens a project chooser
+     * @param openSettings opens editor settings
+     * @param toggleColorScheme toggles between preferred light and dark themes
+     * @param save saves the active editor
+     * @param undo undoes the active editor's latest change
+     * @param redo redoes the active editor's latest undone change
+     * @param quit requests application shutdown
+     */
     public record Actions(
             Runnable openProject,
             Runnable openSettings,
@@ -163,7 +173,14 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
         }
     }
 
-    /** Project-dependent command state supplied by the workspace. */
+    /**
+     * Project-dependent command state supplied by the workspace.
+     *
+     * @param projectOpen whether a project is open
+     * @param dirty whether the active editor has unsaved changes
+     * @param canUndo whether the active editor can undo
+     * @param canRedo whether the active editor can redo
+     */
     public record DocumentCommandState(boolean projectOpen, boolean dirty, boolean canUndo, boolean canRedo) {
         /** State used before a project is opened. */
         public static final DocumentCommandState EMPTY = new DocumentCommandState(false, false, false, false);

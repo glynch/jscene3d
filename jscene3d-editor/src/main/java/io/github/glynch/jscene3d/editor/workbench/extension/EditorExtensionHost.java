@@ -62,7 +62,12 @@ public final class EditorExtensionHost implements AutoCloseable {
     private final EditorRegistration projectContextRegistration;
     private boolean closed;
 
-    /** Creates an empty host around the editor's current-project lifecycle. */
+    /**
+     * Creates an empty host around the editor's current-project lifecycle.
+     *
+     * @param projects current-project context
+     * @param selections editor selection service
+     */
     public EditorExtensionHost(EditorProjectContext projects, EditorSelections selections) {
         this(
                 projects,
@@ -71,7 +76,13 @@ public final class EditorExtensionHost implements AutoCloseable {
                 new EditorColorThemeRegistry(new InMemoryEditorAppearancePreferences()));
     }
 
-    /** Creates an empty host with the window's live effective configuration. */
+    /**
+     * Creates an empty host with the window's live effective configuration.
+     *
+     * @param projects current-project context
+     * @param selections editor selection service
+     * @param configuration effective editor configuration
+     */
     public EditorExtensionHost(
             EditorProjectContext projects, EditorSelections selections, EditorConfiguration configuration) {
         this(
@@ -81,7 +92,14 @@ public final class EditorExtensionHost implements AutoCloseable {
                 new EditorColorThemeRegistry(new InMemoryEditorAppearancePreferences()));
     }
 
-    /** Creates an empty host with live project configuration and user appearance. */
+    /**
+     * Creates an empty host with live project configuration and user appearance.
+     *
+     * @param projects current-project context
+     * @param selections editor selection service
+     * @param configuration effective editor configuration
+     * @param colorThemes color-theme registry
+     */
     public EditorExtensionHost(
             EditorProjectContext projects,
             EditorSelections selections,
@@ -110,7 +128,11 @@ public final class EditorExtensionHost implements AutoCloseable {
                 project -> contributions.setContext(EditorContextKeys.PROJECT_OPEN, project.isPresent()));
     }
 
-    /** Activates one extension exactly once for this host's lifetime. */
+    /**
+     * Activates one extension exactly once for this host's lifetime.
+     *
+     * @param extension extension to activate
+     */
     public void activate(EditorExtension extension) {
         requireOpen();
         EditorExtension candidate = Objects.requireNonNull(extension, "extension");
@@ -128,49 +150,88 @@ public final class EditorExtensionHost implements AutoCloseable {
         }
     }
 
-    /** Observes ordered Activity Bar contributions and immediately publishes the current snapshot. */
+    /**
+     * Observes ordered Activity Bar contributions and immediately publishes the current snapshot.
+     *
+     * @param observer activity contribution observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeActivities(Consumer<List<EditorActivityContribution>> observer) {
         requireOpen();
         return contributions.observeActivities(observer);
     }
 
-    /** Observes ordered view contributions and immediately publishes the current snapshot. */
+    /**
+     * Observes ordered view contributions and immediately publishes the current snapshot.
+     *
+     * @param observer view contribution observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeViews(Consumer<List<EditorViewContribution>> observer) {
         requireOpen();
         return contributions.observeViews(observer);
     }
 
-    /** Observes requests to reveal registered views. */
+    /**
+     * Observes requests to reveal registered views.
+     *
+     * @param observer view-request observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeViewRequests(Consumer<ViewId> observer) {
         requireOpen();
         return window.observeViewRequests(observer);
     }
 
-    /** Observes requests to preview or open workspace files. */
+    /**
+     * Observes requests to preview or open workspace files.
+     *
+     * @param observer file-request observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeFileRequests(Consumer<EditorFileOpenRequest> observer) {
         requireOpen();
         return window.observeFileRequests(observer);
     }
 
-    /** Resolves the contributed type for one workspace file. */
+    /**
+     * Resolves the contributed type for one workspace file.
+     *
+     * @param resource workspace file resource
+     * @return resolved file type, when registered
+     */
     public Optional<EditorFileType> resolveFileType(URI resource) {
         requireOpen();
         return fileTypes.resolve(Objects.requireNonNull(resource, "resource"));
     }
 
-    /** Returns the active appearance and color-theme registry owned by this editor window. */
+    /**
+     * Returns the active appearance and color-theme registry owned by this editor window.
+     *
+     * @return window color-theme registry
+     */
     public EditorColorThemeRegistry colorThemes() {
         requireOpen();
         return colorThemes;
     }
 
-    /** Observes ordered status items and immediately publishes the current snapshot. */
+    /**
+     * Observes ordered status items and immediately publishes the current snapshot.
+     *
+     * @param observer status-item observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeStatusItems(Consumer<List<EditorStatusItemSnapshot>> observer) {
         requireOpen();
         return statusItems.observe(observer);
     }
 
-    /** Observes combined diagnostics and immediately publishes the current snapshot. */
+    /**
+     * Observes combined diagnostics and immediately publishes the current snapshot.
+     *
+     * @param observer diagnostic observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeDiagnostics(Consumer<List<EditorDiagnosticSnapshot>> observer) {
         requireOpen();
         return diagnostics.observe(observer);
@@ -202,43 +263,75 @@ public final class EditorExtensionHost implements AutoCloseable {
         return languageSupports.synchronize(workingCopies);
     }
 
-    /** Routes extension window messages to the workbench presentation. */
+    /**
+     * Routes extension window messages to the workbench presentation.
+     *
+     * @param sink message presentation sink
+     */
     public void showMessagesWith(Consumer<EditorMessage> sink) {
         requireOpen();
         window.showMessagesWith(sink);
     }
 
-    /** Routes extension modal dialogs to the workbench's platform adapter. */
+    /**
+     * Routes extension modal dialogs to the workbench's platform adapter.
+     *
+     * @param sink modal-dialog presentation sink
+     */
     public void showDialogsWith(Function<EditorDialog, Optional<EditorDialogButtonId>> sink) {
         requireOpen();
         window.showDialogsWith(sink);
     }
 
-    /** Observes ordered menus and their currently placed command state. */
+    /**
+     * Observes ordered menus and their currently placed command state.
+     *
+     * @param observer menu observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeMenus(Consumer<List<EditorMenuSnapshot>> observer) {
         requireOpen();
         return commandMenus.observe(observer);
     }
 
-    /** Returns commands currently available at an item-oriented command location. */
+    /**
+     * Returns commands currently available at an item-oriented command location.
+     *
+     * @param location command location
+     * @param contextValue semantic context value, when present
+     * @return available commands
+     */
     public List<EditorMenuCommandSnapshot> commandsAt(CommandLocationId location, Optional<String> contextValue) {
         requireOpen();
         return commandMenus.commandsAt(location, contextValue);
     }
 
-    /** Invokes a registered command through the workbench action path. */
+    /**
+     * Invokes a registered command through the workbench action path.
+     *
+     * @param command command identity
+     */
     public void execute(CommandId command) {
         requireOpen();
         commandMenus.execute(command);
     }
 
-    /** Invokes a registered command with the exact semantic item involved in the interaction. */
+    /**
+     * Invokes a registered command with the exact semantic item involved in the interaction.
+     *
+     * @param command command identity
+     * @param argument semantic invocation argument
+     */
     public void execute(CommandId command, Object argument) {
         requireOpen();
         commandMenus.execute(command, argument);
     }
 
-    /** Requests that the workbench reveal one registered view. */
+    /**
+     * Requests that the workbench reveal one registered view.
+     *
+     * @param view view identity
+     */
     public void showView(ViewId view) {
         window.showView(view);
     }
@@ -254,12 +347,21 @@ public final class EditorExtensionHost implements AutoCloseable {
         window.revealFile(resource, range);
     }
 
-    /** Shows one extension or workbench message through the configured presentation. */
+    /**
+     * Shows one extension or workbench message through the configured presentation.
+     *
+     * @param message message to show
+     */
     public void showMessage(EditorMessage message) {
         window.showMessage(message);
     }
 
-    /** Shows one toolkit-independent application-modal dialog. */
+    /**
+     * Shows one toolkit-independent application-modal dialog.
+     *
+     * @param dialog dialog to show
+     * @return selected button, when the user made a selection
+     */
     public Optional<EditorDialogButtonId> showDialog(EditorDialog dialog) {
         return window.showDialog(dialog);
     }
@@ -283,25 +385,46 @@ public final class EditorExtensionHost implements AutoCloseable {
         window.close();
     }
 
-    /** Registers one workbench or extension command. */
+    /**
+     * Registers one workbench or extension command.
+     *
+     * @param contribution command metadata
+     * @param command command implementation
+     * @return command state and lifecycle registration
+     */
     public EditorCommandRegistration registerCommand(EditorCommandContribution contribution, EditorCommand command) {
         requireOpen();
         return commandMenus.registerCommand(contribution, command);
     }
 
-    /** Registers one visual placement for a registered workbench or extension command. */
+    /**
+     * Registers one visual placement for a registered workbench or extension command.
+     *
+     * @param placement command placement
+     * @return placement lifecycle registration
+     */
     public EditorRegistration registerCommandPlacement(EditorCommandPlacement placement) {
         requireOpen();
         return commandMenus.registerPlacement(placement);
     }
 
-    /** Registers one toolkit-independent top-level menu. */
+    /**
+     * Registers one toolkit-independent top-level menu.
+     *
+     * @param contribution menu metadata
+     * @return menu lifecycle registration
+     */
     public EditorRegistration registerMenu(EditorMenuContribution contribution) {
         requireOpen();
         return commandMenus.registerMenu(contribution);
     }
 
-    /** Returns whether a view remains registered even when its context condition is currently false. */
+    /**
+     * Returns whether a view remains registered even when its context condition is currently false.
+     *
+     * @param view view identity
+     * @return whether the view is registered
+     */
     public boolean isViewRegistered(ViewId view) {
         requireOpen();
         return contributions.isViewRegistered(view);

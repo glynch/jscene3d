@@ -47,7 +47,11 @@ public final class EditorColorThemeRegistry implements EditorColorThemes {
     private int editorFontSize;
     private @Nullable EditorAppearanceSnapshot current;
 
-    /** Creates an empty registry using the supplied user-level preference adapter. */
+    /**
+     * Creates an empty registry using the supplied user-level preference adapter.
+     *
+     * @param preferences user-level appearance preferences
+     */
     public EditorColorThemeRegistry(EditorAppearancePreferences preferences) {
         this.preferences = Objects.requireNonNull(preferences, "preferences");
         requestedTheme = preferences.colorTheme(DEFAULT_THEME);
@@ -86,7 +90,11 @@ public final class EditorColorThemeRegistry implements EditorColorThemes {
         });
     }
 
-    /** Returns the current complete appearance. */
+    /**
+     * Returns the current complete appearance.
+     *
+     * @return current resolved appearance
+     */
     public EditorAppearanceSnapshot current() {
         EditorAppearanceSnapshot appearance = current;
         if (appearance == null) {
@@ -95,7 +103,11 @@ public final class EditorColorThemeRegistry implements EditorColorThemes {
         return appearance;
     }
 
-    /** Returns every currently resolvable theme in contribution order. */
+    /**
+     * Returns every currently resolvable theme in contribution order.
+     *
+     * @return currently resolvable themes
+     */
     public List<EditorResolvedColorTheme> themes() {
         return contributions.keySet().stream()
                 .map(this::resolveIfPossible)
@@ -103,7 +115,11 @@ public final class EditorColorThemeRegistry implements EditorColorThemes {
                 .toList();
     }
 
-    /** Selects and persists one registered theme. */
+    /**
+     * Selects and persists one registered theme.
+     *
+     * @param theme registered theme identity
+     */
     public void select(EditorColorThemeId theme) {
         EditorColorThemeId selected = Objects.requireNonNull(theme, "theme");
         if (!contributions.containsKey(selected)) {
@@ -120,7 +136,12 @@ public final class EditorColorThemeRegistry implements EditorColorThemes {
         select(preferredTheme(!isDark(current().colorTheme().kind())));
     }
 
-    /** Selects and persists source-editor typography independently of the color theme. */
+    /**
+     * Selects and persists source-editor typography independently of the color theme.
+     *
+     * @param family source-editor font family
+     * @param size source-editor font size in pixels
+     */
     public void setEditorFont(String family, int size) {
         EditorAppearanceSnapshot validated =
                 new EditorAppearanceSnapshot(current().colorTheme(), family, size);
@@ -130,7 +151,12 @@ public final class EditorColorThemeRegistry implements EditorColorThemes {
         refresh();
     }
 
-    /** Observes appearance changes and immediately receives the current value. */
+    /**
+     * Observes appearance changes and immediately receives the current value.
+     *
+     * @param observer appearance observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeAppearance(Consumer<EditorAppearanceSnapshot> observer) {
         Consumer<EditorAppearanceSnapshot> listener = Objects.requireNonNull(observer, "observer");
         appearanceObservers.add(listener);
@@ -138,7 +164,12 @@ public final class EditorColorThemeRegistry implements EditorColorThemes {
         return once(() -> appearanceObservers.remove(listener));
     }
 
-    /** Observes available themes and immediately receives the current list. */
+    /**
+     * Observes available themes and immediately receives the current list.
+     *
+     * @param observer theme-list observer
+     * @return registration that removes the observer
+     */
     public EditorRegistration observeThemes(Consumer<List<EditorResolvedColorTheme>> observer) {
         Consumer<List<EditorResolvedColorTheme>> listener = Objects.requireNonNull(observer, "observer");
         themeObservers.add(listener);

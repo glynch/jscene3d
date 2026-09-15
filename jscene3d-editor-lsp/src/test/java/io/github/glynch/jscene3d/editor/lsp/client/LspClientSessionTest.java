@@ -59,8 +59,8 @@ final class LspClientSessionTest {
             LanguageServerInitialization initialization =
                     new LanguageServerInitialization(temporaryDirectory, "Example", "Test Editor", "1.2.3");
 
-            try (LspClientSession client =
-                    LspClientSession.connect(protocol.clientInput(), protocol.clientOutput(), initialization)) {
+            try (LspClientSession client = LspClientSession.connect(
+                    protocol.clientInput(), protocol.clientOutput(), initialization, protocol.clientExecutor)) {
                 client.initialized().toCompletableFuture().get(2, TimeUnit.SECONDS);
                 assertThat(server.initialized.await(2, TimeUnit.SECONDS)).isTrue();
                 assertThat(server.initializeParameters.get().getRootUri())
@@ -106,7 +106,11 @@ final class LspClientSessionTest {
                     new LanguageServerInitialization(temporaryDirectory, "Example", "Test Editor", "1.2.3");
 
             try (LspClientSession client = LspClientSession.connect(
-                    protocol.clientInput(), protocol.clientOutput(), initialization, languageClient)) {
+                    protocol.clientInput(),
+                    protocol.clientOutput(),
+                    initialization,
+                    languageClient,
+                    protocol.clientExecutor)) {
                 client.initialized().toCompletableFuture().get(2, TimeUnit.SECONDS);
                 serverClient.showMessage(new MessageParams(MessageType.Info, "Connected"));
 
@@ -126,8 +130,8 @@ final class LspClientSessionTest {
                     new LanguageServerInitialization(temporaryDirectory, "Example", "Test Editor", "1.2.3");
             var resource = temporaryDirectory.resolve("Example.java").toUri();
 
-            try (LspClientSession client =
-                    LspClientSession.connect(protocol.clientInput(), protocol.clientOutput(), initialization)) {
+            try (LspClientSession client = LspClientSession.connect(
+                    protocol.clientInput(), protocol.clientOutput(), initialization, protocol.clientExecutor)) {
                 client.didOpen(new EditorTextDocument(resource, EditorLanguages.JAVA, 1, "class Example {}"));
                 client.didChange(new EditorTextDocumentChange(
                         new EditorTextDocument(resource, EditorLanguages.JAVA, 2, "class Example {"),
@@ -150,6 +154,7 @@ final class LspClientSessionTest {
         private final PipedOutputStream serverOutput;
         private final PipedInputStream serverInput = new PipedInputStream();
         private final PipedOutputStream clientOutput;
+        private final ExecutorService clientExecutor = Executors.newVirtualThreadPerTaskExecutor();
         private final ExecutorService serverExecutor = Executors.newVirtualThreadPerTaskExecutor();
         private Future<Void> serverListener;
 
@@ -183,6 +188,7 @@ final class LspClientSessionTest {
             if (serverListener != null) {
                 serverListener.cancel(true);
             }
+            clientExecutor.shutdownNow();
             serverExecutor.shutdownNow();
             clientOutput.close();
             serverInput.close();

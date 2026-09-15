@@ -11,7 +11,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Immutable selected Activity Bar container and its primary-side-bar view membership. */
+/**
+ * Immutable selected Activity Bar container and its primary-side-bar view membership.
+ *
+ * @param selected selected activity, when present
+ * @param selectedViews views contributed to the selected activity
+ * @param activityViews all views contributed to activities
+ */
 public record EditorActivitySelectionState(
         Optional<ActivityId> selected, List<ViewId> selectedViews, Set<ViewId> activityViews) {
     /** Copies one consistent selection snapshot. */
@@ -21,7 +27,12 @@ public record EditorActivitySelectionState(
         activityViews = Set.copyOf(Objects.requireNonNull(activityViews, "activityViews"));
     }
 
-    /** Returns whether a primary-side-bar view belongs in the currently selected container. */
+    /**
+     * Returns whether a primary-side-bar view belongs in the currently selected container.
+     *
+     * @param view view to test
+     * @return whether the view should appear in the selected container
+     */
     public boolean includes(ViewId view) {
         ViewId candidate = Objects.requireNonNull(view, "view");
         return !activityViews.contains(candidate) || selectedViews.contains(candidate);

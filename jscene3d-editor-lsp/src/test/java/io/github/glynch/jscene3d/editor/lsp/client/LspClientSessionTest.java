@@ -5,19 +5,26 @@
 package io.github.glynch.jscene3d.editor.lsp.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.diagnostic.EditorTextPosition;
 import io.github.glynch.jscene3d.editor.diagnostic.EditorTextRange;
 import io.github.glynch.jscene3d.editor.file.EditorLanguages;
+import io.github.glynch.jscene3d.editor.language.EditorCompletionItemKind;
+import io.github.glynch.jscene3d.editor.language.EditorCompletionRequest;
+import io.github.glynch.jscene3d.editor.language.EditorCompletionResult;
+import io.github.glynch.jscene3d.editor.language.EditorCompletionTrigger;
 import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
 import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
 import io.github.glynch.jscene3d.editor.language.EditorTextEdit;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -26,6 +33,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionItemKind;
+import org.eclipse.lsp4j.CompletionList;
+import org.eclipse.lsp4j.CompletionParams;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
@@ -39,6 +50,8 @@ import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -149,6 +162,143 @@ final class LspClientSessionTest {
         }
     }
 
+    @Test
+    void requestsCompletionFromLanguageServer() throws Exception {
+        try (ProtocolPair protocol = new ProtocolPair()) {
+            RecordingTextDocumentService documents = new RecordingTextDocumentService(0);
+            RecordingLanguageServer server = new RecordingLanguageServer(documents);
+            protocol.startServer(server);
+            LanguageServerInitialization initialization =
+                    new LanguageServerInitialization(temporaryDirectory, "Example", "Test Editor", "1.2.3");
+            var resource = temporaryDirectory.resolve("Example.java").toUri();
+
+            try (LspClientSession client = LspClientSession.connect(
+                    protocol.clientInput(), protocol.clientOutput(), initialization, protocol.clientExecutor)) {
+                client.initialized().toCompletableFuture().get(2, TimeUnit.SECONDS);
+
+                EditorCompletionRequest request = new EditorCompletionRequest(
+                        resource, 7, new EditorTextPosition(3, 12), EditorCompletionTrigger.manual());
+
+                EditorCompletionResult result =
+                        client.completion(request).toCompletableFuture().get(2, TimeUnit.SECONDS);
+
+                assertThat(result.version()).isEqualTo(7);
+                assertThat(result.items()).hasSize(1);
+                assertThat(result.items().getFirst().label()).isEqualTo("length()");
+                assertThat(result.items().getFirst().kind()).contains(EditorCompletionItemKind.METHOD);
+                assertThat(result.incomplete()).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void ordersCompletionBetweenDocumentChanges() throws Exception {
+        try (ProtocolPair protocol = new ProtocolPair()) {
+            RecordingTextDocumentService documents = new RecordingTextDocumentService(2);
+            RecordingLanguageServer server = new RecordingLanguageServer(documents);
+            protocol.startServer(server);
+            LanguageServerInitialization initialization =
+                    new LanguageServerInitialization(temporaryDirectory, "Example", "Test Editor", "1.2.3");
+            URI resource = temporaryDirectory.resolve("Example.java").toUri();
+            CompletableFuture<Either<List<CompletionItem>, CompletionList>> completionResponse =
+                    new CompletableFuture<>();
+            documents.delayCompletion(completionResponse);
+
+            try (LspClientSession client = LspClientSession.connect(
+                    protocol.clientInput(), protocol.clientOutput(), initialization, protocol.clientExecutor)) {
+                client.initialized().toCompletableFuture().get(2, TimeUnit.SECONDS);
+
+                EditorTextDocument firstDocument =
+                        new EditorTextDocument(resource, EditorLanguages.JAVA, 1, "class Example { int first; }");
+                EditorTextDocumentChange firstChange = new EditorTextDocumentChange(
+                        firstDocument,
+                        List.of(new EditorTextEdit(
+                                new EditorTextRange(new EditorTextPosition(0, 20), new EditorTextPosition(0, 20)),
+                                "first")));
+                client.didChange(firstChange);
+
+                EditorCompletionRequest request = new EditorCompletionRequest(
+                        resource, 1, new EditorTextPosition(0, 20), EditorCompletionTrigger.manual());
+                CompletionStage<EditorCompletionResult> completion = client.completion(request);
+
+                assertThat(documents.awaitCompletionRequest(2, TimeUnit.SECONDS))
+                        .isTrue();
+
+                EditorTextDocument secondDocument =
+                        new EditorTextDocument(resource, EditorLanguages.JAVA, 2, "class Example { int second; }");
+                EditorTextDocumentChange secondChange = new EditorTextDocumentChange(
+                        secondDocument,
+                        List.of(new EditorTextEdit(
+                                new EditorTextRange(new EditorTextPosition(0, 20), new EditorTextPosition(0, 20)),
+                                "second")));
+                client.didChange(secondChange);
+
+                assertThat(documents.notifications).containsExactly("change:1:first");
+
+                completionResponse.complete(Either.forLeft(List.of()));
+                completion.toCompletableFuture().get(2, TimeUnit.SECONDS);
+
+                assertThat(documents.received.await(2, TimeUnit.SECONDS)).isTrue();
+                assertThat(documents.notifications).containsExactly("change:1:first", "change:2:second");
+            }
+        }
+    }
+
+    @Test
+    void continuesDocumentSynchronizationAfterCompletionFailure() throws Exception {
+        try (ProtocolPair protocol = new ProtocolPair()) {
+            RecordingTextDocumentService documents = new RecordingTextDocumentService(2);
+            RecordingLanguageServer server = new RecordingLanguageServer(documents);
+            protocol.startServer(server);
+            LanguageServerInitialization initialization =
+                    new LanguageServerInitialization(temporaryDirectory, "Example", "Test Editor", "1.2.3");
+            URI resource = temporaryDirectory.resolve("Example.java").toUri();
+            CompletableFuture<Either<List<CompletionItem>, CompletionList>> completionResponse =
+                    new CompletableFuture<>();
+            documents.delayCompletion(completionResponse);
+
+            try (LspClientSession client = LspClientSession.connect(
+                    protocol.clientInput(), protocol.clientOutput(), initialization, protocol.clientExecutor)) {
+                client.initialized().toCompletableFuture().get(2, TimeUnit.SECONDS);
+
+                EditorTextDocument firstDocument =
+                        new EditorTextDocument(resource, EditorLanguages.JAVA, 1, "class Example { int first; }");
+                EditorTextDocumentChange firstChange = new EditorTextDocumentChange(
+                        firstDocument,
+                        List.of(new EditorTextEdit(
+                                new EditorTextRange(new EditorTextPosition(0, 20), new EditorTextPosition(0, 20)),
+                                "first")));
+                client.didChange(firstChange);
+
+                EditorCompletionRequest request = new EditorCompletionRequest(
+                        resource, 1, new EditorTextPosition(0, 20), EditorCompletionTrigger.manual());
+                CompletionStage<EditorCompletionResult> completion = client.completion(request);
+
+                assertThat(documents.awaitCompletionRequest(2, TimeUnit.SECONDS))
+                        .isTrue();
+
+                EditorTextDocument secondDocument =
+                        new EditorTextDocument(resource, EditorLanguages.JAVA, 2, "class Example { int second; }");
+                EditorTextDocumentChange secondChange = new EditorTextDocumentChange(
+                        secondDocument,
+                        List.of(new EditorTextEdit(
+                                new EditorTextRange(new EditorTextPosition(0, 20), new EditorTextPosition(0, 20)),
+                                "second")));
+                client.didChange(secondChange);
+
+                completionResponse.completeExceptionally(new IllegalStateException("completion failed"));
+
+                CompletableFuture<EditorCompletionResult> completionFuture = completion.toCompletableFuture();
+
+                assertThatThrownBy(() -> completionFuture.get(2, TimeUnit.SECONDS))
+                        .hasCauseInstanceOf(ResponseErrorException.class);
+
+                assertThat(documents.received.await(2, TimeUnit.SECONDS)).isTrue();
+                assertThat(documents.notifications).containsExactly("change:1:first", "change:2:second");
+            }
+        }
+    }
+
     private static final class ProtocolPair implements AutoCloseable {
         private final PipedInputStream clientInput = new PipedInputStream();
         private final PipedOutputStream serverOutput;
@@ -250,6 +400,9 @@ final class LspClientSessionTest {
         private final List<String> notifications = new CopyOnWriteArrayList<>();
         private final CountDownLatch received;
 
+        private CompletableFuture<Either<List<CompletionItem>, CompletionList>> completionResponse;
+        private final CountDownLatch completionRequested = new CountDownLatch(1);
+
         private RecordingTextDocumentService(int expected) {
             received = new CountDownLatch(expected);
         }
@@ -278,6 +431,27 @@ final class LspClientSessionTest {
         public void didSave(DidSaveTextDocumentParams parameters) {
             notifications.add("save:" + parameters.getText());
             received.countDown();
+        }
+
+        @Override
+        public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams parameters) {
+            completionRequested.countDown();
+
+            if (completionResponse != null) {
+                return completionResponse;
+            }
+
+            CompletionItem item = new CompletionItem("length()");
+            item.setKind(CompletionItemKind.Method);
+            return CompletableFuture.completedFuture(Either.forLeft(List.of(item)));
+        }
+
+        void delayCompletion(CompletableFuture<Either<List<CompletionItem>, CompletionList>> response) {
+            completionResponse = response;
+        }
+
+        boolean awaitCompletionRequest(long timeout, TimeUnit unit) throws InterruptedException {
+            return completionRequested.await(timeout, unit);
         }
     }
 

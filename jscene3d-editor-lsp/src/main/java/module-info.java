@@ -8,6 +8,7 @@ module io.github.glynch.jscene3d.editor.lsp {
     requires transitive io.github.glynch.jscene3d.editor.api;
     requires transitive org.eclipse.lsp4j;
     requires org.eclipse.lsp4j.jsonrpc;
+    requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.editor.lsp.client;
     exports io.github.glynch.jscene3d.editor.lsp.process;

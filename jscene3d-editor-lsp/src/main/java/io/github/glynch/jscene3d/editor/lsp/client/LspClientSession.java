@@ -4,8 +4,11 @@
  */
 package io.github.glynch.jscene3d.editor.lsp.client;
 
+import io.github.glynch.jscene3d.editor.language.EditorCompletionRequest;
+import io.github.glynch.jscene3d.editor.language.EditorCompletionResult;
 import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
 import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
+import io.github.glynch.jscene3d.editor.lsp.client.completion.LspCompletion;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
@@ -176,6 +179,37 @@ public final class LspClientSession implements AutoCloseable {
         enqueue(() -> server.getTextDocumentService()
                 .didClose(new DidCloseTextDocumentParams(
                         new TextDocumentIdentifier(current.resource().toString()))));
+    }
+
+    /**
+     * Requests completion for an editor document after all previously submitted protocol operations
+     * have completed.
+     *
+     * <p>The completion request participates in the same ordered protocol sequence as document
+     * synchronization notifications. A failed completion is propagated to its caller but does not
+     * prevent subsequently submitted protocol operations from executing.
+     *
+     * @param request the completion request
+     * @return a stage containing the completion result
+     * @throws NullPointerException if {@code request} is {@code null}
+     * @throws IllegalStateException if shutdown has started or this session is closed
+     */
+    public synchronized CompletionStage<EditorCompletionResult> completion(EditorCompletionRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (closed.get()) {
+            throw new IllegalStateException("LSP client session is closed");
+        }
+        if (shutdownStarted.get()) {
+            throw new IllegalStateException("LSP client session shutdown has started");
+        }
+
+        CompletableFuture<EditorCompletionResult> result =
+                pendingNotifications.thenCompose(ignored -> server.getTextDocumentService()
+                        .completion(LspCompletion.params(request))
+                        .thenApply(response -> LspCompletion.result(request.version(), response)));
+
+        pendingNotifications = result.handle((ignored, failure) -> null);
+        return result;
     }
 
     /**

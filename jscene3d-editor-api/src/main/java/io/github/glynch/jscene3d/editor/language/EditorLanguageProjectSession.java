@@ -4,6 +4,11 @@
  */
 package io.github.glynch.jscene3d.editor.language;
 
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+
 /** Owned lifetime of one language adapter within one open project. */
 public interface EditorLanguageProjectSession extends AutoCloseable {
     /**
@@ -33,6 +38,21 @@ public interface EditorLanguageProjectSession extends AutoCloseable {
      * @param document final document snapshot
      */
     default void didClose(EditorTextDocument document) {}
+
+    /**
+     * Requests language-aware completion for an open editor document.
+     *
+     * <p>The default implementation reports no completion candidates while preserving the document
+     * version from the request.
+     *
+     * @param request the completion request
+     * @return a stage containing the completion result
+     * @throws NullPointerException if {@code request} is {@code null}
+     */
+    default CompletionStage<EditorCompletionResult> completion(EditorCompletionRequest request) {
+        Objects.requireNonNull(request, "request");
+        return CompletableFuture.completedFuture(new EditorCompletionResult(request.version(), List.of(), false));
+    }
 
     /** Stops the project language session; repeated closure must have no additional effect. */
     @Override

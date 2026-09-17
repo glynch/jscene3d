@@ -52,6 +52,8 @@ import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -286,7 +288,8 @@ final class LspClientSessionTest {
                                 "second")));
                 client.didChange(secondChange);
 
-                completionResponse.completeExceptionally(new IllegalStateException("completion failed"));
+                ResponseError error = new ResponseError(ResponseErrorCode.RequestFailed, "Completion failed", null);
+                completionResponse.completeExceptionally(new ResponseErrorException(error));
 
                 CompletableFuture<EditorCompletionResult> completionFuture = completion.toCompletableFuture();
 

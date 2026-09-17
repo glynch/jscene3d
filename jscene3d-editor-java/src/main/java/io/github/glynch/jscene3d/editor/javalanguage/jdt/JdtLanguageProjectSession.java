@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.javalanguage.jdt;
 
+import io.github.glynch.jscene3d.editor.language.EditorCompletionRequest;
+import io.github.glynch.jscene3d.editor.language.EditorCompletionResult;
 import io.github.glynch.jscene3d.editor.language.EditorLanguageProjectSession;
 import io.github.glynch.jscene3d.editor.language.EditorTextDocument;
 import io.github.glynch.jscene3d.editor.language.EditorTextDocumentChange;
@@ -15,6 +17,7 @@ import io.github.glynch.jscene3d.editor.lsp.process.LanguageServerProcessLaunche
 import io.github.glynch.jscene3d.environment.OperatingSystem;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -22,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -113,6 +117,37 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
         }
     }
 
+    /**
+     * Requests Java completion for the current version of an open editor document.
+     *
+     * @param request the completion request
+     * @return a stage containing the completion result
+     * @throws NullPointerException if {@code request} is {@code null}
+     * @throws IllegalArgumentException if the document is not open or the requested version is not
+     *     current
+     * @throws IllegalStateException if the language-server connection is not ready
+     */
+    @Override
+    public synchronized CompletionStage<EditorCompletionResult> completion(EditorCompletionRequest request) {
+        EditorCompletionRequest current = Objects.requireNonNull(request, "request");
+        EditorTextDocument document = openDocuments.get(current.resource());
+
+        if (document == null) {
+            throw new IllegalArgumentException("Document is not open: " + current.resource());
+        }
+        if (document.version() != current.version()) {
+            throw new IllegalArgumentException("Completion version "
+                    + current.version()
+                    + " does not match current document version "
+                    + document.version());
+        }
+        if (connection == null) {
+            throw new IllegalStateException("Java language server is not ready");
+        }
+
+        return connection.completion(current);
+    }
+
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) {
@@ -175,7 +210,7 @@ final class JdtLanguageProjectSession implements EditorLanguageProjectSession {
             openDocuments(initializedSession);
             return;
         }
-        LOGGER.log(System.Logger.Level.ERROR, "Could not initialize Eclipse JDT Language Server", failure);
+        LOGGER.log(Level.ERROR, "Could not initialize Eclipse JDT Language Server", failure);
         reportFailure(failureMessage(failure));
         closeFailedStartup();
     }

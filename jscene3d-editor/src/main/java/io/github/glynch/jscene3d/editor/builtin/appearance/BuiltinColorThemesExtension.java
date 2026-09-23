@@ -72,7 +72,9 @@ public final class BuiltinColorThemesExtension implements EditorExtension {
             new EditorColorThemeId("io.github.glynch.jscene3d.editor.theme.light");
 
     /** Creates the built-in color-theme extension. */
-    public BuiltinColorThemesExtension() {}
+    public BuiltinColorThemesExtension() {
+        // Default construction requires no additional initialization.
+    }
 
     @Override
     public String id() {

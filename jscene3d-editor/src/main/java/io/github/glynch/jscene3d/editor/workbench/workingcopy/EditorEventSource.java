@@ -21,7 +21,9 @@ public final class EditorEventSource<T> implements EditorEvent<T> {
     private final List<Consumer<? super T>> listeners = new CopyOnWriteArrayList<>();
 
     /** Creates an event source without subscribers. */
-    public EditorEventSource() {}
+    public EditorEventSource() {
+        // Default construction requires no additional initialization.
+    }
 
     @Override
     public EditorRegistration subscribe(Consumer<? super T> listener) {

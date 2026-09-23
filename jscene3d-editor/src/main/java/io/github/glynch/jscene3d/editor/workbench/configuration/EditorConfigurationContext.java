@@ -26,7 +26,9 @@ public final class EditorConfigurationContext implements EditorConfiguration, Au
     private @Nullable EditorProjectSession session;
 
     /** Creates an empty window-scoped configuration context. */
-    public EditorConfigurationContext() {}
+    public EditorConfigurationContext() {
+        // Default construction requires no additional initialization.
+    }
 
     /**
      * Publishes one fully loaded project's setting registry and effective values.

@@ -23,7 +23,9 @@ public final class EditorFileTypeRegistry implements EditorFileTypes {
     private final Map<EditorFileTypeId, EditorFileType> fileTypes = new LinkedHashMap<>();
 
     /** Creates an empty file-type registry. */
-    public EditorFileTypeRegistry() {}
+    public EditorFileTypeRegistry() {
+        // Default construction requires no additional initialization.
+    }
 
     @Override
     public EditorRegistration register(EditorFileType fileType) {

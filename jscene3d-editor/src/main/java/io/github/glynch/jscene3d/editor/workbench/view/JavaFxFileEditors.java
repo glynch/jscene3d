@@ -46,7 +46,14 @@ public final class JavaFxFileEditors implements AutoCloseable {
     private final EditorRegistration languageSynchronization;
     private @Nullable JavaFxOpenFile previewFile;
 
-    /** Connects file-open requests to file-type-specific editor tabs. */
+    /**
+     * Connects file-open requests to file-type-specific editor tabs.
+     *
+     * @param area central editor tab surface
+     * @param extensions host supplying file types, requests, languages, and dialogs
+     * @param icons renderer for file-type icons
+     * @param stateChanged callback invoked when document command state may have changed
+     */
     public JavaFxFileEditors(
             JavaFxEditorArea area, EditorExtensionHost extensions, JavaFxIconRenderer icons, Runnable stateChanged) {
         this.area = Objects.requireNonNull(area, "area");
@@ -58,22 +65,38 @@ public final class JavaFxFileEditors implements AutoCloseable {
         requestRegistration = extensions.observeFileRequests(this::openFile);
     }
 
-    /** Returns the number of dirty source-editor resources. */
+    /**
+     * Returns the number of dirty source-editor resources.
+     *
+     * @return dirty working-copy count
+     */
     public int dirtyCount() {
         return workingCopies.dirtyCount();
     }
 
-    /** Returns whether a workspace file editor is selected. */
+    /**
+     * Returns whether a workspace file editor is selected.
+     *
+     * @return whether the selected tab represents a workspace file
+     */
     public boolean hasSelectedFile() {
         return selectedFile().isPresent();
     }
 
-    /** Returns whether the selected workspace file has unsaved content. */
+    /**
+     * Returns whether the selected workspace file has unsaved content.
+     *
+     * @return whether the selected file is dirty
+     */
     public boolean isSelectedFileDirty() {
         return selectedFile().map(JavaFxOpenFile::isDirty).orElse(false);
     }
 
-    /** Saves the selected file when dirty. */
+    /**
+     * Saves the selected file when dirty.
+     *
+     * @return whether no save was needed or the save succeeded
+     */
     public boolean saveSelectedFile() {
         return selectedFile()
                 .filter(JavaFxOpenFile::isDirty)
@@ -81,7 +104,11 @@ public final class JavaFxFileEditors implements AutoCloseable {
                 .orElse(true);
     }
 
-    /** Saves every dirty source file. */
+    /**
+     * Saves every dirty source file.
+     *
+     * @return whether every dirty source file was saved successfully
+     */
     public boolean saveAll() {
         return openFiles.values().stream().filter(JavaFxOpenFile::isDirty).allMatch(JavaFxOpenFile::save);
     }

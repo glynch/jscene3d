@@ -250,13 +250,30 @@ final class AssetCatalogTest {
                 .isEqualTo("asset.root");
     }
 
-    /** Stops recursive discovery at a nested project instead of merging its independently owned assets. */
+    /** Stops recursive discovery at a nested legacy project during the compatibility period. */
     @Test
-    void excludesNestedProjectAssets() throws IOException {
+    void excludesNestedLegacyProjectAssets() throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("beacon.entity.json"), beaconDefinition());
         Path nestedProject = temporaryDirectory.resolve("target/export/application/project");
         Files.createDirectories(nestedProject);
         Files.writeString(nestedProject.resolve(ProjectLoader.MANIFEST_NAME), "{}\n", StandardCharsets.UTF_8);
+        DefinitionWriter.write(nestedProject.resolve("duplicate.entity.json"), beaconDefinition());
+
+        AssetCatalog catalog = scanValidCatalog();
+
+        assertThat(catalog.assets())
+                .singleElement()
+                .extracting(AssetMetadata::path)
+                .isEqualTo(temporaryDirectory.resolve("beacon.entity.json").toRealPath());
+    }
+
+    /** Treats any nested current descriptor candidate as a separate project boundary. */
+    @Test
+    void excludesNestedJ3dProjectAssets() throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("beacon.entity.json"), beaconDefinition());
+        Path nestedProject = temporaryDirectory.resolve("target/export/application/project");
+        Files.createDirectories(nestedProject);
+        Files.writeString(nestedProject.resolve("nested-game.j3d"), "{}\n", StandardCharsets.UTF_8);
         DefinitionWriter.write(nestedProject.resolve("duplicate.entity.json"), beaconDefinition());
 
         AssetCatalog catalog = scanValidCatalog();

@@ -12,6 +12,11 @@ import java.util.function.Consumer;
 public final class EditorTelemetryLogger implements Consumer<TelemetryMeasurement> {
     private static final System.Logger LOGGER = System.getLogger(EditorTelemetryLogger.class.getName());
 
+    /** Creates a logger which publishes completed measurements to the local process log. */
+    public EditorTelemetryLogger() {
+        super();
+    }
+
     /** Logs one completed operation without including its potentially sensitive attributes. */
     @Override
     public void accept(TelemetryMeasurement measurement) {

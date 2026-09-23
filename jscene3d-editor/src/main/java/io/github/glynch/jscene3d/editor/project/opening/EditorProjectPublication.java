@@ -31,7 +31,13 @@ public final class EditorProjectPublication {
         this(projects, diagnostics, new EditorConfigurationContext());
     }
 
-    /** Creates a publisher over project, diagnostic, and effective-configuration contexts. */
+    /**
+     * Creates a publisher over project, diagnostic, and effective-configuration contexts.
+     *
+     * @param projects extension-facing current-project context
+     * @param diagnostics diagnostic publication sink
+     * @param configuration effective project-configuration context
+     */
     public EditorProjectPublication(
             EditorProjectContext projects,
             Consumer<List<ProjectDiagnostic>> diagnostics,

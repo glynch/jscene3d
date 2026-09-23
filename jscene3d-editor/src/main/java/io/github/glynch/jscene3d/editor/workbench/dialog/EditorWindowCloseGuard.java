@@ -25,7 +25,11 @@ public final class EditorWindowCloseGuard {
 
     private final Function<EditorDialog, Optional<EditorDialogButtonId>> dialogs;
 
-    /** Creates a close guard using one synchronous modal-dialog presenter. */
+    /**
+     * Creates a close guard using one synchronous modal-dialog presenter.
+     *
+     * @param dialogs presenter returning the selected logical dialog action
+     */
     public EditorWindowCloseGuard(Function<EditorDialog, Optional<EditorDialogButtonId>> dialogs) {
         this.dialogs = Objects.requireNonNull(dialogs, "dialogs");
     }

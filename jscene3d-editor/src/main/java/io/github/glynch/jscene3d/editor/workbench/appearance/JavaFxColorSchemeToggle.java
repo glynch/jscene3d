@@ -20,7 +20,13 @@ public final class JavaFxColorSchemeToggle implements AutoCloseable {
     private final JavaFxIconRenderer icons;
     private final EditorRegistration appearanceRegistration;
 
-    /** Creates a live theme-family toggle backed by the editor command model. */
+    /**
+     * Creates a live theme-family toggle backed by the editor command model.
+     *
+     * @param themes active appearance registry
+     * @param icons renderer for the current toggle icon
+     * @param toggleColorScheme action which changes the preferred theme family
+     */
     public JavaFxColorSchemeToggle(
             EditorColorThemeRegistry themes, JavaFxIconRenderer icons, Runnable toggleColorScheme) {
         EditorColorThemeRegistry registry = Objects.requireNonNull(themes, "themes");
@@ -32,7 +38,11 @@ public final class JavaFxColorSchemeToggle implements AutoCloseable {
                 appearance -> update(appearance.colorTheme().kind()));
     }
 
-    /** Returns the workbench-owned toolbar button. */
+    /**
+     * Returns the workbench-owned toolbar button.
+     *
+     * @return live color-scheme toggle button
+     */
     public Button button() {
         return button;
     }

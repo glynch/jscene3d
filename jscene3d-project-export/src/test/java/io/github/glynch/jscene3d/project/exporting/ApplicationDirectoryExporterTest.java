@@ -24,6 +24,86 @@ import org.junit.jupiter.api.io.TempDir;
 /** Verifies complete application directories through the public export interface. */
 final class ApplicationDirectoryExporterTest {
     private static final String ENGINE_VERSION = "0.1.0-SNAPSHOT";
+    private static final String PROJECT_DESCRIPTOR = """
+            {
+              "$schema": "https://jscene3d.org/schemas/project-1.json",
+              "schemaVersion": 1,
+              "identity": {
+                "id": "io.github.glynch.sample-game",
+                "name": "Sample Game",
+                "version": "0.1.0"
+              },
+              "legal": {
+                "projectLicense": {
+                  "expression": "Apache-2.0",
+                  "file": "LICENSE"
+                }
+              },
+              "engine": {
+                "requires": ">=0.1.0-SNAPSHOT <0.2.0"
+              },
+              "runtime": {
+                "applicationExtension": "io.github.glynch.sample-game",
+                "entryScene": "worlds/start.world.json",
+                "inputMap": "config/input-map.json"
+              },
+              "launch": {
+                "splash": {
+                  "background": "branding/background.png",
+                  "title": "branding/title.png",
+                  "poweredByBadges": ["branding/powered-by.png"],
+                  "minimumDurationSeconds": 2.0
+                }
+              },
+              "extensions": [
+                {
+                  "id": "io.github.glynch.sample-game",
+                  "requires": ">=0.1.0 <0.2.0"
+                }
+              ],
+              "assets": [
+                {
+                  "id": "menu-background",
+                  "type": "io.github.glynch.sample/overlay-image",
+                  "path": "resources/menu-background.resource.json"
+                },
+                {
+                  "id": "model",
+                  "type": "io.github.glynch.sample/model-source",
+                  "path": "assets/model.gltf"
+                },
+                {
+                  "id": "runtime-resource",
+                  "type": "io.github.glynch.sample/runtime-resource",
+                  "path": "resources/runtime.bin"
+                }
+              ],
+              "imports": ["imports/model.import.json"],
+              "exportPresets": ["export/desktop.json"]
+            }
+            """;
+    private static final String ENCODED_IMAGE_RESOURCE = """
+            {
+              "$schema": "https://jscene3d.org/schemas/resource-1.json",
+              "schemaVersion": 1,
+              "type": "io.github.glynch.sample/overlay-image",
+              "typeVersion": 1,
+              "properties": {
+                "payload": {"$ref": "project:branding/background.png"},
+                "encoding": "png"
+              }
+            }
+            """;
+    private static final String IMPORT_DEFINITION = """
+            {
+              "$schema": "https://jscene3d.org/schemas/import-1.json",
+              "schemaVersion": 1,
+              "id": "model-import",
+              "source": "asset:model",
+              "importer": "io.github.glynch.sample/model",
+              "selection": ["scenes/0000"]
+            }
+            """;
 
     @TempDir
     private Path temporaryDirectory;
@@ -80,9 +160,9 @@ final class ApplicationDirectoryExporterTest {
                         "project/config/input-map.json",
                         "project/entities/item.entity.json",
                         "project/imports/model.import.json",
-                        "project/jscene3d.json",
                         "project/resources/menu-background.resource.json",
                         "project/resources/runtime.bin",
+                        "project/sample-game.j3d",
                         "project/worlds/start.world.json");
     }
 
@@ -153,7 +233,7 @@ final class ApplicationDirectoryExporterTest {
         exporter.export(request);
 
         assertThat(output.resolve("obsolete.txt")).doesNotExist();
-        assertThat(output.resolve("project/jscene3d.json")).isRegularFile();
+        assertThat(output.resolve("project/sample-game.j3d")).isRegularFile();
     }
 
     /** Leaves an existing output untouched when validation rejects an incomplete runtime class path. */
@@ -198,100 +278,22 @@ final class ApplicationDirectoryExporterTest {
 
     /** Writes the manifest and every category of file used to test export selection. */
     private void writeProjectFixture() throws IOException {
-        write(projectRoot.resolve("jscene3d.json"), manifest());
+        write(projectRoot.resolve("sample-game.j3d"), PROJECT_DESCRIPTOR);
         write(projectRoot.resolve("worlds/start.world.json"), definition("world-definition"));
         write(projectRoot.resolve("entities/item.entity.json"), definition("entity-definition"));
         write(projectRoot.resolve("config/input-map.json"), "{}");
         write(projectRoot.resolve("branding/background.png"), "background");
         write(projectRoot.resolve("branding/title.png"), "title");
         write(projectRoot.resolve("branding/powered-by.png"), "badge");
-        write(projectRoot.resolve("resources/menu-background.resource.json"), encodedImageResource());
+        write(projectRoot.resolve("resources/menu-background.resource.json"), ENCODED_IMAGE_RESOURCE);
         write(projectRoot.resolve("resources/runtime.bin"), "runtime resource");
         write(projectRoot.resolve("assets/model.gltf"), "raw import source");
-        write(projectRoot.resolve("imports/model.import.json"), importDefinition());
+        write(projectRoot.resolve("imports/model.import.json"), IMPORT_DEFINITION);
         write(projectRoot.resolve("export/desktop.json"), "{}");
         write(projectRoot.resolve("playtest/profiles.json"), "{}");
         write(projectRoot.resolve("LICENSE"), "Sample license");
         write(projectRoot.resolve("pom.xml"), "<project />");
         write(projectRoot.resolve("src/main/java/SampleGameApplication.java"), "class SampleGameApplication {}");
-    }
-
-    /** Returns one valid project manifest with both imported and runtime-native asset sources. */
-    private static String manifest() {
-        return """
-                {
-                  "$schema": "https://jscene3d.org/schemas/project-1.json",
-                  "schemaVersion": 1,
-                  "identity": {
-                    "id": "io.github.glynch.sample-game",
-                    "name": "Sample Game",
-                    "version": "0.1.0"
-                  },
-                  "legal": {
-                    "projectLicense": {
-                      "expression": "Apache-2.0",
-                      "file": "LICENSE"
-                    }
-                  },
-                  "engine": {
-                    "requires": ">=0.1.0-SNAPSHOT <0.2.0"
-                  },
-                  "runtime": {
-                    "applicationExtension": "io.github.glynch.sample-game",
-                    "entryScene": "worlds/start.world.json",
-                    "inputMap": "config/input-map.json"
-                  },
-                  "launch": {
-                    "splash": {
-                      "background": "branding/background.png",
-                      "title": "branding/title.png",
-                      "poweredByBadges": ["branding/powered-by.png"],
-                      "minimumDurationSeconds": 2.0
-                    }
-                  },
-                  "extensions": [
-                    {
-                      "id": "io.github.glynch.sample-game",
-                      "requires": ">=0.1.0 <0.2.0"
-                    }
-                  ],
-                  "assets": [
-                    {
-                      "id": "menu-background",
-                      "type": "io.github.glynch.sample/overlay-image",
-                      "path": "resources/menu-background.resource.json"
-                    },
-                    {
-                      "id": "model",
-                      "type": "io.github.glynch.sample/model-source",
-                      "path": "assets/model.gltf"
-                    },
-                    {
-                      "id": "runtime-resource",
-                      "type": "io.github.glynch.sample/runtime-resource",
-                      "path": "resources/runtime.bin"
-                    }
-                  ],
-                  "imports": ["imports/model.import.json"],
-                  "exportPresets": ["export/desktop.json"]
-                }
-                """;
-    }
-
-    /** Returns one resource definition with an authored project payload dependency. */
-    private static String encodedImageResource() {
-        return """
-                {
-                  "$schema": "https://jscene3d.org/schemas/resource-1.json",
-                  "schemaVersion": 1,
-                  "type": "io.github.glynch.sample/overlay-image",
-                  "typeVersion": 1,
-                  "properties": {
-                    "payload": {"$ref": "project:branding/background.png"},
-                    "encoding": "png"
-                  }
-                }
-                """;
     }
 
     /** Returns one discoverable definition header. */
@@ -306,20 +308,6 @@ final class ApplicationDirectoryExporterTest {
                   "formatVersion": 1
                 }
                 """.replace("$ID", id).replace("$TYPE", type);
-    }
-
-    /** Returns an import recipe which identifies the raw asset excluded from runtime output. */
-    private static String importDefinition() {
-        return """
-                {
-                  "$schema": "https://jscene3d.org/schemas/import-1.json",
-                  "schemaVersion": 1,
-                  "id": "model-import",
-                  "source": "asset:model",
-                  "importer": "io.github.glynch.sample/model",
-                  "selection": ["scenes/0000"]
-                }
-                """;
     }
 
     /** Writes one UTF-8 fixture file after creating its parent directory. */

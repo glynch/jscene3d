@@ -15,7 +15,11 @@ public final class EditorStatusProjectOpenProgress implements EditorProjectOpenP
     private String projectName = "Project";
     private EditorLoadingPhase phase = EditorLoadingPhase.READING_MANIFEST;
 
-    /** Creates status progress over the workbench's project-status sink. */
+    /**
+     * Creates status progress over the workbench's project-status sink.
+     *
+     * @param status sink receiving concise project-opening status text
+     */
     public EditorStatusProjectOpenProgress(Consumer<String> status) {
         this.status = Objects.requireNonNull(status, "status");
     }

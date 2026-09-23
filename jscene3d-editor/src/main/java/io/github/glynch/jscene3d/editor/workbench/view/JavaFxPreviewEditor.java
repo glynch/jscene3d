@@ -23,7 +23,14 @@ public final class JavaFxPreviewEditor implements AutoCloseable {
     private final Label title = new Label();
     private final Region dirtyIndicator = new Region();
 
-    /** Creates a preview editor without revealing it. */
+    /**
+     * Creates a preview editor without revealing it.
+     *
+     * @param area central editor tab surface
+     * @param title observable project title
+     * @param dirty observable project-dirty state
+     * @param content preview presentation node
+     */
     public JavaFxPreviewEditor(
             JavaFxEditorArea area, ReadOnlyStringProperty title, ReadOnlyBooleanProperty dirty, Node content) {
         this.area = Objects.requireNonNull(area, "area");

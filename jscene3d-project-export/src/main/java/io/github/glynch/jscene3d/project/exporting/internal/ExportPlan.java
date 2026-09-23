@@ -168,7 +168,7 @@ public final class ExportPlan {
                 .catalog()
                 .orElseThrow(() -> invalidDefinition("asset catalog", catalogResult.diagnostics()));
         Map<Path, ExportFile> files = new LinkedHashMap<>();
-        addProjectFile(project, files, project.root().resolve(ProjectLoader.MANIFEST_NAME));
+        addProjectFile(project, files, project.descriptor());
         catalog.assets().stream().map(AssetMetadata::path).forEach(path -> addProjectFile(project, files, path));
         addProjectFile(project, files, project.runtime().entryScene());
         project.runtime().startupScene().ifPresent(path -> addProjectFile(project, files, path));

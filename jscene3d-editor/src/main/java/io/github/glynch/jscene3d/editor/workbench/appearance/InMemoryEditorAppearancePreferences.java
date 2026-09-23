@@ -16,6 +16,11 @@ public final class InMemoryEditorAppearancePreferences implements EditorAppearan
     private @Nullable String family;
     private @Nullable Integer size;
 
+    /** Creates empty preferences which return caller-supplied defaults until values are saved. */
+    public InMemoryEditorAppearancePreferences() {
+        super();
+    }
+
     @Override
     public EditorColorThemeId colorTheme(EditorColorThemeId fallback) {
         return theme == null ? fallback : theme;

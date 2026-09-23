@@ -14,7 +14,7 @@ public interface ProjectHost {
      *
      * <p>The returned project owns its composed world. Loading performs no activation and creates no execution thread.
      *
-     * @param projectRoot project directory containing {@code jscene3d.json}
+     * @param projectRoot project directory containing one current or legacy project descriptor
      * @return loaded project owning one inactive world
      * @throws ProjectHostException if discovery, validation, composition, or application preparation fails
      */

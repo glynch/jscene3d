@@ -43,7 +43,12 @@ public final class EditorSplashScreen extends StackPane implements EditorProject
     private @Nullable PauseTransition dismissalDelay;
     private long displayedAtNanos = -1L;
 
-    /** Creates the full-frame product splash with live project and loading information. */
+    /**
+     * Creates the full-frame product splash with live project and loading information.
+     *
+     * @param engineVersion engine version shown in the product information
+     * @param timing minimum-visibility policy for startup
+     */
     public EditorSplashScreen(String engineVersion, EditorSplashTiming timing) {
         this.timing = Objects.requireNonNull(timing, "timing");
         getStyleClass().add(EditorStyleClasses.EDITOR_SPLASH);

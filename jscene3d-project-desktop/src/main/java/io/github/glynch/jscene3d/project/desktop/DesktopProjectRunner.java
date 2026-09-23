@@ -63,7 +63,7 @@ public final class DesktopProjectRunner {
 
     /** Runs the manifest-selected startup world until its window requests closure.
      *
-     * @param projectRoot project directory containing {@code jscene3d.json}
+     * @param projectRoot project directory containing one current or legacy project descriptor
      */
     public void run(Path projectRoot) {
         run(projectRoot, ProjectLaunchRequest.standard());
@@ -71,7 +71,7 @@ public final class DesktopProjectRunner {
 
     /** Runs one explicitly selected scene and parameter set until its window requests closure.
      *
-     * @param projectRoot project directory containing {@code jscene3d.json}
+     * @param projectRoot project directory containing one current or legacy project descriptor
      * @param request immutable launch request, including an optional playtest profile
      */
     public void run(Path projectRoot, ProjectLaunchRequest request) {

@@ -16,7 +16,13 @@ public final class JavaFxWelcomeEditor implements AutoCloseable {
     private final Runnable openProject;
     private @Nullable Tab tab;
 
-    /** Creates a Welcome-editor owner. */
+    /**
+     * Creates a Welcome-editor owner.
+     *
+     * @param area central editor tab surface
+     * @param icons renderer for Welcome actions
+     * @param openProject action which opens the project chooser
+     */
     public JavaFxWelcomeEditor(JavaFxEditorArea area, JavaFxIconRenderer icons, Runnable openProject) {
         this.area = Objects.requireNonNull(area, "area");
         this.icons = Objects.requireNonNull(icons, "icons");

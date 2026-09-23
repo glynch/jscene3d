@@ -28,14 +28,22 @@ public final class JavaFxMenuBar implements AutoCloseable {
     private final MenuBar root = new MenuBar();
     private final EditorRegistration registration;
 
-    /** Creates a menu bar which follows contributed menus, placements, and command state. */
+    /**
+     * Creates a menu bar which follows contributed menus, placements, and command state.
+     *
+     * @param extensions extension host supplying menu and command snapshots
+     */
     public JavaFxMenuBar(EditorExtensionHost extensions) {
         this.extensions = Objects.requireNonNull(extensions, "extensions");
         root.getStyleClass().add(EditorStyleClasses.EDITOR_MENU_BAR);
         registration = extensions.observeMenus(this::showMenus);
     }
 
-    /** Returns the workbench-owned menu-bar node. */
+    /**
+     * Returns the workbench-owned menu-bar node.
+     *
+     * @return live JavaFX menu bar
+     */
     public MenuBar node() {
         return root;
     }

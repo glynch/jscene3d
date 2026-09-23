@@ -185,7 +185,9 @@ final class ExtensionCatalogLoaderTest {
                 assertThat(diagnostic.code().code()).isEqualTo("extension.missing");
                 assertThat(diagnostic.location()).isEqualTo("/extensions/0");
                 assertThat(diagnostic.source())
-                        .isEqualTo(temporaryDirectory.resolve("jscene3d.json").toUri());
+                        .isEqualTo(temporaryDirectory
+                                .resolve("example-project.j3d")
+                                .toUri());
             });
         }
     }
@@ -459,8 +461,8 @@ final class ExtensionCatalogLoaderTest {
                 Optional.empty());
         GameProject.Metadata metadata = new GameProject.Metadata(
                 identity, List.of(), GameProject.Links.empty(), GameProject.Legal.empty(), GameProject.Catalog.empty());
-        return new GameProject(
-                root,
+        return GameProject.fromDescriptor(
+                root.resolve("example-project.j3d"),
                 metadata,
                 new GameProject.EngineCompatibility(">=0.1.0 <0.2.0", Optional.empty()),
                 new GameProject.RuntimeConfiguration(

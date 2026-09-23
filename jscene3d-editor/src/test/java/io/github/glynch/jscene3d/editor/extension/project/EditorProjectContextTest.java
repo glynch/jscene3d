@@ -6,9 +6,9 @@ package io.github.glynch.jscene3d.editor.extension.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.lifecycle.EditorRegistration;
 import io.github.glynch.jscene3d.editor.project.EditorProject;
+import io.github.glynch.jscene3d.editor.project.asset.ProjectAsset;
 import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import io.github.glynch.jscene3d.editor.selection.EditorSelectionKinds;
 import io.github.glynch.jscene3d.editor.view.EditorDetails;

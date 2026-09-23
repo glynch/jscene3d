@@ -35,12 +35,21 @@ public final class JavaFxEditorArea implements AutoCloseable {
         });
     }
 
-    /** Returns the workbench-owned JavaFX node. */
+    /**
+     * Returns the workbench-owned JavaFX node.
+     *
+     * @return central editor tab pane
+     */
     public TabPane node() {
         return tabs;
     }
 
-    /** Observes selected-tab changes. */
+    /**
+     * Observes selected-tab changes.
+     *
+     * @param observer callback invoked after the selected tab changes
+     * @return registration which removes the observer when closed
+     */
     public EditorRegistration observeSelectionChanged(Runnable observer) {
         Runnable listener = Objects.requireNonNull(observer, "observer");
         selectionObservers.add(listener);

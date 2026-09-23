@@ -18,6 +18,11 @@ import java.util.Set;
 
 /** Built-in extension associating common raster images with the image viewer. */
 public final class ImageViewerExtension implements EditorExtension {
+    /** Creates the stateless built-in image-viewer extension. */
+    public ImageViewerExtension() {
+        super();
+    }
+
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.image-viewer";

@@ -29,6 +29,7 @@ import java.util.Optional;
 /** Immutable, validated descriptor for one JScene3D game project. */
 public final class GameProject {
     private final Path root;
+    private final Path descriptor;
     private final Metadata metadata;
     private final EngineCompatibility engine;
     private final RuntimeConfiguration runtime;
@@ -55,7 +56,44 @@ public final class GameProject {
             LaunchConfiguration launch,
             List<ExtensionRequirement> extensions,
             ProjectFiles files) {
-        this.root = requireNormalizedAbsolute(root, "root");
+        this(ProjectSource.legacy(root), metadata, engine, runtime, launch, extensions, files);
+    }
+
+    /**
+     * Creates a validated immutable project from its actual loaded descriptor path.
+     *
+     * @param descriptor normalized absolute descriptor path
+     * @param metadata identity and project-browser metadata
+     * @param engine engine compatibility
+     * @param runtime application startup configuration
+     * @param launch application launch presentation
+     * @param extensions extension requirements in declaration order
+     * @param files project content references
+     * @return validated project retaining the supplied descriptor path
+     */
+    public static GameProject fromDescriptor(
+            Path descriptor,
+            Metadata metadata,
+            EngineCompatibility engine,
+            RuntimeConfiguration runtime,
+            LaunchConfiguration launch,
+            List<ExtensionRequirement> extensions,
+            ProjectFiles files) {
+        return new GameProject(
+                ProjectSource.fromDescriptor(descriptor), metadata, engine, runtime, launch, extensions, files);
+    }
+
+    /** Stores validated project values and their resolved source location. */
+    private GameProject(
+            ProjectSource source,
+            Metadata metadata,
+            EngineCompatibility engine,
+            RuntimeConfiguration runtime,
+            LaunchConfiguration launch,
+            List<ExtensionRequirement> extensions,
+            ProjectFiles files) {
+        root = source.root();
+        descriptor = source.descriptor();
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.runtime = Objects.requireNonNull(runtime, "runtime");
@@ -71,6 +109,15 @@ public final class GameProject {
      */
     public Path root() {
         return root;
+    }
+
+    /**
+     * Returns the actual normalized absolute descriptor path loaded for this project.
+     *
+     * @return current or legacy project descriptor path
+     */
+    public Path descriptor() {
+        return descriptor;
     }
 
     /**
@@ -197,6 +244,34 @@ public final class GameProject {
      */
     public Metadata metadata() {
         return metadata;
+    }
+
+    /** Validated project root and its immediate-child descriptor. */
+    private record ProjectSource(Path root, Path descriptor) {
+        /** Validates one project source location. */
+        private ProjectSource {
+            root = requireNormalizedAbsolute(root, "root");
+            descriptor = requireNormalizedAbsolute(descriptor, "descriptor");
+            if (!Objects.equals(descriptor.getParent(), root)) {
+                throw new IllegalArgumentException("descriptor must be an immediate child of root: " + descriptor);
+            }
+        }
+
+        /** Creates a compatibility location for a directly constructed project. */
+        private static ProjectSource legacy(Path root) {
+            Path validRoot = requireNormalizedAbsolute(root, "root");
+            return new ProjectSource(validRoot, validRoot.resolve(ProjectLoader.LEGACY_DESCRIPTOR_NAME));
+        }
+
+        /** Derives the project root from one immediate-child descriptor path. */
+        private static ProjectSource fromDescriptor(Path descriptor) {
+            Path validDescriptor = requireNormalizedAbsolute(descriptor, "descriptor");
+            Path root = validDescriptor.getParent();
+            if (root == null) {
+                throw new IllegalArgumentException("descriptor must have a project-root parent: " + descriptor);
+            }
+            return new ProjectSource(root, validDescriptor);
+        }
     }
 
     /** Identity, attribution, links, legal references, and catalog information.

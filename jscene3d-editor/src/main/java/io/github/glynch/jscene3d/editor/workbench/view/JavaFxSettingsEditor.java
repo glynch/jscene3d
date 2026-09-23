@@ -23,13 +23,23 @@ public final class JavaFxSettingsEditor implements AutoCloseable {
     private final EditorExtensionHost extensions;
     private @Nullable OpenSettings current;
 
-    /** Creates a Settings-editor owner. */
+    /**
+     * Creates a Settings-editor owner.
+     *
+     * @param area central editor tab surface
+     * @param extensions host supplying live appearance state
+     */
     public JavaFxSettingsEditor(JavaFxEditorArea area, EditorExtensionHost extensions) {
         this.area = Objects.requireNonNull(area, "area");
         this.extensions = Objects.requireNonNull(extensions, "extensions");
     }
 
-    /** Opens or reveals user appearance and optional project settings. */
+    /**
+     * Opens or reveals user appearance and optional project settings.
+     *
+     * @param session active project session, or {@code null} when no project is open
+     * @param messages sink for project-settings persistence messages
+     */
     public void show(@Nullable EditorProjectSession session, Consumer<EditorMessage> messages) {
         OpenSettings settings = current;
         if (settings == null) {

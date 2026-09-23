@@ -13,7 +13,6 @@ import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.internal.SemanticVersion;
 import io.github.glynch.jscene3d.project.internal.SemanticVersionRequirement;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
-import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -62,7 +61,7 @@ public final class ExtensionCatalogLoader {
     public ExtensionCatalogLoadResult load(GameProject project, ClassLoader classLoader) {
         GameProject validProject = Objects.requireNonNull(project, "project");
         ClassLoader validClassLoader = Objects.requireNonNull(classLoader, "classLoader");
-        URI manifest = validProject.root().resolve(ProjectLoader.MANIFEST_NAME).toUri();
+        URI manifest = validProject.descriptor().toUri();
         List<ProjectDiagnostic> diagnostics = new ArrayList<>();
         List<URL> resources = discover(validClassLoader, manifest, diagnostics);
         Map<String, LocatedDescriptor> discovered = readDescriptors(resources, manifest, diagnostics);

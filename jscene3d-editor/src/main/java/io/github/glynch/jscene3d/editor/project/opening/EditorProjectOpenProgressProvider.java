@@ -14,7 +14,12 @@ public final class EditorProjectOpenProgressProvider implements Supplier<EditorP
     private final Supplier<EditorProjectOpenProgress> inSessionProgress;
     private @Nullable EditorProjectOpenProgress startupProgress;
 
-    /** Creates a provider with optional startup progress and a reusable in-session factory. */
+    /**
+     * Creates a provider with optional startup progress and a reusable in-session factory.
+     *
+     * @param startupProgress startup presentation to consume at most once
+     * @param inSessionProgress factory for each subsequent in-session presentation
+     */
     public EditorProjectOpenProgressProvider(
             Optional<EditorProjectOpenProgress> startupProgress,
             Supplier<EditorProjectOpenProgress> inSessionProgress) {

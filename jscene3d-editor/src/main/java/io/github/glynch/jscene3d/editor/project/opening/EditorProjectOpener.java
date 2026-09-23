@@ -13,7 +13,6 @@ import io.github.glynch.jscene3d.editor.preview.EditorPreviewResult;
 import io.github.glynch.jscene3d.editor.preview.ViewportController;
 import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
-import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadTask;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.window.EditorMessage;

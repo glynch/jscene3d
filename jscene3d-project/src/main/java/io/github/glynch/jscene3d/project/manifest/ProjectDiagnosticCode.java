@@ -14,6 +14,14 @@ public enum ProjectDiagnosticCode implements DiagnosticCode {
     ASSET_FINGERPRINT_INVALID("project.asset.sha256", "An asset SHA-256 fingerprint is invalid"),
     /** The supported player count is invalid. */
     CATALOG_PLAYERS_INVALID("project.catalog.players", "The supported player count is invalid"),
+    /** Multiple current descriptors or mixed current and legacy descriptors were found. */
+    DESCRIPTOR_AMBIGUOUS("project.descriptor.ambiguous", "The project descriptor selection is ambiguous"),
+    /** A selected descriptor path does not use a supported filename. */
+    DESCRIPTOR_INVALID("project.descriptor.invalid", "The selected project descriptor filename is invalid"),
+    /** The legacy fixed descriptor filename was used. */
+    DESCRIPTOR_LEGACY("project.descriptor.legacy", "The legacy jscene3d.json descriptor filename is deprecated"),
+    /** No current or legacy project descriptor was found. */
+    DESCRIPTOR_MISSING("project.descriptor.missing", "The project root does not contain a project descriptor"),
     /** The project directory is missing. */
     DIRECTORY_MISSING("project.directory.missing", "The project directory does not exist or is not a directory"),
     /** The project directory cannot be resolved. */

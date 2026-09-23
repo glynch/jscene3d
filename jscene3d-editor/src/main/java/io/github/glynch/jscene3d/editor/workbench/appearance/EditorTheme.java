@@ -17,7 +17,11 @@ public final class EditorTheme {
         throw new AssertionError("EditorTheme cannot be instantiated");
     }
 
-    /** Installs the packaged stylesheet at most once on the supplied scene. */
+    /**
+     * Installs the packaged stylesheet at most once on the supplied scene.
+     *
+     * @param scene editor scene receiving the packaged stylesheet
+     */
     public static void install(Scene scene) {
         Scene validScene = Objects.requireNonNull(scene, "scene");
         String stylesheet = stylesheet();
@@ -26,7 +30,11 @@ public final class EditorTheme {
         }
     }
 
-    /** Returns the external URL of the packaged editor stylesheet. */
+    /**
+     * Returns the external URL of the packaged editor stylesheet.
+     *
+     * @return external-form URL suitable for a JavaFX scene stylesheet
+     */
     public static String stylesheet() {
         URL resource = Objects.requireNonNull(EditorTheme.class.getResource(RESOURCE_NAME), RESOURCE_NAME);
         return resource.toExternalForm();

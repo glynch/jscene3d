@@ -37,7 +37,13 @@ public final class EditorProjectOpenTrace {
         root = telemetry.begin("editor.project.open", Map.of("project.path", normalized.toString()));
     }
 
-    /** Measures project loading while exposing its operation for detailed child phases. */
+    /**
+     * Measures project loading while exposing its operation for detailed child phases.
+     *
+     * @param <T> load result type
+     * @param action project-loading operation
+     * @return result produced by the loading operation
+     */
     public synchronized <T> T load(Function<TelemetryOperation, T> action) {
         requireIncomplete();
         Objects.requireNonNull(action, "action");
@@ -59,7 +65,13 @@ public final class EditorProjectOpenTrace {
         }
     }
 
-    /** Measures render-thread preview composition. */
+    /**
+     * Measures render-thread preview composition.
+     *
+     * @param <T> composition result type
+     * @param action preview-composition operation
+     * @return result produced by the composition operation
+     */
     public synchronized <T> T compose(Supplier<T> action) {
         requireIncomplete();
         Objects.requireNonNull(action, "action");
@@ -76,7 +88,12 @@ public final class EditorProjectOpenTrace {
         }
     }
 
-    /** Measures the first rendered and presented frame, then completes the trace. */
+    /**
+     * Measures the first rendered and presented frame, then completes the trace.
+     *
+     * @param action first-frame presentation operation
+     * @return durations for all completed project-opening phases
+     */
     public synchronized EditorProjectOpenDurations present(Runnable action) {
         requireIncomplete();
         Objects.requireNonNull(action, "action");

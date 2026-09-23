@@ -70,7 +70,12 @@ public final class EditorLanguageSupportRegistry implements EditorLanguageSuppor
         };
     }
 
-    /** Returns the registered adapter for one exact language identity. */
+    /**
+     * Returns the registered adapter for one exact language identity.
+     *
+     * @param language language identity to resolve
+     * @return registered support, or empty when no contribution handles the language
+     */
     public Optional<EditorLanguageSupport> resolve(EditorLanguageId language) {
         RegisteredSupport registered = languages.get(Objects.requireNonNull(language, "language"));
         return registered == null ? Optional.empty() : Optional.of(registered.support());

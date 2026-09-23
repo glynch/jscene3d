@@ -45,7 +45,12 @@ public final class JavaFxProjectSettingsPane {
     private final Consumer<EditorMessage> messages;
     private final BorderPane root = new BorderPane();
 
-    /** Creates a generated settings editor for one loaded project session. */
+    /**
+     * Creates a generated settings editor for one loaded project session.
+     *
+     * @param session loaded session supplying settings declarations and persistence
+     * @param messages sink for settings persistence messages
+     */
     public JavaFxProjectSettingsPane(EditorProjectSession session, Consumer<EditorMessage> messages) {
         this.session = Objects.requireNonNull(session, "session");
         this.messages = Objects.requireNonNull(messages, "messages");
@@ -54,7 +59,11 @@ public final class JavaFxProjectSettingsPane {
         root.setCenter(settingsScroll());
     }
 
-    /** Returns the generated JavaFX settings editor. */
+    /**
+     * Returns the generated JavaFX settings editor.
+     *
+     * @return project settings presentation node
+     */
     public Node node() {
         return root;
     }

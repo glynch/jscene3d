@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
-import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
+import io.github.glynch.jscene3d.project.manifest.internal.ProjectDescriptorLocator;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -83,8 +83,9 @@ final class AssetCatalogScanner {
         List<Path> definitions = new ArrayList<>();
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override
-            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
-                if (!directory.equals(root) && Files.isRegularFile(directory.resolve(ProjectLoader.MANIFEST_NAME))) {
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
+                    throws IOException {
+                if (!directory.equals(root) && ProjectDescriptorLocator.containsDescriptorCandidate(directory)) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
                 return FileVisitResult.CONTINUE;

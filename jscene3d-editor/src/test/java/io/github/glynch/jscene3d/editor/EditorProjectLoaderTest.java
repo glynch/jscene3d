@@ -9,9 +9,9 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.application.EditorBuildInfo;
-import io.github.glynch.jscene3d.editor.builtin.project.ProjectAsset;
 import io.github.glynch.jscene3d.editor.preview.EditorWorldPreview;
 import io.github.glynch.jscene3d.editor.preview.EditorWorldPreviewLoadResult;
+import io.github.glynch.jscene3d.editor.project.asset.ProjectAsset;
 import io.github.glynch.jscene3d.editor.project.checking.EditorProjectCheck;
 import io.github.glynch.jscene3d.editor.project.loading.EditorLoadingPhase;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadProgress;
@@ -43,6 +43,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Exercises the headless project-to-editor-session seam with real project files. */
 final class EditorProjectLoaderTest {
+    private static final String PROJECT_DESCRIPTOR = "editor-test.j3d";
     private static final String ENTITY_ASSET_ID = "4c189475-9845-4810-b7f9-af744d3cc726";
     private static final String PLACEMENT_ID = "853f50a0-17dc-46ac-9f04-f772e54c44b2";
     private static final String CHILD_ID = "b991ca3e-66bb-4ef0-a682-74773bbef0d0";
@@ -196,7 +197,7 @@ final class EditorProjectLoaderTest {
     @Test
     void discoversInstalledExtensionMetadata() throws IOException {
         writeProject();
-        write("jscene3d.json", """
+        write(PROJECT_DESCRIPTOR, """
                 {
                   "$schema":"https://jscene3d.org/schemas/project-1.json",
                   "schemaVersion":1,
@@ -492,7 +493,7 @@ final class EditorProjectLoaderTest {
 
     /** Creates the complete valid source project used by the read-only loading test. */
     private void writeProject() throws IOException {
-        write("jscene3d.json", """
+        write(PROJECT_DESCRIPTOR, """
                 {
                   "$schema":"https://jscene3d.org/schemas/project-1.json",
                   "schemaVersion":1,

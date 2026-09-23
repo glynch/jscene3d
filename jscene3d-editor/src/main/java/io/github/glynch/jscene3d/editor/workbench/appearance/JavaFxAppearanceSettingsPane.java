@@ -34,7 +34,11 @@ public final class JavaFxAppearanceSettingsPane implements AutoCloseable {
     private final EditorRegistration appearanceRegistration;
     private boolean updating;
 
-    /** Creates a generated appearance settings surface around the live registry. */
+    /**
+     * Creates a generated appearance settings surface around the live registry.
+     *
+     * @param appearances live appearance registry to present and update
+     */
     public JavaFxAppearanceSettingsPane(EditorColorThemeRegistry appearances) {
         this.appearances = Objects.requireNonNull(appearances, "appearances");
         configureControls();
@@ -45,7 +49,11 @@ public final class JavaFxAppearanceSettingsPane implements AutoCloseable {
         appearanceRegistration = appearances.observeAppearance(this::showAppearance);
     }
 
-    /** Returns the settings node. */
+    /**
+     * Returns the settings node.
+     *
+     * @return workbench-owned appearance settings node
+     */
     public Node node() {
         return root;
     }

@@ -37,7 +37,13 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
     private final EditorCommandRegistration undo;
     private final EditorCommandRegistration redo;
 
-    /** Registers all core menus, commands, and placements. */
+    /**
+     * Registers all core menus, commands, and placements.
+     *
+     * @param extensions host receiving the workbench contributions
+     * @param actions behavior invoked by registered commands
+     * @param aboutText content displayed by the About command
+     */
     public EditorWorkbenchCommandSet(EditorExtensionHost extensions, Actions actions, String aboutText) {
         EditorExtensionHost host = Objects.requireNonNull(extensions, "extensions");
         Actions workbench = Objects.requireNonNull(actions, "actions");
@@ -79,7 +85,11 @@ public final class EditorWorkbenchCommandSet implements AutoCloseable {
         update(DocumentCommandState.EMPTY);
     }
 
-    /** Replaces project-dependent command enablement as one coherent state. */
+    /**
+     * Replaces project-dependent command enablement as one coherent state.
+     *
+     * @param state current document command state
+     */
     public void update(DocumentCommandState state) {
         DocumentCommandState current = Objects.requireNonNull(state, "state");
         save.update(enabled(current.dirty()));

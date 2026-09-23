@@ -28,6 +28,7 @@ public record EditorResolvedColorTheme(
         EditorColorThemeKind kind,
         Map<EditorColorTokenId, EditorColor> colors,
         Map<EditorSyntaxTokenId, EditorSyntaxStyle> syntaxStyles) {
+    /** Validates identities and retains immutable copies of the resolved token maps. */
     public EditorResolvedColorTheme {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(label, "label");
@@ -36,7 +37,12 @@ public record EditorResolvedColorTheme(
         syntaxStyles = Map.copyOf(Objects.requireNonNull(syntaxStyles, "syntaxStyles"));
     }
 
-    /** Returns one required standard workbench color. */
+    /**
+     * Returns one required standard workbench color.
+     *
+     * @param token color token to resolve
+     * @return resolved color for the token
+     */
     public EditorColor color(EditorColorTokenId token) {
         EditorColor color = colors.get(Objects.requireNonNull(token, "token"));
         if (color == null) {

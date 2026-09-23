@@ -18,7 +18,17 @@ public final class OpenGlFxRenderSurface implements RenderSurface {
     private int presentationFramebuffer;
     private boolean released;
 
-    /** Captures the framebuffer and dimensions supplied for one OpenGLFX render callback. */
+    /** Creates an unbound surface which claims its context thread on first use. */
+    public OpenGlFxRenderSurface() {
+        super();
+    }
+
+    /**
+     * Captures the framebuffer and dimensions supplied for one OpenGLFX render callback.
+     *
+     * @param canvas OpenGLFX canvas supplying logical dimensions
+     * @param event render callback carrying physical dimensions and presentation framebuffer
+     */
     public void beginFrame(GLCanvas canvas, GLRenderEvent event) {
         requireAvailable();
         requireContextThread();

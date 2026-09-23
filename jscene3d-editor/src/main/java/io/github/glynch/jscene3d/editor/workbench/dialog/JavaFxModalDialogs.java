@@ -40,12 +40,21 @@ public final class JavaFxModalDialogs {
 
     private final Stage owner;
 
-    /** Creates a modal-dialog adapter owned by one editor stage. */
+    /**
+     * Creates a modal-dialog adapter owned by one editor stage.
+     *
+     * @param owner editor stage which owns every presented modal dialog
+     */
     public JavaFxModalDialogs(Stage owner) {
         this.owner = Objects.requireNonNull(owner, "owner");
     }
 
-    /** Presents one dialog and returns its selected logical action. */
+    /**
+     * Presents one dialog and returns its selected logical action.
+     *
+     * @param specification toolkit-independent dialog declaration
+     * @return selected action, or empty when the dialog was dismissed without one
+     */
     public Optional<EditorDialogButtonId> show(EditorDialog specification) {
         EditorDialog model = Objects.requireNonNull(specification, "specification");
         Stage dialog = new Stage(WINDOW_STYLE);

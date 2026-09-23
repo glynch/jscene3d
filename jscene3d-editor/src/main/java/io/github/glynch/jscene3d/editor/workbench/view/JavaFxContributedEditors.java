@@ -26,7 +26,14 @@ public final class JavaFxContributedEditors implements AutoCloseable {
     private final EditorRegistration viewRegistration;
     private final EditorRegistration requestRegistration;
 
-    /** Connects editor-area view contributions to the generic tab surface. */
+    /**
+     * Connects editor-area view contributions to the generic tab surface.
+     *
+     * @param area central editor tab surface
+     * @param extensions host supplying view contributions and reveal requests
+     * @param layout current workbench view placement model
+     * @param icons renderer for contributed view icons
+     */
     public JavaFxContributedEditors(
             JavaFxEditorArea area,
             EditorExtensionHost extensions,

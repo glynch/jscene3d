@@ -39,6 +39,7 @@ public final class ManifestValidator {
     private static final String LOCAL_SCHEMA_REFERENCE = "schema/project-1.schema.json";
 
     private final Path root;
+    private final Path source;
     private final SemanticVersion engineVersion;
     private final String engineVersionText;
     private final DiagnosticCollector diagnostics;
@@ -48,6 +49,7 @@ public final class ManifestValidator {
     /** Stores one validation context. */
     private ManifestValidator(Path root, Path source, SemanticVersion engineVersion, String engineVersionText) {
         this.root = root;
+        this.source = source;
         this.engineVersion = engineVersion;
         this.engineVersionText = engineVersionText;
         diagnostics = new DiagnosticCollector(source);
@@ -107,7 +109,7 @@ public final class ManifestValidator {
         }
         GameProject.Metadata metadata = new GameProject.Metadata(identity, authors, links, legal, catalog);
         GameProject.ProjectFiles files = new GameProject.ProjectFiles(assets, imports, exportPresets);
-        return Optional.of(new GameProject(root, metadata, engine, runtime, launch, extensions, files));
+        return Optional.of(GameProject.fromDescriptor(source, metadata, engine, runtime, launch, extensions, files));
     }
 
     /** Validates the authoritative integer schema version and optional schema URI. */

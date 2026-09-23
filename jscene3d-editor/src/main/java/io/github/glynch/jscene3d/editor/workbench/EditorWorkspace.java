@@ -69,7 +69,17 @@ public final class EditorWorkspace extends BorderPane {
     private final JavaFxColorSchemeToggle colorSchemeToggle;
     private final JavaFxMenuBar menuBar;
 
-    /** Creates the shell around an existing viewport and the real open-project command. */
+    /**
+     * Creates the shell around an existing viewport and the real open-project command.
+     *
+     * @param viewportCanvas native-backed preview canvas
+     * @param actions application actions exposed to the workbench
+     * @param selections shared editor-selection service
+     * @param extensions active extension host
+     * @param buildPreferences workspace build preferences
+     * @param buildInfo editor build information
+     * @param buildExecutor executor for project build operations
+     */
     public EditorWorkspace(
             GLCanvas viewportCanvas,
             Actions actions,
@@ -163,17 +173,29 @@ public final class EditorWorkspace extends BorderPane {
         documentController.showWelcome();
     }
 
-    /** Updates the viewport portion of the status bar. */
+    /**
+     * Updates the viewport portion of the status bar.
+     *
+     * @param text concise viewport status text
+     */
     public void setViewportStatus(String text) {
         statusBar.showViewportStatus(text);
     }
 
-    /** Shows that a project directory is being opened without claiming it has loaded. */
+    /**
+     * Shows that a project directory is being opened without claiming it has loaded.
+     *
+     * @param directory project directory currently being opened
+     */
     public void beginOpening(Path directory) {
         documentController.beginOpening(directory);
     }
 
-    /** Replaces the visible hierarchy, Project content, and preview context atomically. */
+    /**
+     * Replaces the visible hierarchy, Project content, and preview context atomically.
+     *
+     * @param session completely loaded editor project session
+     */
     public void showProject(EditorProjectSession session) {
         documentController.showProject(session);
         activitySelection.revealDefault();
@@ -184,23 +206,39 @@ public final class EditorWorkspace extends BorderPane {
         documentController.clearProject();
     }
 
-    /** Updates the concise project portion of the status bar. */
+    /**
+     * Updates the concise project portion of the status bar.
+     *
+     * @param text concise project status text
+     */
     public void setProjectStatus(String text) {
         documentController.setProjectStatus(text);
     }
 
-    /** Completes project presentation with the default project navigation visible. */
+    /**
+     * Completes project presentation with the default project navigation visible.
+     *
+     * @param status final project-opening status text
+     */
     public void finishProjectOpening(String status) {
         activitySelection.revealDefault();
         statusBar.showProjectStatus(status);
     }
 
-    /** Shows an extension message without exposing JavaFX through the extension interface. */
+    /**
+     * Shows an extension message without exposing JavaFX through the extension interface.
+     *
+     * @param message extension-facing message declaration
+     */
     public void showMessage(EditorMessage message) {
         documentController.showMessage(message);
     }
 
-    /** Confirms or saves dirty resources before an orderly window close. */
+    /**
+     * Confirms or saves dirty resources before an orderly window close.
+     *
+     * @return whether the editor window may close
+     */
     public boolean prepareToClose() {
         return documentController.prepareToClose();
     }

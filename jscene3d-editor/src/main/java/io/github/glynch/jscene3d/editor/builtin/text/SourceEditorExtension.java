@@ -23,6 +23,11 @@ import java.util.Set;
 public final class SourceEditorExtension implements EditorExtension {
     private static final String TYPE_PREFIX = "io.github.glynch.jscene3d.editor.file-type.";
 
+    /** Creates the stateless built-in source-editor extension. */
+    public SourceEditorExtension() {
+        super();
+    }
+
     @Override
     public String id() {
         return "io.github.glynch.jscene3d.editor.builtin.source-editor";

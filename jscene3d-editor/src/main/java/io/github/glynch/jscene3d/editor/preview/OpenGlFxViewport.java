@@ -13,7 +13,11 @@ import java.util.Objects;
 public final class OpenGlFxViewport {
     private OpenGlFxViewport() {}
 
-    /** Returns a core-profile canvas configured for the renderer baseline. */
+    /**
+     * Returns a core-profile canvas configured for the renderer baseline.
+     *
+     * @return configured OpenGLFX viewport canvas
+     */
     public static GLCanvas createCanvas() {
         GLCanvas.Builder.ContextDescription.New context = new GLCanvas.Builder.ContextDescription.New()
                 .setProfile(GLProfile.CORE)
@@ -34,7 +38,12 @@ public final class OpenGlFxViewport {
         return result;
     }
 
-    /** Connects rendering, disposal, and focus events to one viewport controller. */
+    /**
+     * Connects rendering, disposal, and focus events to one viewport controller.
+     *
+     * @param canvas viewport canvas producing lifecycle events
+     * @param controller controller receiving rendering, disposal, and focus changes
+     */
     public static void installEvents(GLCanvas canvas, ViewportController controller) {
         GLCanvas viewport = Objects.requireNonNull(canvas, "canvas");
         ViewportController target = Objects.requireNonNull(controller, "controller");

@@ -51,12 +51,25 @@ public final class EditorTextFileWorkingCopy implements EditorTextWorkingCopy {
         this.content = content;
     }
 
-    /** Opens a bounded UTF-8 text file, rejecting binary and malformed input. */
+    /**
+     * Opens a bounded UTF-8 text file, rejecting binary and malformed input.
+     *
+     * @param path local file to open
+     * @return working copy initialized from the file content
+     * @throws IOException when the file cannot be read or is not supported text input
+     */
     public static EditorTextFileWorkingCopy load(Path path) throws IOException {
         return load(path, EditorLanguages.PLAIN_TEXT);
     }
 
-    /** Opens a bounded UTF-8 text file with its resolved editor language. */
+    /**
+     * Opens a bounded UTF-8 text file with its resolved editor language.
+     *
+     * @param path local file to open
+     * @param language language identity associated with the working copy
+     * @return working copy initialized from the file content
+     * @throws IOException when the file cannot be read or is not supported text input
+     */
     public static EditorTextFileWorkingCopy load(Path path, EditorLanguageId language) throws IOException {
         Path source = Objects.requireNonNull(path, "path").toAbsolutePath().normalize();
         long size = Files.size(source);
@@ -70,7 +83,11 @@ public final class EditorTextFileWorkingCopy implements EditorTextWorkingCopy {
         return new EditorTextFileWorkingCopy(source, language, decode(bytes));
     }
 
-    /** Returns the normalized source path. */
+    /**
+     * Returns the normalized source path.
+     *
+     * @return absolute normalized file path
+     */
     public Path path() {
         return path;
     }
@@ -91,12 +108,21 @@ public final class EditorTextFileWorkingCopy implements EditorTextWorkingCopy {
         return version;
     }
 
-    /** Replaces the current content after an editor change. */
+    /**
+     * Replaces the current content after an editor change.
+     *
+     * @param replacement complete updated file content
+     */
     public void update(String replacement) {
         update(replacement, List.of(new EditorTextEdit(fullRange(content), replacement)));
     }
 
-    /** Replaces current content and publishes the ordered Monaco edits which produced it. */
+    /**
+     * Replaces current content and publishes the ordered Monaco edits which produced it.
+     *
+     * @param replacement complete updated file content
+     * @param edits ordered source edits which produced the replacement
+     */
     public void update(String replacement, List<EditorTextEdit> edits) {
         String updated = Objects.requireNonNull(replacement, "replacement");
         List<EditorTextEdit> changes = List.copyOf(Objects.requireNonNull(edits, "edits"));

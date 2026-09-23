@@ -36,7 +36,14 @@ public final class ViewportController {
     private boolean firstFrameReported;
     private boolean disposed;
 
-    /** Stores the JavaFX controls and state used by rendering callbacks. */
+    /**
+     * Stores the JavaFX controls and state used by rendering callbacks.
+     *
+     * @param canvas OpenGLFX viewport canvas
+     * @param status sink for concise viewport status text
+     * @param firstFramePresented callback invoked after the first frame is presented
+     * @param disposalComplete callback scheduled after renderer disposal completes
+     */
     public ViewportController(
             GLCanvas canvas, Consumer<String> status, Runnable firstFramePresented, Runnable disposalComplete) {
         this.canvas = canvas;

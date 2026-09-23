@@ -25,7 +25,12 @@ public final class EditorProjectCheck {
 
     private EditorProjectCheck() {}
 
-    /** Returns the project requested by the optional headless-check command-line argument. */
+    /**
+     * Returns the project requested by the optional headless-check command-line argument.
+     *
+     * @param arguments editor command-line arguments
+     * @return requested normalized project path, or empty when the check argument is absent
+     */
     public static Optional<Path> requestedProject(String[] arguments) {
         return Arrays.stream(arguments)
                 .filter(argument -> argument.startsWith(ARGUMENT))
@@ -34,7 +39,11 @@ public final class EditorProjectCheck {
                 .map(EditorProjectCheck::projectPath);
     }
 
-    /** Loads and composes one project through the same path used by the graphical editor. */
+    /**
+     * Loads and composes one project through the same path used by the graphical editor.
+     *
+     * @param projectDirectory project directory or descriptor to check
+     */
     public static void check(Path projectDirectory) {
         EditorProjectLoader loader = new EditorProjectLoader(
                 EditorBuildInfo.engineVersion(),
@@ -43,7 +52,12 @@ public final class EditorProjectCheck {
         check(loader, projectDirectory);
     }
 
-    /** Loads and composes one project with an injected loader for deterministic testing. */
+    /**
+     * Loads and composes one project with an injected loader for deterministic testing.
+     *
+     * @param loader project loader to exercise
+     * @param projectDirectory project directory or descriptor to check
+     */
     public static void check(EditorProjectLoader loader, Path projectDirectory) {
         EditorProjectLoadResult load = loader.load(projectDirectory);
         requireNoErrors("project load", load.diagnostics());

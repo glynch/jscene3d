@@ -20,6 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Exercises the complete public loading seam with real project directories. */
 final class ProjectLoaderTest {
+    private static final String PROJECT_DESCRIPTOR = "test-game.j3d";
     private static final String MINIMAL_MANIFEST = """
             {
               "$schema": "https://jscene3d.org/schemas/project-1.json",
@@ -153,6 +154,7 @@ final class ProjectLoaderTest {
         GameProject project = result.project().orElseThrow();
         Path canonicalRoot = temporaryDirectory.toRealPath();
         assertIdentity(project, canonicalRoot);
+        assertThat(project.descriptor()).isEqualTo(canonicalRoot.resolve(PROJECT_DESCRIPTOR));
         assertMetadata(project);
         assertRuntime(project, canonicalRoot);
         assertContent(project, canonicalRoot);
@@ -190,12 +192,92 @@ final class ProjectLoaderTest {
         assertThat(result.project().orElseThrow().assets()).isEmpty();
     }
 
+    /** Accepts a selected custom-named descriptor path as the project-loading input. */
+    @Test
+    void loadsSelectedCustomDescriptorPath() throws IOException {
+        createFile("scenes/main.scene.json");
+        Path descriptor = writeDescriptor("doomed-corridors.j3d", MINIMAL_MANIFEST);
+
+        ProjectLoadResult result = loader().load(descriptor);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.project().orElseThrow().descriptor()).isEqualTo(descriptor.toRealPath());
+    }
+
+    /** Rejects a selected regular file whose name is outside the descriptor contract. */
+    @Test
+    void rejectsSelectedFileWithInvalidDescriptorName() throws IOException {
+        Path selectedFile = writeDescriptor("project.json", MINIMAL_MANIFEST);
+
+        ProjectLoadResult result = loader().load(selectedFile);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code().code()).isEqualTo("project.descriptor.invalid");
+            assertThat(diagnostic.source())
+                    .isEqualTo(selectedFile.toAbsolutePath().normalize().toUri());
+        });
+    }
+
+    /** Loads the fixed legacy descriptor with one explicit deprecation diagnostic. */
+    @Test
+    void loadsLegacyDescriptorWithDeprecationWarning() throws IOException {
+        createFile("scenes/main.scene.json");
+        Path descriptor = writeDescriptor(ProjectLoader.LEGACY_DESCRIPTOR_NAME, MINIMAL_MANIFEST);
+
+        ProjectLoadResult result = loader().load(temporaryDirectory);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.project().orElseThrow().descriptor()).isEqualTo(descriptor.toRealPath());
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.severity()).isEqualTo(ProjectDiagnostic.Severity.WARNING);
+            assertThat(diagnostic.code().code()).isEqualTo("project.descriptor.legacy");
+            assertThat(diagnostic.source()).isEqualTo(descriptor.toRealPath().toUri());
+        });
+    }
+
+    /** Rejects multiple current descriptors without choosing one by filename order. */
+    @Test
+    void rejectsMultipleCurrentDescriptors() throws IOException {
+        writeDescriptor("a-project.j3d", MINIMAL_MANIFEST);
+        writeDescriptor("z-project.j3d", MINIMAL_MANIFEST);
+
+        ProjectLoadResult result = loader().load(temporaryDirectory);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
+            assertThat(diagnostic.code().code()).isEqualTo("project.descriptor.ambiguous");
+            assertThat(diagnostic.details().get("technicalDetail")).contains("a-project.j3d, z-project.j3d");
+        });
+    }
+
+    /** Rejects mixed current and legacy descriptors as ambiguous. */
+    @Test
+    void rejectsCurrentAndLegacyDescriptorAmbiguity() throws IOException {
+        writeDescriptor(PROJECT_DESCRIPTOR, MINIMAL_MANIFEST);
+        writeDescriptor(ProjectLoader.LEGACY_DESCRIPTOR_NAME, MINIMAL_MANIFEST);
+
+        ProjectLoadResult result = loader().load(temporaryDirectory);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.diagnostics())
+                .singleElement()
+                .extracting(diagnostic -> diagnostic.code().code())
+                .isEqualTo("project.descriptor.ambiguous");
+    }
+
     /** Rejects fields unknown to the selected manifest schema. */
     @Test
     void rejectsUnknownJsonField() throws IOException {
         writeManifest(MINIMAL_MANIFEST.replace("\"schemaVersion\": 1,", "\"schemaVersion\": 1,\n  \"mystery\": true,"));
 
-        assertSingleError("project.manifest.json");
+        ProjectDiagnostic diagnostic = assertSingleError("project.manifest.json");
+        assertThat(diagnostic.source())
+                .isEqualTo(temporaryDirectory
+                        .toRealPath()
+                        .resolve(PROJECT_DESCRIPTOR)
+                        .toUri());
     }
 
     /** Rejects duplicate keys instead of silently accepting the last value. */
@@ -304,16 +386,16 @@ final class ProjectLoaderTest {
                 .isEqualTo("project.directory.missing");
     }
 
-    /** Returns a structured error when jscene3d.json is absent. */
+    /** Returns a structured error when no current or legacy project descriptor is present. */
     @Test
-    void reportsMissingManifest() {
+    void reportsMissingDescriptor() {
         ProjectLoadResult result = loader().load(temporaryDirectory);
 
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics())
                 .singleElement()
                 .extracting(diagnostic -> diagnostic.code().code())
-                .isEqualTo("project.manifest.missing");
+                .isEqualTo("project.descriptor.missing");
     }
 
     /** Treats an invalid running engine version as a programmer configuration error. */
@@ -405,7 +487,12 @@ final class ProjectLoaderTest {
 
     /** Writes a manifest to the temporary project root. */
     private void writeManifest(String content) throws IOException {
-        Files.writeString(temporaryDirectory.resolve(ProjectLoader.MANIFEST_NAME), content);
+        writeDescriptor(PROJECT_DESCRIPTOR, content);
+    }
+
+    /** Writes one named descriptor to the temporary project root. */
+    private Path writeDescriptor(String filename, String content) throws IOException {
+        return Files.writeString(temporaryDirectory.resolve(filename), content);
     }
 
     /** Creates one referenced project file, including parent directories. */
@@ -416,12 +503,13 @@ final class ProjectLoaderTest {
     }
 
     /** Verifies one terminal loader diagnostic. */
-    private void assertSingleError(String code) {
+    private ProjectDiagnostic assertSingleError(String code) {
         ProjectLoadResult result = loader().load(temporaryDirectory);
         assertThat(result.isValid()).isFalse();
         assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
             assertThat(diagnostic.severity()).isEqualTo(ProjectDiagnostic.Severity.ERROR);
             assertThat(diagnostic.code().code()).isEqualTo(code);
         });
+        return result.diagnostics().getFirst();
     }
 }

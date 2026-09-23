@@ -29,6 +29,16 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
     private final EditorRegistration diagnosticRegistration;
     private boolean closed;
 
+    /**
+     * Creates a Monaco editor synchronized with one working copy and the active editor services.
+     *
+     * @param workingCopy text-file working copy edited by Monaco
+     * @param language language identity used to configure Monaco
+     * @param extensions host supplying appearance and diagnostic updates
+     * @param stateChanged callback invoked when document command state may have changed
+     * @param initializationFailure sink for Monaco initialization failures
+     * @param saveFailure sink for file persistence failures
+     */
     public JavaFxMonacoEditor(
             EditorTextFileWorkingCopy workingCopy,
             EditorLanguageId language,
@@ -89,28 +99,45 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
         return Objects.requireNonNull(host, "extensions");
     }
 
+    /**
+     * Returns the WebView hosting Monaco.
+     *
+     * @return editor presentation node
+     */
     public Node node() {
         return view;
     }
 
+    /** Transfers input focus to the embedded Monaco editor. */
     public void requestFocus() {
         view.requestFocus();
         execute("window.focusEditor && window.focusEditor()");
     }
 
+    /**
+     * Saves the working copy through the embedded editor bridge.
+     *
+     * @return whether persistence succeeded
+     */
     public boolean save() {
         return bridge.save();
     }
 
+    /** Applies Monaco's undo command to the current editor. */
     public void undo() {
         execute("window.runEditorCommand && window.runEditorCommand('undo')");
     }
 
+    /** Applies Monaco's redo command to the current editor. */
     public void redo() {
         execute("window.runEditorCommand && window.runEditorCommand('redo')");
     }
 
-    /** Reveals and selects a zero-based source range. */
+    /**
+     * Reveals and selects a zero-based source range.
+     *
+     * @param range source range to reveal and select
+     */
     public void reveal(EditorTextRange range) {
         bridge.applySelection(Objects.requireNonNull(range, "range"));
         executeOnJavaFxThread("window.applyJavaSelection && window.applyJavaSelection()");
@@ -172,42 +199,75 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
             this.saveFailure = Objects.requireNonNull(saveFailure, "saveFailure");
         }
 
-        /** Returns initial source content to JavaScript without source-code interpolation. */
+        /**
+         * Returns initial source content to JavaScript without source-code interpolation.
+         *
+         * @return current working-copy content
+         */
         public String initialContent() {
             return workingCopy.content();
         }
 
-        /** Returns Monaco's language identity. */
+        /**
+         * Returns Monaco's language identity.
+         *
+         * @return Monaco-compatible language identifier
+         */
         public String language() {
             return language.value();
         }
 
-        /** Returns the canonical resource URI used as Monaco's model identity. */
+        /**
+         * Returns the canonical resource URI used as Monaco's model identity.
+         *
+         * @return canonical working-copy resource URI
+         */
         public String resource() {
             return workingCopy.id().resource().toString();
         }
 
-        /** Returns the editor's accessible label. */
+        /**
+         * Returns the editor's accessible label.
+         *
+         * @return label identifying the source editor to assistive technology
+         */
         public String accessibleLabel() {
             return workingCopy.path().getFileName() + " source editor";
         }
 
-        /** Returns the current resolved appearance as JSON consumed by the bundled Monaco page. */
+        /**
+         * Returns the current resolved appearance as JSON consumed by the bundled Monaco page.
+         *
+         * @return serialized Monaco appearance
+         */
         public String appearance() {
             return appearance;
         }
 
-        /** Returns current Monaco marker data as JSON. */
+        /**
+         * Returns current Monaco marker data as JSON.
+         *
+         * @return serialized diagnostic markers
+         */
         public String diagnostics() {
             return diagnostics;
         }
 
-        /** Returns the pending source selection as JSON. */
+        /**
+         * Returns the pending source selection as JSON.
+         *
+         * @return serialized source selection
+         */
         public String selection() {
             return selection;
         }
 
-        /** Receives source changes from Monaco. */
+        /**
+         * Receives source changes from Monaco.
+         *
+         * @param content complete updated model content
+         * @param changes JavaScript array of ordered Monaco content changes
+         */
         public void contentChanged(String content, Object changes) {
             if (!bridgeClosed) {
                 workingCopy.update(content, JavaFxMonacoInterop.textEdits(Objects.requireNonNull(changes, "changes")));
@@ -215,7 +275,11 @@ public final class JavaFxMonacoEditor implements AutoCloseable {
             }
         }
 
-        /** Reports a JavaScript or resource-loading failure to the workbench. */
+        /**
+         * Reports a JavaScript or resource-loading failure to the workbench.
+         *
+         * @param message failure description produced by the embedded editor
+         */
         public void initializationFailed(String message) {
             if (!bridgeClosed) {
                 initializationFailure.accept(Objects.requireNonNull(message, "message"));

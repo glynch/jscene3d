@@ -35,7 +35,12 @@ public final class EditorWorldPreview implements AutoCloseable {
         this.spatial = spatial;
     }
 
-    /** Composes real presentation components and inert substitutes for every non-presentation extension. */
+    /**
+     * Composes real presentation components and inert substitutes for every non-presentation extension.
+     *
+     * @param session loaded editor project session
+     * @return composed preview or structured composition diagnostics
+     */
     public static EditorWorldPreviewLoadResult compose(EditorProjectSession session) {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         List<ComponentRuntimeExtension> extensions = previewExtensions(session);
@@ -77,7 +82,11 @@ public final class EditorWorldPreview implements AutoCloseable {
         spatial.render(renderer, viewportAspectRatio);
     }
 
-    /** Returns whether spatial presentation is active and ready for renderer submission. */
+    /**
+     * Returns whether spatial presentation is active and ready for renderer submission.
+     *
+     * @return whether the preview can render a frame
+     */
     public boolean isReady() {
         return world.isActive() && spatial.isReadyToRender();
     }

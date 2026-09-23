@@ -25,7 +25,12 @@ public record EditorSplashTiming(Duration startupMinimumVisibility) {
         }
     }
 
-    /** Reads the editor-only splash timing option from JavaFX named arguments. */
+    /**
+     * Reads the editor-only splash timing option from JavaFX named arguments.
+     *
+     * @param namedArguments JavaFX named command-line arguments
+     * @return configured timing, or the standard timing when the option is absent
+     */
     public static EditorSplashTiming fromNamedArguments(Map<String, String> namedArguments) {
         String seconds =
                 Objects.requireNonNull(namedArguments, "namedArguments").get(MINIMUM_SECONDS_ARGUMENT);
@@ -35,7 +40,12 @@ public record EditorSplashTiming(Duration startupMinimumVisibility) {
         return new EditorSplashTiming(parseSeconds(seconds));
     }
 
-    /** Returns how much longer startup must remain visible after the supplied elapsed time. */
+    /**
+     * Returns how much longer startup must remain visible after the supplied elapsed time.
+     *
+     * @param elapsed time the splash has already been visible
+     * @return remaining minimum visibility, never negative
+     */
     public Duration remainingAfter(Duration elapsed) {
         Duration validElapsed = Objects.requireNonNull(elapsed, "elapsed");
         if (validElapsed.isNegative()) {

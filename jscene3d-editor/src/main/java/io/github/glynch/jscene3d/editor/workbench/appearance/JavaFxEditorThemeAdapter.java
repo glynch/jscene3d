@@ -52,7 +52,12 @@ public final class JavaFxEditorThemeAdapter implements AutoCloseable {
     private final Parent root;
     private final EditorRegistration registration;
 
-    /** Observes and applies the active appearance to one JavaFX scene root. */
+    /**
+     * Observes and applies the active appearance to one JavaFX scene root.
+     *
+     * @param root scene root receiving semantic looked-up colors
+     * @param themes active appearance registry
+     */
     public JavaFxEditorThemeAdapter(Parent root, EditorColorThemeRegistry themes) {
         this.root = Objects.requireNonNull(root, "root");
         registration = Objects.requireNonNull(themes, "themes").observeAppearance(this::apply);

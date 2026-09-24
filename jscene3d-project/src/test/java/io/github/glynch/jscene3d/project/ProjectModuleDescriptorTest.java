@@ -41,6 +41,12 @@ final class ProjectModuleDescriptorTest {
                         "io.github.glynch.jscene3d.project.resource",
                         "io.github.glynch.jscene3d.project.scene",
                         "io.github.glynch.jscene3d.project.settings",
+                        "io.github.glynch.jscene3d.project.standard",
+                        "io.github.glynch.jscene3d.project.standard.application",
+                        "io.github.glynch.jscene3d.project.standard.game3d",
+                        "io.github.glynch.jscene3d.project.standard.physics3d",
+                        "io.github.glynch.jscene3d.project.standard.presentation",
+                        "io.github.glynch.jscene3d.project.standard.spatial3d",
                         "io.github.glynch.jscene3d.project.value",
                         "io.github.glynch.jscene3d.project.world");
     }

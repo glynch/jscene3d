@@ -4,22 +4,13 @@
  */
 package io.github.glynch.jscene3d.game;
 
-import io.github.glynch.jscene3d.game.application.GameApplicationDescriptors;
-import io.github.glynch.jscene3d.game.presentation.GamePresentationDescriptors;
-import io.github.glynch.jscene3d.game.project3d.Game3dDescriptors;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
-import io.github.glynch.jscene3d.project.physics3d.Physics3dDescriptors;
-import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.standard.StandardProjectDescriptors;
 import java.util.List;
 
 /** Standard descriptor set understood by JScene3D game hosts and authoring tools. */
 public final class StandardGameDescriptors {
-    private static final List<ExtensionDescriptor> ALL = List.of(
-            GameApplicationDescriptors.extensionDescriptor(),
-            Spatial3dDescriptors.extensionDescriptor(),
-            Physics3dDescriptors.extensionDescriptor(),
-            Game3dDescriptors.extensionDescriptor(),
-            GamePresentationDescriptors.extensionDescriptor());
+    private static final List<ExtensionDescriptor> ALL = StandardProjectDescriptors.all();
 
     private StandardGameDescriptors() {
         throw new AssertionError("StandardGameDescriptors cannot be instantiated");

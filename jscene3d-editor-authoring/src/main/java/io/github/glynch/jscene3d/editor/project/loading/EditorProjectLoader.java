@@ -17,7 +17,6 @@ import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
-import io.github.glynch.jscene3d.project.runtime.ProjectContent;
 import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
 import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoadResult;
@@ -133,11 +132,10 @@ public final class EditorProjectLoader {
                 Map.of(),
                 () -> EditorPublishedContentLoader.loadImports(project, diagnostics));
         progress.phaseStarted(EditorLoadingPhase.LOADING_PUBLISHED_CONTENT);
-        ProjectContent content = operation.measure(
+        DefinitionResolver definitions = operation.measure(
                 "project.published-content.load",
                 Map.of(),
-                () -> EditorPublishedContentLoader.load(project, configuration, authored, types, imports, diagnostics));
-        DefinitionResolver definitions = content.definitions();
+                () -> EditorPublishedContentLoader.load(project, configuration, authored, imports, diagnostics));
         progress.phaseStarted(EditorLoadingPhase.VALIDATING_ASSETS);
         List<ProjectAsset> assets = operation.measure(
                 "project.assets.validate",
@@ -164,7 +162,7 @@ public final class EditorProjectLoader {
                 Map.of(),
                 () -> new EditorProjectSession(
                         new EditorProjectSession.Source(
-                                project, configuration, authored, types, content, world, worldSource),
+                                project, configuration, authored, types, definitions, world, worldSource),
                         assets,
                         hierarchyProjector));
         return new EditorProjectLoadResult(Optional.of(session), List.copyOf(diagnostics));

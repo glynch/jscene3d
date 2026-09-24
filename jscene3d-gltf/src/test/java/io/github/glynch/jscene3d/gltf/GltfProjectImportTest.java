@@ -23,7 +23,6 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.importing.ImportArtifactKind;
 import io.github.glynch.jscene3d.project.importing.ImportManager;
 import io.github.glynch.jscene3d.project.importing.ImportedDefinitionResolver;
-import io.github.glynch.jscene3d.project.importing.ImportedRuntimeResources;
 import io.github.glynch.jscene3d.project.importing.PreparedImport;
 import io.github.glynch.jscene3d.project.importing.SourceItem;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
@@ -31,6 +30,7 @@ import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.Entity;
+import io.github.glynch.jscene3d.project.runtime.ImportedRuntimeResources;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
@@ -41,7 +41,7 @@ import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
-import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -158,7 +158,7 @@ final class GltfProjectImportTest {
         AssetCatalog authored = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         DefinitionResolver definitions = ImportedDefinitionResolver.create(authored, List.of(definition), manager);
         RegisteredTypeCatalog runtimeTypes =
-                RegisteredTypeCatalog.of(List.of(Spatial3dDescriptors.extensionDescriptor()));
+                RegisteredTypeCatalog.of(List.of(StandardSpatial3dDescriptors.extensionDescriptor()));
         EntityDefinition generated = definitions
                 .loadEntity(AssetRef.to(generatedId), runtimeTypes)
                 .definition()
@@ -167,7 +167,7 @@ final class GltfProjectImportTest {
         ComponentDefinition rendererDefinition = sourceNode.components().stream()
                 .filter(component -> component
                         .type()
-                        .equals(Spatial3dDescriptors.meshRendererType().id()))
+                        .equals(StandardSpatial3dDescriptors.meshRendererType().id()))
                 .findFirst()
                 .orElseThrow();
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();

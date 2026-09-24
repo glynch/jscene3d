@@ -19,8 +19,8 @@ import io.github.glynch.jscene3d.project.importing.SourceItem;
 import io.github.glynch.jscene3d.project.importing.extension.ImportInspectionContext;
 import io.github.glynch.jscene3d.project.importing.extension.ImportPreparationContext;
 import io.github.glynch.jscene3d.project.importing.extension.ProjectImporter;
-import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.spatial3d.resource.Spatial3dResourceWriter;
+import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.io.IOException;
@@ -85,7 +85,7 @@ final class GltfProjectImporter implements ProjectImporter {
         for (Map.Entry<String, GltfProjectContent.Primitive> entry : materials.entrySet()) {
             context.artifact(
                     ImportArtifactDescriptor.resource(
-                            entry.getKey(), Spatial3dDescriptors.materialResourceType(), List.of()),
+                            entry.getKey(), StandardSpatial3dDescriptors.materialResourceType(), List.of()),
                     output -> Spatial3dResourceWriter.writeMaterial(
                             output, entry.getValue().material()));
         }
@@ -111,7 +111,7 @@ final class GltfProjectImporter implements ProjectImporter {
                 ResourceReference.imported(context.definition().id() + '/' + payloadIdentity);
         context.artifact(
                 ImportArtifactDescriptor.resource(
-                        resourceIdentity, Spatial3dDescriptors.meshResourceType(), List.of(payloadIdentity)),
+                        resourceIdentity, StandardSpatial3dDescriptors.meshResourceType(), List.of(payloadIdentity)),
                 output -> Spatial3dResourceWriter.writeMeshDefinition(output, payloadReference));
     }
 
@@ -153,14 +153,16 @@ final class GltfProjectImporter implements ProjectImporter {
         components.add(transform(importId, locator + "/transform", node.transform()));
         for (GltfProjectContent.Primitive primitive : node.primitives()) {
             Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
-            properties.put(Spatial3dDescriptors.meshProperty(), reference(importId, meshIdentity(prefix, primitive)));
             properties.put(
-                    Spatial3dDescriptors.materialProperty(), reference(importId, materialIdentity(prefix, primitive)));
+                    StandardSpatial3dDescriptors.meshProperty(), reference(importId, meshIdentity(prefix, primitive)));
+            properties.put(
+                    StandardSpatial3dDescriptors.materialProperty(),
+                    reference(importId, materialIdentity(prefix, primitive)));
             components.add(component(
                     importId,
                     locator + "/mesh-renderers/" + formatted(primitive.meshIndex()) + '-'
                             + formatted(primitive.primitiveIndex()),
-                    Spatial3dDescriptors.meshRendererType(),
+                    StandardSpatial3dDescriptors.meshRendererType(),
                     properties));
         }
         List<EntityEntry> children = node.children().stream()
@@ -173,10 +175,10 @@ final class GltfProjectImporter implements ProjectImporter {
     private static ComponentDefinition transform(
             String importId, String locator, GltfProjectContent.Transform transform) {
         Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
-        properties.put(Spatial3dDescriptors.positionProperty(), vector(transform.position()));
-        properties.put(Spatial3dDescriptors.orientationProperty(), quaternion(transform.orientation()));
-        properties.put(Spatial3dDescriptors.scaleProperty(), vector(transform.scale()));
-        return component(importId, locator, Spatial3dDescriptors.transformType(), properties);
+        properties.put(StandardSpatial3dDescriptors.positionProperty(), vector(transform.position()));
+        properties.put(StandardSpatial3dDescriptors.orientationProperty(), quaternion(transform.orientation()));
+        properties.put(StandardSpatial3dDescriptors.scaleProperty(), vector(transform.scale()));
+        return component(importId, locator, StandardSpatial3dDescriptors.transformType(), properties);
     }
 
     /** Creates one typed component with a deterministic source-derived identity. */

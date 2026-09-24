@@ -15,7 +15,11 @@ package io.github.glynch.jscene3d.project.physics3d;
 public record CharacterBody3dSettings(
         float gravity, float jumpSpeed, float maximumStepHeight, float groundSnapDistance) {
     /** General-purpose character settings shared by descriptor defaults and direct module clients. */
-    public static final CharacterBody3dSettings DEFAULT = new CharacterBody3dSettings(18.0F, 7.0F, 0.5F, 0.1F);
+    public static final CharacterBody3dSettings DEFAULT = new CharacterBody3dSettings(
+            Physics3dDescriptors.defaultGravity(),
+            Physics3dDescriptors.defaultJumpSpeed(),
+            Physics3dDescriptors.defaultMaximumStepHeight(),
+            Physics3dDescriptors.defaultGroundSnapDistance());
 
     /** Validates one immutable settings value. */
     public CharacterBody3dSettings {

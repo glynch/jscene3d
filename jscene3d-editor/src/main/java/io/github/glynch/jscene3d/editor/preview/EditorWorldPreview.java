@@ -5,19 +5,24 @@
 package io.github.glynch.jscene3d.editor.preview;
 
 import io.github.glynch.jscene3d.editor.diagnostics.EditorDiagnosticCode;
+import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
+import io.github.glynch.jscene3d.project.runtime.ProjectContent;
+import io.github.glynch.jscene3d.project.runtime.PublishedRuntimeResources;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
+import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.render.Renderer;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,14 +49,30 @@ public final class EditorWorldPreview implements AutoCloseable {
     public static EditorWorldPreviewLoadResult compose(EditorProjectSession session) {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         List<ComponentRuntimeExtension> extensions = previewExtensions(session);
+        ProjectContent content;
+        try {
+            content = new ProjectContent(
+                    session.definitions(),
+                    PublishedRuntimeResources.load(
+                            session.project(),
+                            session.types(),
+                            EditorProjectLoader.resolvePublishedContentRoot(
+                                    session.project().root()),
+                            Spatial3dResourceLoaders.all()));
+        } catch (IllegalArgumentException | IllegalStateException | UncheckedIOException failure) {
+            closeAfterFailure(spatial);
+            ProjectDiagnostic diagnostic =
+                    error(session, EditorDiagnosticCode.IMPORT_CONTENT_UNAVAILABLE, failure.toString());
+            return new EditorWorldPreviewLoadResult(Optional.empty(), List.of(diagnostic));
+        }
         WorldCompositionResult composition = WorldComposer.compose(
                 session.startupWorldWorkingCopy().id().resource(),
-                session.content().definitions(),
+                content.definitions(),
                 session.startupWorld(),
                 session.types(),
                 extensions,
                 List.of(WorldModuleBinding.of(Spatial3dWorldModule.class, spatial)),
-                session.content().resources());
+                content.resources());
         if (!composition.isComposed()) {
             closeAfterFailure(spatial);
             return new EditorWorldPreviewLoadResult(Optional.empty(), composition.diagnostics());

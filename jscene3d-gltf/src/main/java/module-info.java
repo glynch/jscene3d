@@ -5,6 +5,7 @@
 /** Optional glTF 2.0 and GLB loading for JScene3D. */
 module io.github.glynch.jscene3d.gltf {
     requires transitive io.github.glynch.jscene3d.core;
+    requires io.github.glynch.jscene3d.project;
     requires transitive io.github.glynch.jscene3d.project.importing;
     requires io.github.glynch.jscene3d.project.spatial3d;
     requires java.desktop;

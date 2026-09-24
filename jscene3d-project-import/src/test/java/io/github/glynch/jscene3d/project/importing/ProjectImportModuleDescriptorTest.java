@@ -33,5 +33,8 @@ final class ProjectImportModuleDescriptorTest {
                         "io.github.glynch.jscene3d.project.importing",
                         "io.github.glynch.jscene3d.project.importing.extension");
         assertThat(descriptor.uses()).containsExactly(ProjectImportExtension.class.getName());
+        assertThat(descriptor.requires())
+                .extracting(ModuleDescriptor.Requires::name)
+                .doesNotContain("io.github.glynch.jscene3d.project.runtime");
     }
 }

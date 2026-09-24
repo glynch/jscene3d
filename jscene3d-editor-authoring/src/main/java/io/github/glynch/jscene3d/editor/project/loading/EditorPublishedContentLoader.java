@@ -10,22 +10,18 @@ import io.github.glynch.jscene3d.configuration.definition.SettingDefinition;
 import io.github.glynch.jscene3d.configuration.registry.SettingRegistry;
 import io.github.glynch.jscene3d.editor.diagnostics.EditorDiagnosticCode;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
+import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
-import io.github.glynch.jscene3d.project.importing.PublishedProjectContent;
+import io.github.glynch.jscene3d.project.importing.PublishedProjectDefinitions;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.imports.ImportLoadResult;
 import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
-import io.github.glynch.jscene3d.project.runtime.ProjectContent;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.settings.CoreProjectSettings;
 import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
 import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoader;
-import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
-import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,12 +37,6 @@ final class EditorPublishedContentLoader {
     private static final String PROJECT_RESOURCES = "src/main/resources";
     private static final String PUBLISHED_CONTENT = ".jscene3d/published";
     private static final String LEGACY_MAVEN_CACHE = "target/import-cache";
-    private static final RuntimeResourceProvider UNAVAILABLE_RESOURCES = new RuntimeResourceProvider() {
-        @Override
-        public <T> RuntimeResourceLease<T> acquire(ResourceReference reference, Class<T> valueType) {
-            throw new IllegalStateException("published runtime resources are unavailable");
-        }
-    };
 
     private EditorPublishedContentLoader() {}
 
@@ -62,25 +52,23 @@ final class EditorPublishedContentLoader {
         return List.copyOf(imports);
     }
 
-    /** Combines authored definitions with already-published definitions and spatial resources. */
-    static ProjectContent load(
+    /** Combines authored definitions with already-published definitions without creating runtime resources. */
+    static DefinitionResolver load(
             GameProject project,
             ProjectConfiguration configuration,
             AssetCatalog authored,
-            RegisteredTypeCatalog types,
             List<ImportDefinition> imports,
             LinkedHashSet<ProjectDiagnostic> diagnostics) {
         if (imports.size() != project.imports().size()) {
-            return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
+            return authored;
         }
         Path publishedContentRoot = resolveRoot(project.root(), configuration);
         try {
-            return PublishedProjectContent.load(
-                    project, types, authored, publishedContentRoot, Spatial3dResourceLoaders.all());
+            return PublishedProjectDefinitions.load(project, authored, publishedContentRoot);
         } catch (IllegalArgumentException | IllegalStateException | UncheckedIOException exception) {
             diagnostics.add(
                     error(publishedContentRoot, EditorDiagnosticCode.IMPORT_CONTENT_UNAVAILABLE, exception.toString()));
-            return new ProjectContent(authored, UNAVAILABLE_RESOURCES);
+            return authored;
         }
     }
 

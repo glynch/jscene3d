@@ -22,6 +22,12 @@ module io.github.glynch.jscene3d.project {
     exports io.github.glynch.jscene3d.project.resource;
     exports io.github.glynch.jscene3d.project.scene;
     exports io.github.glynch.jscene3d.project.settings;
+    exports io.github.glynch.jscene3d.project.standard;
+    exports io.github.glynch.jscene3d.project.standard.application;
+    exports io.github.glynch.jscene3d.project.standard.game3d;
+    exports io.github.glynch.jscene3d.project.standard.physics3d;
+    exports io.github.glynch.jscene3d.project.standard.presentation;
+    exports io.github.glynch.jscene3d.project.standard.spatial3d;
     exports io.github.glynch.jscene3d.project.value;
     exports io.github.glynch.jscene3d.project.world;
 

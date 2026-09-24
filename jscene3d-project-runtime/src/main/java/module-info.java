@@ -5,6 +5,7 @@
 /** Trusted runtime composition for versioned JScene3D game projects. */
 module io.github.glynch.jscene3d.project.runtime {
     requires transitive io.github.glynch.jscene3d.project;
+    requires io.github.glynch.jscene3d.project.importing;
     requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.project.runtime;

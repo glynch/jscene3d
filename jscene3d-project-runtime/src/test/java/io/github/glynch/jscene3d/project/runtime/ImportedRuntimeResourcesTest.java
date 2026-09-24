@@ -2,7 +2,7 @@
  * Copyright 2026 Graham Lynch
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.glynch.jscene3d.project.importing;
+package io.github.glynch.jscene3d.project.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -16,15 +16,15 @@ import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
+import io.github.glynch.jscene3d.project.importing.ImportArtifactDescriptor;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifact;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifactLookup;
+import io.github.glynch.jscene3d.project.importing.ImportedArtifactMetadata;
 import io.github.glynch.jscene3d.project.imports.ImportDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.resource.ResourceWriter;
-import io.github.glynch.jscene3d.project.runtime.ResourceContent;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLease;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceLoader;
-import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.io.ByteArrayInputStream;

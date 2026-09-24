@@ -17,8 +17,9 @@ import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
+import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
-import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.ArrayList;
 import java.util.List;
@@ -113,7 +114,7 @@ final class EditorComponentSectionProjector {
             PropertyId propertyId,
             PropertyDescriptor descriptor,
             Optional<EditorComponentPropertyEditor> componentEditor) {
-        if (!isEditablePosition(entityId, component, propertyId, componentEditor)) {
+        if (!isEditableVector(entityId, descriptor, componentEditor)) {
             return Optional.empty();
         }
         ComponentId componentId = component.id();
@@ -126,17 +127,15 @@ final class EditorComponentSectionProjector {
         });
     }
 
-    private static boolean isEditablePosition(
+    private static boolean isEditableVector(
             Optional<EntityId> entityId,
-            ComponentDefinition component,
-            PropertyId propertyId,
+            PropertyDescriptor descriptor,
             Optional<EditorComponentPropertyEditor> componentEditor) {
-        return entityId.isPresent()
-                && componentEditor.isPresent()
-                && component.type().equals(Spatial3dDescriptors.transformType().id())
-                && component.typeVersion()
-                        == Spatial3dDescriptors.transformType().version()
-                && propertyId.equals(Spatial3dDescriptors.positionProperty());
+        if (entityId.isEmpty() || componentEditor.isEmpty()) {
+            return false;
+        }
+        ProjectValue semantic = descriptor.editorMetadata().get(PropertyDescriptorKeys.EDITOR_SEMANTIC);
+        return semantic instanceof ProjectValue.TextValue text && text.value().equals(PropertyEditorSemantics.VECTOR3);
     }
 
     private static EditorDetails.Section missingDescriptorSection(ComponentDefinition component) {

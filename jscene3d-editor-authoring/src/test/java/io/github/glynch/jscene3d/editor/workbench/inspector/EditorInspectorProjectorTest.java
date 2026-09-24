@@ -23,6 +23,7 @@ import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
+import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
@@ -99,6 +100,64 @@ final class EditorInspectorProjectorTest {
                 .returns("asset:player-capsule", EditorDetails.Property::value);
         assertThat(inspection.decorations())
                 .containsExactly(new EditorIcon(EditorIcons.READ_ONLY, "Generated content · read-only"));
+    }
+
+    /** Selects the vector editor from safe descriptor semantics rather than a concrete runtime type. */
+    @Test
+    void editsDescriptorSemanticVectorWithoutRuntimeTypeCoupling() {
+        PropertyId location = new PropertyId("location");
+        PropertyDescriptor locationDescriptor = PropertyDescriptor.optionalArrayWithDefault(
+                location.value(),
+                ProjectValueKind.NUMBER,
+                3,
+                new ProjectValue.ArrayValue(List.of(
+                        new ProjectValue.NumberValue(BigDecimal.ZERO),
+                        new ProjectValue.NumberValue(BigDecimal.ZERO),
+                        new ProjectValue.NumberValue(BigDecimal.ZERO))),
+                DescriptorPresentation.named("Location"),
+                Map.of(
+                        PropertyDescriptorKeys.EDITOR_SEMANTIC,
+                        new ProjectValue.TextValue(PropertyEditorSemantics.VECTOR3)));
+        ComponentTypeDescriptor descriptor = ComponentTypeDescriptor.builder(
+                        COMPONENT_TYPE, DescriptorPresentation.named("Movement"))
+                .properties(List.of(locationDescriptor))
+                .build();
+        RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
+                "example.inspector",
+                "1.0.0",
+                ">=0.1.0 <1.0.0",
+                DescriptorPresentation.named("Inspector Test"),
+                List.of(),
+                List.of(descriptor))));
+        ComponentDefinition component = new ComponentDefinition(
+                ComponentId.from(COMPONENT_ID), COMPONENT_TYPE.id(), COMPONENT_TYPE.version(), Map.of());
+        LocalEntity entity = new LocalEntity(EntityId.from(ENTITY_ID), "Player", true, List.of(component), List.of());
+        List<ProjectValue> replacements = new ArrayList<>();
+
+        EditorDetails inspection = EditorInspectorProjector.entity(
+                        entity,
+                        Path.of("/project/worlds/map01.world.json"),
+                        Path.of("/project"),
+                        types,
+                        false,
+                        Optional.empty(),
+                        Optional.of((entityId, componentId, propertyId, value) -> replacements.add(value)))
+                .details()
+                .orElseThrow();
+
+        inspection
+                .sections()
+                .get(1)
+                .properties()
+                .getFirst()
+                .editor()
+                .orElseThrow()
+                .setValue("[1, 2, 3]");
+        assertThat(replacements)
+                .containsExactly(new ProjectValue.ArrayValue(List.of(
+                        new ProjectValue.NumberValue(BigDecimal.ONE),
+                        new ProjectValue.NumberValue(new BigDecimal("2")),
+                        new ProjectValue.NumberValue(new BigDecimal("3")))));
     }
 
     /** Copies section and property collections so loaded state cannot be mutated through the Inspector. */

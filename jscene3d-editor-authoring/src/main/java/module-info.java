@@ -7,9 +7,8 @@ module io.github.glynch.jscene3d.editor.authoring {
     requires io.github.glynch.jscene3d.configuration;
     requires io.github.glynch.jscene3d.core;
     requires transitive io.github.glynch.jscene3d.editor.api;
-    requires io.github.glynch.jscene3d.game;
-    requires transitive io.github.glynch.jscene3d.project.importing;
-    requires io.github.glynch.jscene3d.project.spatial3d;
+    requires transitive io.github.glynch.jscene3d.project;
+    requires io.github.glynch.jscene3d.project.importing;
     requires static org.jspecify;
 
     exports io.github.glynch.jscene3d.editor.diagnostics;

@@ -8,13 +8,13 @@ import static io.github.glynch.jscene3d.editor.project.loading.EditorLoadingDiag
 import static io.github.glynch.jscene3d.editor.project.loading.EditorLoadingDiagnostics.warning;
 
 import io.github.glynch.jscene3d.editor.diagnostics.EditorDiagnosticCode;
-import io.github.glynch.jscene3d.game.StandardGameDescriptors;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.standard.StandardProjectDescriptors;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -47,7 +47,7 @@ final class EditorExtensionMetadataLoader {
         diagnostics.addAll(extensionResult.diagnostics());
         List<ExtensionDescriptor> descriptors =
                 new ArrayList<>(extensionResult.catalog().extensions());
-        StandardGameDescriptors.all().forEach(descriptor -> addIfAbsent(descriptors, descriptor));
+        StandardProjectDescriptors.all().forEach(descriptor -> addIfAbsent(descriptors, descriptor));
         try {
             return RegisteredTypeCatalog.of(descriptors);
         } catch (IllegalArgumentException exception) {

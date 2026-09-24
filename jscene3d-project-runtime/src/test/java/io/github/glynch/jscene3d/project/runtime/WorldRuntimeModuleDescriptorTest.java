@@ -33,5 +33,8 @@ final class WorldRuntimeModuleDescriptorTest {
                         "io.github.glynch.jscene3d.project.runtime",
                         "io.github.glynch.jscene3d.project.runtime.extension");
         assertThat(descriptor.uses()).containsExactly(ComponentRuntimeExtension.class.getName());
+        assertThat(descriptor.requires())
+                .extracting(ModuleDescriptor.Requires::name)
+                .contains("io.github.glynch.jscene3d.project.importing");
     }
 }

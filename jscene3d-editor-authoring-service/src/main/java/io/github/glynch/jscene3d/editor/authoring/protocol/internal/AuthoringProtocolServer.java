@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InitializeParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InitializeResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProtocolVersion;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ShutdownResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.framing.ContentLengthMessageReader;
@@ -38,7 +39,8 @@ public final class AuthoringProtocolServer {
     private static final int INCOMPATIBLE_PROTOCOL = -32001;
     private static final int NOT_INITIALIZED = -32002;
     private static final int ALREADY_INITIALIZED = -32003;
-    private static final List<String> CAPABILITIES = List.of("project/open", "project/close", "service/shutdown");
+    private static final List<String> CAPABILITIES =
+            List.of("project/open", "project/replace", "project/close", "service/shutdown");
 
     private final ObjectMapper mapper = new ObjectMapper()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
@@ -164,6 +166,8 @@ public final class AuthoringProtocolServer {
         }
         return switch (method) {
             case "project/open" -> success(id, service.openProject(readParams(request, ProjectOpenParams.class)));
+            case "project/replace" ->
+                success(id, service.replaceProject(readParams(request, ProjectReplaceParams.class)));
             case "project/close" -> success(id, service.closeProject());
             default -> error(id, METHOD_NOT_FOUND, "Method not found", method);
         };

@@ -8,6 +8,8 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectCloseResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectDiagnosticDto;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
@@ -26,6 +28,12 @@ import org.jspecify.annotations.Nullable;
 public final class AuthoringProjectService implements AutoCloseable {
     /** Stable rejection when an open request would silently replace an active project. */
     public static final String PROJECT_ALREADY_OPEN = "authoring.project.alreadyOpen";
+
+    /** Stable rejection when replacement is requested without an active project. */
+    public static final String PROJECT_NOT_OPEN = "authoring.project.notOpen";
+
+    /** Stable rejection when replacement no longer targets the active project generation. */
+    public static final String PROJECT_GENERATION_CONFLICT = "authoring.project.generationConflict";
 
     private final EditorProjectLoader loader;
 
@@ -49,7 +57,7 @@ public final class AuthoringProjectService implements AutoCloseable {
      * @param params generic project-root or descriptor selection
      * @return domain outcome with summary and structured diagnostics
      */
-    public ProjectOpenResult openProject(ProjectOpenParams params) {
+    public synchronized ProjectOpenResult openProject(ProjectOpenParams params) {
         ensureOpen();
         Objects.requireNonNull(params, "params");
         if (activeSession != null) {
@@ -72,11 +80,62 @@ public final class AuthoringProjectService implements AutoCloseable {
     }
 
     /**
+     * Loads a candidate while retaining the current project, then conditionally installs it.
+     *
+     * <p>Candidate loading uses the ordinary editor project loader. A rejected candidate leaves the
+     * active session, its generation, and all authored state untouched. A successful candidate is
+     * installed under a new generation before the replaced session is disposed without saving.
+     *
+     * @param params expected active generation and candidate project selection
+     * @return explicit replacement, candidate-rejection, or generation-conflict outcome
+     */
+    public ProjectReplaceResult replaceProject(ProjectReplaceParams params) {
+        Objects.requireNonNull(params, "params");
+        EditorProjectSession expectedSession;
+        synchronized (this) {
+            ensureOpen();
+            expectedSession = activeSession;
+            if (expectedSession == null) {
+                return conflict(PROJECT_NOT_OPEN);
+            }
+            if (activeProjectGeneration != params.expectedProjectGeneration()) {
+                return conflict(PROJECT_GENERATION_CONFLICT);
+            }
+        }
+
+        EditorProjectLoadResult loadResult = loader.load(Path.of(params.path()));
+        List<ProjectDiagnosticDto> diagnostics = diagnostics(loadResult.diagnostics());
+        if (loadResult.session().isEmpty()) {
+            return new ProjectReplaceResult(ProjectReplaceResult.CANDIDATE_REJECTED, null, null, diagnostics, null);
+        }
+
+        EditorProjectSession candidate = loadResult.session().orElseThrow();
+        long replacementGeneration;
+        synchronized (this) {
+            if (closed) {
+                candidate.close();
+                ensureOpen();
+            }
+            if (activeSession != expectedSession || activeProjectGeneration != params.expectedProjectGeneration()) {
+                candidate.close();
+                return conflict(PROJECT_GENERATION_CONFLICT);
+            }
+            replacementGeneration = nextProjectGeneration++;
+            activeSession = candidate;
+            activeProjectGeneration = replacementGeneration;
+        }
+
+        expectedSession.close();
+        return new ProjectReplaceResult(
+                ProjectReplaceResult.REPLACED, replacementGeneration, summary(candidate), diagnostics, null);
+    }
+
+    /**
      * Closes the active session without saving and leaves the process available for another project.
      *
      * @return whether a project was closed and which generation was invalidated
      */
-    public ProjectCloseResult closeProject() {
+    public synchronized ProjectCloseResult closeProject() {
         ensureOpen();
         EditorProjectSession session = activeSession;
         if (session == null) {
@@ -94,7 +153,7 @@ public final class AuthoringProjectService implements AutoCloseable {
      *
      * @return active authoring session, when open
      */
-    public Optional<EditorProjectSession> activeSession() {
+    public synchronized Optional<EditorProjectSession> activeSession() {
         ensureOpen();
         return Optional.ofNullable(activeSession);
     }
@@ -104,13 +163,13 @@ public final class AuthoringProjectService implements AutoCloseable {
      *
      * @return whether the service is closed
      */
-    public boolean isClosed() {
+    public synchronized boolean isClosed() {
         return closed;
     }
 
     /** Closes any retained session without saving; repeated closure has no additional effect. */
     @Override
-    public void close() {
+    public synchronized void close() {
         if (closed) {
             return;
         }
@@ -148,6 +207,16 @@ public final class AuthoringProjectService implements AutoCloseable {
                 diagnostic.source().toString(),
                 diagnostic.location(),
                 diagnostic.details());
+    }
+
+    /** Maps ordered domain diagnostics to their stable wire representation. */
+    private static List<ProjectDiagnosticDto> diagnostics(List<ProjectDiagnostic> diagnostics) {
+        return diagnostics.stream().map(AuthoringProjectService::diagnostic).toList();
+    }
+
+    /** Creates an operation-level replacement conflict without loading a candidate. */
+    private static ProjectReplaceResult conflict(String failureCode) {
+        return new ProjectReplaceResult(ProjectReplaceResult.CONFLICT, null, null, List.of(), failureCode);
     }
 
     /** Rejects operations after process-scoped ownership has ended. */

@@ -29,10 +29,14 @@ final class AuthoringServiceProcessTest {
     @TempDir
     private Path temporaryDirectory;
 
-    /** Spawns, initializes, opens, closes, shuts down, and cleanly reaps the real service process. */
+    /** Exercises atomic replacement and orderly shutdown through the real framed service process. */
     @Test
     void runsAuthoringLifecycleInSeparateProcess() throws Exception {
-        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        Path first = temporaryDirectory.resolve("first");
+        Path invalid = temporaryDirectory.resolve("invalid");
+        Path second = temporaryDirectory.resolve("second");
+        AuthoringTestProject.write(first, "first.j3d", "First Project");
+        AuthoringTestProject.write(second, "second.j3d", "Second Project");
         Process process = startService();
         try {
             ContentLengthMessageWriter writer = new ContentLengthMessageWriter(process.getOutputStream());
@@ -43,22 +47,42 @@ final class AuthoringServiceProcessTest {
             assertThat(initialize.at("/result/processKind").asText()).isEqualTo("authoring");
             assertThat(initialize.at("/result/capabilities"))
                     .extracting(JsonNode::asText)
-                    .contains("project/open", "project/close");
+                    .contains("project/open", "project/replace", "project/close");
 
-            ObjectNode openParams = JSON.createObjectNode().put("path", temporaryDirectory.toString());
+            ObjectNode openParams = JSON.createObjectNode().put("path", first.toString());
             writer.writeMessage(request(2, "project/open", openParams));
             JsonNode openResponse = response(reader);
             assertThat(openResponse.at("/result/opened").asBoolean()).isTrue();
-            assertThat(openResponse.at("/result/project/name").asText()).isEqualTo("Small Authoring Project");
-            assertThat(openResponse.at("/result/project/descriptor").asText())
-                    .endsWith(AuthoringTestProject.DESCRIPTOR);
+            assertThat(openResponse.at("/result/project/name").asText()).isEqualTo("First Project");
+            assertThat(openResponse.at("/result/project/descriptor").asText()).endsWith("first.j3d");
             assertThat(openResponse.at("/result/diagnostics")).isEmpty();
+            long firstGeneration = openResponse.at("/result/projectGeneration").asLong();
 
-            writer.writeMessage(request(3, "project/close", JSON.createObjectNode()));
+            ObjectNode staleParams = replaceParams(firstGeneration + 1, second);
+            writer.writeMessage(request(3, "project/replace", staleParams));
+            JsonNode stale = response(reader);
+            assertThat(stale.at("/result/outcome").asText()).isEqualTo("conflict");
+            assertThat(stale.at("/result/failureCode").asText()).isEqualTo("authoring.project.generationConflict");
+
+            writer.writeMessage(request(4, "project/replace", replaceParams(firstGeneration, invalid)));
+            JsonNode rejected = response(reader);
+            assertThat(rejected.at("/result/outcome").asText()).isEqualTo("candidateRejected");
+            assertThat(rejected.at("/result/diagnostics/0/code").asText()).isEqualTo("project.directory.missing");
+
+            writer.writeMessage(request(5, "project/replace", replaceParams(firstGeneration, second)));
+            JsonNode replaced = response(reader);
+            assertThat(replaced.at("/result/outcome").asText()).isEqualTo("replaced");
+            assertThat(replaced.at("/result/project/name").asText()).isEqualTo("Second Project");
+            assertThat(replaced.at("/result/projectGeneration").asLong()).isNotEqualTo(firstGeneration);
+            long secondGeneration = replaced.at("/result/projectGeneration").asLong();
+
+            writer.writeMessage(request(6, "project/close", JSON.createObjectNode()));
             JsonNode close = response(reader);
             assertThat(close.at("/result/closed").asBoolean()).isTrue();
+            assertThat(close.at("/result/invalidatedProjectGeneration").asLong())
+                    .isEqualTo(secondGeneration);
 
-            writer.writeMessage(request(4, "service/shutdown", JSON.createObjectNode()));
+            writer.writeMessage(request(7, "service/shutdown", JSON.createObjectNode()));
             JsonNode shutdown = response(reader);
             assertThat(shutdown.at("/result/shutdown").asBoolean()).isTrue();
 
@@ -98,6 +122,13 @@ final class AuthoringServiceProcessTest {
     private static ObjectNode initializeParams() {
         ObjectNode version = JSON.createObjectNode().put("major", 1).put("minor", 0);
         return JSON.createObjectNode().set("protocolVersion", version);
+    }
+
+    /** Creates replacement parameters for one expected active generation and candidate path. */
+    private static ObjectNode replaceParams(long expectedProjectGeneration, Path path) {
+        return JSON.createObjectNode()
+                .put("expectedProjectGeneration", expectedProjectGeneration)
+                .put("path", path.toString());
     }
 
     /** Serializes one JSON-RPC-style request. */

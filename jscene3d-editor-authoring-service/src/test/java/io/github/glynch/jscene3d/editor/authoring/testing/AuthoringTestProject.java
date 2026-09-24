@@ -15,6 +15,9 @@ public final class AuthoringTestProject {
     /** Current descriptor filename used by the primary fixture. */
     public static final String DESCRIPTOR = "small-authoring-project.j3d";
 
+    /** Stable local entity identity used by working-copy lifecycle tests. */
+    public static final String ENTITY_ID = "0b295328-b5a3-4f41-9f34-e9b4abc430a7";
+
     private AuthoringTestProject() {}
 
     /**
@@ -67,7 +70,14 @@ public final class AuthoringTestProject {
                   "formatVersion":1,
                   "name":"Opening World",
                   "connections":[],
-                  "roots":[]
+                  "roots":[{
+                    "entryType":"local",
+                    "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
+                    "name":"Player",
+                    "enabled":true,
+                    "components":[],
+                    "children":[]
+                  }]
                 }
                 """);
     }

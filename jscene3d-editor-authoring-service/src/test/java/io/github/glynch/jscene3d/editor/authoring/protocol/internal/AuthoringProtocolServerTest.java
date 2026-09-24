@@ -11,15 +11,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.glynch.jscene3d.editor.authoring.protocol.framing.ProtocolFramingException;
 import io.github.glynch.jscene3d.editor.authoring.service.AuthoringProjectService;
+import io.github.glynch.jscene3d.editor.authoring.testing.AuthoringTestProject;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -32,6 +35,9 @@ final class AuthoringProtocolServerTest {
             new EditorProjectLoader("0.1.0-SNAPSHOT", AuthoringProtocolServerTest.class.getClassLoader()));
     private final AuthoringProtocolServer server =
             new AuthoringProtocolServer(service, "1.2.0-test", "0.1.0-SNAPSHOT", "connection-test");
+
+    @TempDir
+    private Path temporaryDirectory;
 
     /** Releases service state even when an assertion fails. */
     @AfterEach
@@ -53,7 +59,7 @@ final class AuthoringProtocolServerTest {
         assertThat(response.at("/result/engineVersion").asText()).isEqualTo("0.1.0-SNAPSHOT");
         assertThat(response.at("/result/capabilities"))
                 .extracting(JsonNode::asText)
-                .containsExactly("project/open", "project/close", "service/shutdown");
+                .containsExactly("project/open", "project/replace", "project/close", "service/shutdown");
         assertThat(server.isInitialized()).isTrue();
     }
 
@@ -126,11 +132,37 @@ final class AuthoringProtocolServerTest {
         response(initialize(1, 0));
         JsonNode missingOpen = response("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"project/open\"}");
         JsonNode invalidOpen = response(request(4, "project/open", "{\"path\":\"   \"}"));
+        JsonNode invalidReplace =
+                response(request(5, "project/replace", "{\"expectedProjectGeneration\":0,\"path\":\"/project\"}"));
 
         assertThat(missingInitialize.at("/error/code").asInt()).isEqualTo(-32602);
         assertThat(scalarInitialize.at("/error/code").asInt()).isEqualTo(-32602);
         assertThat(missingOpen.at("/error/code").asInt()).isEqualTo(-32602);
         assertThat(invalidOpen.at("/error/code").asInt()).isEqualTo(-32602);
+        assertThat(invalidReplace.at("/error/code").asInt()).isEqualTo(-32602);
+    }
+
+    /** Dispatches replacement as a structured domain result rather than a protocol failure. */
+    @Test
+    void dispatchesProjectReplacement() throws IOException {
+        Path first = temporaryDirectory.resolve("first");
+        Path invalid = temporaryDirectory.resolve("invalid");
+        AuthoringTestProject.write(first, "first.j3d");
+        response(initialize(1, 0));
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + first + "\"}"));
+        long generation = opened.at("/result/projectGeneration").asLong();
+
+        JsonNode replacement = response(request(
+                3,
+                "project/replace",
+                "{\"expectedProjectGeneration\":" + generation + ",\"path\":\"" + invalid + "\"}"));
+
+        assertThat(replacement.at("/result/outcome").asText()).isEqualTo("candidateRejected");
+        assertThat(replacement.at("/result/diagnostics/0/code").asText()).isEqualTo("project.directory.missing");
+        assertThat(service.activeSession())
+                .get()
+                .extracting(session -> session.project().root())
+                .isEqualTo(first.toRealPath());
     }
 
     /** Ignores unknown optional initialization fields as required for additive evolution. */

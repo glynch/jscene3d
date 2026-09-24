@@ -31,6 +31,17 @@ final class ProtocolDtoValidationTest {
                 .hasMessageContaining("blank");
     }
 
+    /** Rejects non-positive expected generations and blank replacement selections. */
+    @Test
+    void rejectsInvalidProjectReplacementParams() {
+        assertThatThrownBy(() -> new ProjectReplaceParams(0L, "/project"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> new ProjectReplaceParams(1L, " \t"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+    }
+
     /** Rejects inconsistent success and failure result shapes. */
     @Test
     void rejectsInconsistentProjectOpenResults() {
@@ -44,6 +55,24 @@ final class ProtocolDtoValidationTest {
         assertThatThrownBy(() -> new ProjectOpenResult(false, 1L, null, diagnostics, null))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ProjectOpenResult(false, null, summary, diagnostics, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** Rejects unknown or structurally inconsistent replacement result outcomes. */
+    @Test
+    void rejectsInconsistentProjectReplaceResults() {
+        ProjectSummary summary = summary();
+        List<ProjectDiagnosticDto> diagnostics = List.of();
+
+        assertThatThrownBy(() -> new ProjectReplaceResult("unknown", null, null, diagnostics, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(
+                        () -> new ProjectReplaceResult(ProjectReplaceResult.REPLACED, null, summary, diagnostics, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ProjectReplaceResult(
+                        ProjectReplaceResult.CANDIDATE_REJECTED, 1L, summary, diagnostics, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ProjectReplaceResult(ProjectReplaceResult.CONFLICT, null, null, diagnostics, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

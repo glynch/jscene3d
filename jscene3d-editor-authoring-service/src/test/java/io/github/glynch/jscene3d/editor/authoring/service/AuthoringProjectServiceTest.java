@@ -10,10 +10,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectCloseResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
 import io.github.glynch.jscene3d.editor.authoring.testing.AuthoringTestProject;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
+import io.github.glynch.jscene3d.project.entity.EntityId;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -140,6 +146,117 @@ final class AuthoringProjectServiceTest {
         assertThat(retained.isClosed()).isFalse();
     }
 
+    /** Installs a normally loaded candidate under a new generation before disposing the old session. */
+    @Test
+    void replacesActiveProject() throws IOException {
+        Path first = temporaryDirectory.resolve("first");
+        Path second = temporaryDirectory.resolve("second");
+        AuthoringTestProject.write(first, "first.j3d", "First Project");
+        AuthoringTestProject.write(second, "jscene3d.json", "Second Project");
+        ProjectOpenResult opened = service.openProject(new ProjectOpenParams(first.toString()));
+        EditorProjectSession replaced = service.activeSession().orElseThrow();
+
+        ProjectReplaceResult result = service.replaceProject(
+                new ProjectReplaceParams(Objects.requireNonNull(opened.projectGeneration()), second.toString()));
+        EditorProjectSession replacement = service.activeSession().orElseThrow();
+
+        assertThat(result.outcome()).isEqualTo(ProjectReplaceResult.REPLACED);
+        assertThat(result.projectGeneration()).isEqualTo(2L);
+        assertThat(Objects.requireNonNull(result.project()).name()).isEqualTo("Second Project");
+        assertThat(result.diagnostics())
+                .singleElement()
+                .returns("project.descriptor.legacy", diagnostic -> diagnostic.code());
+        assertThat(replaced.isClosed()).isTrue();
+        assertThat(replacement).isNotSameAs(replaced);
+        assertThat(replacement.project().identity().name()).isEqualTo("Second Project");
+        assertThat(service.closeProject().invalidatedProjectGeneration()).isEqualTo(2L);
+    }
+
+    /** Rejects an invalid candidate without changing dirty working-copy or history state. */
+    @Test
+    void preservesDirtyActiveProjectWhenCandidateIsInvalid() throws IOException {
+        Path active = temporaryDirectory.resolve("active");
+        Path invalid = temporaryDirectory.resolve("invalid");
+        AuthoringTestProject.write(active, "active.j3d", "Active Project");
+        ProjectOpenResult opened = service.openProject(new ProjectOpenParams(active.toString()));
+        EditorProjectSession retained = service.activeSession().orElseThrow();
+        InspectorMutationTarget.EntityEnabled target = enabledTarget(retained);
+        retained.mutate(target, new ProjectValue.BooleanValue(false), retained.revision());
+        retained.mutate(target, new ProjectValue.BooleanValue(true), retained.revision());
+        retained.undo();
+        long revision = retained.revision();
+
+        ProjectReplaceResult result = service.replaceProject(
+                new ProjectReplaceParams(Objects.requireNonNull(opened.projectGeneration()), invalid.toString()));
+
+        assertThat(result.outcome()).isEqualTo(ProjectReplaceResult.CANDIDATE_REJECTED);
+        assertThat(result.projectGeneration()).isNull();
+        assertThat(result.diagnostics())
+                .singleElement()
+                .returns("project.directory.missing", diagnostic -> diagnostic.code());
+        assertThat(service.activeSession()).containsSame(retained);
+        assertThat(retained.revision()).isEqualTo(revision);
+        assertThat(retained.isDirty()).isTrue();
+        assertThat(retained.startupWorld().roots().getFirst().isEnabled()).isFalse();
+        assertThat(retained.canUndo()).isTrue();
+        assertThat(retained.canRedo()).isTrue();
+        retained.redo();
+        assertThat(retained.startupWorld().roots().getFirst().isEnabled()).isTrue();
+        assertThat(service.closeProject().invalidatedProjectGeneration()).isEqualTo(1L);
+    }
+
+    /** Dirty state does not block a valid candidate from replacing and disposing the active session. */
+    @Test
+    void replacesDirtyActiveProject() throws IOException {
+        Path active = temporaryDirectory.resolve("active");
+        Path replacement = temporaryDirectory.resolve("replacement");
+        AuthoringTestProject.write(active, "active.j3d", "Active Project");
+        AuthoringTestProject.write(replacement, "replacement.j3d", "Replacement Project");
+        ProjectOpenResult opened = service.openProject(new ProjectOpenParams(active.toString()));
+        EditorProjectSession replaced = service.activeSession().orElseThrow();
+        InspectorMutationTarget.EntityEnabled target = enabledTarget(replaced);
+        replaced.mutate(target, new ProjectValue.BooleanValue(false), replaced.revision());
+
+        ProjectReplaceResult result = service.replaceProject(
+                new ProjectReplaceParams(Objects.requireNonNull(opened.projectGeneration()), replacement.toString()));
+
+        assertThat(result.outcome()).isEqualTo(ProjectReplaceResult.REPLACED);
+        assertThat(result.projectGeneration()).isEqualTo(2L);
+        assertThat(Objects.requireNonNull(result.project()).name()).isEqualTo("Replacement Project");
+        assertThat(replaced.isClosed()).isTrue();
+        assertThat(service.activeSession())
+                .get()
+                .extracting(session -> session.project().identity().name())
+                .isEqualTo("Replacement Project");
+    }
+
+    /** Rejects stale ownership before attempting to interpret or load the candidate path. */
+    @Test
+    void rejectsStaleGenerationWithoutLoadingCandidate() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        EditorProjectSession retained = service.activeSession().orElseThrow();
+
+        ProjectReplaceResult result = service.replaceProject(new ProjectReplaceParams(2L, "\0not-loaded"));
+
+        assertThat(result.outcome()).isEqualTo(ProjectReplaceResult.CONFLICT);
+        assertThat(result.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_GENERATION_CONFLICT);
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(service.activeSession()).containsSame(retained);
+        assertThat(retained.isClosed()).isFalse();
+        assertThat(service.closeProject().invalidatedProjectGeneration()).isEqualTo(1L);
+    }
+
+    /** Replacement requires an active project and does not attempt candidate loading otherwise. */
+    @Test
+    void rejectsReplacementWithoutActiveProject() {
+        ProjectReplaceResult result = service.replaceProject(new ProjectReplaceParams(1L, "\0not-loaded"));
+
+        assertThat(result.outcome()).isEqualTo(ProjectReplaceResult.CONFLICT);
+        assertThat(result.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_NOT_OPEN);
+        assertThat(service.activeSession()).isEmpty();
+    }
+
     /** An invalid project remains a domain result with structured diagnostics. */
     @Test
     void reportsInvalidProject() {
@@ -185,5 +302,12 @@ final class AuthoringProjectServiceTest {
         assertThatThrownBy(service::activeSession)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("closed");
+    }
+
+    /** Creates an enabled-state mutation target for the fixture's local entity. */
+    private static InspectorMutationTarget.EntityEnabled enabledTarget(EditorProjectSession session) {
+        EditorHierarchyNode entity = session.hierarchy().children().getFirst();
+        return new InspectorMutationTarget.EntityEnabled(
+                entity.occurrence(), EntityId.from(AuthoringTestProject.ENTITY_ID));
     }
 }

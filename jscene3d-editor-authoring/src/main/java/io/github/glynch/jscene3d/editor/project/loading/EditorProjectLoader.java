@@ -155,8 +155,8 @@ public final class EditorProjectLoader {
                 .map(AssetMetadata::path)
                 .orElse(project.runtime().entryScene());
         progress.phaseStarted(EditorLoadingPhase.BUILDING_HIERARCHY);
-        EditorHierarchyProjector hierarchyProjector = new EditorHierarchyProjector(
-                worldSource, project.root(), authored, definitions, types, new LinkedHashSet<>());
+        EditorHierarchyProjector hierarchyProjector =
+                new EditorHierarchyProjector(worldSource, project.root(), authored, definitions, types, diagnostics);
         EditorProjectSession session = operation.measure(
                 "project.hierarchy.project",
                 Map.of(),
@@ -164,7 +164,8 @@ public final class EditorProjectLoader {
                         new EditorProjectSession.Source(
                                 project, configuration, authored, types, definitions, world, worldSource),
                         assets,
-                        hierarchyProjector));
+                        hierarchyProjector,
+                        diagnostics));
         return new EditorProjectLoadResult(Optional.of(session), List.copyOf(diagnostics));
     }
 

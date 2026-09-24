@@ -4,10 +4,9 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.workingcopy;
 
-import io.github.glynch.jscene3d.editor.command.EditorUndoRedoEntry;
-import io.github.glynch.jscene3d.editor.lifecycle.EditorEvent;
-import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopy;
-import io.github.glynch.jscene3d.editor.workingcopy.EditorWorkingCopyId;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringChange;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringOperation;
+import io.github.glynch.jscene3d.editor.project.session.internal.AuthoringChangeSource;
 import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -22,21 +21,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Resource working copy for one authored world definition. */
-public final class EditorWorldWorkingCopy implements EditorWorkingCopy {
-    /** Stable type identifier for authored-world working copies. */
-    public static final String TYPE = "world";
-
+/** Internal authoritative working copy for one authored world definition. */
+public final class EditorWorldWorkingCopy implements AutoCloseable {
     private final Path source;
-    private final EditorWorkingCopyId id;
     private final Deque<WorldEdit> undoHistory = new ArrayDeque<>();
     private final Deque<WorldEdit> redoHistory = new ArrayDeque<>();
-    private final EditorEventSource<EditorWorkingCopy> contentChanges = new EditorEventSource<>();
-    private final EditorEventSource<EditorWorkingCopy> dirtyChanges = new EditorEventSource<>();
-    private final EditorEventSource<EditorWorkingCopy> saves = new EditorEventSource<>();
+    private final AuthoringChangeSource<Change> changes = new AuthoringChangeSource<>();
 
     private WorldDefinition current;
     private WorldDefinition saved;
+    private boolean closed;
 
     /**
      * Creates a clean working copy from a loaded authored world.
@@ -48,55 +42,63 @@ public final class EditorWorldWorkingCopy implements EditorWorkingCopy {
         this.source = Objects.requireNonNull(source, "source").toAbsolutePath().normalize();
         current = Objects.requireNonNull(world, "world");
         saved = current;
-        id = new EditorWorkingCopyId(this.source.toUri(), TYPE);
     }
 
-    @Override
-    public EditorWorkingCopyId id() {
-        return id;
+    /**
+     * Returns the normalized authored source.
+     *
+     * @return authored source
+     */
+    public Path source() {
+        ensureOpen();
+        return source;
     }
 
-    @Override
+    /**
+     * Returns whether current content differs from the saved baseline.
+     *
+     * @return dirty state
+     */
     public boolean isDirty() {
+        ensureOpen();
         return !current.equals(saved);
     }
 
-    @Override
-    public EditorEvent<EditorWorkingCopy> onDidChangeContent() {
-        return contentChanges;
+    /**
+     * Returns the internal working-copy change stream.
+     *
+     * @return change stream
+     */
+    public AuthoringChange<Change> onDidChange() {
+        ensureOpen();
+        return changes;
     }
 
-    @Override
-    public EditorEvent<EditorWorkingCopy> onDidChangeDirty() {
-        return dirtyChanges;
-    }
-
-    @Override
-    public EditorEvent<EditorWorkingCopy> onDidSave() {
-        return saves;
-    }
-
-    @Override
+    /**
+     * Saves changed content atomically to the authored source.
+     *
+     * @throws IOException when the replacement cannot be persisted
+     */
     public void save() throws IOException {
+        ensureOpen();
         if (!isDirty()) {
             return;
         }
         DefinitionWriter.write(source, current);
         saved = current;
-        dirtyChanges.emit(this);
-        saves.emit(this);
+        changes.emit(Change.SAVED);
     }
 
-    @Override
+    /** Reverts current content to its saved baseline and clears undo/redo history. */
     public void revert() {
+        ensureOpen();
         if (!isDirty()) {
             return;
         }
         current = saved;
         undoHistory.clear();
         redoHistory.clear();
-        contentChanges.emit(this);
-        dirtyChanges.emit(this);
+        changes.emit(Change.REVERTED);
     }
 
     /**
@@ -105,6 +107,7 @@ public final class EditorWorldWorkingCopy implements EditorWorkingCopy {
      * @return current world revision
      */
     public WorldDefinition current() {
+        ensureOpen();
         return current;
     }
 
@@ -114,110 +117,125 @@ public final class EditorWorldWorkingCopy implements EditorWorkingCopy {
      * @return immutable modified entity identity set
      */
     public Set<EntityId> modifiedEntityIds() {
+        ensureOpen();
         return WorldDefinitionEdits.modifiedEntityIds(current, saved);
     }
 
     /**
-     * Returns the next undoable edit.
+     * Returns the next undoable operation.
      *
-     * @return next undo entry, if available
+     * @return next undo operation, if available
      */
-    public Optional<EditorUndoRedoEntry> undoEntry() {
-        return Optional.ofNullable(undoHistory.peek()).map(WorldEdit::description);
+    public Optional<AuthoringOperation> undoOperation() {
+        ensureOpen();
+        return Optional.ofNullable(undoHistory.peek()).map(WorldEdit::operation);
     }
 
     /**
-     * Returns the next redoable edit.
+     * Returns the next redoable operation.
      *
-     * @return next redo entry, if available
+     * @return next redo operation, if available
      */
-    public Optional<EditorUndoRedoEntry> redoEntry() {
-        return Optional.ofNullable(redoHistory.peek()).map(WorldEdit::description);
+    public Optional<AuthoringOperation> redoOperation() {
+        ensureOpen();
+        return Optional.ofNullable(redoHistory.peek()).map(WorldEdit::operation);
     }
 
     /** Restores the immediately preceding in-memory revision. */
     public void undo() {
+        ensureOpen();
         WorldEdit edit = undoHistory.poll();
         if (edit == null) {
             return;
         }
-        boolean wasDirty = isDirty();
         current = edit.before();
         redoHistory.push(edit);
-        publishContentChange(wasDirty);
+        changes.emit(Change.CONTENT);
     }
 
     /** Reapplies the immediately following in-memory revision. */
     public void redo() {
+        ensureOpen();
         WorldEdit edit = redoHistory.poll();
         if (edit == null) {
             return;
         }
-        boolean wasDirty = isDirty();
         current = edit.after();
         undoHistory.push(edit);
-        publishContentChange(wasDirty);
+        changes.emit(Change.CONTENT);
     }
 
-    /**
-     * Replaces one entity's enabled state and records a resource-aware undo entry.
+    /** Replaces one entity's enabled state and records an undo operation.
      *
-     * @param entityId entity to update
+     * @param entityId entity or placement identity
      * @param enabled replacement enabled state
      */
-    public void setEntityEnabled(EntityId entityId, Boolean enabled) {
-        EntityId target = Objects.requireNonNull(entityId, "entityId");
-        boolean replacement = Objects.requireNonNull(enabled, "enabled");
-        WorldDefinition changed = WorldDefinitionEdits.setEntityEnabled(current, target, replacement);
-        if (changed == current) {
-            return;
-        }
-        boolean wasDirty = isDirty();
-        WorldEdit edit = new WorldEdit(new EditorUndoRedoEntry("Set entity enabled", id), current, changed);
-        undoHistory.push(edit);
-        redoHistory.clear();
-        current = changed;
-        publishContentChange(wasDirty);
+    public void setEntityEnabled(EntityId entityId, boolean enabled) {
+        ensureOpen();
+        WorldDefinition changed =
+                WorldDefinitionEdits.setEntityEnabled(current, Objects.requireNonNull(entityId, "entityId"), enabled);
+        recordEdit("Set entity enabled", changed);
     }
 
-    /**
-     * Replaces one property on a locally authored component and records a resource-aware undo entry.
+    /** Replaces one locally authored component property and records an undo operation.
      *
-     * @param entityId entity owning the component
-     * @param componentId component to update
-     * @param propertyId property to replace
-     * @param value validated portable replacement value
+     * @param entityId owning entity identity
+     * @param componentId component identity
+     * @param propertyId property identity
+     * @param value typed replacement value
      */
     public void setComponentProperty(
             EntityId entityId, ComponentId componentId, PropertyId propertyId, ProjectValue value) {
-        EntityId targetEntity = Objects.requireNonNull(entityId, "entityId");
-        ComponentId targetComponent = Objects.requireNonNull(componentId, "componentId");
-        PropertyId targetProperty = Objects.requireNonNull(propertyId, "propertyId");
-        ProjectValue replacement = Objects.requireNonNull(value, "value");
+        ensureOpen();
         WorldDefinition changed = WorldDefinitionEdits.setComponentProperty(
-                current, targetEntity, targetComponent, targetProperty, replacement);
+                current,
+                Objects.requireNonNull(entityId, "entityId"),
+                Objects.requireNonNull(componentId, "componentId"),
+                Objects.requireNonNull(propertyId, "propertyId"),
+                Objects.requireNonNull(value, "value"));
+        recordEdit("Set component property", changed);
+    }
+
+    /** Releases listeners and rejects subsequent use. */
+    @Override
+    public void close() {
+        if (!closed) {
+            closed = true;
+            changes.close();
+        }
+    }
+
+    private void recordEdit(String label, WorldDefinition changed) {
         if (changed == current) {
             return;
         }
-        boolean wasDirty = isDirty();
-        WorldEdit edit = new WorldEdit(new EditorUndoRedoEntry("Set component property", id), current, changed);
+        WorldEdit edit = new WorldEdit(new AuthoringOperation(label, source), current, changed);
         undoHistory.push(edit);
         redoHistory.clear();
         current = changed;
-        publishContentChange(wasDirty);
+        changes.emit(Change.CONTENT);
     }
 
-    private void publishContentChange(boolean wasDirty) {
-        contentChanges.emit(this);
-        if (wasDirty != isDirty()) {
-            dirtyChanges.emit(this);
+    private void ensureOpen() {
+        if (closed) {
+            throw new IllegalStateException("World working copy is closed");
         }
     }
 
-    /** One reversible world edit with its affected resource identity. */
-    private record WorldEdit(EditorUndoRedoEntry description, WorldDefinition before, WorldDefinition after) {
+    /** Internal working-copy change categories. */
+    public enum Change {
+        /** Current authored content changed. */
+        CONTENT,
+        /** Current content became the saved baseline. */
+        SAVED,
+        /** Current content reverted to the saved baseline. */
+        REVERTED
+    }
+
+    /** One reversible world edit with its affected source metadata. */
+    private record WorldEdit(AuthoringOperation operation, WorldDefinition before, WorldDefinition after) {
         private WorldEdit {
-            Objects.requireNonNull(description, "description");
+            Objects.requireNonNull(operation, "operation");
             Objects.requireNonNull(before, "before");
             Objects.requireNonNull(after, "after");
         }

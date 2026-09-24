@@ -4,21 +4,13 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.inspector;
 
-import static io.github.glynch.jscene3d.editor.workbench.inspector.EditorInspectorProperties.authoredProperty;
-import static io.github.glynch.jscene3d.editor.workbench.inspector.EditorInspectorProperties.constraints;
-import static io.github.glynch.jscene3d.editor.workbench.inspector.EditorInspectorProperties.label;
-
-import io.github.glynch.jscene3d.editor.view.EditorDetails;
-import io.github.glynch.jscene3d.editor.view.EditorPropertyEditor;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
-import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
-import io.github.glynch.jscene3d.project.extension.DescriptorPresentation;
+import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
-import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
-import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.ArrayList;
@@ -32,120 +24,108 @@ final class EditorComponentSectionProjector {
         throw new AssertionError("EditorComponentSectionProjector cannot be instantiated");
     }
 
-    /** Projects read-only component definitions in authored order. */
-    static List<EditorDetails.Section> componentSections(
-            List<ComponentDefinition> components, RegisteredTypeCatalog types) {
+    /** Projects component definitions in authored order. */
+    static List<InspectorSection> componentSections(
+            Optional<EditableEntity> editable, List<ComponentDefinition> components, RegisteredTypeCatalog types) {
         return components.stream()
-                .map(component -> componentSection(component, types))
+                .map(component -> componentSection(editable, component, types))
                 .toList();
     }
 
-    /** Projects editable component definitions for one locally authored entity. */
-    static List<EditorDetails.Section> componentSections(
-            EntityId entityId,
-            List<ComponentDefinition> components,
-            RegisteredTypeCatalog types,
-            Optional<EditorComponentPropertyEditor> componentEditor) {
-        return components.stream()
-                .map(component -> componentSection(Optional.of(entityId), component, types, componentEditor))
-                .toList();
-    }
-
-    private static EditorDetails.Section componentSection(ComponentDefinition component, RegisteredTypeCatalog types) {
-        return componentSection(Optional.empty(), component, types, Optional.empty());
-    }
-
-    private static EditorDetails.Section componentSection(
-            Optional<EntityId> entityId,
-            ComponentDefinition component,
-            RegisteredTypeCatalog types,
-            Optional<EditorComponentPropertyEditor> componentEditor) {
+    private static InspectorSection componentSection(
+            Optional<EditableEntity> editable, ComponentDefinition component, RegisteredTypeCatalog types) {
         ComponentType type = new ComponentType(component.type(), component.typeVersion());
         return types.findComponent(type)
                 .map(descriptor -> descriptorSection(
-                        entityId, component, descriptor.presentation(), descriptor.properties(), componentEditor))
-                .orElseGet(() -> missingDescriptorSection(component));
+                        editable,
+                        component,
+                        type,
+                        descriptor.presentation().displayName(),
+                        descriptor.presentation().description(),
+                        descriptor.properties()))
+                .orElseGet(() -> missingDescriptorSection(component, type));
     }
 
-    private static EditorDetails.Section descriptorSection(
-            Optional<EntityId> entityId,
+    private static InspectorSection descriptorSection(
+            Optional<EditableEntity> editable,
             ComponentDefinition component,
-            DescriptorPresentation presentation,
-            Map<PropertyId, PropertyDescriptor> descriptors,
-            Optional<EditorComponentPropertyEditor> componentEditor) {
-        List<EditorDetails.Property> properties = new ArrayList<>();
-        for (Map.Entry<PropertyId, PropertyDescriptor> entry : descriptors.entrySet()) {
-            PropertyId id = entry.getKey();
-            PropertyDescriptor descriptor = entry.getValue();
-            Optional<ProjectValue> authored =
-                    Optional.ofNullable(component.properties().get(id));
-            Optional<ProjectValue> displayed = authored.or(descriptor::defaultValue);
-            EditorDetails.ValueOrigin origin = valueOrigin(authored, displayed);
-            properties.add(new EditorDetails.Property(
-                    id.value(),
-                    descriptor.presentation().displayName(),
-                    label(descriptor.valueKind()),
-                    displayed.map(EditorInspectorProperties::format).orElse("Not set"),
-                    origin,
-                    descriptor.isRequired(),
-                    descriptor.presentation().description(),
-                    constraints(descriptor),
-                    propertyEditor(entityId, component, id, descriptor, componentEditor)));
-        }
+            ComponentType type,
+            String label,
+            Optional<String> description,
+            Map<PropertyId, PropertyDescriptor> descriptors) {
+        List<InspectorProperty> properties = new ArrayList<>();
+        descriptors.forEach(
+                (id, descriptor) -> properties.add(descriptorProperty(editable, component, id, descriptor)));
         component.properties().forEach((id, value) -> {
             if (!descriptors.containsKey(id)) {
                 properties.add(authoredProperty(id, value));
             }
         });
-        return new EditorDetails.Section(presentation.displayName(), presentation.description(), true, properties);
+        return new InspectorSection(component.id().toString(), label, description, Optional.of(type), true, properties);
     }
 
-    private static EditorDetails.ValueOrigin valueOrigin(
-            Optional<ProjectValue> authored, Optional<ProjectValue> displayed) {
-        if (authored.isPresent()) {
-            return EditorDetails.ValueOrigin.AUTHORED;
-        }
-        return displayed.isPresent() ? EditorDetails.ValueOrigin.DEFAULT : EditorDetails.ValueOrigin.UNSET;
-    }
-
-    private static Optional<EditorPropertyEditor> propertyEditor(
-            Optional<EntityId> entityId,
+    private static InspectorProperty descriptorProperty(
+            Optional<EditableEntity> editable,
             ComponentDefinition component,
-            PropertyId propertyId,
-            PropertyDescriptor descriptor,
-            Optional<EditorComponentPropertyEditor> componentEditor) {
-        if (!isEditableVector(entityId, descriptor, componentEditor)) {
-            return Optional.empty();
-        }
-        ComponentId componentId = component.id();
-        return Optional.of(replacement -> {
-            ProjectValue value = EditorVectorValueParser.parse(replacement, 3);
-            if (!descriptor.accepts(value)) {
-                throw new IllegalArgumentException("replacement does not satisfy property " + propertyId.value());
-            }
-            componentEditor.orElseThrow().set(entityId.orElseThrow(), componentId, propertyId, value);
-        });
+            PropertyId id,
+            PropertyDescriptor descriptor) {
+        Optional<ProjectValue> authored =
+                Optional.ofNullable(component.properties().get(id));
+        Optional<ProjectValue> displayed = authored.or(descriptor::defaultValue);
+        InspectorProperty.Origin origin = authored.isPresent()
+                ? InspectorProperty.Origin.AUTHORED
+                : displayed.isPresent() ? InspectorProperty.Origin.DEFAULT : InspectorProperty.Origin.UNSET;
+        InspectorConstraints constraints = new InspectorConstraints(
+                descriptor.elementKind(),
+                descriptor.exactElementCount(),
+                descriptor.acceptedReferenceKinds(),
+                descriptor.editorMetadata());
+        Optional<InspectorMutationTarget> mutation =
+                editable.map(target -> new InspectorMutationTarget.ComponentProperty(
+                        target.occurrence(), target.entity(), component.id(), id));
+        return new InspectorProperty(
+                id.value(),
+                new InspectorProperty.Presentation(
+                        descriptor.presentation().displayName(),
+                        descriptor.valueKind(),
+                        descriptor.isRequired(),
+                        descriptor.presentation().description(),
+                        constraints),
+                new InspectorProperty.State(displayed, origin),
+                mutation);
     }
 
-    private static boolean isEditableVector(
-            Optional<EntityId> entityId,
-            PropertyDescriptor descriptor,
-            Optional<EditorComponentPropertyEditor> componentEditor) {
-        if (entityId.isEmpty() || componentEditor.isEmpty()) {
-            return false;
-        }
-        ProjectValue semantic = descriptor.editorMetadata().get(PropertyDescriptorKeys.EDITOR_SEMANTIC);
-        return semantic instanceof ProjectValue.TextValue text && text.value().equals(PropertyEditorSemantics.VECTOR3);
-    }
-
-    private static EditorDetails.Section missingDescriptorSection(ComponentDefinition component) {
-        List<EditorDetails.Property> properties = component.properties().entrySet().stream()
+    private static InspectorSection missingDescriptorSection(ComponentDefinition component, ComponentType type) {
+        List<InspectorProperty> properties = component.properties().entrySet().stream()
                 .map(entry -> authoredProperty(entry.getKey(), entry.getValue()))
                 .toList();
-        return new EditorDetails.Section(
+        return new InspectorSection(
+                component.id().toString(),
                 component.type().value(),
                 Optional.of("Descriptor metadata unavailable for type version " + component.typeVersion()),
+                Optional.of(type),
                 false,
                 properties);
     }
+
+    private static InspectorProperty authoredProperty(PropertyId id, ProjectValue value) {
+        return new InspectorProperty(
+                id.value(),
+                new InspectorProperty.Presentation(
+                        displayName(id.value()),
+                        ProjectValueKind.of(value),
+                        false,
+                        Optional.empty(),
+                        InspectorConstraints.empty()),
+                new InspectorProperty.State(Optional.of(value), InspectorProperty.Origin.AUTHORED),
+                Optional.empty());
+    }
+
+    private static String displayName(String identity) {
+        String value = identity.replace('-', ' ');
+        return value.isEmpty() ? identity : Character.toUpperCase(value.charAt(0)) + value.substring(1);
+    }
+
+    /** Editable local entity identity used to create stable mutation targets. */
+    record EditableEntity(HierarchyOccurrenceId occurrence, EntityId entity) {}
 }

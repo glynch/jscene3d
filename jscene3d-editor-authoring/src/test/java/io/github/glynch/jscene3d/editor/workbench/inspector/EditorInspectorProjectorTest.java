@@ -7,14 +7,12 @@ package io.github.glynch.jscene3d.editor.workbench.inspector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.glynch.jscene3d.editor.view.EditorDetails;
-import io.github.glynch.jscene3d.editor.view.EditorIcon;
-import io.github.glynch.jscene3d.editor.view.EditorIcons;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
+import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
-import io.github.glynch.jscene3d.project.component.ComponentTypeId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
@@ -37,76 +35,69 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Verifies safe descriptor-to-Inspector projection independently of JavaFX. */
+/** Verifies typed target-scoped Inspector projection independently of any editor UI. */
 final class EditorInspectorProjectorTest {
-    private static final String ENTITY_ID = "0b295328-b5a3-4f41-9f34-e9b4abc430a7";
-    private static final String COMPONENT_ID = "3e940be7-e58d-4f3a-8b5e-e61c99c00904";
+    private static final AssetId WORLD_ID = AssetId.from("3b406aba-26fb-4681-9abe-7a952c321f9a");
+    private static final EntityId ENTITY_ID = EntityId.from("0b295328-b5a3-4f41-9f34-e9b4abc430a7");
+    private static final ComponentId COMPONENT_ID = ComponentId.from("3e940be7-e58d-4f3a-8b5e-e61c99c00904");
     private static final ComponentType COMPONENT_TYPE = ComponentType.of("example.inspector/mover", 1);
+    private static final Path SOURCE = Path.of("/project/worlds/map01.world.json");
 
-    /** Uses descriptor display names, authored values, defaults, descriptions, and constraints. */
+    /** Retains typed authored/default values, provenance, required state, and structured constraints. */
     @Test
     void projectsDescriptorBackedComponentProperties() {
-        RegisteredTypeCatalog types = catalog();
-        LocalEntity entity = entity(COMPONENT_TYPE.id());
+        HierarchyOccurrenceId occurrence = new HierarchyOccurrenceId(WORLD_ID, List.of(ENTITY_ID));
 
-        EditorDetails inspection = EditorInspectorProjector.entity(
-                        entity, Path.of("/project/worlds/map01.world.json"), Path.of("/project"), types, false)
-                .details()
-                .orElseThrow();
+        InspectorProjection inspection =
+                EditorInspectorProjector.entity(entity(), SOURCE, catalog(), occurrence, false);
 
         assertThat(inspection)
-                .returns("Player", EditorDetails::title)
-                .returns("Local entity", EditorDetails::kind)
-                .returns("worlds/map01.world.json", EditorDetails::source);
-        assertThat(inspection.decorations()).containsExactly(new EditorIcon(EditorIcons.READ_ONLY, "Read-only"));
-        EditorDetails.Section component = inspection.sections().get(1);
+                .returns("Player", InspectorProjection::title)
+                .returns(false, InspectorProjection::generated)
+                .returns(true, InspectorProjection::editable);
+        InspectorSection component = inspection.sections().get(1);
         assertThat(component)
-                .returns("Movement", EditorDetails.Section::title)
-                .returns(true, EditorDetails.Section::metadataAvailable);
-        assertThat(component.properties())
-                .extracting(EditorDetails.Property::displayName)
-                .containsExactly("Speed", "Shape");
-        assertThat(component.properties().get(0))
-                .returns("2.5", EditorDetails.Property::value)
-                .returns(EditorDetails.ValueOrigin.DEFAULT, EditorDetails.Property::origin)
-                .satisfies(property -> assertThat(property.constraints()).containsEntry("minimum", "0"));
-        assertThat(component.properties().get(1))
-                .returns("asset:player-capsule", EditorDetails.Property::value)
-                .returns(EditorDetails.ValueOrigin.AUTHORED, EditorDetails.Property::origin)
-                .satisfies(property -> assertThat(property.constraints())
-                        .containsEntry(PropertyDescriptorKeys.ACCEPTED_REFERENCE_KINDS, "asset"));
+                .returns("Movement", InspectorSection::label)
+                .returns(Optional.of(COMPONENT_TYPE), InspectorSection::componentType)
+                .returns(true, InspectorSection::metadataAvailable);
+        InspectorProperty speed = component.properties().get(0);
+        assertThat(speed.state())
+                .returns(
+                        Optional.of(new ProjectValue.NumberValue(new BigDecimal("2.5"))),
+                        InspectorProperty.State::value)
+                .returns(InspectorProperty.Origin.DEFAULT, InspectorProperty.State::origin);
+        assertThat(speed.presentation().constraints().semanticMetadata())
+                .containsEntry("minimum", new ProjectValue.NumberValue(BigDecimal.ZERO));
+        InspectorProperty shape = component.properties().get(1);
+        assertThat(shape.state().origin()).isEqualTo(InspectorProperty.Origin.AUTHORED);
+        assertThat(shape.presentation().required()).isTrue();
+        assertThat(shape.presentation().constraints().acceptedReferenceKinds())
+                .containsExactly(ResourceReference.Kind.ASSET);
+        assertThat(shape.mutationTarget())
+                .contains(new InspectorMutationTarget.ComponentProperty(
+                        occurrence, ENTITY_ID, COMPONENT_ID, new PropertyId("shape")));
     }
 
-    /** Retains authored values and visibly marks a missing exact component descriptor. */
+    /** Removes all mutation targets from generated content while preserving typed values. */
     @Test
-    void projectsAuthoredValuesWhenMetadataIsUnavailable() {
-        LocalEntity entity = entity(new ComponentTypeId("example.inspector/missing"));
+    void projectsGeneratedContentAsReadOnly() {
+        HierarchyOccurrenceId occurrence = new HierarchyOccurrenceId(WORLD_ID, List.of(ENTITY_ID));
 
-        EditorDetails inspection = EditorInspectorProjector.entity(
-                        entity,
-                        Path.of("/project/worlds/map01.world.json"),
-                        Path.of("/project"),
-                        RegisteredTypeCatalog.of(List.of()),
-                        true)
-                .details()
-                .orElseThrow();
+        InspectorProjection inspection = EditorInspectorProjector.entity(entity(), SOURCE, catalog(), occurrence, true);
 
-        EditorDetails.Section component = inspection.sections().get(1);
-        assertThat(component.metadataAvailable()).isFalse();
-        assertThat(component.description())
-                .hasValueSatisfying(description -> assertThat(description).contains("metadata unavailable"));
-        assertThat(component.properties())
-                .singleElement()
-                .returns("asset:player-capsule", EditorDetails.Property::value);
-        assertThat(inspection.decorations())
-                .containsExactly(new EditorIcon(EditorIcons.READ_ONLY, "Generated content · read-only"));
+        assertThat(inspection.generated()).isTrue();
+        assertThat(inspection.editable()).isFalse();
+        assertThat(inspection.sections())
+                .flatExtracting(InspectorSection::properties)
+                .extracting(InspectorProperty::mutationTarget)
+                .containsOnly(Optional.empty());
     }
 
-    /** Selects the vector editor from safe descriptor semantics rather than a concrete runtime type. */
+    /** Keeps semantic metadata typed instead of choosing or invoking a Java property editor. */
     @Test
-    void editsDescriptorSemanticVectorWithoutRuntimeTypeCoupling() {
+    void retainsVectorSemanticsWithoutCallbacksOrStringParsing() {
         PropertyId location = new PropertyId("location");
-        PropertyDescriptor locationDescriptor = PropertyDescriptor.optionalArrayWithDefault(
+        PropertyDescriptor descriptor = PropertyDescriptor.optionalArrayWithDefault(
                 location.value(),
                 ProjectValueKind.NUMBER,
                 3,
@@ -118,73 +109,59 @@ final class EditorInspectorProjectorTest {
                 Map.of(
                         PropertyDescriptorKeys.EDITOR_SEMANTIC,
                         new ProjectValue.TextValue(PropertyEditorSemantics.VECTOR3)));
-        ComponentTypeDescriptor descriptor = ComponentTypeDescriptor.builder(
+        ComponentTypeDescriptor component = ComponentTypeDescriptor.builder(
                         COMPONENT_TYPE, DescriptorPresentation.named("Movement"))
-                .properties(List.of(locationDescriptor))
+                .properties(List.of(descriptor))
                 .build();
-        RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
-                "example.inspector",
-                "1.0.0",
-                ">=0.1.0 <1.0.0",
-                DescriptorPresentation.named("Inspector Test"),
-                List.of(),
-                List.of(descriptor))));
-        ComponentDefinition component = new ComponentDefinition(
-                ComponentId.from(COMPONENT_ID), COMPONENT_TYPE.id(), COMPONENT_TYPE.version(), Map.of());
-        LocalEntity entity = new LocalEntity(EntityId.from(ENTITY_ID), "Player", true, List.of(component), List.of());
-        List<ProjectValue> replacements = new ArrayList<>();
+        RegisteredTypeCatalog types = types(component);
+        LocalEntity entity = new LocalEntity(
+                ENTITY_ID,
+                "Player",
+                true,
+                List.of(new ComponentDefinition(COMPONENT_ID, COMPONENT_TYPE.id(), 1, Map.of())),
+                List.of());
 
-        EditorDetails inspection = EditorInspectorProjector.entity(
-                        entity,
-                        Path.of("/project/worlds/map01.world.json"),
-                        Path.of("/project"),
-                        types,
-                        false,
-                        Optional.empty(),
-                        Optional.of((entityId, componentId, propertyId, value) -> replacements.add(value)))
-                .details()
-                .orElseThrow();
-
-        inspection
+        InspectorProperty property = EditorInspectorProjector.entity(
+                        entity, SOURCE, types, new HierarchyOccurrenceId(WORLD_ID, List.of(ENTITY_ID)), false)
                 .sections()
                 .get(1)
                 .properties()
-                .getFirst()
-                .editor()
-                .orElseThrow()
-                .setValue("[1, 2, 3]");
-        assertThat(replacements)
-                .containsExactly(new ProjectValue.ArrayValue(List.of(
-                        new ProjectValue.NumberValue(BigDecimal.ONE),
-                        new ProjectValue.NumberValue(new BigDecimal("2")),
-                        new ProjectValue.NumberValue(new BigDecimal("3")))));
+                .getFirst();
+
+        assertThat(property.presentation().constraints().exactElementCount()).contains(3);
+        assertThat(property.presentation().constraints().elementKind()).contains(ProjectValueKind.NUMBER);
+        assertThat(property.presentation().constraints().semanticMetadata())
+                .containsEntry(
+                        PropertyDescriptorKeys.EDITOR_SEMANTIC,
+                        new ProjectValue.TextValue(PropertyEditorSemantics.VECTOR3));
     }
 
-    /** Copies section and property collections so loaded state cannot be mutated through the Inspector. */
+    /** Copies section collections so callers cannot mutate projected state. */
     @Test
     void producesImmutableInspectorData() {
-        List<EditorDetails.Section> sections = new ArrayList<>();
-        EditorDetails inspection = new EditorDetails("Player", "Local entity", "world", ENTITY_ID, List.of(), sections);
+        List<InspectorSection> sections = new ArrayList<>();
+        InspectorProjection inspection = new InspectorProjection(
+                new InspectorTarget(InspectorTarget.Kind.ASSET, SOURCE, "asset", Optional.empty()),
+                "Asset",
+                false,
+                false,
+                sections);
+        InspectorSection value =
+                new InspectorSection("late", "Late", Optional.empty(), Optional.empty(), true, List.of());
+        List<InspectorSection> immutableSections = inspection.sections();
 
-        sections.add(new EditorDetails.Section("Late", Optional.empty(), true, List.of()));
-
-        assertThat(inspection.sections()).isEmpty();
-        EditorDetails.Section lateSection = sections.getFirst();
-        List<EditorDetails.Section> immutableSections = inspection.sections();
-        assertThatThrownBy(() -> immutableSections.add(lateSection)).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> immutableSections.add(value)).isInstanceOf(UnsupportedOperationException.class);
     }
 
-    /** Creates a local entity with one authored resource-reference property. */
-    private static LocalEntity entity(ComponentTypeId componentType) {
+    private static LocalEntity entity() {
         Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
         properties.put(
                 new PropertyId("shape"), new ProjectValue.ReferenceValue(ResourceReference.asset("player-capsule")));
         ComponentDefinition component =
-                new ComponentDefinition(ComponentId.from(COMPONENT_ID), componentType, 1, properties);
-        return new LocalEntity(EntityId.from(ENTITY_ID), "Player", true, List.of(component), List.of());
+                new ComponentDefinition(COMPONENT_ID, COMPONENT_TYPE.id(), COMPONENT_TYPE.version(), properties);
+        return new LocalEntity(ENTITY_ID, "Player", true, List.of(component), List.of());
     }
 
-    /** Creates exact safe metadata without any runtime implementation class. */
     private static RegisteredTypeCatalog catalog() {
         PropertyDescriptor speed = PropertyDescriptor.optionalWithDefault(
                 "speed",
@@ -200,16 +177,19 @@ final class EditorInspectorProjectorTest {
                 Map.of(),
                 Set.of(ResourceReference.Kind.ASSET));
         ComponentTypeDescriptor component = ComponentTypeDescriptor.builder(
-                        COMPONENT_TYPE, DescriptorPresentation.described("Movement", "Moves the selected entity"))
+                        COMPONENT_TYPE, DescriptorPresentation.described("Movement", "Moves the entity"))
                 .properties(List.of(speed, shape))
                 .build();
-        ExtensionDescriptor extension = new ExtensionDescriptor(
+        return types(component);
+    }
+
+    private static RegisteredTypeCatalog types(ComponentTypeDescriptor component) {
+        return RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
                 "example.inspector",
                 "1.0.0",
                 ">=0.1.0 <1.0.0",
                 DescriptorPresentation.named("Inspector Test"),
                 List.of(),
-                List.of(component));
-        return RegisteredTypeCatalog.of(List.of(extension));
+                List.of(component))));
     }
 }

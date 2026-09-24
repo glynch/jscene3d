@@ -4,27 +4,24 @@
  */
 package io.github.glynch.jscene3d.editor.project.asset;
 
-import io.github.glynch.jscene3d.editor.selection.EditorSelection;
 import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * One immutable Project-browser asset with retained stable identity and inspection data.
+ * One immutable authored asset with retained stable identity and source.
  *
  * @param label author-facing asset label
  * @param identity stable asset identity
  * @param kind asset category
  * @param source authoritative source path
- * @param selection selection published when the asset is chosen
  */
-public record ProjectAsset(String label, String identity, Kind kind, Path source, EditorSelection selection) {
+public record ProjectAsset(String label, String identity, Kind kind, Path source) {
     /** Validates one asset projection. */
     public ProjectAsset {
         Objects.requireNonNull(label, "label");
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(source, "source");
-        Objects.requireNonNull(selection, "selection");
     }
 
     /** Shows only ordinary author-facing information in the asset browser. */

@@ -4,110 +4,71 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.hierarchy;
 
-import io.github.glynch.jscene3d.editor.selection.EditorSelection;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable read-only projection of one authored hierarchy entry. */
-public final class EditorHierarchyNode {
-    private final Kind kind;
-    private final String label;
-    private final Optional<EntityId> entityId;
-    private final Optional<AssetId> definitionId;
-    private final boolean enabled;
-    private final boolean modified;
-    private final EditorSelection selection;
-    private final List<EditorHierarchyNode> children;
-
-    /**
-     * Stores one hierarchy projection while retaining its stable identities.
-     *
-     * @param kind hierarchy entry kind
-     * @param label human-readable label
-     * @param entityId optional entity identity
-     * @param definitionId optional referenced definition identity
-     * @param enabled whether the entry starts locally enabled
-     * @param selection shared editor selection
-     * @param children ordered child entries
-     */
-    public EditorHierarchyNode(
-            Kind kind,
-            String label,
-            Optional<EntityId> entityId,
-            Optional<AssetId> definitionId,
-            boolean enabled,
-            EditorSelection selection,
-            List<EditorHierarchyNode> children) {
-        this(kind, label, entityId, definitionId, new AuthoringState(enabled, false), selection, children);
+/** Immutable semantic projection of one authored hierarchy occurrence.
+ *
+ * @param identity stable domain and occurrence identity
+ * @param label author-facing label
+ * @param authoringState enabled, modified, and mutation state
+ * @param inspectorTarget stable target for on-demand inspection
+ * @param children child occurrences in authored order
+ */
+public record EditorHierarchyNode(
+        Identity identity,
+        String label,
+        AuthoringState authoringState,
+        InspectorTarget inspectorTarget,
+        List<EditorHierarchyNode> children) {
+    /** Copies and validates the projected node. */
+    public EditorHierarchyNode {
+        Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(label, "label");
+        Objects.requireNonNull(authoringState, "authoringState");
+        Objects.requireNonNull(inspectorTarget, "inspectorTarget");
+        children = List.copyOf(children);
     }
 
     /**
-     * Stores one hierarchy projection including its current authoring state.
+     * Returns the stable occurrence identity.
      *
-     * @param kind hierarchy entry kind
-     * @param label human-readable label
-     * @param entityId optional entity identity
-     * @param definitionId optional referenced definition identity
-     * @param authoringState current enabled and modified state
-     * @param selection shared editor selection
-     * @param children ordered child entries
+     * @return hierarchy occurrence
      */
-    public EditorHierarchyNode(
-            Kind kind,
-            String label,
-            Optional<EntityId> entityId,
-            Optional<AssetId> definitionId,
-            AuthoringState authoringState,
-            EditorSelection selection,
-            List<EditorHierarchyNode> children) {
-        AuthoringState state = Objects.requireNonNull(authoringState, "authoringState");
-        this.kind = Objects.requireNonNull(kind, "kind");
-        this.label = Objects.requireNonNull(label, "label");
-        this.entityId = Objects.requireNonNull(entityId, "entityId");
-        this.definitionId = Objects.requireNonNull(definitionId, "definitionId");
-        enabled = state.enabled();
-        modified = state.modified();
-        this.selection = Objects.requireNonNull(selection, "selection");
-        this.children = List.copyOf(children);
+    public HierarchyOccurrenceId occurrence() {
+        return identity.occurrence();
     }
 
     /**
-     * Returns the projected hierarchy kind.
+     * Returns the semantic hierarchy kind.
      *
      * @return hierarchy kind
      */
     public Kind kind() {
-        return kind;
+        return identity.kind();
     }
 
     /**
-     * Returns the editor label.
-     *
-     * @return human-readable label
-     */
-    public String label() {
-        return label;
-    }
-
-    /**
-     * Returns the stable entity identity when this is an entity entry.
+     * Returns the local entity or placement identity when applicable.
      *
      * @return optional entity identity
      */
     public Optional<EntityId> entityId() {
-        return entityId;
+        return identity.entityId();
     }
 
     /**
-     * Returns the referenced definition identity for a world or placement.
+     * Returns the opened world or referenced definition identity when applicable.
      *
      * @return optional definition identity
      */
     public Optional<AssetId> definitionId() {
-        return definitionId;
+        return identity.definitionId();
     }
 
     /**
@@ -116,7 +77,7 @@ public final class EditorHierarchyNode {
      * @return whether the entry is enabled
      */
     public boolean isEnabled() {
-        return enabled;
+        return authoringState.enabled();
     }
 
     /**
@@ -125,34 +86,25 @@ public final class EditorHierarchyNode {
      * @return whether this hierarchy entry has unsaved changes
      */
     public boolean isModified() {
-        return modified;
+        return authoringState.modified();
     }
 
     /**
-     * Returns the stable shared selection represented by this hierarchy entry.
+     * Returns whether this occurrence supports authoring mutations in the containing world.
      *
-     * @return shared selection
+     * @return whether the occurrence is editable
      */
-    public EditorSelection selection() {
-        return selection;
+    public boolean isEditable() {
+        return authoringState.editable();
     }
 
-    /**
-     * Returns projected child entries in authored order.
-     *
-     * @return immutable child entries
-     */
-    public List<EditorHierarchyNode> children() {
-        return children;
-    }
-
-    /** Adds a disabled marker without exposing stable IDs in the ordinary tree label. */
+    /** Adds a disabled marker without exposing stable identities in the ordinary tree label. */
     @Override
     public String toString() {
-        return enabled ? label : label + " (disabled)";
+        return isEnabled() ? label : label + " (disabled)";
     }
 
-    /** Kinds displayed by the editor hierarchy. */
+    /** Semantic hierarchy entry kinds. */
     public enum Kind {
         /** Opened world definition. */
         WORLD,
@@ -160,15 +112,50 @@ public final class EditorHierarchyNode {
         LOCAL_ENTITY,
         /** Reusable entity-definition placement. */
         PLACEMENT,
-        /** Local entity projected from inside a placed reusable definition. */
+        /** Entity projected from inside a placed reusable definition. */
         GENERATED_ENTITY
     }
 
     /**
-     * Current authored presentation state for one hierarchy entry.
+     * Stable semantic and occurrence identity for one hierarchy node.
+     *
+     * @param occurrence occurrence-safe hierarchy identity
+     * @param kind semantic hierarchy kind
+     * @param entityId local entity or placement identity when applicable
+     * @param definitionId world or referenced definition identity when applicable
+     */
+    public record Identity(
+            HierarchyOccurrenceId occurrence, Kind kind, Optional<EntityId> entityId, Optional<AssetId> definitionId) {
+        /** Validates hierarchy identity values. */
+        public Identity {
+            Objects.requireNonNull(occurrence, "occurrence");
+            Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(entityId, "entityId");
+            Objects.requireNonNull(definitionId, "definitionId");
+        }
+    }
+
+    /**
+     * Current authoring state for one hierarchy occurrence.
      *
      * @param enabled whether the entry starts locally enabled
      * @param modified whether the entry differs from its saved revision
+     * @param mutationTarget enabled-state mutation target when this occurrence is locally authored
      */
-    public record AuthoringState(boolean enabled, boolean modified) {}
+    public record AuthoringState(
+            boolean enabled, boolean modified, Optional<InspectorMutationTarget.EntityEnabled> mutationTarget) {
+        /** Validates the optional mutation target. */
+        public AuthoringState {
+            Objects.requireNonNull(mutationTarget, "mutationTarget");
+        }
+
+        /**
+         * Returns whether mutations may target this occurrence.
+         *
+         * @return whether the occurrence is editable
+         */
+        public boolean editable() {
+            return mutationTarget.isPresent();
+        }
+    }
 }

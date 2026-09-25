@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -101,6 +103,122 @@ final class AuthoringServiceProcessTest {
         }
     }
 
+    /** Loads required installed descriptor metadata without resolving its declared runtime provider. */
+    @Test
+    void opensProjectWithConfiguredInstalledExtensionMetadata() throws Exception {
+        String extensionId = "example.installed";
+        Path project = temporaryDirectory.resolve("project");
+        Path unusedMetadata = temporaryDirectory.resolve("unused");
+        Path installedMetadata = temporaryDirectory.resolve("installed");
+        AuthoringTestProject.writeRequiringInstalledExtension(project, "installed.j3d", extensionId);
+        AuthoringTestProject.writeInstalledExtensionMetadata(unusedMetadata, "example.unused");
+        AuthoringTestProject.writeInstalledExtensionMetadata(installedMetadata, extensionId);
+        Process process = startService(List.of(unusedMetadata, installedMetadata));
+        try {
+            ContentLengthMessageWriter writer = new ContentLengthMessageWriter(process.getOutputStream());
+            ContentLengthMessageReader reader = new ContentLengthMessageReader(process.getInputStream());
+            writer.writeMessage(request(1, "initialize", initializeParams()));
+            response(reader);
+
+            ObjectNode openParams = JSON.createObjectNode().put("path", project.toString());
+            writer.writeMessage(request(2, "project/open", openParams));
+            JsonNode opened = response(reader);
+
+            assertThat(opened.at("/result/opened").asBoolean())
+                    .withFailMessage(opened::toPrettyString)
+                    .isTrue();
+            assertThat(opened.at("/result/diagnostics")).isEmpty();
+        } finally {
+            stopService(process);
+        }
+    }
+
+    /** Keeps a genuinely absent installed extension as a structured project diagnostic. */
+    @Test
+    void reportsMissingInstalledExtensionWithoutStoppingService() throws Exception {
+        Path project = temporaryDirectory.resolve("project");
+        AuthoringTestProject.writeRequiringInstalledExtension(project, "missing.j3d", "example.missing");
+        Process process = startService();
+        try {
+            ContentLengthMessageWriter writer = new ContentLengthMessageWriter(process.getOutputStream());
+            ContentLengthMessageReader reader = new ContentLengthMessageReader(process.getInputStream());
+            writer.writeMessage(request(1, "initialize", initializeParams()));
+            response(reader);
+
+            writer.writeMessage(
+                    request(2, "project/open", JSON.createObjectNode().put("path", project.toString())));
+            JsonNode opened = response(reader);
+
+            assertThat(opened.at("/result/opened").asBoolean()).isTrue();
+            assertThat(opened.at("/result/diagnostics"))
+                    .extracting(diagnostic -> diagnostic.path("code").asText())
+                    .contains("extension.missing");
+            assertThat(process.isAlive()).isTrue();
+        } finally {
+            stopService(process);
+        }
+    }
+
+    /** Reports an unavailable configured artifact through existing project diagnostics. */
+    @Test
+    void reportsUnavailableInstalledExtensionMetadataWithoutStoppingService() throws Exception {
+        Path project = temporaryDirectory.resolve("project");
+        Path missingArtifact = temporaryDirectory.resolve("not-installed");
+        AuthoringTestProject.writeRequiringInstalledExtension(project, "missing.j3d", "example.missing");
+        Process process = startService(List.of(missingArtifact));
+        try {
+            ContentLengthMessageWriter writer = new ContentLengthMessageWriter(process.getOutputStream());
+            ContentLengthMessageReader reader = new ContentLengthMessageReader(process.getInputStream());
+            writer.writeMessage(request(1, "initialize", initializeParams()));
+            response(reader);
+
+            writer.writeMessage(
+                    request(2, "project/open", JSON.createObjectNode().put("path", project.toString())));
+            JsonNode rejected = response(reader);
+
+            assertThat(rejected.at("/result/diagnostics"))
+                    .extracting(diagnostic -> diagnostic.path("code").asText())
+                    .contains("editor.extension.metadata", "extension.missing");
+            assertThat(process.isAlive()).isTrue();
+        } finally {
+            stopService(process);
+        }
+    }
+
+    /** Rejects malformed process configuration before accepting protocol input. */
+    @Test
+    void rejectsUnsupportedConfigurationArgument() throws Exception {
+        Process process = startServiceWithArguments(List.of("--unsupported"));
+        try {
+            assertThat(process.waitFor(PROCESS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS))
+                    .isTrue();
+            assertThat(process.exitValue()).isNotZero();
+            assertThat(stderr(process)).contains("Unsupported authoring service argument: --unsupported");
+        } finally {
+            if (process.isAlive()) {
+                process.destroy();
+                process.waitFor(PROCESS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            }
+        }
+    }
+
+    /** Rejects a configured metadata option whose artifact path is blank. */
+    @Test
+    void rejectsBlankExtensionMetadataConfigurationArgument() throws Exception {
+        Process process = startServiceWithArguments(List.of("--extension-metadata="));
+        try {
+            assertThat(process.waitFor(PROCESS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS))
+                    .isTrue();
+            assertThat(process.exitValue()).isNotZero();
+            assertThat(stderr(process)).contains("extension metadata path must not be blank");
+        } finally {
+            if (process.isAlive()) {
+                process.destroy();
+                process.waitFor(PROCESS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            }
+        }
+    }
+
     /** Reads versions filtered into the built service artifact. */
     @Test
     void readsEmbeddedBuildVersions() {
@@ -112,10 +230,41 @@ final class AuthoringServiceProcessTest {
 
     /** Starts the service main class with Surefire's resolved production module path. */
     private static Process startService() throws IOException {
+        return startService(List.of());
+    }
+
+    /** Starts the service with explicit installed extension metadata artifacts. */
+    private static Process startService(List<Path> installedExtensionMetadata) throws IOException {
+        List<String> arguments = installedExtensionMetadata.stream()
+                .map(path -> "--extension-metadata=" + path)
+                .toList();
+        return startServiceWithArguments(arguments);
+    }
+
+    /** Starts the service with explicit application arguments after the JPMS entry point. */
+    private static Process startServiceWithArguments(List<String> arguments) throws IOException {
         String modulePath = Objects.requireNonNull(System.getProperty("jdk.module.path"));
         Path javaExecutable = Path.of(Objects.requireNonNull(System.getProperty("java.home")), "bin", "java");
         String main = "io.github.glynch.jscene3d.editor.authoring.service/" + AuthoringServiceMain.class.getName();
-        return new ProcessBuilder(javaExecutable.toString(), "--module-path", modulePath, "--module", main).start();
+        List<String> command =
+                new ArrayList<>(List.of(javaExecutable.toString(), "--module-path", modulePath, "--module", main));
+        command.addAll(arguments);
+        return new ProcessBuilder(command).start();
+    }
+
+    /** Requests orderly shutdown when possible and otherwise terminates the child process. */
+    private static void stopService(Process process) throws Exception {
+        if (!process.isAlive()) {
+            return;
+        }
+        ContentLengthMessageWriter writer = new ContentLengthMessageWriter(process.getOutputStream());
+        ContentLengthMessageReader reader = new ContentLengthMessageReader(process.getInputStream());
+        writer.writeMessage(request(99, "service/shutdown", JSON.createObjectNode()));
+        response(reader);
+        if (!process.waitFor(PROCESS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+            process.destroy();
+            process.waitFor(PROCESS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        }
     }
 
     /** Creates initialization parameters for the current protocol major. */

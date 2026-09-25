@@ -23,12 +23,15 @@ public final class AuthoringServiceMain {
     /**
      * Serves the owning stdio connection until shutdown, EOF, or transport failure.
      *
-     * @param arguments unused process arguments
+     * @param arguments repeatable installed-extension metadata artifact options
      */
     public static void main(String[] arguments) {
         AuthoringServiceBuildInfo build = AuthoringServiceBuildInfo.current();
-        EditorProjectLoader loader =
-                new EditorProjectLoader(build.engineVersion(), AuthoringServiceMain.class.getClassLoader());
+        AuthoringServiceConfiguration configuration = AuthoringServiceConfiguration.from(arguments);
+        EditorProjectLoader loader = new EditorProjectLoader(
+                build.engineVersion(),
+                AuthoringServiceMain.class.getClassLoader(),
+                configuration.installedExtensionMetadata());
         AuthoringProjectService service = new AuthoringProjectService(loader);
         AuthoringProtocolServer server = new AuthoringProtocolServer(
                 service,

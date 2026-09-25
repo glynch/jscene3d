@@ -12,10 +12,10 @@ import java.util.Objects;
  *
  * @param severity diagnostic severity
  * @param code stable feature-owned diagnostic code
- * @param message locale-neutral English fallback
+ * @param message complete display message resolved for the initialized client locale
  * @param source absolute source URI
  * @param location JSON Pointer or empty document location
- * @param details language-neutral diagnostic detail values
+ * @param details technical diagnostic metadata not intended as localized display prose
  */
 public record ProjectDiagnosticDto(
         String severity, String code, String message, String source, String location, Map<String, String> details) {

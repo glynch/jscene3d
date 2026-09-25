@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.project.session;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
@@ -53,7 +54,8 @@ final class EditorProjectSessionTest {
             assertThat(session.undoOperation())
                     .get()
                     .extracting(AuthoringOperation::label)
-                    .isEqualTo("Set component property");
+                    .isEqualTo(
+                            AuthoringText.message("editor.operation.set-component-property", "Set component property"));
             assertThat(changes)
                     .containsExactly(new AuthoringSessionChange(1L, true, AuthoringSessionChange.Kind.CONTENT));
             assertThat(dirtyChanges).containsExactly(true);

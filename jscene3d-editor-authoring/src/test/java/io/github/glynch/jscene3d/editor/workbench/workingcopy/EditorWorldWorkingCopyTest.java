@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.workbench.workingcopy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringOperation;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
@@ -38,7 +39,9 @@ final class EditorWorldWorkingCopyTest {
         assertThat(workingCopy.isDirty()).isTrue();
         assertThat(workingCopy.current().roots().getFirst().isEnabled()).isFalse();
         assertThat(workingCopy.undoOperation())
-                .contains(new AuthoringOperation("Set entity enabled", temporaryDirectory.resolve("world.json")));
+                .contains(new AuthoringOperation(
+                        AuthoringText.message("editor.operation.set-entity-enabled", "Set entity enabled"),
+                        temporaryDirectory.resolve("world.json")));
         workingCopy.undo();
         assertThat(workingCopy.current().roots().getFirst().isEnabled()).isTrue();
         assertThat(workingCopy.redoOperation()).isPresent();

@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.hierarchy;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
@@ -71,7 +72,7 @@ public final class EditorHierarchyProjector {
         return new EditorHierarchyNode(
                 new EditorHierarchyNode.Identity(
                         root, EditorHierarchyNode.Kind.WORLD, Optional.empty(), Optional.of(world.id())),
-                world.name(),
+                AuthoringText.literal(world.name()),
                 new EditorHierarchyNode.AuthoringState(true, false, Optional.empty()),
                 target,
                 children);
@@ -108,7 +109,9 @@ public final class EditorHierarchyProjector {
                 generated ? InspectorTarget.Kind.GENERATED_ENTITY : InspectorTarget.Kind.LOCAL_ENTITY;
         return new EditorHierarchyNode(
                 new EditorHierarchyNode.Identity(occurrence, kind, Optional.of(local.id()), Optional.empty()),
-                local.name().orElse("Unnamed entity"),
+                local.name()
+                        .<AuthoringText>map(AuthoringText::literal)
+                        .orElseGet(() -> AuthoringText.message("editor.hierarchy.unnamed-entity", "Unnamed entity")),
                 new EditorHierarchyNode.AuthoringState(
                         local.isEnabled(),
                         !generated && state.modified().contains(local.id()),
@@ -137,7 +140,11 @@ public final class EditorHierarchyProjector {
                     generated,
                     occurrence,
                     state,
-                    placement.name().orElse("Unavailable definition"),
+                    placement
+                            .name()
+                            .<AuthoringText>map(AuthoringText::literal)
+                            .orElseGet(() -> AuthoringText.message(
+                                    "editor.hierarchy.unavailable-definition", "Unavailable definition")),
                     List.of());
         }
         EntityDefinition definition = loaded.orElseThrow();
@@ -149,7 +156,8 @@ public final class EditorHierarchyProjector {
                 .map(child -> projectEntry(child, definitionSource, ancestors, true, occurrence, state))
                 .toList();
         ancestors.remove(placement.definition().id());
-        String label = placement.name().orElseGet(() -> definition.root().name().orElse(definition.name()));
+        AuthoringText label = AuthoringText.literal(
+                placement.name().orElseGet(() -> definition.root().name().orElse(definition.name())));
         return placementNode(placement, source, generated, occurrence, state, label, children);
     }
 
@@ -159,7 +167,7 @@ public final class EditorHierarchyProjector {
             boolean generated,
             HierarchyOccurrenceId occurrence,
             ProjectionState state,
-            String label,
+            AuthoringText label,
             List<EditorHierarchyNode> children) {
         return new EditorHierarchyNode(
                 new EditorHierarchyNode.Identity(

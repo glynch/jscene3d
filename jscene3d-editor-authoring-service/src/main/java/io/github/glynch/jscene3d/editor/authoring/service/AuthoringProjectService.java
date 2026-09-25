@@ -36,6 +36,7 @@ public final class AuthoringProjectService implements AutoCloseable {
     public static final String PROJECT_GENERATION_CONFLICT = "authoring.project.generationConflict";
 
     private final EditorProjectLoader loader;
+    private final ProjectDiagnosticMessageResolver diagnosticMessages;
 
     private @Nullable EditorProjectSession activeSession;
     private long nextProjectGeneration = 1;
@@ -48,26 +49,42 @@ public final class AuthoringProjectService implements AutoCloseable {
      * @param loader headless authoring project loader
      */
     public AuthoringProjectService(EditorProjectLoader loader) {
+        this(loader, new ProjectDiagnosticMessageResolver());
+    }
+
+    /** Creates a service with an explicit diagnostic presentation resolver. */
+    AuthoringProjectService(EditorProjectLoader loader, ProjectDiagnosticMessageResolver diagnosticMessages) {
         this.loader = Objects.requireNonNull(loader, "loader");
+        this.diagnosticMessages = Objects.requireNonNull(diagnosticMessages, "diagnosticMessages");
+    }
+
+    /**
+     * Opens a project with the stable English presentation used by direct Java consumers.
+     *
+     * @param params generic project-root or descriptor selection
+     * @return domain outcome with summary and structured diagnostics
+     */
+    public synchronized ProjectOpenResult openProject(ProjectOpenParams params) {
+        return openProject(params, Locale.ENGLISH);
     }
 
     /**
      * Opens and retains one project, rejecting replacement until an explicit close.
      *
      * @param params generic project-root or descriptor selection
+     * @param locale initialized client display locale
      * @return domain outcome with summary and structured diagnostics
      */
-    public synchronized ProjectOpenResult openProject(ProjectOpenParams params) {
+    public synchronized ProjectOpenResult openProject(ProjectOpenParams params, Locale locale) {
         ensureOpen();
         Objects.requireNonNull(params, "params");
+        Objects.requireNonNull(locale, "locale");
         if (activeSession != null) {
             return new ProjectOpenResult(false, null, null, List.of(), PROJECT_ALREADY_OPEN);
         }
 
         EditorProjectLoadResult loadResult = loader.load(Path.of(params.path()));
-        List<ProjectDiagnosticDto> diagnostics = loadResult.diagnostics().stream()
-                .map(AuthoringProjectService::diagnostic)
-                .toList();
+        List<ProjectDiagnosticDto> diagnostics = diagnostics(loadResult.diagnostics(), locale);
         if (loadResult.session().isEmpty()) {
             return new ProjectOpenResult(false, null, null, diagnostics, null);
         }
@@ -80,6 +97,16 @@ public final class AuthoringProjectService implements AutoCloseable {
     }
 
     /**
+     * Replaces a project with the stable English presentation used by direct Java consumers.
+     *
+     * @param params expected active generation and candidate project selection
+     * @return explicit replacement, candidate-rejection, or generation-conflict outcome
+     */
+    public ProjectReplaceResult replaceProject(ProjectReplaceParams params) {
+        return replaceProject(params, Locale.ENGLISH);
+    }
+
+    /**
      * Loads a candidate while retaining the current project, then conditionally installs it.
      *
      * <p>Candidate loading uses the ordinary editor project loader. A rejected candidate leaves the
@@ -87,10 +114,12 @@ public final class AuthoringProjectService implements AutoCloseable {
      * installed under a new generation before the replaced session is disposed without saving.
      *
      * @param params expected active generation and candidate project selection
+     * @param locale initialized client display locale
      * @return explicit replacement, candidate-rejection, or generation-conflict outcome
      */
-    public ProjectReplaceResult replaceProject(ProjectReplaceParams params) {
+    public ProjectReplaceResult replaceProject(ProjectReplaceParams params, Locale locale) {
         Objects.requireNonNull(params, "params");
+        Objects.requireNonNull(locale, "locale");
         EditorProjectSession expectedSession;
         synchronized (this) {
             ensureOpen();
@@ -104,7 +133,7 @@ public final class AuthoringProjectService implements AutoCloseable {
         }
 
         EditorProjectLoadResult loadResult = loader.load(Path.of(params.path()));
-        List<ProjectDiagnosticDto> diagnostics = diagnostics(loadResult.diagnostics());
+        List<ProjectDiagnosticDto> diagnostics = diagnostics(loadResult.diagnostics(), locale);
         if (loadResult.session().isEmpty()) {
             return new ProjectReplaceResult(ProjectReplaceResult.CANDIDATE_REJECTED, null, null, diagnostics, null);
         }
@@ -199,19 +228,21 @@ public final class AuthoringProjectService implements AutoCloseable {
     }
 
     /** Maps one domain diagnostic without adding serialization concerns to the domain type. */
-    private static ProjectDiagnosticDto diagnostic(ProjectDiagnostic diagnostic) {
+    private ProjectDiagnosticDto diagnostic(ProjectDiagnostic diagnostic, Locale locale) {
         return new ProjectDiagnosticDto(
                 diagnostic.severity().name().toLowerCase(Locale.ROOT),
                 diagnostic.code().code(),
-                diagnostic.message(),
+                diagnosticMessages.resolve(diagnostic, locale),
                 diagnostic.source().toString(),
                 diagnostic.location(),
                 diagnostic.details());
     }
 
     /** Maps ordered domain diagnostics to their stable wire representation. */
-    private static List<ProjectDiagnosticDto> diagnostics(List<ProjectDiagnostic> diagnostics) {
-        return diagnostics.stream().map(AuthoringProjectService::diagnostic).toList();
+    private List<ProjectDiagnosticDto> diagnostics(List<ProjectDiagnostic> diagnostics, Locale locale) {
+        return diagnostics.stream()
+                .map(diagnostic -> diagnostic(diagnostic, locale))
+                .toList();
     }
 
     /** Creates an operation-level replacement conflict without loading a candidate. */

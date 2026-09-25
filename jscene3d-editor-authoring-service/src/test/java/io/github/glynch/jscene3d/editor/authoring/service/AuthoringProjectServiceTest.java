@@ -22,6 +22,7 @@ import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Objects;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -260,7 +261,8 @@ final class AuthoringProjectServiceTest {
     /** An invalid project remains a domain result with structured diagnostics. */
     @Test
     void reportsInvalidProject() {
-        ProjectOpenResult result = service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        ProjectOpenResult result =
+                service.openProject(new ProjectOpenParams(temporaryDirectory.toString()), Locale.FRENCH);
 
         assertThat(result.opened()).isFalse();
         assertThat(result.project()).isNull();
@@ -268,8 +270,38 @@ final class AuthoringProjectServiceTest {
                 .singleElement()
                 .returns("error", diagnostic -> diagnostic.severity())
                 .returns("project.descriptor.missing", diagnostic -> diagnostic.code())
+                .returns(
+                        "Le dossier du projet ne contient aucun descripteur de projet",
+                        diagnostic -> diagnostic.message())
                 .satisfies(diagnostic -> assertThat(diagnostic.source()).startsWith("file:"));
         assertThat(service.activeSession()).isEmpty();
+    }
+
+    /** Candidate rejection resolves diagnostics through the same requested-locale path as open. */
+    @Test
+    void localizesCandidateRejectionDiagnostics() throws IOException {
+        Path active = temporaryDirectory.resolve("active");
+        Path invalid = temporaryDirectory.resolve("invalid");
+        AuthoringTestProject.write(active, "active.j3d");
+        ProjectOpenResult opened = service.openProject(new ProjectOpenParams(active.toString()), Locale.FRENCH);
+
+        ProjectReplaceResult result = service.replaceProject(
+                new ProjectReplaceParams(Objects.requireNonNull(opened.projectGeneration()), invalid.toString()),
+                Locale.FRENCH);
+
+        assertThat(result.outcome()).isEqualTo(ProjectReplaceResult.CANDIDATE_REJECTED);
+        assertThat(result.failureCode()).isNull();
+        assertThat(result.diagnostics())
+                .singleElement()
+                .returns("error", diagnostic -> diagnostic.severity())
+                .returns("project.directory.missing", diagnostic -> diagnostic.code())
+                .returns(
+                        "Le dossier du projet n’existe pas ou n’est pas un dossier", diagnostic -> diagnostic.message())
+                .satisfies(diagnostic -> {
+                    assertThat(diagnostic.source()).startsWith("file:");
+                    assertThat(diagnostic.location()).isEmpty();
+                    assertThat(diagnostic.details()).isNotNull();
+                });
     }
 
     /** The legacy descriptor opens with its real path and deprecation diagnostic intact. */

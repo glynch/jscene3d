@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.workbench.hierarchy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
@@ -55,8 +56,12 @@ final class EditorHierarchyProjectorTest {
                         EditorHierarchyNode.Kind.PLACEMENT,
                         EditorHierarchyNode.Kind.PLACEMENT);
         assertThat(root.children().getFirst())
+                .returns(AuthoringText.literal("Local"), EditorHierarchyNode::label)
                 .returns(true, EditorHierarchyNode::isModified)
                 .returns(true, EditorHierarchyNode::isEditable);
+        assertThat(root.children().get(2))
+                .returns(false, EditorHierarchyNode::isEnabled)
+                .satisfies(node -> assertThat(node.toString()).doesNotContain("(disabled)"));
         EditorHierarchyNode generated = root.children().get(1).children().getFirst();
         assertThat(generated)
                 .returns(EditorHierarchyNode.Kind.GENERATED_ENTITY, EditorHierarchyNode::kind)

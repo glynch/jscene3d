@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.project.loading;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,6 @@ final class EditorLoadingPhaseTest {
                 .toList();
         assertThat(progress).isSorted().doesNotHaveDuplicates().allMatch(value -> value > 0.0 && value <= 1.0);
         assertThat(EditorLoadingPhase.values())
-                .allSatisfy(phase -> assertThat(phase.description()).isNotBlank());
+                .allSatisfy(phase -> assertThat(phase.description()).isInstanceOf(AuthoringText.Message.class));
     }
 }

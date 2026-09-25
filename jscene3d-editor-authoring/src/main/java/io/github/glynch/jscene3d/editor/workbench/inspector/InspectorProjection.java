@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.inspector;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import java.util.List;
 import java.util.Objects;
 
@@ -16,7 +17,11 @@ import java.util.Objects;
  * @param sections typed sections in declaration order
  */
 public record InspectorProjection(
-        InspectorTarget target, String title, boolean generated, boolean editable, List<InspectorSection> sections) {
+        InspectorTarget target,
+        AuthoringText title,
+        boolean generated,
+        boolean editable,
+        List<InspectorSection> sections) {
     /** Copies and validates projected Inspector data. */
     public InspectorProjection {
         Objects.requireNonNull(target, "target");

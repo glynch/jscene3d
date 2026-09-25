@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.project.asset;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -24,28 +25,28 @@ public record ProjectAsset(String label, String identity, Kind kind, Path source
         Objects.requireNonNull(source, "source");
     }
 
-    /** Shows only ordinary author-facing information in the asset browser. */
+    /** Preserves the project-authored label without adding Java-owned UI decoration. */
     @Override
     public String toString() {
-        return label + "  ·  " + kind.label;
+        return label;
     }
 
     /** Asset categories displayed by the initial editor browser. */
     public enum Kind {
         /** Reusable entity definition. */
-        ENTITY_DEFINITION("Entity definition"),
+        ENTITY_DEFINITION("entity-definition", "Entity definition"),
         /** World definition. */
-        WORLD_DEFINITION("World definition"),
+        WORLD_DEFINITION("world-definition", "World definition"),
         /** Authoritative source or resource asset. */
-        SOURCE_ASSET("Source asset"),
+        SOURCE_ASSET("source-asset", "Source asset"),
         /** Source-import definition. */
-        IMPORT_DEFINITION("Import definition");
+        IMPORT_DEFINITION("import-definition", "Import definition");
 
-        private final String label;
+        private final AuthoringText label;
 
         /** Stores the author-facing category label. */
-        Kind(String label) {
-            this.label = label;
+        Kind(String codeSuffix, String defaultLabel) {
+            label = AuthoringText.message("editor.asset.kind." + codeSuffix, defaultLabel);
         }
 
         /**
@@ -53,7 +54,7 @@ public record ProjectAsset(String label, String identity, Kind kind, Path source
          *
          * @return author-facing kind label
          */
-        public String label() {
+        public AuthoringText label() {
             return label;
         }
     }

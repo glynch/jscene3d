@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.inspector;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
@@ -40,8 +41,8 @@ final class EditorComponentSectionProjector {
                         editable,
                         component,
                         type,
-                        descriptor.presentation().displayName(),
-                        descriptor.presentation().description(),
+                        AuthoringText.literal(descriptor.presentation().displayName()),
+                        descriptor.presentation().description().map(AuthoringText::literal),
                         descriptor.properties()))
                 .orElseGet(() -> missingDescriptorSection(component, type));
     }
@@ -50,8 +51,8 @@ final class EditorComponentSectionProjector {
             Optional<EditableEntity> editable,
             ComponentDefinition component,
             ComponentType type,
-            String label,
-            Optional<String> description,
+            AuthoringText label,
+            Optional<AuthoringText> description,
             Map<PropertyId, PropertyDescriptor> descriptors) {
         List<InspectorProperty> properties = new ArrayList<>();
         descriptors.forEach(
@@ -86,10 +87,10 @@ final class EditorComponentSectionProjector {
         return new InspectorProperty(
                 id.value(),
                 new InspectorProperty.Presentation(
-                        descriptor.presentation().displayName(),
+                        AuthoringText.literal(descriptor.presentation().displayName()),
                         descriptor.valueKind(),
                         descriptor.isRequired(),
-                        descriptor.presentation().description(),
+                        descriptor.presentation().description().map(AuthoringText::literal),
                         constraints),
                 new InspectorProperty.State(displayed, origin),
                 mutation);
@@ -101,8 +102,11 @@ final class EditorComponentSectionProjector {
                 .toList();
         return new InspectorSection(
                 component.id().toString(),
-                component.type().value(),
-                Optional.of("Descriptor metadata unavailable for type version " + component.typeVersion()),
+                AuthoringText.literal(component.type().value()),
+                Optional.of(AuthoringText.message(
+                        "editor.inspector.descriptor-unavailable",
+                        "Descriptor metadata is unavailable for type version {0,number,integer}",
+                        component.typeVersion())),
                 Optional.of(type),
                 false,
                 properties);
@@ -112,18 +116,13 @@ final class EditorComponentSectionProjector {
         return new InspectorProperty(
                 id.value(),
                 new InspectorProperty.Presentation(
-                        displayName(id.value()),
+                        AuthoringText.literal(id.value()),
                         ProjectValueKind.of(value),
                         false,
                         Optional.empty(),
                         InspectorConstraints.empty()),
                 new InspectorProperty.State(Optional.of(value), InspectorProperty.Origin.AUTHORED),
                 Optional.empty());
-    }
-
-    private static String displayName(String identity) {
-        String value = identity.replace('-', ' ');
-        return value.isEmpty() ? identity : Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     /** Editable local entity identity used to create stable mutation targets. */

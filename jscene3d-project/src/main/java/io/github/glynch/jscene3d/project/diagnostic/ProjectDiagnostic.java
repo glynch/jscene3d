@@ -8,6 +8,7 @@ import static io.github.glynch.jscene3d.project.internal.Preconditions.requireAb
 
 import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -17,16 +18,37 @@ import java.util.Objects;
  * @param code feature-owned stable code and English fallback
  * @param source absolute source URI, including {@code jar:} resources
  * @param location JSON Pointer location, or an empty string for the complete file
- * @param details immutable language-neutral values associated with the diagnostic
+ * @param messageArguments immutable ordered values for localized message formatting
+ * @param details immutable technical metadata associated with the diagnostic
  */
 public record ProjectDiagnostic(
-        Severity severity, DiagnosticCode code, URI source, String location, Map<String, String> details) {
+        Severity severity,
+        DiagnosticCode code,
+        URI source,
+        String location,
+        List<Object> messageArguments,
+        Map<String, String> details) {
+    /**
+     * Creates a diagnostic with no display-message arguments.
+     *
+     * @param severity diagnostic severity
+     * @param code feature-owned stable code and English fallback
+     * @param source absolute source URI, including {@code jar:} resources
+     * @param location JSON Pointer location, or an empty string for the complete file
+     * @param details immutable technical metadata associated with the diagnostic
+     */
+    public ProjectDiagnostic(
+            Severity severity, DiagnosticCode code, URI source, String location, Map<String, String> details) {
+        this(severity, code, source, location, List.of(), details);
+    }
+
     /** Validates diagnostic values. */
     public ProjectDiagnostic {
         Objects.requireNonNull(severity, "severity");
         Objects.requireNonNull(code, "code");
         source = requireAbsoluteUri(source, "source");
         Objects.requireNonNull(location, "location");
+        messageArguments = List.copyOf(messageArguments);
         details = Map.copyOf(details);
     }
 

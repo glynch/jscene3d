@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.hierarchy;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -22,7 +23,7 @@ import java.util.Optional;
  */
 public record EditorHierarchyNode(
         Identity identity,
-        String label,
+        AuthoringText label,
         AuthoringState authoringState,
         InspectorTarget inspectorTarget,
         List<EditorHierarchyNode> children) {
@@ -96,12 +97,6 @@ public record EditorHierarchyNode(
      */
     public boolean isEditable() {
         return authoringState.editable();
-    }
-
-    /** Adds a disabled marker without exposing stable identities in the ordinary tree label. */
-    @Override
-    public String toString() {
-        return isEnabled() ? label : label + " (disabled)";
     }
 
     /** Semantic hierarchy entry kinds. */

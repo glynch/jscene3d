@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.workingcopy;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringChange;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringOperation;
 import io.github.glynch.jscene3d.editor.project.session.internal.AuthoringChangeSource;
@@ -174,7 +175,7 @@ public final class EditorWorldWorkingCopy implements AutoCloseable {
         ensureOpen();
         WorldDefinition changed =
                 WorldDefinitionEdits.setEntityEnabled(current, Objects.requireNonNull(entityId, "entityId"), enabled);
-        recordEdit("Set entity enabled", changed);
+        recordEdit(AuthoringText.message("editor.operation.set-entity-enabled", "Set entity enabled"), changed);
     }
 
     /** Replaces one locally authored component property and records an undo operation.
@@ -193,7 +194,7 @@ public final class EditorWorldWorkingCopy implements AutoCloseable {
                 Objects.requireNonNull(componentId, "componentId"),
                 Objects.requireNonNull(propertyId, "propertyId"),
                 Objects.requireNonNull(value, "value"));
-        recordEdit("Set component property", changed);
+        recordEdit(AuthoringText.message("editor.operation.set-component-property", "Set component property"), changed);
     }
 
     /** Releases listeners and rejects subsequent use. */
@@ -205,7 +206,7 @@ public final class EditorWorldWorkingCopy implements AutoCloseable {
         }
     }
 
-    private void recordEdit(String label, WorldDefinition changed) {
+    private void recordEdit(AuthoringText label, WorldDefinition changed) {
         if (changed == current) {
             return;
         }

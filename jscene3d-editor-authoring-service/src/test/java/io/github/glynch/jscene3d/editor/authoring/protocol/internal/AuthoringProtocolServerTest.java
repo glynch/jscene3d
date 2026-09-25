@@ -18,8 +18,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.ResourceBundle;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -33,8 +36,9 @@ final class AuthoringProtocolServerTest {
 
     private final AuthoringProjectService service = new AuthoringProjectService(
             new EditorProjectLoader("0.1.0-SNAPSHOT", AuthoringProtocolServerTest.class.getClassLoader()));
+    private final RecordingLogger logger = new RecordingLogger();
     private final AuthoringProtocolServer server =
-            new AuthoringProtocolServer(service, "1.2.0-test", "0.1.0-SNAPSHOT", "connection-test");
+            new AuthoringProtocolServer(service, "1.2.0-test", "0.1.0-SNAPSHOT", "connection-test", logger);
 
     @TempDir
     private Path temporaryDirectory;
@@ -61,6 +65,7 @@ final class AuthoringProtocolServerTest {
                 .extracting(JsonNode::asText)
                 .containsExactly("project/open", "project/replace", "project/close", "service/shutdown");
         assertThat(server.isInitialized()).isTrue();
+        assertThat(server.clientLocale()).contains(Locale.forLanguageTag("en-GB"));
     }
 
     /** Rejects an incompatible major without initializing the connection. */
@@ -104,6 +109,15 @@ final class AuthoringProtocolServerTest {
         assertThat(service.activeSession()).isEmpty();
     }
 
+    /** Preserves the initialization requirement before revealing whether an unknown method exists. */
+    @Test
+    void rejectsUnknownRequestBeforeInitialization() throws IOException {
+        JsonNode response = response(request(1, "project/unknown", "{}"));
+
+        assertThat(response.at("/error/code").asInt()).isEqualTo(-32002);
+        assertThat(response.at("/error/data").isMissingNode()).isTrue();
+    }
+
     /** Returns a JSON-RPC parse error for invalid JSON without exposing a stack trace. */
     @Test
     void reportsInvalidJson() throws IOException {
@@ -142,6 +156,21 @@ final class AuthoringProtocolServerTest {
         assertThat(invalidReplace.at("/error/code").asInt()).isEqualTo(-32602);
     }
 
+    /** Rejects absent, blank, and malformed client language tags without retaining a locale. */
+    @Test
+    void rejectsInvalidClientLanguage() throws IOException {
+        JsonNode missing = response(request(1, "initialize", "{\"protocolVersion\":{\"major\":1,\"minor\":0}}"));
+        JsonNode blank = response(
+                request(2, "initialize", "{\"protocolVersion\":{\"major\":1,\"minor\":0},\"clientLanguage\":\" \"}"));
+        JsonNode malformed = response(request(
+                3, "initialize", "{\"protocolVersion\":{\"major\":1,\"minor\":0},\"clientLanguage\":\"en_US\"}"));
+
+        assertThat(missing.at("/error/code").asInt()).isEqualTo(-32602);
+        assertThat(blank.at("/error/code").asInt()).isEqualTo(-32602);
+        assertThat(malformed.at("/error/code").asInt()).isEqualTo(-32602);
+        assertThat(server.clientLocale()).isEmpty();
+    }
+
     /** Dispatches replacement as a structured domain result rather than a protocol failure. */
     @Test
     void dispatchesProjectReplacement() throws IOException {
@@ -168,7 +197,8 @@ final class AuthoringProtocolServerTest {
     /** Ignores unknown optional initialization fields as required for additive evolution. */
     @Test
     void ignoresUnknownInitializationFields() throws IOException {
-        String params = "{\"protocolVersion\":{\"major\":1,\"minor\":0,\"patch\":4},\"clientName\":\"test\"}";
+        String params = "{\"protocolVersion\":{\"major\":1,\"minor\":0,\"patch\":4},"
+                + "\"clientLanguage\":\"en\",\"clientName\":\"test\"}";
 
         JsonNode response = response(request(1, "initialize", params));
 
@@ -199,6 +229,11 @@ final class AuthoringProtocolServerTest {
         assertThat(response.at("/error/data").isMissingNode()).isTrue();
         assertThat(server.isShutdownRequested()).isTrue();
         assertThat(service.isClosed()).isTrue();
+        assertThat(logger.level).isEqualTo(System.Logger.Level.ERROR);
+        assertThat(logger.message).isEqualTo("Unexpected authoring request failure");
+        assertThat(logger.thrown)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Authoring project service is closed");
     }
 
     /** Accepts shutdown, closes project ownership, and marks the dispatcher terminal. */
@@ -258,7 +293,10 @@ final class AuthoringProtocolServerTest {
 
     /** Creates one initialize request. */
     private static String initialize(int major, int minor) {
-        return request(1, "initialize", "{\"protocolVersion\":{\"major\":" + major + ",\"minor\":" + minor + "}}");
+        return request(
+                1,
+                "initialize",
+                "{\"protocolVersion\":{\"major\":" + major + ",\"minor\":" + minor + "},\"clientLanguage\":\"en-GB\"}");
     }
 
     /** Creates one JSON-RPC-style request. */
@@ -280,5 +318,36 @@ final class AuthoringProtocolServerTest {
                 Arguments.of("{\"jsonrpc\":\"1.0\",\"id\":2,\"method\":\"project/close\"}", "2"),
                 Arguments.of("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":4}", "3"),
                 Arguments.of("{\"jsonrpc\":\"2.0\",\"id\":true,\"method\":\"project/close\"}", "true"));
+    }
+
+    /** Captures expected server diagnostics without writing them to the test process console. */
+    private static final class RecordingLogger implements System.Logger {
+        private @Nullable Level level;
+        private @Nullable String message;
+        private @Nullable Throwable thrown;
+
+        @Override
+        public String getName() {
+            return "authoring-protocol-test";
+        }
+
+        @Override
+        public boolean isLoggable(Level candidate) {
+            return true;
+        }
+
+        @Override
+        public void log(Level eventLevel, ResourceBundle bundle, String eventMessage, Throwable eventThrown) {
+            level = eventLevel;
+            message = eventMessage;
+            thrown = eventThrown;
+        }
+
+        @Override
+        public void log(Level eventLevel, ResourceBundle bundle, String format, Object... params) {
+            level = eventLevel;
+            message = format;
+            thrown = null;
+        }
     }
 }

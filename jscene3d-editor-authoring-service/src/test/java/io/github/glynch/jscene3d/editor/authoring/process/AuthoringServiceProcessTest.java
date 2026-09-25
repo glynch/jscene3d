@@ -121,7 +121,8 @@ final class AuthoringServiceProcessTest {
     /** Creates initialization parameters for the current protocol major. */
     private static ObjectNode initializeParams() {
         ObjectNode version = JSON.createObjectNode().put("major", 1).put("minor", 0);
-        return JSON.createObjectNode().set("protocolVersion", version);
+        ObjectNode params = JSON.createObjectNode().put("clientLanguage", "en-GB");
+        return params.set("protocolVersion", version);
     }
 
     /** Creates replacement parameters for one expected active generation and candidate path. */

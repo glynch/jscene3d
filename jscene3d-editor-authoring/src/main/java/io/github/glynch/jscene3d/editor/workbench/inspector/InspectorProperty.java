@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.inspector;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Objects;
@@ -36,10 +37,10 @@ public record InspectorProperty(
      * @param constraints structured descriptor constraints
      */
     public record Presentation(
-            String label,
+            AuthoringText label,
             ProjectValueKind valueKind,
             boolean required,
-            Optional<String> description,
+            Optional<AuthoringText> description,
             InspectorConstraints constraints) {
         /** Validates presentation metadata. */
         public Presentation {

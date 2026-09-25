@@ -23,13 +23,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /** Serial JSON-RPC-style dispatcher for one owning stdio connection. */
 public final class AuthoringProtocolServer {
-    private static final System.Logger LOGGER = System.getLogger(AuthoringProtocolServer.class.getName());
+    private static final System.Logger DEFAULT_LOGGER = System.getLogger(AuthoringProtocolServer.class.getName());
     private static final String JSON_RPC_VERSION = "2.0";
     private static final int PARSE_ERROR = -32700;
     private static final int INVALID_REQUEST = -32600;
@@ -39,8 +40,7 @@ public final class AuthoringProtocolServer {
     private static final int INCOMPATIBLE_PROTOCOL = -32001;
     private static final int NOT_INITIALIZED = -32002;
     private static final int ALREADY_INITIALIZED = -32003;
-    private static final List<String> CAPABILITIES =
-            List.of("project/open", "project/replace", "project/close", "service/shutdown");
+    private static final List<String> CAPABILITIES = AuthoringProtocolMethod.capabilities();
 
     private final ObjectMapper mapper = new ObjectMapper()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
@@ -49,9 +49,11 @@ public final class AuthoringProtocolServer {
     private final String serviceVersion;
     private final String engineVersion;
     private final String connectionGeneration;
+    private final System.Logger logger;
 
     private boolean initialized;
     private boolean shutdownRequested;
+    private @Nullable Locale clientLocale;
 
     /**
      * Creates one connection-scoped protocol dispatcher.
@@ -63,10 +65,29 @@ public final class AuthoringProtocolServer {
      */
     public AuthoringProtocolServer(
             AuthoringProjectService service, String serviceVersion, String engineVersion, String connectionGeneration) {
+        this(service, serviceVersion, engineVersion, connectionGeneration, DEFAULT_LOGGER);
+    }
+
+    /**
+     * Creates one connection-scoped protocol dispatcher with an explicit diagnostic sink.
+     *
+     * @param service retained authoring project owner
+     * @param serviceVersion authoring-service implementation version
+     * @param engineVersion JScene3D engine compatibility version
+     * @param connectionGeneration unique owning-connection generation
+     * @param logger sparse unexpected-failure diagnostic sink
+     */
+    AuthoringProtocolServer(
+            AuthoringProjectService service,
+            String serviceVersion,
+            String engineVersion,
+            String connectionGeneration,
+            System.Logger logger) {
         this.service = Objects.requireNonNull(service, "service");
         this.serviceVersion = Objects.requireNonNull(serviceVersion, "serviceVersion");
         this.engineVersion = Objects.requireNonNull(engineVersion, "engineVersion");
         this.connectionGeneration = Objects.requireNonNull(connectionGeneration, "connectionGeneration");
+        this.logger = Objects.requireNonNull(logger, "logger");
     }
 
     /**
@@ -127,7 +148,7 @@ public final class AuthoringProtocolServer {
         } catch (RuntimeException exception) {
             shutdownRequested = true;
             service.close();
-            LOGGER.log(System.Logger.Level.ERROR, "Unexpected authoring request failure", exception);
+            logger.log(System.Logger.Level.ERROR, "Unexpected authoring request failure", exception);
             return Optional.of(serialize(error(validId, INTERNAL_ERROR, "Internal error", null)));
         }
     }
@@ -150,27 +171,46 @@ public final class AuthoringProtocolServer {
         return shutdownRequested;
     }
 
+    /**
+     * Returns the validated display locale retained for this initialized connection.
+     *
+     * @return initialized client locale, or empty before initialization
+     */
+    public Optional<Locale> clientLocale() {
+        return Optional.ofNullable(clientLocale);
+    }
+
     /** Dispatches one structurally valid request. */
     private ObjectNode dispatch(JsonNode request, JsonNode id) throws JsonProcessingException {
-        String method = request.path("method").textValue();
-        if ("initialize".equals(method)) {
-            return initialize(id, request.get("params"));
+        String wireMethod = request.path("method").textValue();
+        Optional<AuthoringProtocolMethod> method = AuthoringProtocolMethod.fromWireName(wireMethod);
+        if (method.isEmpty()) {
+            return initialized
+                    ? error(id, METHOD_NOT_FOUND, "Method not found", wireMethod)
+                    : error(id, NOT_INITIALIZED, "Service is not initialized", null);
         }
-        if ("service/shutdown".equals(method)) {
-            shutdownRequested = true;
-            service.close();
-            return success(id, new ShutdownResult(true));
-        }
-        if (!initialized) {
+        AuthoringProtocolMethod resolvedMethod = method.orElseThrow();
+        if (resolvedMethod.requiresInitialization() && !initialized) {
             return error(id, NOT_INITIALIZED, "Service is not initialized", null);
         }
-        return switch (method) {
-            case "project/open" -> success(id, service.openProject(readParams(request, ProjectOpenParams.class)));
-            case "project/replace" ->
-                success(id, service.replaceProject(readParams(request, ProjectReplaceParams.class)));
-            case "project/close" -> success(id, service.closeProject());
-            default -> error(id, METHOD_NOT_FOUND, "Method not found", method);
+        return switch (resolvedMethod) {
+            case INITIALIZE -> initialize(id, request.get("params"));
+            case PROJECT_OPEN ->
+                success(id, service.openProject(readParams(request, ProjectOpenParams.class), initializedLocale()));
+            case PROJECT_REPLACE ->
+                success(
+                        id,
+                        service.replaceProject(readParams(request, ProjectReplaceParams.class), initializedLocale()));
+            case PROJECT_CLOSE -> success(id, service.closeProject());
+            case SERVICE_SHUTDOWN -> shutdown(id);
         };
+    }
+
+    /** Performs terminal service shutdown. */
+    private ObjectNode shutdown(JsonNode id) {
+        shutdownRequested = true;
+        service.close();
+        return success(id, new ShutdownResult(true));
     }
 
     /** Negotiates one compatible protocol connection. */
@@ -191,6 +231,7 @@ public final class AuthoringProtocolServer {
         }
         ProtocolVersion negotiated = new ProtocolVersion(
                 ProtocolVersion.CURRENT.major(), Math.min(requested.minor(), ProtocolVersion.CURRENT.minor()));
+        clientLocale = offered.clientLocale();
         initialized = true;
         return success(id, new InitializeResult(negotiated, "authoring", serviceVersion, engineVersion, CAPABILITIES));
     }
@@ -202,6 +243,11 @@ public final class AuthoringProtocolServer {
             throw new IllegalArgumentException("params must be an object");
         }
         return mapper.treeToValue(params, type);
+    }
+
+    /** Returns the locale established by successful initialization. */
+    private Locale initializedLocale() {
+        return Objects.requireNonNull(clientLocale, "clientLocale");
     }
 
     /** Validates the minimal request or notification envelope before method dispatch. */

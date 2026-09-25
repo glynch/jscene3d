@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.inspector;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import java.util.List;
 import java.util.Objects;
@@ -20,8 +21,8 @@ import java.util.Optional;
  */
 public record InspectorSection(
         String identity,
-        String label,
-        Optional<String> description,
+        AuthoringText label,
+        Optional<AuthoringText> description,
         Optional<ComponentType> componentType,
         boolean metadataAvailable,
         List<InspectorProperty> properties) {

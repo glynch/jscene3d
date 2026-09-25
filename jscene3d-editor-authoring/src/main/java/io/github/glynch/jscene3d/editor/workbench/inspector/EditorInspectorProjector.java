@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.inspector;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
@@ -34,27 +35,27 @@ public final class EditorInspectorProjector {
                 InspectorTarget.Kind.WORLD, source, world.id().toString(), Optional.of(occurrence));
         return new InspectorProjection(
                 target,
-                world.name(),
+                AuthoringText.literal(world.name()),
                 false,
                 false,
                 List.of(new InspectorSection(
                         "world",
-                        "World",
+                        message("editor.inspector.section.world", "World"),
                         Optional.empty(),
                         Optional.empty(),
                         true,
                         List.of(
                                 summary(
                                         "asset-id",
-                                        "Asset ID",
+                                        message("editor.inspector.property.asset-id", "Asset ID"),
                                         new ProjectValue.TextValue(world.id().toString())),
                                 summary(
                                         "root-count",
-                                        "Root entities",
+                                        message("editor.inspector.property.root-entities", "Root entities"),
                                         number(world.roots().size())),
                                 summary(
                                         "connection-count",
-                                        "Connections",
+                                        message("editor.inspector.property.connections", "Connections"),
                                         number(world.connections().size()))))));
     }
 
@@ -85,22 +86,25 @@ public final class EditorInspectorProjector {
         List<InspectorSection> sections = new ArrayList<>();
         sections.add(new InspectorSection(
                 "entity",
-                "Entity",
+                message("editor.inspector.section.entity", "Entity"),
                 Optional.empty(),
                 Optional.empty(),
                 true,
                 List.of(
                         property(
                                 "enabled",
-                                "Enabled",
+                                message("editor.inspector.property.enabled", "Enabled"),
                                 new ProjectValue.BooleanValue(entity.isEnabled()),
                                 enabledMutation),
                         summary(
                                 "child-count",
-                                "Children",
+                                message("editor.inspector.property.children", "Children"),
                                 number(entity.children().size())))));
         sections.addAll(EditorComponentSectionProjector.componentSections(editable, entity.components(), types));
-        return new InspectorProjection(target, entity.name().orElse("Unnamed entity"), generated, !generated, sections);
+        AuthoringText title = entity.name()
+                .<AuthoringText>map(AuthoringText::literal)
+                .orElseGet(() -> AuthoringText.message("editor.hierarchy.unnamed-entity", "Unnamed entity"));
+        return new InspectorProjection(target, title, generated, !generated, sections);
     }
 
     /** Projects a reusable-definition placement and its realized root components.
@@ -120,9 +124,14 @@ public final class EditorInspectorProjector {
             RegisteredTypeCatalog types,
             HierarchyOccurrenceId occurrence,
             boolean generated) {
-        String title = placement
+        AuthoringText title = placement
                 .name()
-                .orElseGet(() -> definition.map(EntityDefinition::name).orElse("Unavailable definition"));
+                .<AuthoringText>map(AuthoringText::literal)
+                .orElseGet(() -> definition
+                        .map(EntityDefinition::name)
+                        .<AuthoringText>map(AuthoringText::literal)
+                        .orElseGet(() -> AuthoringText.message(
+                                "editor.hierarchy.unavailable-definition", "Unavailable definition")));
         InspectorTarget target = new InspectorTarget(
                 InspectorTarget.Kind.PLACEMENT, source, placement.id().toString(), Optional.of(occurrence));
         Optional<InspectorMutationTarget> enabledMutation = generated
@@ -131,14 +140,25 @@ public final class EditorInspectorProjector {
         List<InspectorProperty> placementProperties = new ArrayList<>();
         placementProperties.add(summary(
                 "definition",
-                "Definition",
+                message("editor.inspector.property.definition", "Definition"),
                 new ProjectValue.TextValue(placement.definition().id().toString())));
-        placementProperties.add(
-                property("enabled", "Enabled", new ProjectValue.BooleanValue(placement.isEnabled()), enabledMutation));
-        placement.arguments().forEach((id, value) -> placementProperties.add(summary(id.value(), id.value(), value)));
+        placementProperties.add(property(
+                "enabled",
+                message("editor.inspector.property.enabled", "Enabled"),
+                new ProjectValue.BooleanValue(placement.isEnabled()),
+                enabledMutation));
+        placement
+                .arguments()
+                .forEach((id, value) ->
+                        placementProperties.add(summary(id.value(), AuthoringText.literal(id.value()), value)));
         List<InspectorSection> sections = new ArrayList<>();
         sections.add(new InspectorSection(
-                "placement", "Placement", Optional.empty(), Optional.empty(), true, placementProperties));
+                "placement",
+                message("editor.inspector.section.placement", "Placement"),
+                Optional.empty(),
+                Optional.empty(),
+                true,
+                placementProperties));
         definition.ifPresent(value -> sections.addAll(EditorComponentSectionProjector.componentSections(
                 Optional.empty(), value.root().components(), types)));
         return new InspectorProjection(target, title, generated, !generated, sections);
@@ -148,17 +168,24 @@ public final class EditorInspectorProjector {
         return new ProjectValue.NumberValue(BigDecimal.valueOf(value));
     }
 
-    private static InspectorProperty summary(String identity, String label, ProjectValue value) {
+    private static InspectorProperty summary(String identity, AuthoringText label, ProjectValue value) {
         return property(identity, label, value, Optional.empty());
     }
 
     private static InspectorProperty property(
-            String identity, String label, ProjectValue value, Optional<InspectorMutationTarget> mutationTarget) {
+            String identity,
+            AuthoringText label,
+            ProjectValue value,
+            Optional<InspectorMutationTarget> mutationTarget) {
         return new InspectorProperty(
                 identity,
                 new InspectorProperty.Presentation(
                         label, ProjectValueKind.of(value), false, Optional.empty(), InspectorConstraints.empty()),
                 new InspectorProperty.State(Optional.of(value), InspectorProperty.Origin.AUTHORED),
                 mutationTarget);
+    }
+
+    private static AuthoringText message(String code, String defaultMessage) {
+        return AuthoringText.message(code, defaultMessage);
     }
 }

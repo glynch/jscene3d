@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.project.session;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -12,7 +13,7 @@ import java.util.Objects;
  * @param label author-facing operation label
  * @param source affected authored source
  */
-public record AuthoringOperation(String label, Path source) {
+public record AuthoringOperation(AuthoringText label, Path source) {
     /** Normalizes the affected authored source. */
     public AuthoringOperation {
         Objects.requireNonNull(label, "label");

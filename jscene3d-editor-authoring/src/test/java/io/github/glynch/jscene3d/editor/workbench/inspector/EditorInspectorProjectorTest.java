@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.workbench.inspector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
@@ -52,12 +53,12 @@ final class EditorInspectorProjectorTest {
                 EditorInspectorProjector.entity(entity(), SOURCE, catalog(), occurrence, false);
 
         assertThat(inspection)
-                .returns("Player", InspectorProjection::title)
+                .returns(AuthoringText.literal("Player"), InspectorProjection::title)
                 .returns(false, InspectorProjection::generated)
                 .returns(true, InspectorProjection::editable);
         InspectorSection component = inspection.sections().get(1);
         assertThat(component)
-                .returns("Movement", InspectorSection::label)
+                .returns(AuthoringText.literal("Movement"), InspectorSection::label)
                 .returns(Optional.of(COMPONENT_TYPE), InspectorSection::componentType)
                 .returns(true, InspectorSection::metadataAvailable);
         InspectorProperty speed = component.properties().get(0);
@@ -142,12 +143,12 @@ final class EditorInspectorProjectorTest {
         List<InspectorSection> sections = new ArrayList<>();
         InspectorProjection inspection = new InspectorProjection(
                 new InspectorTarget(InspectorTarget.Kind.ASSET, SOURCE, "asset", Optional.empty()),
-                "Asset",
+                AuthoringText.literal("Asset"),
                 false,
                 false,
                 sections);
-        InspectorSection value =
-                new InspectorSection("late", "Late", Optional.empty(), Optional.empty(), true, List.of());
+        InspectorSection value = new InspectorSection(
+                "late", AuthoringText.literal("Late"), Optional.empty(), Optional.empty(), true, List.of());
         List<InspectorSection> immutableSections = inspection.sections();
 
         assertThatThrownBy(() -> immutableSections.add(value)).isInstanceOf(UnsupportedOperationException.class);

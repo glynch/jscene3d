@@ -6,6 +6,7 @@
 module io.github.glynch.jscene3d.project {
     requires transitive io.github.glynch.jscene3d.configuration;
     requires transitive io.github.glynch.jscene3d.core;
+    requires static io.github.glynch.jscene3d.i18n;
     requires com.fasterxml.jackson.databind;
     requires static org.jspecify;
 
@@ -41,6 +42,8 @@ module io.github.glynch.jscene3d.project {
             com.fasterxml.jackson.databind;
     opens io.github.glynch.jscene3d.project.manifest.internal to
             com.fasterxml.jackson.databind;
+    opens io.github.glynch.jscene3d.project.manifest to
+            io.github.glynch.jscene3d.i18n;
     opens io.github.glynch.jscene3d.project.resource.internal to
             com.fasterxml.jackson.databind;
     opens io.github.glynch.jscene3d.project.scene.internal to

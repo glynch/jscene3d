@@ -18,6 +18,12 @@ public final class AuthoringTestProject {
     /** Stable local entity identity used by working-copy lifecycle tests. */
     public static final String ENTITY_ID = "0b295328-b5a3-4f41-9f34-e9b4abc430a7";
 
+    /** Stable startup-world asset identity. */
+    public static final String WORLD_ASSET_ID = "e890c4c3-fb32-49d8-88b8-4e04e7a29656";
+
+    /** Stable reusable entity-definition identity for definition-opening tests. */
+    public static final String DEFINITION_ASSET_ID = "4ccdb339-9c5b-47d3-9b18-9169be5e4936";
+
     private AuthoringTestProject() {}
 
     /**
@@ -132,6 +138,36 @@ public final class AuthoringTestProject {
                 root,
                 "META-INF/services/io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension",
                 "class.which.must.not.be.loaded.MissingRuntimeExtension\n");
+    }
+
+    /** Writes one additional authored reusable entity definition. */
+    public static void writeEntityDefinition(Path root) throws IOException {
+        writeFile(root, "entities/reusable.entity.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/entity-definition-1.json",
+                  "assetId":"4ccdb339-9c5b-47d3-9b18-9169be5e4936",
+                  "assetType":"entity-definition",
+                  "formatVersion":1,
+                  "name":"Reusable",
+                  "contract":{
+                    "parameters":[],
+                    "signals":[],
+                    "actions":[],
+                    "capabilities":[],
+                    "attachments":[],
+                    "resourceBindings":[]
+                  },
+                  "connections":[],
+                  "root":{
+                    "entryType":"local",
+                    "entityId":"7be5cdf0-1bc7-481c-8880-3d627e14d52d",
+                    "name":"Reusable Root",
+                    "enabled":true,
+                    "components":[],
+                    "children":[]
+                  }
+                }
+                """);
     }
 
     /** Writes one UTF-8 fixture file below the project root. */

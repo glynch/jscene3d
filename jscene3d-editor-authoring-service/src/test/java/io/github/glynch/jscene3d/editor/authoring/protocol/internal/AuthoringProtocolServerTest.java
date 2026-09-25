@@ -63,7 +63,8 @@ final class AuthoringProtocolServerTest {
         assertThat(response.at("/result/engineVersion").asText()).isEqualTo("0.1.0-SNAPSHOT");
         assertThat(response.at("/result/capabilities"))
                 .extracting(JsonNode::asText)
-                .containsExactly("project/open", "project/replace", "project/close", "service/shutdown");
+                .containsExactly(
+                        "project/open", "project/replace", "project/close", "definition/open", "service/shutdown");
         assertThat(server.isInitialized()).isTrue();
         assertThat(server.clientLocale()).contains(Locale.forLanguageTag("en-GB"));
     }
@@ -85,7 +86,7 @@ final class AuthoringProtocolServerTest {
         JsonNode response = response(initialize(1, 7));
 
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isZero();
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(1);
         assertThat(server.isInitialized()).isTrue();
     }
 
@@ -192,6 +193,33 @@ final class AuthoringProtocolServerTest {
                 .get()
                 .extracting(session -> session.project().root())
                 .isEqualTo(first.toRealPath());
+    }
+
+    /** Serializes a complete ordered hierarchy snapshot with stable semantic identities. */
+    @Test
+    void dispatchesDefinitionOpen() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        response(initialize(1, 1));
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
+        long generation = opened.at("/result/projectGeneration").asLong();
+
+        JsonNode response = response(request(
+                3,
+                "definition/open",
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                        + "\"}"));
+
+        assertThat(response.at("/result/opened").asBoolean()).isTrue();
+        assertThat(response.at("/result/projectGeneration").asLong()).isEqualTo(generation);
+        assertThat(response.at("/result/definition/context/assetId").asText())
+                .isEqualTo(AuthoringTestProject.WORLD_ASSET_ID);
+        assertThat(response.at("/result/definition/context/kind").asText()).isEqualTo("world-definition");
+        assertThat(response.at("/result/definition/context/origin").asText()).isEqualTo("authored");
+        assertThat(response.at("/result/definition/roots/0/occurrence/entityPath/0")
+                        .asText())
+                .isEqualTo(AuthoringTestProject.ENTITY_ID);
+        assertThat(response.at("/result/definition/roots/0/target/source").asText())
+                .endsWith("worlds/main.world.json");
     }
 
     /** Ignores unknown optional initialization fields as required for additive evolution. */

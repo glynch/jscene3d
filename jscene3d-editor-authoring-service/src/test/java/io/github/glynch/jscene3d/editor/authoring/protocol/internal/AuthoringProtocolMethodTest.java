@@ -28,6 +28,7 @@ final class AuthoringProtocolMethodTest {
     @Test
     void advertisesOperationalCapabilities() {
         assertThat(AuthoringProtocolMethod.capabilities())
-                .containsExactly("project/open", "project/replace", "project/close", "service/shutdown");
+                .containsExactly(
+                        "project/open", "project/replace", "project/close", "definition/open", "service/shutdown");
     }
 }

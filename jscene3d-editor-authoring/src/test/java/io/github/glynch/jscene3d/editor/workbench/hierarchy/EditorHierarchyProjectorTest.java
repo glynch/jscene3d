@@ -46,23 +46,24 @@ final class EditorHierarchyProjectorTest {
         EditorHierarchyProjector projector = projector(catalog, diagnostics);
         WorldDefinition world = world();
 
-        EditorHierarchyNode root = projector.project(world, Set.of(LOCAL_ID));
+        EditorHierarchyProjection projection =
+                projector.project(world, projectRoot.resolve("world.world.json").toUri(), true, true, Set.of(LOCAL_ID));
 
-        assertThat(root.kind()).isEqualTo(EditorHierarchyNode.Kind.WORLD);
-        assertThat(root.children())
+        assertThat(projection.context().definitionId()).isEqualTo(WORLD_ID);
+        assertThat(projection.roots())
                 .extracting(EditorHierarchyNode::kind)
                 .containsExactly(
                         EditorHierarchyNode.Kind.LOCAL_ENTITY,
                         EditorHierarchyNode.Kind.PLACEMENT,
                         EditorHierarchyNode.Kind.PLACEMENT);
-        assertThat(root.children().getFirst())
+        assertThat(projection.roots().getFirst())
                 .returns(AuthoringText.literal("Local"), EditorHierarchyNode::label)
                 .returns(true, EditorHierarchyNode::isModified)
                 .returns(true, EditorHierarchyNode::isEditable);
-        assertThat(root.children().get(2))
+        assertThat(projection.roots().get(2))
                 .returns(false, EditorHierarchyNode::isEnabled)
                 .satisfies(node -> assertThat(node.toString()).doesNotContain("(disabled)"));
-        EditorHierarchyNode generated = root.children().get(1).children().getFirst();
+        EditorHierarchyNode generated = projection.roots().get(1).children().getFirst();
         assertThat(generated)
                 .returns(EditorHierarchyNode.Kind.GENERATED_ENTITY, EditorHierarchyNode::kind)
                 .returns(false, EditorHierarchyNode::isEditable)
@@ -76,18 +77,39 @@ final class EditorHierarchyProjectorTest {
         AssetCatalog catalog = catalog(definition());
         EditorHierarchyProjector projector = projector(catalog, new ArrayList<>());
 
-        EditorHierarchyNode firstProjection = projector.project(world(), Set.of());
-        EditorHierarchyNode secondProjection = projector.project(world(), Set.of());
+        EditorHierarchyProjection firstProjection = projector.project(
+                world(), projectRoot.resolve("world.world.json").toUri(), true, true, Set.of());
+        EditorHierarchyProjection secondProjection = projector.project(
+                world(), projectRoot.resolve("world.world.json").toUri(), true, true, Set.of());
         HierarchyOccurrenceId first =
-                firstProjection.children().get(1).children().getFirst().occurrence();
+                firstProjection.roots().get(1).children().getFirst().occurrence();
         HierarchyOccurrenceId second =
-                firstProjection.children().get(2).children().getFirst().occurrence();
+                firstProjection.roots().get(2).children().getFirst().occurrence();
 
         assertThat(first).isNotEqualTo(second);
         assertThat(first.entityPath()).containsExactly(FIRST_PLACEMENT, GENERATED_ID);
         assertThat(second.entityPath()).containsExactly(SECOND_PLACEMENT, GENERATED_ID);
-        assertThat(secondProjection.children().get(1).children().getFirst().occurrence())
+        assertThat(secondProjection.roots().get(1).children().getFirst().occurrence())
                 .isEqualTo(first);
+    }
+
+    /** Projects an independently opened entity definition with its actual root and root occurrence identity. */
+    @Test
+    void projectsEntityDefinitionRootWithoutSyntheticWrapper() throws Exception {
+        EntityDefinition definition = definition();
+        AssetCatalog catalog = catalog(definition);
+        EditorHierarchyProjector projector = projector(catalog, new ArrayList<>());
+
+        EditorHierarchyProjection projection = projector.project(
+                definition, projectRoot.resolve("shared.entity.json").toUri(), true, false, Set.of());
+
+        assertThat(projection.context().definitionId()).isEqualTo(DEFINITION_ID);
+        assertThat(projection.roots()).singleElement().satisfies(root -> {
+            assertThat(root.entityId()).contains(LOCAL_ID);
+            assertThat(root.isEditable()).isFalse();
+            assertThat(root.occurrence().definition()).isEqualTo(DEFINITION_ID);
+            assertThat(root.occurrence().entityPath()).containsExactly(LOCAL_ID);
+        });
     }
 
     /** Stops a cyclic definition graph and retains the authored placement as an unavailable leaf. */
@@ -100,14 +122,17 @@ final class EditorHierarchyProjectorTest {
         List<ProjectDiagnostic> diagnostics = new ArrayList<>();
         EditorHierarchyProjector projector = projector(catalog, diagnostics);
 
-        EditorHierarchyNode root = projector.project(
+        EditorHierarchyProjection projection = projector.project(
                 new WorldDefinition(
                         WORLD_ID,
                         "World",
                         List.of(new EntityPlacement(FIRST_PLACEMENT, true, AssetRef.to(DEFINITION_ID), Map.of()))),
+                projectRoot.resolve("world.world.json").toUri(),
+                true,
+                true,
                 Set.of());
 
-        assertThat(root.children())
+        assertThat(projection.roots())
                 .singleElement()
                 .satisfies(node -> assertThat(node.children()).isEmpty());
         assertThat(diagnostics).isNotEmpty();
@@ -119,13 +144,7 @@ final class EditorHierarchyProjectorTest {
     }
 
     private EditorHierarchyProjector projector(AssetCatalog catalog, List<ProjectDiagnostic> diagnostics) {
-        return new EditorHierarchyProjector(
-                projectRoot.resolve("world.world.json"),
-                projectRoot,
-                catalog,
-                catalog,
-                RegisteredTypeCatalog.of(List.of()),
-                diagnostics);
+        return new EditorHierarchyProjector(catalog, RegisteredTypeCatalog.of(List.of()), diagnostics);
     }
 
     private static EntityDefinition definition() {

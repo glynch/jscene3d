@@ -8,15 +8,22 @@ import io.github.glynch.jscene3d.configuration.definition.SettingKey;
 import io.github.glynch.jscene3d.editor.project.asset.ProjectAsset;
 import io.github.glynch.jscene3d.editor.project.session.internal.AuthoringChangeSource;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
+import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjection;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjector;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorWorldWorkingCopy;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.asset.AssetKind;
+import io.github.glynch.jscene3d.project.asset.AssetMetadata;
+import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
@@ -28,11 +35,15 @@ import io.github.glynch.jscene3d.project.settings.ProjectSettings;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /** Central revisioned facade for one loaded JScene3D authoring project. */
 public final class EditorProjectSession implements AutoCloseable {
@@ -46,13 +57,14 @@ public final class EditorProjectSession implements AutoCloseable {
     private final EditorHierarchyProjector hierarchyProjector;
     private final EditorWorldWorkingCopy startupWorld;
     private final AuthoringChangeSource<AuthoringSessionChange> changes = new AuthoringChangeSource<>();
-    private final AuthoringChangeSource<EditorHierarchyNode> hierarchyChanges = new AuthoringChangeSource<>();
+    private final AuthoringChangeSource<EditorHierarchyProjection> hierarchyChanges = new AuthoringChangeSource<>();
     private final AuthoringChangeSource<Boolean> dirtyChanges = new AuthoringChangeSource<>();
     private final AuthoringChangeSource<AuthoringConfigurationChange> configurationChanges =
             new AuthoringChangeSource<>();
     private final AuthoringSubscription workingCopySubscription;
+    private final Map<AssetId, RetainedState> retainedDefinitions = new LinkedHashMap<>();
 
-    private EditorHierarchyNode hierarchy;
+    private EditorHierarchyProjection hierarchy;
     private long revision;
     private boolean lastDirty;
     private boolean closed;
@@ -184,6 +196,40 @@ public final class EditorProjectSession implements AutoCloseable {
         return revision;
     }
 
+    /**
+     * Resolves and retains one structural definition by authoritative asset identity.
+     *
+     * <p>The startup world reuses its existing working copy. Other definitions are retained as immutable loaded
+     * content. Generated definitions remain read-only and retain their logical published source.
+     *
+     * @param id structural definition asset identity
+     * @return retained snapshot or ordered loading diagnostics
+     */
+    public DefinitionRetentionResult retainDefinition(AssetId id) {
+        ensureOpen();
+        AssetId validId = Objects.requireNonNull(id, "id");
+        RetainedState existing = retainedDefinitions.get(validId);
+        if (existing != null) {
+            return new DefinitionRetentionResult(Optional.of(snapshot(existing)), List.of());
+        }
+
+        Optional<AssetMetadata> authored = authoredAssets.find(validId);
+        DefinitionRetentionResult result =
+                authored.isPresent() ? retainAuthored(authored.orElseThrow()) : retainGeneratedEntity(validId);
+        diagnostics.addAll(result.diagnostics());
+        return result;
+    }
+
+    /**
+     * Returns retained identities in first-retention order.
+     *
+     * @return immutable retained definition identities
+     */
+    public List<AssetId> retainedDefinitionIds() {
+        ensureOpen();
+        return List.copyOf(retainedDefinitions.keySet());
+    }
+
     /** Returns whether startup-world content differs from its saved baseline.
      *
      * @return dirty state
@@ -259,9 +305,9 @@ public final class EditorProjectSession implements AutoCloseable {
 
     /** Returns the hierarchy projection for the current startup world.
      *
-     * @return current hierarchy root
+     * @return current definition context and hierarchy roots
      */
-    public EditorHierarchyNode hierarchy() {
+    public EditorHierarchyProjection hierarchy() {
         ensureOpen();
         return hierarchy;
     }
@@ -279,7 +325,7 @@ public final class EditorProjectSession implements AutoCloseable {
      *
      * @return hierarchy change stream
      */
-    public AuthoringChange<EditorHierarchyNode> onDidChangeHierarchy() {
+    public AuthoringChange<EditorHierarchyProjection> onDidChangeHierarchy() {
         ensureOpen();
         return hierarchyChanges;
     }
@@ -386,6 +432,7 @@ public final class EditorProjectSession implements AutoCloseable {
         closed = true;
         workingCopySubscription.close();
         startupWorld.close();
+        retainedDefinitions.clear();
         changes.close();
         hierarchyChanges.close();
         dirtyChanges.close();
@@ -412,8 +459,93 @@ public final class EditorProjectSession implements AutoCloseable {
         changes.emit(new AuthoringSessionChange(revision, dirty, kind));
     }
 
-    private EditorHierarchyNode projectHierarchy() {
-        return hierarchyProjector.project(startupWorld.current(), startupWorld.modifiedEntityIds());
+    private EditorHierarchyProjection projectHierarchy() {
+        return hierarchyProjector.project(
+                startupWorld.current(), startupWorld.source().toUri(), true, true, startupWorld.modifiedEntityIds());
+    }
+
+    /** Loads one definition whose kind and filesystem source were established by the authored catalog. */
+    private DefinitionRetentionResult retainAuthored(AssetMetadata metadata) {
+        return switch (metadata.kind()) {
+            case WORLD_DEFINITION -> retainAuthoredWorld(metadata);
+            case ENTITY_DEFINITION -> {
+                DefinitionLoadResult<EntityDefinition> result =
+                        definitions.loadEntity(AssetRef.to(metadata.id()), types);
+                yield retainLoaded(
+                        result,
+                        AssetKind.ENTITY_DEFINITION,
+                        EditorRetainedDefinition.Origin.AUTHORED,
+                        result.definition().map(EditorRetainedDefinition.Content.Entity::new));
+            }
+        };
+    }
+
+    /** Reuses the startup working copy or loads another authored world as immutable content. */
+    private DefinitionRetentionResult retainAuthoredWorld(AssetMetadata metadata) {
+        if (metadata.id().equals(startupWorld.current().id())) {
+            RetainedState state = new RetainedState(
+                    metadata.id(),
+                    AssetKind.WORLD_DEFINITION,
+                    EditorRetainedDefinition.Origin.AUTHORED,
+                    metadata.path().toUri(),
+                    new EditorRetainedDefinition.Content.World(startupWorld.current()));
+            retainedDefinitions.put(metadata.id(), state);
+            return new DefinitionRetentionResult(Optional.of(snapshot(state)), List.of());
+        }
+        DefinitionLoadResult<WorldDefinition> result = definitions.loadWorld(AssetRef.to(metadata.id()), types);
+        return retainLoaded(
+                result,
+                AssetKind.WORLD_DEFINITION,
+                EditorRetainedDefinition.Origin.AUTHORED,
+                result.definition().map(EditorRetainedDefinition.Content.World::new));
+    }
+
+    /** Resolves the only currently publishable generated structural kind. */
+    private DefinitionRetentionResult retainGeneratedEntity(AssetId id) {
+        DefinitionLoadResult<EntityDefinition> result = definitions.loadEntity(AssetRef.to(id), types);
+        return retainLoaded(
+                result,
+                AssetKind.ENTITY_DEFINITION,
+                EditorRetainedDefinition.Origin.GENERATED,
+                result.definition().map(EditorRetainedDefinition.Content.Entity::new));
+    }
+
+    /** Retains successfully loaded content while preserving resolver diagnostics on failure. */
+    private DefinitionRetentionResult retainLoaded(
+            DefinitionLoadResult<?> result,
+            AssetKind kind,
+            EditorRetainedDefinition.Origin origin,
+            Optional<EditorRetainedDefinition.Content> content) {
+        if (content.isEmpty()) {
+            return new DefinitionRetentionResult(Optional.empty(), result.diagnostics());
+        }
+        EditorRetainedDefinition.Content loaded = content.orElseThrow();
+        RetainedState state = new RetainedState(loaded.id(), kind, origin, result.source(), loaded);
+        retainedDefinitions.put(loaded.id(), state);
+        return new DefinitionRetentionResult(Optional.of(snapshot(state)), result.diagnostics());
+    }
+
+    /** Creates a current immutable snapshot, refreshing the startup world from its authoritative working copy. */
+    private EditorRetainedDefinition snapshot(RetainedState state) {
+        EditorRetainedDefinition.Content content =
+                state.id().equals(startupWorld.current().id())
+                        ? new EditorRetainedDefinition.Content.World(startupWorld.current())
+                        : state.content();
+        boolean editable = state.origin() == EditorRetainedDefinition.Origin.AUTHORED;
+        EditorHierarchyProjection projection =
+                switch (content) {
+                    case EditorRetainedDefinition.Content.World world ->
+                        hierarchyProjector.project(
+                                world.definition(),
+                                state.source(),
+                                editable,
+                                state.id().equals(startupWorld.current().id()),
+                                startupWorld.modifiedEntityIds());
+                    case EditorRetainedDefinition.Content.Entity entity ->
+                        hierarchyProjector.project(entity.definition(), state.source(), editable, false, Set.of());
+                };
+        return new EditorRetainedDefinition(
+                state.id(), state.kind(), state.origin(), editable, state.source(), revision, content, projection);
     }
 
     private void requireRevision(long expectedRevision) {
@@ -424,7 +556,10 @@ public final class EditorProjectSession implements AutoCloseable {
     }
 
     private EditorHierarchyNode editableNode(HierarchyOccurrenceId occurrence) {
-        EditorHierarchyNode node = findNode(hierarchy, occurrence)
+        EditorHierarchyNode node = hierarchy.roots().stream()
+                .map(root -> findNode(root, occurrence))
+                .flatMap(Optional::stream)
+                .findFirst()
                 .orElseThrow(() -> new IllegalStateException("hierarchy occurrence is not current: " + occurrence));
         if (!node.isEditable()) {
             throw new IllegalStateException("hierarchy occurrence is read-only: " + occurrence);
@@ -512,6 +647,22 @@ public final class EditorProjectSession implements AutoCloseable {
             Objects.requireNonNull(definitions, "definitions");
             Objects.requireNonNull(startupWorld, "startupWorld");
             Objects.requireNonNull(startupWorldSource, "startupWorldSource");
+        }
+    }
+
+    /** Session-owned retained definition data independent of transient protocol snapshots. */
+    private record RetainedState(
+            AssetId id,
+            AssetKind kind,
+            EditorRetainedDefinition.Origin origin,
+            URI source,
+            EditorRetainedDefinition.Content content) {
+        private RetainedState {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(origin, "origin");
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(content, "content");
         }
     }
 }

@@ -42,6 +42,17 @@ final class ProtocolDtoValidationTest {
                 .hasMessageContaining("blank");
     }
 
+    /** Rejects non-positive generations and blank definition asset identities. */
+    @Test
+    void rejectsInvalidDefinitionOpenParams() {
+        assertThatThrownBy(() -> new DefinitionOpenParams(0L, "asset"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> new DefinitionOpenParams(1L, " \t"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+    }
+
     /** Rejects inconsistent success and failure result shapes. */
     @Test
     void rejectsInconsistentProjectOpenResults() {

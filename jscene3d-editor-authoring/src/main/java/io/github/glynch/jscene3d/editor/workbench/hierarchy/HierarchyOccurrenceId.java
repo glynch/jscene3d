@@ -11,19 +11,19 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Stable identity of one hierarchy occurrence within an opened world.
+ * Stable identity of one hierarchy occurrence within an opened structural definition.
  *
- * <p>The world asset identifies the containing authored root and the ordered entity path contains each authored local
- * entity or placement identity traversed from that root. Descendants from one reusable definition therefore remain
+ * <p>The definition asset identifies the containing authored document and the ordered entity path contains each local
+ * entity or placement identity traversed from its roots. Descendants from one reusable definition therefore remain
  * distinct beneath different placement identities.
  *
- * @param world containing world asset identity
- * @param entityPath immutable authored entity/placement path from the world root
+ * @param definition containing structural-definition asset identity
+ * @param entityPath immutable authored entity/placement path from the definition roots
  */
-public record HierarchyOccurrenceId(AssetId world, List<EntityId> entityPath) {
+public record HierarchyOccurrenceId(AssetId definition, List<EntityId> entityPath) {
     /** Copies and validates the occurrence path. */
     public HierarchyOccurrenceId {
-        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(definition, "definition");
         entityPath = List.copyOf(entityPath);
     }
 
@@ -36,6 +36,6 @@ public record HierarchyOccurrenceId(AssetId world, List<EntityId> entityPath) {
     public HierarchyOccurrenceId child(EntityId entity) {
         ArrayList<EntityId> path = new ArrayList<>(entityPath);
         path.add(Objects.requireNonNull(entity, "entity"));
-        return new HierarchyOccurrenceId(world, path);
+        return new HierarchyOccurrenceId(definition, path);
     }
 }

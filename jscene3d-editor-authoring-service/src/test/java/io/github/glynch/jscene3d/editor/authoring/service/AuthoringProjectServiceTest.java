@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.editor.authoring.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectCloseResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
@@ -72,6 +74,39 @@ final class AuthoringProjectServiceTest {
                     assertThat(project.assetCounts().projected()).isEqualTo(1);
                 });
         assertThat(service.activeSession()).isPresent();
+    }
+
+    /** Opens generic world and entity definitions only for the expected active project generation. */
+    @Test
+    void opensDefinitionsWithGenerationScopedIdentity() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        AuthoringTestProject.writeEntityDefinition(temporaryDirectory);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+
+        DefinitionOpenResult world =
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+        DefinitionOpenResult entity =
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.DEFINITION_ASSET_ID));
+        DefinitionOpenResult stale =
+                service.openDefinition(new DefinitionOpenParams(2L, AuthoringTestProject.WORLD_ASSET_ID));
+
+        assertThat(world.opened()).isTrue();
+        var worldSnapshot = Objects.requireNonNull(world.definition());
+        assertThat(worldSnapshot.context())
+                .returns("world-definition", context -> context.kind())
+                .returns("authored", context -> context.origin())
+                .returns(true, context -> context.editable());
+        assertThat(worldSnapshot.roots()).hasSize(1);
+        assertThat(entity.opened()).isTrue();
+        var entitySnapshot = Objects.requireNonNull(entity.definition());
+        assertThat(entitySnapshot.context().kind()).isEqualTo("entity-definition");
+        assertThat(entitySnapshot.roots())
+                .singleElement()
+                .satisfies(root -> assertThat(root.occurrence().entityPath()).hasSize(1));
+        assertThat(service.activeSession().orElseThrow().retainedDefinitionIds())
+                .hasSize(2);
+        assertThat(stale.opened()).isFalse();
+        assertThat(stale.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_GENERATION_CONFLICT);
     }
 
     /** Accepts the selected descriptor path without encoding its filename in the protocol. */
@@ -338,7 +373,7 @@ final class AuthoringProjectServiceTest {
 
     /** Creates an enabled-state mutation target for the fixture's local entity. */
     private static InspectorMutationTarget.EntityEnabled enabledTarget(EditorProjectSession session) {
-        EditorHierarchyNode entity = session.hierarchy().children().getFirst();
+        EditorHierarchyNode entity = session.hierarchy().roots().getFirst();
         return new InspectorMutationTarget.EntityEnabled(
                 entity.occurrence(), EntityId.from(AuthoringTestProject.ENTITY_ID));
     }

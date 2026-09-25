@@ -19,6 +19,8 @@ enum AuthoringProtocolMethod {
     PROJECT_REPLACE("project/replace"),
     /** Closes the retained project without terminating the service. */
     PROJECT_CLOSE("project/close"),
+    /** Resolves and retains a structural definition with its complete hierarchy snapshot. */
+    DEFINITION_OPEN("definition/open"),
     /** Performs orderly service shutdown. */
     SERVICE_SHUTDOWN("service/shutdown");
 

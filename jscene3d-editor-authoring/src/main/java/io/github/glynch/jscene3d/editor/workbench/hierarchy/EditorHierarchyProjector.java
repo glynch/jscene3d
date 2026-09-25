@@ -7,9 +7,8 @@ package io.github.glynch.jscene3d.editor.workbench.hierarchy;
 import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
-import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
-import io.github.glynch.jscene3d.project.asset.AssetMetadata;
+import io.github.glynch.jscene3d.project.asset.AssetKind;
 import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
@@ -20,7 +19,7 @@ import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -28,80 +27,117 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Projects a world and placed definition roots into an immutable semantic hierarchy. */
+/** Projects structural definitions and placed definition roots into an immutable semantic hierarchy. */
 public final class EditorHierarchyProjector {
-    private final Path worldSource;
     private final ProjectionContext context;
 
     /**
      * Creates a projector backed by loaded project catalogs.
      *
-     * @param worldSource authored startup-world source
-     * @param projectRoot opened project root
-     * @param authored authored asset catalog
      * @param definitions definition resolver
      * @param types registered project types
      * @param diagnostics collection receiving definition-loading diagnostics
      */
     public EditorHierarchyProjector(
-            Path worldSource,
-            Path projectRoot,
-            AssetCatalog authored,
-            DefinitionResolver definitions,
-            RegisteredTypeCatalog types,
-            Collection<ProjectDiagnostic> diagnostics) {
-        this.worldSource = Objects.requireNonNull(worldSource, "worldSource");
-        context = new ProjectionContext(projectRoot, authored, definitions, types, diagnostics);
+            DefinitionResolver definitions, RegisteredTypeCatalog types, Collection<ProjectDiagnostic> diagnostics) {
+        context = new ProjectionContext(definitions, types, diagnostics);
     }
 
     /**
      * Projects the latest authored world.
      *
-     * @param world current startup-world definition
+     * @param world world definition
+     * @param source logical definition source
+     * @param definitionEditable whether the definition has authored editability
+     * @param entriesEditable whether local entries have an authoritative writable working copy
      * @param modifiedEntityIds entities modified since the saved revision
-     * @return immutable hierarchy root
+     * @return immutable definition context and actual ordered roots
      */
-    public EditorHierarchyNode project(WorldDefinition world, Set<EntityId> modifiedEntityIds) {
+    public EditorHierarchyProjection project(
+            WorldDefinition world,
+            URI source,
+            boolean definitionEditable,
+            boolean entriesEditable,
+            Set<EntityId> modifiedEntityIds) {
+        Objects.requireNonNull(world, "world");
+        URI validSource = requireAbsolute(source);
         ProjectionState state = new ProjectionState(Set.copyOf(modifiedEntityIds));
         HierarchyOccurrenceId root = new HierarchyOccurrenceId(world.id(), List.of());
-        List<EditorHierarchyNode> children = world.roots().stream()
-                .map(entry -> projectEntry(entry, worldSource, new HashSet<>(), false, root, state))
+        List<EditorHierarchyNode> roots = world.roots().stream()
+                .map(entry -> projectEntry(entry, validSource, new HashSet<>(), false, entriesEditable, root, state))
                 .toList();
-        InspectorTarget target = new InspectorTarget(
-                InspectorTarget.Kind.WORLD, worldSource, world.id().toString(), Optional.of(root));
-        return new EditorHierarchyNode(
-                new EditorHierarchyNode.Identity(
-                        root, EditorHierarchyNode.Kind.WORLD, Optional.empty(), Optional.of(world.id())),
+        EditorHierarchyProjection.Context definition = new EditorHierarchyProjection.Context(
+                world.id(),
+                AssetKind.WORLD_DEFINITION,
                 AuthoringText.literal(world.name()),
-                new EditorHierarchyNode.AuthoringState(true, false, Optional.empty()),
-                target,
-                children);
+                validSource,
+                definitionEditable);
+        return new EditorHierarchyProjection(definition, roots);
+    }
+
+    /**
+     * Projects one independently opened reusable entity definition.
+     *
+     * @param definition entity definition
+     * @param source logical definition source
+     * @param definitionEditable whether the definition has authored editability
+     * @param entriesEditable whether local entries have an authoritative writable working copy
+     * @param modifiedEntityIds entities modified since the saved revision
+     * @return immutable definition context and actual root entity
+     */
+    public EditorHierarchyProjection project(
+            EntityDefinition definition,
+            URI source,
+            boolean definitionEditable,
+            boolean entriesEditable,
+            Set<EntityId> modifiedEntityIds) {
+        Objects.requireNonNull(definition, "definition");
+        URI validSource = requireAbsolute(source);
+        ProjectionState state = new ProjectionState(Set.copyOf(modifiedEntityIds));
+        HierarchyOccurrenceId root = new HierarchyOccurrenceId(definition.id(), List.of());
+        EditorHierarchyNode entityRoot = projectEntry(
+                definition.root(),
+                validSource,
+                new HashSet<>(Set.of(definition.id())),
+                false,
+                entriesEditable,
+                root,
+                state);
+        EditorHierarchyProjection.Context context = new EditorHierarchyProjection.Context(
+                definition.id(),
+                AssetKind.ENTITY_DEFINITION,
+                AuthoringText.literal(definition.name()),
+                validSource,
+                definitionEditable);
+        return new EditorHierarchyProjection(context, List.of(entityRoot));
     }
 
     private EditorHierarchyNode projectEntry(
             EntityEntry entry,
-            Path source,
+            URI source,
             Set<AssetId> ancestors,
             boolean generated,
+            boolean editable,
             HierarchyOccurrenceId parent,
             ProjectionState state) {
         HierarchyOccurrenceId occurrence = parent.child(entry.id());
         return switch (entry) {
-            case LocalEntity local -> projectLocal(local, source, ancestors, generated, occurrence, state);
+            case LocalEntity local -> projectLocal(local, source, ancestors, generated, editable, occurrence, state);
             case EntityPlacement placement ->
-                projectPlacement(placement, source, ancestors, generated, occurrence, state);
+                projectPlacement(placement, source, ancestors, generated, editable, occurrence, state);
         };
     }
 
     private EditorHierarchyNode projectLocal(
             LocalEntity local,
-            Path source,
+            URI source,
             Set<AssetId> ancestors,
             boolean generated,
+            boolean editable,
             HierarchyOccurrenceId occurrence,
             ProjectionState state) {
         List<EditorHierarchyNode> children = local.children().stream()
-                .map(child -> projectEntry(child, source, ancestors, generated, occurrence, state))
+                .map(child -> projectEntry(child, source, ancestors, generated, editable, occurrence, state))
                 .toList();
         EditorHierarchyNode.Kind kind =
                 generated ? EditorHierarchyNode.Kind.GENERATED_ENTITY : EditorHierarchyNode.Kind.LOCAL_ENTITY;
@@ -114,8 +150,8 @@ public final class EditorHierarchyProjector {
                         .orElseGet(() -> AuthoringText.message("editor.hierarchy.unnamed-entity", "Unnamed entity")),
                 new EditorHierarchyNode.AuthoringState(
                         local.isEnabled(),
-                        !generated && state.modified().contains(local.id()),
-                        generated
+                        editable && !generated && state.modified().contains(local.id()),
+                        generated || !editable
                                 ? Optional.empty()
                                 : Optional.of(new InspectorMutationTarget.EntityEnabled(occurrence, local.id()))),
                 new InspectorTarget(targetKind, source, local.id().toString(), Optional.of(occurrence)),
@@ -124,11 +160,13 @@ public final class EditorHierarchyProjector {
 
     private EditorHierarchyNode projectPlacement(
             EntityPlacement placement,
-            Path source,
+            URI source,
             Set<AssetId> ancestors,
             boolean generated,
+            boolean editable,
             HierarchyOccurrenceId occurrence,
             ProjectionState state) {
+        EntryProjectionState entryState = new EntryProjectionState(source, generated, editable, state);
         DefinitionLoadResult<EntityDefinition> result =
                 context.definitions().loadEntity(placement.definition(), context.types());
         context.diagnostics().addAll(result.diagnostics());
@@ -136,10 +174,8 @@ public final class EditorHierarchyProjector {
         if (loaded.isEmpty() || !ancestors.add(placement.definition().id())) {
             return placementNode(
                     placement,
-                    source,
-                    generated,
+                    entryState,
                     occurrence,
-                    state,
                     placement
                             .name()
                             .<AuthoringText>map(AuthoringText::literal)
@@ -148,25 +184,20 @@ public final class EditorHierarchyProjector {
                     List.of());
         }
         EntityDefinition definition = loaded.orElseThrow();
-        Path definitionSource = context.authored()
-                .find(definition.id())
-                .map(AssetMetadata::path)
-                .orElse(source);
+        URI definitionSource = result.source();
         List<EditorHierarchyNode> children = definition.root().children().stream()
-                .map(child -> projectEntry(child, definitionSource, ancestors, true, occurrence, state))
+                .map(child -> projectEntry(child, definitionSource, ancestors, true, false, occurrence, state))
                 .toList();
         ancestors.remove(placement.definition().id());
         AuthoringText label = AuthoringText.literal(
                 placement.name().orElseGet(() -> definition.root().name().orElse(definition.name())));
-        return placementNode(placement, source, generated, occurrence, state, label, children);
+        return placementNode(placement, entryState, occurrence, label, children);
     }
 
     private static EditorHierarchyNode placementNode(
             EntityPlacement placement,
-            Path source,
-            boolean generated,
+            EntryProjectionState entryState,
             HierarchyOccurrenceId occurrence,
-            ProjectionState state,
             AuthoringText label,
             List<EditorHierarchyNode> children) {
         return new EditorHierarchyNode(
@@ -178,28 +209,39 @@ public final class EditorHierarchyProjector {
                 label,
                 new EditorHierarchyNode.AuthoringState(
                         placement.isEnabled(),
-                        !generated && state.modified().contains(placement.id()),
-                        generated
+                        entryState.editable()
+                                && !entryState.generated()
+                                && entryState.projection().modified().contains(placement.id()),
+                        entryState.generated() || !entryState.editable()
                                 ? Optional.empty()
                                 : Optional.of(new InspectorMutationTarget.EntityEnabled(occurrence, placement.id()))),
                 new InspectorTarget(
-                        InspectorTarget.Kind.PLACEMENT, source, placement.id().toString(), Optional.of(occurrence)),
+                        InspectorTarget.Kind.PLACEMENT,
+                        entryState.source(),
+                        placement.id().toString(),
+                        Optional.of(occurrence)),
                 children);
+    }
+
+    /** Validates a logical source without assuming it is a filesystem path. */
+    private static URI requireAbsolute(URI source) {
+        URI validSource = Objects.requireNonNull(source, "source").normalize();
+        if (!validSource.isAbsolute()) {
+            throw new IllegalArgumentException("source must be absolute");
+        }
+        return validSource;
     }
 
     /** Values that vary for each hierarchy refresh. */
     private record ProjectionState(Set<EntityId> modified) {}
 
+    /** Values inherited by one projected entry. */
+    private record EntryProjectionState(URI source, boolean generated, boolean editable, ProjectionState projection) {}
+
     /** Stable services used by all hierarchy refreshes. */
     private record ProjectionContext(
-            Path projectRoot,
-            AssetCatalog authored,
-            DefinitionResolver definitions,
-            RegisteredTypeCatalog types,
-            Collection<ProjectDiagnostic> diagnostics) {
+            DefinitionResolver definitions, RegisteredTypeCatalog types, Collection<ProjectDiagnostic> diagnostics) {
         private ProjectionContext {
-            Objects.requireNonNull(projectRoot, "projectRoot");
-            Objects.requireNonNull(authored, "authored");
             Objects.requireNonNull(definitions, "definitions");
             Objects.requireNonNull(types, "types");
             Objects.requireNonNull(diagnostics, "diagnostics");

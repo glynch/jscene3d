@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.manifest.ProjectDiagnosticCode;
+import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
@@ -28,6 +29,17 @@ final class ProjectDiagnosticMessageResolverTest {
                 .isEqualTo("The project manifest is not valid Project Manifest JSON");
         assertThat(resolver.resolve(diagnostic, Locale.FRENCH))
                 .isEqualTo("Le manifeste du projet n’est pas un manifeste JScene3D valide au format JSON");
+    }
+
+    /** Resolves the property-validation diagnostic family from its Java-owned French bundle. */
+    @Test
+    void resolvesLocalizedPropertyValidationMessage() {
+        ProjectDiagnostic diagnostic = diagnostic(PropertyValidationDiagnosticCode.INTEGER, List.of("count"));
+
+        assertThat(resolver.resolve(diagnostic, Locale.ENGLISH))
+                .isEqualTo("Property count must be a mathematically integral number");
+        assertThat(resolver.resolve(diagnostic, Locale.FRENCH))
+                .isEqualTo("La propriété count doit être un nombre mathématiquement entier");
     }
 
     /** Formats the feature fallback with deterministic ordered arguments when no bundle is registered. */

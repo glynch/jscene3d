@@ -375,6 +375,82 @@ final class ExtensionCatalogLoaderTest {
         }
     }
 
+    /** Rejects context-free semantic and descriptor failures in extension-declared defaults. */
+    @Test
+    void rejectsInvalidPropertyDefaultsThroughDescriptorLoading() throws IOException {
+        Path classPathRoot = descriptorRoot("invalid-defaults", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/extension-1.json",
+                  "schemaVersion":1,
+                  "id":"example.game",
+                  "version":"1.0.0",
+                  "engineRequires":">=0.1.0-SNAPSHOT <0.2.0",
+                  "displayName":"Example Game",
+                  "types":[{
+                    "id":"example.game/invalid-defaults",
+                    "typeVersion":1,
+                    "scope":"resource",
+                    "displayName":"Invalid defaults",
+                    "properties":[
+                      {
+                        "id":"integer",
+                        "valueKind":"number",
+                        "defaultValue":1.5,
+                        "displayName":"Integer",
+                        "editor":{"semantic":"integer"}
+                      },
+                      {
+                        "id":"minimum",
+                        "valueKind":"number",
+                        "defaultValue":-1,
+                        "displayName":"Minimum",
+                        "editor":{"minimum":0}
+                      },
+                      {
+                        "id":"quaternion",
+                        "valueKind":"array",
+                        "elementKind":"number",
+                        "exactElementCount":4,
+                        "defaultValue":[0,0,0,0],
+                        "displayName":"Quaternion",
+                        "editor":{"semantic":"quaternion"}
+                      },
+                      {
+                        "id":"color",
+                        "valueKind":"array",
+                        "elementKind":"number",
+                        "exactElementCount":3,
+                        "defaultValue":[0,1.1,1],
+                        "displayName":"Color",
+                        "editor":{"semantic":"color-linear"}
+                      },
+                      {
+                        "id":"kind",
+                        "valueKind":"number",
+                        "defaultValue":"wrong",
+                        "displayName":"Kind"
+                      }
+                    ]
+                  }]
+                }
+                """);
+
+        try (TrackingClassLoader classLoader = classLoader(classPathRoot)) {
+            ExtensionCatalogLoadResult result =
+                    new ExtensionCatalogLoader("0.1.0-SNAPSHOT").load(project("example.game", "1.0.0"), classLoader);
+
+            assertThat(result.catalog().extensions()).isEmpty();
+            assertThat(result.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .contains(
+                            "property.integer",
+                            "property.minimum",
+                            "property.quaternion.zero",
+                            "property.domain",
+                            "property.kind");
+        }
+    }
+
     /** Converts class-path enumeration failures into structured diagnostics. */
     @Test
     void reportsDescriptorEnumerationFailure() {

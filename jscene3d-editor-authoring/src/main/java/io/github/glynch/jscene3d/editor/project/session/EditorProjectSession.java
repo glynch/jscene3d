@@ -25,23 +25,30 @@ import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
+import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
-import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
+import io.github.glynch.jscene3d.project.validation.PropertySetValidator;
+import io.github.glynch.jscene3d.project.validation.PropertyTargetLookup;
+import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -445,11 +452,11 @@ public final class EditorProjectSession implements AutoCloseable {
      * @param target stable semantic mutation target
      * @param replacement typed replacement value
      * @param expectedRevision revision observed by the caller
-     * @return resulting authoritative revision
+     * @return accepted revision or ordered validation diagnostics for an atomic rejection
      * @throws IllegalStateException if the revision is stale or the target is not editable
-     * @throws IllegalArgumentException if the replacement violates descriptor constraints
      */
-    public long mutate(InspectorMutationTarget target, ProjectValue replacement, long expectedRevision) {
+    public AuthoringMutationResult mutate(
+            InspectorMutationTarget target, ProjectValue replacement, long expectedRevision) {
         ensureOpen();
         requireRevision(expectedRevision);
         InspectorMutationTarget validTarget = Objects.requireNonNull(target, "target");
@@ -459,21 +466,29 @@ public final class EditorProjectSession implements AutoCloseable {
             case InspectorMutationTarget.EntityEnabled enabled -> {
                 requireEntity(node, enabled.entity());
                 if (!(value instanceof ProjectValue.BooleanValue booleanValue)) {
-                    throw new IllegalArgumentException("enabled replacement must be a boolean value");
+                    return rejectedEnabled(value);
                 }
                 startupWorld.setEntityEnabled(enabled.entity(), booleanValue.value());
             }
             case InspectorMutationTarget.ComponentProperty property -> {
                 requireEntity(node, property.entity());
-                PropertyDescriptor descriptor = propertyDescriptor(property);
-                if (!descriptor.accepts(value)) {
-                    throw new IllegalArgumentException("replacement does not satisfy property "
-                            + property.property().value());
+                ResolvedProperty resolved = resolveProperty(property);
+                Map<PropertyId, ProjectValue> candidate =
+                        new LinkedHashMap<>(resolved.component().properties());
+                candidate.put(property.property(), value);
+                List<ProjectDiagnostic> validation = PropertySetValidator.validateComponent(
+                        Collections.unmodifiableMap(candidate),
+                        resolved.owner(),
+                        startupWorld.source().toUri(),
+                        "/properties",
+                        currentTargetLookup());
+                if (hasErrors(validation)) {
+                    return new AuthoringMutationResult(revision, validation);
                 }
                 startupWorld.setComponentProperty(property.entity(), property.component(), property.property(), value);
             }
         }
-        return revision;
+        return new AuthoringMutationResult(revision, List.of());
     }
 
     /** Returns whether this session has released its subscriptions and working copy.
@@ -694,7 +709,7 @@ public final class EditorProjectSession implements AutoCloseable {
         }
     }
 
-    private PropertyDescriptor propertyDescriptor(InspectorMutationTarget.ComponentProperty target) {
+    private ResolvedProperty resolveProperty(InspectorMutationTarget.ComponentProperty target) {
         LocalEntity entity = findLocal(startupWorld.current().roots(), target.entity())
                 .orElseThrow(() -> new IllegalStateException("local entity is not current: " + target.entity()));
         ComponentDefinition component = entity.components().stream()
@@ -702,11 +717,62 @@ public final class EditorProjectSession implements AutoCloseable {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("component is not current: " + target.component()));
         ComponentType type = new ComponentType(component.type(), component.typeVersion());
-        return types.findComponent(type)
-                .flatMap(descriptor ->
-                        Optional.ofNullable(descriptor.properties().get(target.property())))
-                .orElseThrow(
-                        () -> new IllegalStateException("property descriptor is unavailable: " + target.property()));
+        ComponentTypeDescriptor owner = types.findComponent(type)
+                .orElseThrow(() -> new IllegalStateException("component descriptor is unavailable: " + type));
+        if (!owner.properties().containsKey(target.property())) {
+            throw new IllegalStateException("property descriptor is unavailable: " + target.property());
+        }
+        return new ResolvedProperty(component, owner);
+    }
+
+    /** Returns the current definition-local target lookup without exposing working-copy mutation. */
+    private PropertyTargetLookup currentTargetLookup() {
+        return new PropertyTargetLookup() {
+            @Override
+            public boolean containsEntity(EntityId entity) {
+                return findEntry(startupWorld.current().roots(), entity).isPresent();
+            }
+
+            @Override
+            public boolean containsComponent(ComponentTarget target) {
+                return findLocal(startupWorld.current().roots(), target.entity()).stream()
+                        .flatMap(entity -> entity.components().stream())
+                        .anyMatch(component -> component.id().equals(target.component()));
+            }
+        };
+    }
+
+    /** Finds a local entity or placement in the current authored definition scope. */
+    private static Optional<EntityEntry> findEntry(List<EntityEntry> entries, EntityId target) {
+        for (EntityEntry entry : entries) {
+            if (entry.id().equals(target)) {
+                return Optional.of(entry);
+            }
+            if (entry instanceof LocalEntity local) {
+                Optional<EntityEntry> child = findEntry(local.children(), target);
+                if (child.isPresent()) {
+                    return child;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Creates a structured rejection for the built-in entity-enabled value. */
+    private AuthoringMutationResult rejectedEnabled(ProjectValue value) {
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR,
+                PropertyValidationDiagnosticCode.KIND,
+                startupWorld.source().toUri(),
+                "/enabled",
+                List.of("enabled", "BOOLEAN", ProjectValueKind.of(value)),
+                Map.of("technicalDetail", "enabled replacement must be a boolean value"));
+        return new AuthoringMutationResult(revision, List.of(diagnostic));
+    }
+
+    /** Returns whether validation produced an error. */
+    private static boolean hasErrors(List<ProjectDiagnostic> diagnostics) {
+        return diagnostics.stream().anyMatch(diagnostic -> diagnostic.severity() == ProjectDiagnostic.Severity.ERROR);
     }
 
     private static Optional<LocalEntity> findLocal(List<EntityEntry> entries, EntityId target) {
@@ -722,6 +788,15 @@ public final class EditorProjectSession implements AutoCloseable {
             }
         }
         return Optional.empty();
+    }
+
+    /** Exact component and property metadata resolved for one mutation target. */
+    private record ResolvedProperty(ComponentDefinition component, ComponentTypeDescriptor owner) {
+        /** Validates resolved mutation metadata. */
+        private ResolvedProperty {
+            Objects.requireNonNull(component, "component");
+            Objects.requireNonNull(owner, "owner");
+        }
     }
 
     private void ensureOpen() {

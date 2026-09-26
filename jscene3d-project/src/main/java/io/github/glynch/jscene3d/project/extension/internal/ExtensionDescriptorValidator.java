@@ -39,6 +39,7 @@ import io.github.glynch.jscene3d.project.internal.FieldDiagnosticCodes;
 import io.github.glynch.jscene3d.project.internal.SemanticVersion;
 import io.github.glynch.jscene3d.project.internal.SemanticVersionRequirement;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
+import io.github.glynch.jscene3d.project.validation.internal.PropertyValueValidation;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
@@ -61,6 +62,7 @@ public final class ExtensionDescriptorValidator {
     private static final String SCHEMA_URI = "https://jscene3d.org/schemas/extension-1.json";
 
     private final SemanticVersion engineVersion;
+    private final URI source;
     private final DiagnosticCollector diagnostics;
     private final ValidationContext fields;
     private final ProjectValueDecoder values;
@@ -68,6 +70,7 @@ public final class ExtensionDescriptorValidator {
     /** Stores one validation context. */
     private ExtensionDescriptorValidator(URI source, SemanticVersion engineVersion) {
         this.engineVersion = engineVersion;
+        this.source = source;
         diagnostics = new DiagnosticCollector(source);
         fields = new ValidationContext(
                 diagnostics,
@@ -570,15 +573,6 @@ public final class ExtensionDescriptorValidator {
         Set<ResourceReference.Kind> acceptedReferences =
                 referenceKinds(raw.acceptedReferences(), valueKind, location + "/acceptedReferences");
         Optional<ProjectValue> defaultValue = optionalValue(raw.defaultValue(), location + "/defaultValue");
-        if (defaultValue.isPresent()
-                && !accepts(
-                        valueKind, elementKind, exactElementCount, acceptedReferences, defaultValue.orElseThrow())) {
-            diagnostics.error(
-                    ExtensionDiagnosticCode.PROPERTY_DEFAULT_INVALID,
-                    "defaultValue does not satisfy valueKind and acceptedReferences",
-                    location + "/defaultValue");
-            defaultValue = Optional.empty();
-        }
         if (required && defaultValue.isPresent()) {
             diagnostics.error(
                     ExtensionDiagnosticCode.PROPERTY_REQUIRED_DEFAULT,
@@ -589,25 +583,85 @@ public final class ExtensionDescriptorValidator {
             return Optional.empty();
         }
         DescriptorPresentation metadata = presentation(displayName, description);
+        PropertyConstruction construction = new PropertyConstruction(
+                id, valueKind, elementKind, exactElementCount, metadata, editor, acceptedReferences);
         try {
-            if (elementKind.isPresent()) {
-                return Optional.of(arrayProperty(
-                        id, elementKind.orElseThrow(), exactElementCount, required, defaultValue, metadata, editor));
-            }
-            if (required) {
-                return Optional.of(PropertyDescriptor.required(id, valueKind, metadata, editor, acceptedReferences));
-            }
+            PropertyDescriptor descriptor = createProperty(construction, required, Optional.empty());
             if (defaultValue.isPresent()) {
-                return Optional.of(PropertyDescriptor.optionalWithDefault(
-                        id, valueKind, defaultValue.orElseThrow(), metadata, editor, acceptedReferences));
+                List<ProjectDiagnostic> defaultDiagnostics = PropertyValueValidation.validateDefault(
+                        descriptor, defaultValue.orElseThrow(), source, location + "/defaultValue");
+                diagnostics.addAll(defaultDiagnostics);
+                if (!defaultDiagnostics.isEmpty() || required) {
+                    return Optional.of(descriptor);
+                }
+                descriptor = createProperty(construction, false, defaultValue);
             }
-            return Optional.of(PropertyDescriptor.optional(id, valueKind, metadata, editor, acceptedReferences));
+            return Optional.of(descriptor);
         } catch (IllegalArgumentException exception) {
             diagnostics.error(
                     ExtensionDiagnosticCode.PROPERTY_EDITOR_INVALID,
                     exception.getMessage() == null ? "invalid property editor metadata" : exception.getMessage(),
                     location + "/editor");
             return Optional.empty();
+        }
+    }
+
+    /** Creates one scalar or array descriptor after raw fields have been validated. */
+    private static PropertyDescriptor createProperty(
+            PropertyConstruction declaration, boolean required, Optional<ProjectValue> defaultValue) {
+        if (declaration.elementKind().isPresent()) {
+            return arrayProperty(
+                    declaration.id(),
+                    declaration.elementKind().orElseThrow(),
+                    declaration.exactElementCount(),
+                    required,
+                    defaultValue,
+                    declaration.presentation(),
+                    declaration.editor());
+        }
+        if (required) {
+            return PropertyDescriptor.required(
+                    declaration.id(),
+                    declaration.valueKind(),
+                    declaration.presentation(),
+                    declaration.editor(),
+                    declaration.acceptedReferences());
+        }
+        if (defaultValue.isPresent()) {
+            return PropertyDescriptor.optionalWithDefault(
+                    declaration.id(),
+                    declaration.valueKind(),
+                    defaultValue.orElseThrow(),
+                    declaration.presentation(),
+                    declaration.editor(),
+                    declaration.acceptedReferences());
+        }
+        return PropertyDescriptor.optional(
+                declaration.id(),
+                declaration.valueKind(),
+                declaration.presentation(),
+                declaration.editor(),
+                declaration.acceptedReferences());
+    }
+
+    /** Cohesive property declaration used while optional defaults are validated. */
+    private record PropertyConstruction(
+            String id,
+            ProjectValueKind valueKind,
+            Optional<ProjectValueKind> elementKind,
+            Optional<Integer> exactElementCount,
+            DescriptorPresentation presentation,
+            Map<String, ProjectValue> editor,
+            Set<ResourceReference.Kind> acceptedReferences) {
+        /** Copies construction inputs used by both the default-free and completed descriptors. */
+        private PropertyConstruction {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(valueKind, "valueKind");
+            Objects.requireNonNull(elementKind, "elementKind");
+            Objects.requireNonNull(exactElementCount, "exactElementCount");
+            Objects.requireNonNull(presentation, "presentation");
+            editor = Map.copyOf(editor);
+            acceptedReferences = Set.copyOf(acceptedReferences);
         }
     }
 
@@ -1001,31 +1055,6 @@ public final class ExtensionDescriptorValidator {
             }
         }
         return Collections.unmodifiableSet(result);
-    }
-
-    /** Returns whether a default value satisfies property constraints. */
-    private static boolean accepts(
-            ProjectValueKind kind,
-            Optional<ProjectValueKind> elementKind,
-            Optional<Integer> exactElementCount,
-            Set<ResourceReference.Kind> referenceKinds,
-            ProjectValue value) {
-        if (ProjectValueKind.of(value) != kind) {
-            return false;
-        }
-        if (value instanceof ProjectValue.ReferenceValue reference) {
-            return referenceKinds.isEmpty()
-                    || referenceKinds.contains(reference.reference().kind());
-        }
-        if (!(value instanceof ProjectValue.ArrayValue array)) {
-            return true;
-        }
-        if (exactElementCount.isPresent() && array.values().size() != exactElementCount.orElseThrow()) {
-            return false;
-        }
-        return elementKind.isEmpty()
-                || array.values().stream()
-                        .allMatch(element -> ProjectValueKind.of(element) == elementKind.orElseThrow());
     }
 
     /** Converts an optional raw JSON value without interpreting resource references. */

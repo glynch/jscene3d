@@ -8,11 +8,10 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
-import io.github.glynch.jscene3d.project.extension.internal.RegisteredPropertyValidator;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
-import io.github.glynch.jscene3d.project.internal.PropertyDiagnosticCodes;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.resource.ResourceDiagnosticCode;
+import io.github.glynch.jscene3d.project.validation.PropertySetValidator;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,15 +43,8 @@ public final class ResourceCatalogValidator {
                             + " is required",
                     "/type");
         } else {
-            diagnostics.addAll(RegisteredPropertyValidator.validate(
-                    resource.properties(),
-                    descriptor.orElseThrow(),
-                    resource.source(),
-                    "/properties",
-                    new PropertyDiagnosticCodes(
-                            ResourceDiagnosticCode.PROPERTY_REQUIRED,
-                            ResourceDiagnosticCode.PROPERTY_UNKNOWN,
-                            ResourceDiagnosticCode.PROPERTY_VALUE_INVALID)));
+            diagnostics.addAll(PropertySetValidator.validate(
+                    resource.properties(), descriptor.orElseThrow(), resource.source(), "/properties"));
         }
         return diagnostics.diagnostics();
     }

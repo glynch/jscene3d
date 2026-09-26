@@ -26,12 +26,14 @@ import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
+import io.github.glynch.jscene3d.project.standard.game3d.StandardGame3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayInputStream;
@@ -43,6 +45,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -54,7 +57,11 @@ final class EditorProjectSessionTest {
     private static final AssetId GENERATED_DEFINITION_ID = AssetId.from("11111111-1111-4111-8111-111111111111");
     private static final EntityId ENTITY_ID = EntityId.from("0b295328-b5a3-4f41-9f34-e9b4abc430a7");
     private static final ComponentId COMPONENT_ID = ComponentId.from("3e940be7-e58d-4f3a-8b5e-e61c99c00904");
+    private static final ComponentId CONTROLLER_ID = ComponentId.from("939375cc-b60d-4204-a70a-0335cc18885f");
+    private static final EntityId MISSING_ENTITY = EntityId.from("f44faed6-7d2d-4e8f-86b0-5c359d32ed77");
     private static final PropertyId SPEED = new PropertyId("speed");
+    private static final PropertyId ORIENTATION = new PropertyId("orientation");
+    private static final PropertyId TARGET = new PropertyId("target");
 
     @TempDir
     private Path projectRoot;
@@ -176,9 +183,12 @@ final class EditorProjectSessionTest {
             session.onDidChange().subscribe(changes::add);
             session.onDidChangeDirty().subscribe(dirtyChanges::add);
 
-            long revision =
-                    session.mutate(target, new ProjectValue.NumberValue(new BigDecimal("2.5")), session.revision());
+            AuthoringMutationResult accepted =
+                    session.mutate(target, new ProjectValue.NumberValue(new BigDecimal("2")), session.revision());
+            long revision = accepted.revision();
 
+            assertThat(accepted.isAccepted()).isTrue();
+            assertThat(accepted.diagnostics()).isEmpty();
             assertThat(revision).isEqualTo(1L);
             assertThat(session.isDirty()).isTrue();
             assertThat(session.undoOperation())
@@ -190,14 +200,78 @@ final class EditorProjectSessionTest {
                     .containsExactly(new AuthoringSessionChange(1L, true, AuthoringSessionChange.Kind.CONTENT));
             assertThat(dirtyChanges).containsExactly(true);
             ProjectValue invalid = new ProjectValue.TextValue("invalid");
-            assertThatThrownBy(() -> session.mutate(target, invalid, revision))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("does not satisfy property speed");
+            AuthoringMutationResult rejected = session.mutate(target, invalid, revision);
+            assertThat(rejected.isAccepted()).isFalse();
+            assertThat(rejected.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("property.kind");
             ProjectValue stale = new ProjectValue.NumberValue(BigDecimal.ONE);
             assertThatThrownBy(() -> session.mutate(target, stale, 0L))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("stale authoring revision");
             assertThat(session.revision()).isEqualTo(1L);
+        }
+    }
+
+    /** Rejects invalid candidates without changing content, revision, history, dirty state, or notifications. */
+    @Test
+    void rejectsPropertyMutationAtomicallyWithStructuredDiagnostics() throws Exception {
+        try (EditorProjectSession session = session()) {
+            EditorHierarchyNode entity = session.hierarchy().roots().getFirst();
+            InspectorMutationTarget.ComponentProperty target =
+                    new InspectorMutationTarget.ComponentProperty(entity.occurrence(), ENTITY_ID, COMPONENT_ID, SPEED);
+            WorldDefinition before = session.startupWorld();
+            List<AuthoringSessionChange> changes = new ArrayList<>();
+            List<Boolean> dirtyChanges = new ArrayList<>();
+            session.onDidChange().subscribe(changes::add);
+            session.onDidChangeDirty().subscribe(dirtyChanges::add);
+
+            AuthoringMutationResult wrongKind = session.mutate(target, new ProjectValue.TextValue("fast"), 0L);
+            AuthoringMutationResult nonIntegral = session.mutate(target, number("1.5"), 0L);
+            AuthoringMutationResult aboveMaximum = session.mutate(target, number("6"), 0L);
+            AuthoringMutationResult zeroQuaternion = session.mutate(
+                    new InspectorMutationTarget.ComponentProperty(
+                            entity.occurrence(), ENTITY_ID, COMPONENT_ID, ORIENTATION),
+                    array("0", "0", "0", "0"),
+                    0L);
+            AuthoringMutationResult invalidTarget = session.mutate(
+                    new InspectorMutationTarget.ComponentProperty(entity.occurrence(), ENTITY_ID, COMPONENT_ID, TARGET),
+                    new ProjectValue.ComponentTargetValue(new ComponentTarget(MISSING_ENTITY, COMPONENT_ID)),
+                    0L);
+            AuthoringMutationResult invalidRelationship = session.mutate(
+                    new InspectorMutationTarget.ComponentProperty(
+                            entity.occurrence(),
+                            ENTITY_ID,
+                            CONTROLLER_ID,
+                            StandardGame3dDescriptors.maximumKeyboardTurnSpeedDegreesProperty()),
+                    number("9"),
+                    0L);
+
+            assertThat(wrongKind.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("property.kind");
+            assertThat(nonIntegral.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("property.integer");
+            assertThat(aboveMaximum.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("property.maximum");
+            assertThat(zeroQuaternion.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("property.quaternion.zero");
+            assertThat(invalidTarget.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("property.target");
+            assertThat(invalidRelationship.diagnostics())
+                    .extracting(diagnostic -> diagnostic.code().code())
+                    .containsExactly("property.domain");
+            assertThat(session.startupWorld()).isEqualTo(before);
+            assertThat(session.revision()).isZero();
+            assertThat(session.isDirty()).isFalse();
+            assertThat(session.canUndo()).isFalse();
+            assertThat(session.canRedo()).isFalse();
+            assertThat(changes).isEmpty();
+            assertThat(dirtyChanges).isEmpty();
         }
     }
 
@@ -319,12 +393,30 @@ final class EditorProjectSessionTest {
                     "id":"example.session-test/mover",
                     "typeVersion":1,
                     "displayName":"Mover",
-                    "properties":[{
-                      "id":"speed",
-                      "valueKind":"number",
-                      "required":true,
-                      "displayName":"Speed"
-                    }]
+                    "properties":[
+                      {
+                        "id":"speed",
+                        "valueKind":"number",
+                        "required":true,
+                        "displayName":"Speed",
+                        "editor":{"semantic":"integer","minimum":0,"maximum":5}
+                      },
+                      {
+                        "id":"orientation",
+                        "valueKind":"array",
+                        "elementKind":"number",
+                        "exactElementCount":4,
+                        "required":true,
+                        "displayName":"Orientation",
+                        "editor":{"semantic":"quaternion"}
+                      },
+                      {
+                        "id":"target",
+                        "valueKind":"component_target",
+                        "required":true,
+                        "displayName":"Target"
+                      }
+                    ]
                   }]
                 }
                 """);
@@ -341,12 +433,46 @@ final class EditorProjectSessionTest {
                     "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
                     "name":"Player",
                     "enabled":true,
-                    "components":[{
-                      "componentId":"3e940be7-e58d-4f3a-8b5e-e61c99c00904",
-                      "type":"example.session-test/mover",
-                      "typeVersion":1,
-                      "properties":{"speed":1}
-                    }],
+                    "components":[
+                      {
+                        "componentId":"3e940be7-e58d-4f3a-8b5e-e61c99c00904",
+                        "type":"example.session-test/mover",
+                        "typeVersion":1,
+                        "properties":{
+                          "speed":1,
+                          "orientation":[0,0,0,1],
+                          "target":{"$target":{
+                            "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
+                            "componentId":"3e940be7-e58d-4f3a-8b5e-e61c99c00904"
+                          }}
+                        }
+                      },
+                      {
+                        "componentId":"939375cc-b60d-4204-a70a-0335cc18885f",
+                        "type":"io.github.glynch.jscene3d.game3d/first-person-character-controller-3d",
+                        "typeVersion":1,
+                        "properties":{
+                          "body":{"$target":{
+                            "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
+                            "componentId":"3e940be7-e58d-4f3a-8b5e-e61c99c00904"
+                          }},
+                          "view-transform":{"$target":{
+                            "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
+                            "componentId":"3e940be7-e58d-4f3a-8b5e-e61c99c00904"
+                          }},
+                          "move-action":"move",
+                          "look-action":"look",
+                          "turn-left-action":"turn-left",
+                          "turn-right-action":"turn-right",
+                          "move-speed":1,
+                          "turn-speed-degrees":10,
+                          "maximum-keyboard-turn-speed-degrees":20,
+                          "keyboard-turn-acceleration-degrees":5,
+                          "pointer-sensitivity":1,
+                          "maximum-pitch-degrees":80
+                        }
+                      }
+                    ],
                     "children":[]
                   }]
                 }
@@ -383,5 +509,17 @@ final class EditorProjectSessionTest {
         Path target = projectRoot.resolve(relativePath);
         Files.createDirectories(target.getParent());
         Files.writeString(target, content, StandardCharsets.UTF_8);
+    }
+
+    /** Creates one exact decimal project number. */
+    private static ProjectValue.NumberValue number(String value) {
+        return new ProjectValue.NumberValue(new BigDecimal(value));
+    }
+
+    /** Creates one exact-decimal project array. */
+    private static ProjectValue.ArrayValue array(String... values) {
+        return new ProjectValue.ArrayValue(Arrays.stream(values)
+                .<ProjectValue>map(EditorProjectSessionTest::number)
+                .toList());
     }
 }

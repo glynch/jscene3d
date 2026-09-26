@@ -7,8 +7,10 @@ package io.github.glynch.jscene3d.project.extension;
 import static io.github.glynch.jscene3d.project.internal.Preconditions.immutableProjectValues;
 import static io.github.glynch.jscene3d.project.internal.Preconditions.requireLocalId;
 
+import io.github.glynch.jscene3d.project.validation.internal.PropertyValueValidation;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
+import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -379,28 +381,15 @@ public final class PropertyDescriptor {
     /**
      * Returns whether a project value satisfies this descriptor's structural constraints.
      *
+     * <p>This compatibility predicate checks only value shape and accepted reference namespace. It does not enforce
+     * numeric bounds, built-in semantics, owner-type rules, or contextual resolution. Authoritative callers must use
+     * {@code PropertySetValidator} with a complete property set.
+     *
      * @param value project value to check
      * @return {@code true} when the value is accepted
      */
     public boolean accepts(ProjectValue value) {
-        ProjectValue validValue = Objects.requireNonNull(value, "value");
-        if (ProjectValueKind.of(validValue) != valueKind) {
-            return false;
-        }
-        if (validValue instanceof ProjectValue.ReferenceValue referenceValue) {
-            return acceptedReferenceKinds.isEmpty()
-                    || acceptedReferenceKinds.contains(
-                            referenceValue.reference().kind());
-        }
-        if (!(validValue instanceof ProjectValue.ArrayValue array)) {
-            return true;
-        }
-        if (exactElementCount.isPresent() && array.values().size() != exactElementCount.orElseThrow()) {
-            return false;
-        }
-        return elementKind.isEmpty()
-                || array.values().stream()
-                        .allMatch(element -> ProjectValueKind.of(element) == elementKind.orElseThrow());
+        return PropertyValueValidation.structurallyAccepts(this, value);
     }
 
     @Override
@@ -446,7 +435,8 @@ public final class PropertyDescriptor {
 
     /** Rejects a default inconsistent with this property. */
     private void requireAcceptedValue(ProjectValue value) {
-        if (!accepts(value)) {
+        if (!PropertyValueValidation.validateDefault(this, value, URI.create("jscene3d-descriptor:/"), "/defaultValue")
+                .isEmpty()) {
             throw new IllegalArgumentException("defaultValue does not satisfy property " + id);
         }
     }

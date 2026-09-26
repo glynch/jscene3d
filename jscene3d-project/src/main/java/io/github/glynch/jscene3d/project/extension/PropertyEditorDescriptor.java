@@ -29,10 +29,13 @@ public final class PropertyEditorDescriptor {
         this.semantic = Objects.requireNonNull(semantic, "semantic");
         this.minimum = Objects.requireNonNull(minimum, "minimum");
         this.maximum = Objects.requireNonNull(maximum, "maximum");
-        if (minimum.isPresent()
-                && maximum.isPresent()
-                && minimum.orElseThrow().value().compareTo(maximum.orElseThrow().value()) > 0) {
-            throw new IllegalArgumentException("minimum editor bound must not exceed maximum");
+        if (minimum.isPresent() && maximum.isPresent()) {
+            PropertyNumericBound lower = minimum.orElseThrow();
+            PropertyNumericBound upper = maximum.orElseThrow();
+            int comparison = lower.value().compareTo(upper.value());
+            if (comparison > 0 || comparison == 0 && (!lower.isInclusive() || !upper.isInclusive())) {
+                throw new IllegalArgumentException("numeric editor bounds must describe a non-empty interval");
+            }
         }
     }
 

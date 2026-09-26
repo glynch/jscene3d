@@ -21,6 +21,7 @@ import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
@@ -81,7 +82,7 @@ final class AuthoredTargetValidationTest {
         assertThat(result.definition()).isEmpty();
         assertThat(result.diagnostics())
                 .extracting(diagnostic -> diagnostic.code())
-                .contains(AssetDiagnosticCode.TARGET_INVALID);
+                .contains(PropertyValidationDiagnosticCode.TARGET);
     }
 
     /** Prevents an outer asset from naming a private component inside a reusable-definition placement. */
@@ -101,7 +102,7 @@ final class AuthoredTargetValidationTest {
         assertThat(result.definition()).isEmpty();
         assertThat(result.diagnostics())
                 .extracting(diagnostic -> diagnostic.code())
-                .contains(AssetDiagnosticCode.TARGET_INVALID);
+                .contains(PropertyValidationDiagnosticCode.TARGET);
     }
 
     /** Creates a valid definition whose child targets its root entity and body component. */

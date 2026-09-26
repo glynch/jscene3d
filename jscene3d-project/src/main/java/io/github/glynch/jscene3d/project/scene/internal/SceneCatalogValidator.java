@@ -11,13 +11,12 @@ import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
-import io.github.glynch.jscene3d.project.extension.internal.RegisteredPropertyValidator;
-import io.github.glynch.jscene3d.project.internal.PropertyDiagnosticCodes;
 import io.github.glynch.jscene3d.project.scene.ControllerDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneConnection;
 import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.scene.SceneDiagnosticCode;
 import io.github.glynch.jscene3d.project.scene.SceneNodeDefinition;
+import io.github.glynch.jscene3d.project.validation.PropertySetValidator;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.net.URI;
 import java.util.ArrayList;
@@ -102,15 +101,7 @@ public final class SceneCatalogValidator {
     /** Validates authored properties against one registered type descriptor. */
     private void validateProperties(
             Map<String, ProjectValue> authored, RegisteredTypeDescriptor type, String location) {
-        diagnostics.addAll(RegisteredPropertyValidator.validate(
-                authored,
-                type,
-                source,
-                location,
-                new PropertyDiagnosticCodes(
-                        SceneDiagnosticCode.PROPERTY_REQUIRED,
-                        SceneDiagnosticCode.PROPERTY_UNKNOWN,
-                        SceneDiagnosticCode.PROPERTY_VALUE_INVALID)));
+        diagnostics.addAll(PropertySetValidator.validate(authored, type, source, location));
     }
 
     /** Validates every signal-to-action connection. */

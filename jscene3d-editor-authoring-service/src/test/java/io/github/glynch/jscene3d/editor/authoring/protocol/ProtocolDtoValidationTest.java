@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.LinkedHashMap;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -204,6 +205,51 @@ final class ProtocolDtoValidationTest {
         assertThat(json.at("/groups/0/properties/0/state/effectiveValue/values/1/decimal")
                         .asText())
                 .isEqualTo("90.0000000000000000001");
+    }
+
+    /** Preserves the complete semantic Inspector value vocabulary without losing identity data. */
+    @Test
+    void representsSemanticInspectorValueVocabulary() {
+        InspectorSnapshot.NullValue nullValue = new InspectorSnapshot.NullValue("null");
+        InspectorSnapshot.TextValue textValue = new InspectorSnapshot.TextValue("text", "display value");
+        LinkedHashMap<String, InspectorSnapshot.Value> sourceValues = new LinkedHashMap<>();
+        sourceValues.put("empty", nullValue);
+        sourceValues.put("label", textValue);
+        InspectorSnapshot.ObjectValue objectValue = new InspectorSnapshot.ObjectValue("object", sourceValues);
+        InspectorSnapshot.ReferenceValue referenceValue = new InspectorSnapshot.ReferenceValue(
+                "reference", "asset", "texture:wall", "Wall Texture", "resolved", "file:///project/wall.png");
+        DefinitionSnapshot.Occurrence occurrence =
+                new DefinitionSnapshot.Occurrence("world-a", List.of("room-a", "entity-a"));
+        InspectorSnapshot.EntityTargetValue entityTarget = new InspectorSnapshot.EntityTargetValue(
+                "entity-target", "entity-a", "Entity A", "resolved", occurrence);
+        InspectorSnapshot.ComponentTypeDto componentType =
+                new InspectorSnapshot.ComponentTypeDto("example/transform", 2);
+        InspectorSnapshot.ComponentTargetValue componentTarget = new InspectorSnapshot.ComponentTargetValue(
+                "component-target",
+                "entity-a",
+                "transform-a",
+                "Entity A",
+                "Transform",
+                componentType,
+                "resolved",
+                occurrence);
+        InspectorSnapshot.NumericBound minimum = new InspectorSnapshot.NumericBound("-1.25", true);
+
+        sourceValues.put("late", textValue);
+
+        assertThat(objectValue.values().keySet()).containsExactly("empty", "label");
+        assertThat(objectValue.values()).containsEntry("empty", nullValue).containsEntry("label", textValue);
+        assertThat(referenceValue)
+                .extracting(
+                        InspectorSnapshot.ReferenceValue::referenceKind,
+                        InspectorSnapshot.ReferenceValue::locator,
+                        InspectorSnapshot.ReferenceValue::resolution)
+                .containsExactly("asset", "texture:wall", "resolved");
+        assertThat(entityTarget.occurrence()).isEqualTo(occurrence);
+        assertThat(componentTarget.componentType()).isEqualTo(componentType);
+        assertThat(componentTarget.occurrence()).isEqualTo(occurrence);
+        assertThat(minimum.decimal()).isEqualTo("-1.25");
+        assertThat(minimum.inclusive()).isTrue();
     }
 
     /** Creates one valid project summary for result-shape validation. */

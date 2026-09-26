@@ -18,6 +18,7 @@ import io.github.glynch.jscene3d.project.manifest.ProjectDiagnosticCode;
 import io.github.glynch.jscene3d.project.resource.ResourceDiagnosticCode;
 import io.github.glynch.jscene3d.project.scene.SceneDiagnosticCode;
 import io.github.glynch.jscene3d.project.settings.ProjectSettingsDiagnosticCode;
+import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.Map;
@@ -34,6 +35,7 @@ final class ProjectDiagnosticMessageResolver {
             source(ResourceDiagnosticCode.class, "io.github.glynch.jscene3d.project.resource.messages"),
             source(SceneDiagnosticCode.class, "io.github.glynch.jscene3d.project.scene.messages"),
             source(ProjectSettingsDiagnosticCode.class, "io.github.glynch.jscene3d.project.settings.messages"),
+            source(PropertyValidationDiagnosticCode.class, "io.github.glynch.jscene3d.project.validation.messages"),
             source(ImportDiagnosticCode.class, "io.github.glynch.jscene3d.project.importing.messages"),
             source(EditorDiagnosticCode.class, "io.github.glynch.jscene3d.editor.diagnostics.messages"));
 

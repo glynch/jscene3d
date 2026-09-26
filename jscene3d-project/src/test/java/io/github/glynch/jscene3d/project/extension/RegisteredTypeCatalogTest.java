@@ -59,13 +59,10 @@ final class RegisteredTypeCatalogTest {
 
         assertThat(diagnostics)
                 .extracting(diagnostic -> diagnostic.code().code())
-                .containsExactlyInAnyOrder(
-                        "scene.catalog.property.value",
-                        "scene.catalog.property.unknown",
-                        "scene.catalog.property.required");
+                .containsExactlyInAnyOrder("property.kind", "property.unknown", "property.required");
         assertThat(diagnostics)
                 .extracting(ProjectDiagnostic::location)
-                .contains("/root/properties/speed", "/root/properties/mystery", "/root/properties");
+                .contains("/root/properties/speed", "/root/properties/mystery", "/root/properties/label");
     }
 
     /** Reports unresolved registered types and types used in the wrong scene scope. */

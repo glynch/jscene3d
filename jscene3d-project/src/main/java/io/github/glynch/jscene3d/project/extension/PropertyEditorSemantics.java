@@ -15,7 +15,7 @@ public final class PropertyEditorSemantics {
     /** Three-axis Euler rotation authored in degrees and applied in XYZ order. */
     public static final String EULER_ROTATION = "euler-rotation";
 
-    /** Four-axis normalized quaternion. */
+    /** Four-axis non-zero quaternion; authored values need not already be normalized. */
     public static final String QUATERNION = "quaternion";
 
     /** Linear-sRGB color channels. */

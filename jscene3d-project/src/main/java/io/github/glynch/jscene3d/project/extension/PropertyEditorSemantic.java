@@ -16,7 +16,7 @@ public enum PropertyEditorSemantic {
     VECTOR3(PropertyEditorSemantics.VECTOR3),
     /** Three-axis Euler rotation authored in degrees and applied in XYZ order. */
     EULER_ROTATION(PropertyEditorSemantics.EULER_ROTATION),
-    /** Four-axis normalized quaternion. */
+    /** Four-axis non-zero quaternion; authored values need not already be normalized. */
     QUATERNION(PropertyEditorSemantics.QUATERNION),
     /** Three-channel linear-sRGB color. */
     LINEAR_COLOR(PropertyEditorSemantics.LINEAR_COLOR);

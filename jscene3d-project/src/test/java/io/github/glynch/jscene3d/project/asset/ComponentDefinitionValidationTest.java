@@ -30,11 +30,14 @@ import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -93,11 +96,70 @@ final class ComponentDefinitionValidationTest {
         assertThat(result.diagnostics())
                 .extracting(diagnostic -> diagnostic.code().code())
                 .contains(
-                        "asset.component.catalog.property.value",
-                        "asset.component.catalog.property.unknown",
+                        "property.kind",
+                        "property.unknown",
                         "asset.component.catalog.multiplicity",
                         "asset.component.catalog.conflict",
                         "asset.component.catalog.capability.ambiguous");
+    }
+
+    /** Rejects every representative core property failure through the ordinary definition loader. */
+    @Test
+    void rejectsAuthoritativePropertyFailuresDuringLoad() throws IOException {
+        Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
+        properties.put(new PropertyId("wrong-kind"), new ProjectValue.TextValue("not-a-number"));
+        properties.put(new PropertyId("wrong-length"), array(number("1")));
+        properties.put(
+                new PropertyId("wrong-element"),
+                new ProjectValue.ArrayValue(List.of(number("1"), new ProjectValue.TextValue("two"))));
+        properties.put(new PropertyId("integer"), number("1.5"));
+        properties.put(new PropertyId("minimum"), number("-0.1"));
+        properties.put(new PropertyId("maximum"), number("1"));
+        properties.put(new PropertyId("quaternion"), array(number("0"), number("0"), number("0"), number("0")));
+        properties.put(new PropertyId("color"), array(number("0"), number("1.1"), number("1")));
+        properties.put(new PropertyId("unknown"), new ProjectValue.BooleanValue(true));
+        ComponentDefinition invalid = component(MOVER, MOVER_TYPE, properties);
+        EntityDefinition definition = new EntityDefinition(
+                ASSET_ID, "Invalid properties", new LocalEntity(ROOT, true, List.of(invalid), List.of()));
+
+        DefinitionLoadResult<EntityDefinition> result = load(definition, validationDescriptor());
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains(
+                        "property.kind",
+                        "property.array.length",
+                        "property.array.element-kind",
+                        "property.integer",
+                        "property.minimum",
+                        "property.maximum",
+                        "property.quaternion.zero",
+                        "property.domain",
+                        "property.unknown",
+                        "property.required");
+    }
+
+    /** Applies built-in whole-component rules while loading an ordinary authored definition. */
+    @Test
+    void rejectsBuiltInCrossPropertyFailureDuringLoad() throws IOException {
+        ComponentDefinition camera = component(
+                MOVER,
+                StandardSpatial3dDescriptors.perspectiveCameraType().id(),
+                Map.of(
+                        StandardSpatial3dDescriptors.nearProperty(), number("10"),
+                        StandardSpatial3dDescriptors.farProperty(), number("10")));
+        EntityDefinition definition = new EntityDefinition(
+                ASSET_ID, "Invalid camera", new LocalEntity(ROOT, true, List.of(camera), List.of()));
+        RegisteredTypeCatalog types =
+                RegisteredTypeCatalog.of(List.of(StandardSpatial3dDescriptors.extensionDescriptor()));
+
+        DefinitionLoadResult<EntityDefinition> result = load(definition, types);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains("property.domain");
     }
 
     /** Rejects multiple components claiming primary spatial authority even across different domains. */
@@ -172,6 +234,14 @@ final class ComponentDefinitionValidationTest {
         return assets.loadEntity(AssetRef.to(definition.id()), types);
     }
 
+    /** Writes and validates one definition against an already assembled catalog. */
+    private DefinitionLoadResult<EntityDefinition> load(EntityDefinition definition, RegisteredTypeCatalog types)
+            throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("subject.entity.json"), definition);
+        AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
+        return assets.loadEntity(AssetRef.to(definition.id()), types);
+    }
+
     /** Creates one authored component with version one. */
     private static ComponentDefinition component(
             ComponentId id, ComponentTypeId type, Map<PropertyId, ProjectValue> properties) {
@@ -232,6 +302,61 @@ final class ComponentDefinitionValidationTest {
                 .build();
     }
 
+    /** Declares properties spanning every core validation family exercised through loading. */
+    private static ComponentTypeDescriptor validationDescriptor() {
+        List<PropertyDescriptor> properties = List.of(
+                PropertyDescriptor.required(
+                        "required",
+                        ProjectValueKind.BOOLEAN,
+                        DescriptorPresentation.named("Required"),
+                        Map.of(),
+                        Set.of()),
+                PropertyDescriptor.required(
+                        "wrong-kind",
+                        ProjectValueKind.NUMBER,
+                        DescriptorPresentation.named("Kind"),
+                        Map.of(),
+                        Set.of()),
+                PropertyDescriptor.requiredArray(
+                        "wrong-length", ProjectValueKind.NUMBER, 2, DescriptorPresentation.named("Length"), Map.of()),
+                PropertyDescriptor.requiredArray(
+                        "wrong-element", ProjectValueKind.NUMBER, DescriptorPresentation.named("Element"), Map.of()),
+                PropertyDescriptor.required(
+                        "integer",
+                        ProjectValueKind.NUMBER,
+                        DescriptorPresentation.named("Integer"),
+                        Map.of("semantic", new ProjectValue.TextValue("integer")),
+                        Set.of()),
+                PropertyDescriptor.required(
+                        "minimum",
+                        ProjectValueKind.NUMBER,
+                        DescriptorPresentation.named("Minimum"),
+                        Map.of("minimum", number("0")),
+                        Set.of()),
+                PropertyDescriptor.required(
+                        "maximum",
+                        ProjectValueKind.NUMBER,
+                        DescriptorPresentation.named("Maximum"),
+                        Map.of("maximum-exclusive", number("1")),
+                        Set.of()),
+                PropertyDescriptor.requiredArray(
+                        "quaternion",
+                        ProjectValueKind.NUMBER,
+                        4,
+                        DescriptorPresentation.named("Quaternion"),
+                        Map.of("semantic", new ProjectValue.TextValue(PropertyEditorSemantics.QUATERNION))),
+                PropertyDescriptor.requiredArray(
+                        "color",
+                        ProjectValueKind.NUMBER,
+                        3,
+                        DescriptorPresentation.named("Color"),
+                        Map.of("semantic", new ProjectValue.TextValue(PropertyEditorSemantics.LINEAR_COLOR))));
+        return ComponentTypeDescriptor.builder(
+                        new ComponentType(MOVER_TYPE, 1), DescriptorPresentation.named("Validation"))
+                .properties(properties)
+                .build();
+    }
+
     /** Declares a component that conflicts with movement behavior. */
     private static ComponentTypeDescriptor teleporterDescriptor() {
         return ComponentTypeDescriptor.builder(
@@ -246,5 +371,15 @@ final class ComponentDefinitionValidationTest {
                 .requiredCapabilities(Set.of(new CapabilityId("example.game/missing")))
                 .multiplicity(ComponentMultiplicity.MULTIPLE)
                 .build();
+    }
+
+    /** Creates one exact decimal value. */
+    private static ProjectValue.NumberValue number(String value) {
+        return new ProjectValue.NumberValue(new BigDecimal(value));
+    }
+
+    /** Creates one project array while retaining the portable element supertype. */
+    private static ProjectValue.ArrayValue array(ProjectValue... values) {
+        return new ProjectValue.ArrayValue(List.of(values));
     }
 }

@@ -485,10 +485,15 @@ public class StandardSpatial3dDescriptors {
     private static ComponentTypeDescriptor cameraDescriptor() {
         return presentation(PERSPECTIVE_CAMERA_TYPE, "Perspective Camera 3D", "Perspective projection")
                 .properties(List.of(
-                        numberProperty(
-                                FIELD_OF_VIEW_DEGREES, "Field of view", "Vertical field of view in degrees", 60.0F),
-                        numberProperty(NEAR, "Near", "Near clipping distance", 0.1F),
-                        numberProperty(FAR, "Far", "Far clipping distance", 1000.0F),
+                        boundedNumberProperty(
+                                FIELD_OF_VIEW_DEGREES,
+                                "Field of view",
+                                "Vertical field of view in degrees",
+                                60.0F,
+                                0.0F,
+                                180.0F),
+                        positiveNumberProperty(NEAR, "Near", "Near clipping distance", 0.1F),
+                        positiveNumberProperty(FAR, "Far", "Far clipping distance", 1000.0F),
                         booleanProperty(PRIMARY, "Primary", "Selects the authored primary camera", false)))
                 .build();
     }
@@ -574,6 +579,30 @@ public class StandardSpatial3dDescriptors {
                 number(value),
                 DescriptorPresentation.described(name, description),
                 Map.of(),
+                Set.of());
+    }
+
+    /** Creates one optional positive numeric component property. */
+    private static PropertyDescriptor positiveNumberProperty(
+            PropertyId id, String name, String description, float value) {
+        return PropertyDescriptor.optionalWithDefault(
+                id.value(),
+                ProjectValueKind.NUMBER,
+                number(value),
+                DescriptorPresentation.described(name, description),
+                Map.of("minimum-exclusive", number(0.0F)),
+                Set.of());
+    }
+
+    /** Creates one optional numeric component property inside an exclusive interval. */
+    private static PropertyDescriptor boundedNumberProperty(
+            PropertyId id, String name, String description, float value, float minimum, float maximum) {
+        return PropertyDescriptor.optionalWithDefault(
+                id.value(),
+                ProjectValueKind.NUMBER,
+                number(value),
+                DescriptorPresentation.described(name, description),
+                Map.of("minimum-exclusive", number(minimum), "maximum-exclusive", number(maximum)),
                 Set.of());
     }
 

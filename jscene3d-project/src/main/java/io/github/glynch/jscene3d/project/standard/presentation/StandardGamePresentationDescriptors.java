@@ -382,6 +382,7 @@ public class StandardGamePresentationDescriptors {
                         PropertyDescriptor.requiredArray(
                                 DIGITS.value(),
                                 ProjectValueKind.REFERENCE,
+                                10,
                                 DescriptorPresentation.named("Digit images"),
                                 Map.of()),
                         PropertyDescriptor.optional(
@@ -390,7 +391,7 @@ public class StandardGamePresentationDescriptors {
                                 DescriptorPresentation.named("Suffix image"),
                                 Map.of(),
                                 Set.of()),
-                        required(INITIAL_VALUE, ProjectValueKind.NUMBER, "Initial value"),
+                        nonNegativeInteger(INITIAL_VALUE, "Initial value"),
                         required(ALIGNMENT, ProjectValueKind.TEXT, "Alignment")))
                 .providedCapabilities(Set.of(SCREEN_CONTENT_CAPABILITY, SCREEN_NUMBER_CAPABILITY))
                 .build();
@@ -424,6 +425,16 @@ public class StandardGamePresentationDescriptors {
                 ProjectValueKind.NUMBER,
                 DescriptorPresentation.named(name),
                 Map.of("minimum", number(0.0F), "maximum", number(1.0F)),
+                Set.of());
+    }
+
+    /** Creates one non-negative mathematically integral property. */
+    private static PropertyDescriptor nonNegativeInteger(PropertyId id, String name) {
+        return PropertyDescriptor.required(
+                id.value(),
+                ProjectValueKind.NUMBER,
+                DescriptorPresentation.named(name),
+                Map.of("semantic", new ProjectValue.TextValue("integer"), "minimum", number(0.0F)),
                 Set.of());
     }
 

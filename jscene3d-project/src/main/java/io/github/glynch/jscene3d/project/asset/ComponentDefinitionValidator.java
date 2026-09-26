@@ -13,7 +13,6 @@ import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.ComponentTypeId;
 import io.github.glynch.jscene3d.project.component.EndpointId;
-import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.contract.EntityContract;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.entity.ComponentTarget;
@@ -30,6 +29,8 @@ import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.validation.PropertySetValidator;
+import io.github.glynch.jscene3d.project.validation.PropertyTargetLookup;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.net.URI;
@@ -44,8 +45,9 @@ import java.util.Optional;
 import java.util.Set;
 
 /** Validates locally authored components through the registered component descriptor seam. */
-final class ComponentDefinitionValidator {
+final class ComponentDefinitionValidator implements PropertyTargetLookup {
     private final RegisteredTypeCatalog catalog;
+    private final URI source;
     private final DiagnosticCollector diagnostics;
     private final Map<EntityId, EntityComponents> entities = new LinkedHashMap<>();
     private final Set<EntityId> addressableEntities = new HashSet<>();
@@ -53,6 +55,7 @@ final class ComponentDefinitionValidator {
     /** Stores one source-local component validation context. */
     private ComponentDefinitionValidator(RegisteredTypeCatalog catalog, URI source) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
+        this.source = Objects.requireNonNull(source, "source");
         diagnostics = new DiagnosticCollector(source);
     }
 
@@ -129,7 +132,6 @@ final class ComponentDefinitionValidator {
             return Optional.empty();
         }
         ComponentTypeDescriptor resolved = descriptor.orElseThrow();
-        validateProperties(component, resolved, location + "/properties");
         return Optional.of(new ResolvedComponent(component, resolved));
     }
 
@@ -155,7 +157,17 @@ final class ComponentDefinitionValidator {
     /** Validates target-valued properties on locally authored components. */
     private void validateComponentTargetValues(List<ComponentDefinition> components, String location) {
         for (int index = 0; index < components.size(); index++) {
-            validateValueTargets(components.get(index).properties(), location + "/" + index + "/properties");
+            ComponentDefinition component = components.get(index);
+            ComponentType type = new ComponentType(component.type(), component.typeVersion());
+            Optional<ComponentTypeDescriptor> descriptor = catalog.findComponent(type);
+            if (descriptor.isPresent()) {
+                diagnostics.addAll(PropertySetValidator.validateComponent(
+                        component.properties(),
+                        descriptor.orElseThrow(),
+                        source,
+                        location + "/" + index + "/properties",
+                        this));
+            }
         }
     }
 
@@ -198,34 +210,6 @@ final class ComponentDefinitionValidator {
                     AssetDiagnosticCode.TARGET_INVALID,
                     "component target does not identify a local component: " + target,
                     location);
-        }
-    }
-
-    /** Validates required, unknown, and structurally invalid component properties. */
-    private void validateProperties(
-            ComponentDefinition component, ComponentTypeDescriptor descriptor, String location) {
-        for (Map.Entry<PropertyId, ProjectValue> entry : component.properties().entrySet()) {
-            PropertyDescriptor property = descriptor.properties().get(entry.getKey());
-            if (property == null) {
-                error(
-                        AssetDiagnosticCode.COMPONENT_PROPERTY_UNKNOWN,
-                        "component property is not declared: " + entry.getKey(),
-                        location + "/" + entry.getKey());
-            } else if (!property.accepts(entry.getValue())) {
-                error(
-                        AssetDiagnosticCode.COMPONENT_PROPERTY_VALUE_INVALID,
-                        "component property value is invalid: " + entry.getKey(),
-                        location + "/" + entry.getKey());
-            }
-        }
-        for (Map.Entry<PropertyId, PropertyDescriptor> entry :
-                descriptor.properties().entrySet()) {
-            if (entry.getValue().isRequired() && !component.properties().containsKey(entry.getKey())) {
-                error(
-                        AssetDiagnosticCode.COMPONENT_PROPERTY_REQUIRED,
-                        "required component property is missing: " + entry.getKey(),
-                        location + "/" + entry.getKey());
-            }
         }
     }
 
@@ -462,6 +446,19 @@ final class ComponentDefinitionValidator {
     private Optional<ResolvedComponent> localComponent(EntityId entity, ComponentId component) {
         EntityComponents entityComponents = entities.get(entity);
         return entityComponents == null ? Optional.empty() : entityComponents.find(component);
+    }
+
+    /** Returns whether a source-local entity or placement is addressable. */
+    @Override
+    public boolean containsEntity(EntityId entity) {
+        return addressableEntities.contains(Objects.requireNonNull(entity, "entity"));
+    }
+
+    /** Returns whether a target identifies a locally authored component. */
+    @Override
+    public boolean containsComponent(ComponentTarget target) {
+        ComponentTarget validTarget = Objects.requireNonNull(target, "target");
+        return localComponent(validTarget.entity(), validTarget.component()).isPresent();
     }
 
     /** Returns whether every exported reference kind is accepted by its private property. */

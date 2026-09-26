@@ -27,14 +27,20 @@ final class EditorComponentSectionProjector {
 
     /** Projects component definitions in authored order. */
     static List<InspectorSection> componentSections(
-            Optional<EditableEntity> editable, List<ComponentDefinition> components, RegisteredTypeCatalog types) {
+            Optional<EditableEntity> editable,
+            List<ComponentDefinition> components,
+            RegisteredTypeCatalog types,
+            InspectorValueProjector values) {
         return components.stream()
-                .map(component -> componentSection(editable, component, types))
+                .map(component -> componentSection(editable, component, types, values))
                 .toList();
     }
 
     private static InspectorSection componentSection(
-            Optional<EditableEntity> editable, ComponentDefinition component, RegisteredTypeCatalog types) {
+            Optional<EditableEntity> editable,
+            ComponentDefinition component,
+            RegisteredTypeCatalog types,
+            InspectorValueProjector values) {
         ComponentType type = new ComponentType(component.type(), component.typeVersion());
         return types.findComponent(type)
                 .map(descriptor -> descriptorSection(
@@ -43,8 +49,9 @@ final class EditorComponentSectionProjector {
                         type,
                         AuthoringText.literal(descriptor.presentation().displayName()),
                         descriptor.presentation().description().map(AuthoringText::literal),
-                        descriptor.properties()))
-                .orElseGet(() -> missingDescriptorSection(component, type));
+                        descriptor.properties(),
+                        values))
+                .orElseGet(() -> missingDescriptorSection(component, type, values));
     }
 
     private static InspectorSection descriptorSection(
@@ -53,26 +60,38 @@ final class EditorComponentSectionProjector {
             ComponentType type,
             AuthoringText label,
             Optional<AuthoringText> description,
-            Map<PropertyId, PropertyDescriptor> descriptors) {
+            Map<PropertyId, PropertyDescriptor> descriptors,
+            InspectorValueProjector values) {
         List<InspectorProperty> properties = new ArrayList<>();
         descriptors.forEach(
-                (id, descriptor) -> properties.add(descriptorProperty(editable, component, id, descriptor)));
+                (id, descriptor) -> properties.add(descriptorProperty(editable, component, id, descriptor, values)));
         component.properties().forEach((id, value) -> {
             if (!descriptors.containsKey(id)) {
-                properties.add(authoredProperty(id, value));
+                properties.add(authoredProperty(id, value, values));
             }
         });
-        return new InspectorSection(component.id().toString(), label, description, Optional.of(type), true, properties);
+        return new InspectorSection(
+                component.id().toString(),
+                InspectorSection.Kind.COMPONENT,
+                label,
+                description,
+                Optional.of(component.id()),
+                Optional.of(type),
+                true,
+                editable.isPresent(),
+                properties);
     }
 
     private static InspectorProperty descriptorProperty(
             Optional<EditableEntity> editable,
             ComponentDefinition component,
             PropertyId id,
-            PropertyDescriptor descriptor) {
+            PropertyDescriptor descriptor,
+            InspectorValueProjector values) {
         Optional<ProjectValue> authored =
                 Optional.ofNullable(component.properties().get(id));
-        Optional<ProjectValue> displayed = authored.or(descriptor::defaultValue);
+        Optional<ProjectValue> defaultValue = descriptor.defaultValue();
+        Optional<ProjectValue> displayed = authored.or(() -> defaultValue);
         InspectorProperty.Origin origin = authored.isPresent()
                 ? InspectorProperty.Origin.AUTHORED
                 : displayed.isPresent() ? InspectorProperty.Origin.DEFAULT : InspectorProperty.Origin.UNSET;
@@ -80,10 +99,20 @@ final class EditorComponentSectionProjector {
                 descriptor.elementKind(),
                 descriptor.exactElementCount(),
                 descriptor.acceptedReferenceKinds(),
-                descriptor.editorMetadata());
+                descriptor.editor());
         Optional<InspectorMutationTarget> mutation =
                 editable.map(target -> new InspectorMutationTarget.ComponentProperty(
                         target.occurrence(), target.entity(), component.id(), id));
+        Optional<InspectorValue> authoredInspection = authored.map(values::project);
+        Optional<InspectorValue> defaultInspection = defaultValue.map(values::project);
+        Optional<InspectorValue> effectiveInspection = displayed.map(values::project);
+        InspectorProperty.Validity validity = displayed.isEmpty() && descriptor.isRequired()
+                ? InspectorProperty.Validity.REQUIRED_UNSET
+                : effectiveInspection
+                                .filter(EditorComponentSectionProjector::containsBrokenReference)
+                                .isPresent()
+                        ? InspectorProperty.Validity.BROKEN_REFERENCE
+                        : InspectorProperty.Validity.VALID;
         return new InspectorProperty(
                 id.value(),
                 new InspectorProperty.Presentation(
@@ -92,27 +121,39 @@ final class EditorComponentSectionProjector {
                         descriptor.isRequired(),
                         descriptor.presentation().description().map(AuthoringText::literal),
                         constraints),
-                new InspectorProperty.State(displayed, origin),
+                new InspectorProperty.State(
+                        authoredInspection,
+                        defaultInspection,
+                        effectiveInspection,
+                        origin,
+                        validity,
+                        mutation.isPresent()),
                 mutation);
     }
 
-    private static InspectorSection missingDescriptorSection(ComponentDefinition component, ComponentType type) {
+    private static InspectorSection missingDescriptorSection(
+            ComponentDefinition component, ComponentType type, InspectorValueProjector values) {
         List<InspectorProperty> properties = component.properties().entrySet().stream()
-                .map(entry -> authoredProperty(entry.getKey(), entry.getValue()))
+                .map(entry -> authoredProperty(entry.getKey(), entry.getValue(), values))
                 .toList();
         return new InspectorSection(
                 component.id().toString(),
+                InspectorSection.Kind.COMPONENT,
                 AuthoringText.literal(component.type().value()),
                 Optional.of(AuthoringText.message(
                         "editor.inspector.descriptor-unavailable",
                         "Descriptor metadata is unavailable for type version {0,number,integer}",
                         component.typeVersion())),
+                Optional.of(component.id()),
                 Optional.of(type),
+                false,
                 false,
                 properties);
     }
 
-    private static InspectorProperty authoredProperty(PropertyId id, ProjectValue value) {
+    private static InspectorProperty authoredProperty(
+            PropertyId id, ProjectValue value, InspectorValueProjector values) {
+        InspectorValue projected = values.project(value);
         return new InspectorProperty(
                 id.value(),
                 new InspectorProperty.Presentation(
@@ -121,8 +162,28 @@ final class EditorComponentSectionProjector {
                         false,
                         Optional.empty(),
                         InspectorConstraints.empty()),
-                new InspectorProperty.State(Optional.of(value), InspectorProperty.Origin.AUTHORED),
+                new InspectorProperty.State(
+                        Optional.of(projected),
+                        Optional.empty(),
+                        Optional.of(projected),
+                        InspectorProperty.Origin.AUTHORED,
+                        InspectorProperty.Validity.METADATA_UNAVAILABLE,
+                        false),
                 Optional.empty());
+    }
+
+    /** Returns whether a recursively projected value contains an unresolved semantic target. */
+    private static boolean containsBrokenReference(InspectorValue value) {
+        return switch (value) {
+            case InspectorValue.ReferenceValue reference -> reference.resolution() == InspectorValue.Resolution.BROKEN;
+            case InspectorValue.EntityTargetValue target -> target.resolution() == InspectorValue.Resolution.BROKEN;
+            case InspectorValue.ComponentTargetValue target -> target.resolution() == InspectorValue.Resolution.BROKEN;
+            case InspectorValue.ArrayValue array ->
+                array.values().stream().anyMatch(EditorComponentSectionProjector::containsBrokenReference);
+            case InspectorValue.ObjectValue object ->
+                object.values().values().stream().anyMatch(EditorComponentSectionProjector::containsBrokenReference);
+            default -> false;
+        };
     }
 
     /** Editable local entity identity used to create stable mutation targets. */

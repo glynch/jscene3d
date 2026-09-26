@@ -146,6 +146,61 @@ final class ExtensionDescriptorModelTest {
                 .isFalse();
     }
 
+    /** Projects only known typed editor semantics and preserves exact numeric bounds. */
+    @Test
+    void validatesTypedEditorSemantics() {
+        PropertyDescriptor vector = PropertyDescriptor.optionalArray(
+                "position",
+                ProjectValueKind.NUMBER,
+                3,
+                PRESENTATION,
+                Map.of("semantic", new ProjectValue.TextValue("vector3")));
+        PropertyDescriptor integer = PropertyDescriptor.optional(
+                "layers",
+                ProjectValueKind.NUMBER,
+                PRESENTATION,
+                Map.of(
+                        "semantic", new ProjectValue.TextValue("integer"),
+                        "minimum", new ProjectValue.NumberValue(new BigDecimal("0")),
+                        "maximum-exclusive", new ProjectValue.NumberValue(new BigDecimal("32"))),
+                Set.of());
+        PropertyDescriptor structurallySimilar =
+                PropertyDescriptor.optionalArray("weights", ProjectValueKind.NUMBER, 3, PRESENTATION, Map.of());
+        PropertyDescriptor unknown = PropertyDescriptor.optional(
+                "future",
+                ProjectValueKind.TEXT,
+                PRESENTATION,
+                Map.of(
+                        "semantic", new ProjectValue.TextValue("future-widget"),
+                        "vendor-data", new ProjectValue.TextValue("retained")),
+                Set.of());
+
+        assertThat(vector.editor().semantic()).isEqualTo(PropertyEditorSemantic.VECTOR3);
+        assertThat(integer.editor().semantic()).isEqualTo(PropertyEditorSemantic.INTEGER);
+        assertThat(integer.editor().minimum()).contains(new PropertyNumericBound(new BigDecimal("0"), true));
+        assertThat(integer.editor().maximum()).contains(new PropertyNumericBound(new BigDecimal("32"), false));
+        assertThat(structurallySimilar.editor().semantic()).isEqualTo(PropertyEditorSemantic.DEFAULT);
+        assertThat(unknown.editor().semantic()).isEqualTo(PropertyEditorSemantic.DEFAULT);
+        assertThat(unknown.editorMetadata()).containsKey("vendor-data");
+    }
+
+    /** Rejects known semantic metadata that conflicts with the declared structural shape. */
+    @Test
+    void rejectsIncompatibleTypedEditorSemantics() {
+        Map<String, ProjectValue> vector3 = Map.of("semantic", new ProjectValue.TextValue("vector3"));
+        Map<String, ProjectValue> minimum = Map.of("minimum", new ProjectValue.NumberValue(BigDecimal.ZERO));
+        Set<ResourceReference.Kind> noReferences = Set.of();
+
+        assertThatThrownBy(() ->
+                        PropertyDescriptor.optionalArray("position", ProjectValueKind.NUMBER, 2, PRESENTATION, vector3))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ARRAY<NUMBER>[3]");
+        assertThatThrownBy(() -> PropertyDescriptor.optional(
+                        "label", ProjectValueKind.TEXT, PRESENTATION, minimum, noReferences))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("number property");
+    }
+
     /** Rejects inconsistent descriptor construction. */
     @Test
     void rejectsInvalidDescriptorInvariants() {

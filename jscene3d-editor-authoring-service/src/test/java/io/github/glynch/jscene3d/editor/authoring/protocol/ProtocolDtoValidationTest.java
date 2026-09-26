@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.editor.authoring.protocol;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -102,6 +104,53 @@ final class ProtocolDtoValidationTest {
     @Test
     void representsAcceptedShutdown() {
         assertThat(new ShutdownResult(true).shutdown()).isTrue();
+    }
+
+    /** Serializes exact decimal text and only the closed typed editor semantic shape. */
+    @Test
+    void serializesExactInspectorDecimalWithoutRawMetadata() {
+        InspectorSnapshot.Value exact =
+                new InspectorSnapshot.NumberValue("number", "12345678901234567890.12345678901234567890");
+        InspectorSnapshot snapshot = new InspectorSnapshot(
+                0,
+                new DefinitionSnapshot.SemanticTarget(
+                        "local-entity",
+                        "file:///project/world.json",
+                        "entity-a",
+                        new DefinitionSnapshot.Occurrence("world-a", List.of("entity-a"))),
+                "Entity",
+                "authored",
+                "local",
+                false,
+                List.of(new InspectorSnapshot.TargetGroup(
+                        "entity",
+                        "entity",
+                        "Entity",
+                        null,
+                        null,
+                        null,
+                        "available",
+                        false,
+                        List.of(new InspectorSnapshot.Property(
+                                "precision",
+                                "Precision",
+                                null,
+                                "number",
+                                false,
+                                new InspectorSnapshot.Constraints(
+                                        null,
+                                        null,
+                                        List.of(),
+                                        new InspectorSnapshot.EditorSemantics("default", null, null)),
+                                new InspectorSnapshot.PropertyState(exact, null, exact, "authored", "valid", false),
+                                null)))));
+
+        JsonNode json = new ObjectMapper().valueToTree(snapshot);
+
+        assertThat(json.at("/groups/0/properties/0/state/effectiveValue/decimal")
+                        .asText())
+                .isEqualTo("12345678901234567890.12345678901234567890");
+        assertThat(json.toString()).doesNotContain("editorMetadata", "semanticMetadata");
     }
 
     /** Creates one valid project summary for result-shape validation. */

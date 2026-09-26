@@ -15,6 +15,8 @@ import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProje
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjector;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProjection;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetKind;
@@ -75,12 +77,21 @@ final class EditorProjectSessionTest {
             assertThat(entity)
                     .returns(AssetKind.ENTITY_DEFINITION, EditorRetainedDefinition::kind)
                     .returns(EditorRetainedDefinition.Origin.AUTHORED, EditorRetainedDefinition::origin)
-                    .returns(true, EditorRetainedDefinition::editable);
+                    .returns(false, EditorRetainedDefinition::editable);
             assertThat(entity.content()).isInstanceOf(EditorRetainedDefinition.Content.Entity.class);
-            assertThat(entity.hierarchy().roots())
-                    .singleElement()
-                    .satisfies(root -> assertThat(root.occurrence().entityPath())
-                            .containsExactly(root.entityId().orElseThrow()));
+            assertThat(entity.hierarchy().roots()).singleElement().satisfies(root -> {
+                assertThat(root.occurrence().entityPath())
+                        .containsExactly(root.entityId().orElseThrow());
+                assertThat(root.isEditable()).isFalse();
+            });
+            InspectorProjection entityInspection =
+                    session.inspect(entity.hierarchy().roots().getFirst().inspectorTarget(), entity.revision());
+            assertThat(entityInspection)
+                    .returns(InspectorProjection.DefinitionOrigin.AUTHORED, InspectorProjection::definitionOrigin)
+                    .returns(false, InspectorProjection::editable);
+            assertThat(entityInspection.sections())
+                    .flatExtracting(section -> section.properties())
+                    .allMatch(property -> property.mutationTarget().isEmpty());
             assertThat(session.retainedDefinitionIds()).containsExactlyInAnyOrder(WORLD_ID, DEFINITION_ID);
         }
     }
@@ -98,6 +109,36 @@ final class EditorProjectSessionTest {
         }
     }
 
+    /** Resolves only current retained Java-issued Inspector targets at the expected revision. */
+    @Test
+    void inspectsRetainedOccurrenceAndRejectsStaleOrMismatchedTargets() throws Exception {
+        try (EditorProjectSession session = session()) {
+            EditorRetainedDefinition retained =
+                    session.retainDefinition(WORLD_ID).definition().orElseThrow();
+            EditorHierarchyNode node = retained.hierarchy().roots().getFirst();
+            InspectorTarget target = node.inspectorTarget();
+
+            InspectorProjection projection = session.inspect(target, retained.revision());
+
+            assertThat(projection)
+                    .returns(target, InspectorProjection::target)
+                    .returns(InspectorProjection.DefinitionOrigin.AUTHORED, InspectorProjection::definitionOrigin)
+                    .returns(InspectorProjection.Provenance.LOCAL, InspectorProjection::provenance)
+                    .returns(true, InspectorProjection::editable);
+            assertThat(projection.sections().getFirst().identity()).isEqualTo("entity");
+            long staleRevision = retained.revision() + 1;
+            assertThatThrownBy(() -> session.inspect(target, staleRevision))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("stale authoring revision");
+            InspectorTarget mismatch =
+                    new InspectorTarget(target.kind(), target.source(), "different-entity", target.occurrence());
+            long currentRevision = retained.revision();
+            assertThatThrownBy(() -> session.inspect(mismatch, currentRevision))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("does not match");
+        }
+    }
+
     /** Retains currently resolvable published definitions as generated and read-only. */
     @Test
     void retainsGeneratedDefinitionAsReadOnly() throws Exception {
@@ -112,6 +153,14 @@ final class EditorProjectSessionTest {
                     .returns(false, EditorRetainedDefinition::editable)
                     .returns(source, EditorRetainedDefinition::source);
             assertThat(definition.hierarchy().roots()).singleElement().returns(false, EditorHierarchyNode::isEditable);
+            InspectorProjection projection =
+                    session.inspect(definition.hierarchy().roots().getFirst().inspectorTarget(), definition.revision());
+            assertThat(projection)
+                    .returns(InspectorProjection.DefinitionOrigin.GENERATED, InspectorProjection::definitionOrigin)
+                    .returns(false, InspectorProjection::editable);
+            assertThat(projection.sections())
+                    .flatExtracting(section -> section.properties())
+                    .allMatch(property -> property.mutationTarget().isEmpty());
         }
     }
 

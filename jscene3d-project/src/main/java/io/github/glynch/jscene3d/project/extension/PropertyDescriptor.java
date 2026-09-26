@@ -24,6 +24,7 @@ public final class PropertyDescriptor {
     private final Optional<ProjectValue> defaultValue;
     private final DescriptorPresentation presentation;
     private final Map<String, ProjectValue> editorMetadata;
+    private final PropertyEditorDescriptor editor;
     private final Set<ResourceReference.Kind> acceptedReferenceKinds;
 
     /** Stores one validated property descriptor. */
@@ -44,6 +45,7 @@ public final class PropertyDescriptor {
         this.defaultValue = Objects.requireNonNull(defaultValue, "defaultValue");
         this.presentation = Objects.requireNonNull(presentation, "presentation");
         this.editorMetadata = immutableProjectValues(editorMetadata, "editorMetadata");
+        editor = PropertyEditorDescriptor.from(valueKind, elementKind, exactElementCount, this.editorMetadata);
         this.acceptedReferenceKinds =
                 Set.copyOf(Objects.requireNonNull(acceptedReferenceKinds, "acceptedReferenceKinds"));
         if (valueKind != ProjectValueKind.REFERENCE && !this.acceptedReferenceKinds.isEmpty()) {
@@ -357,6 +359,15 @@ public final class PropertyDescriptor {
     }
 
     /**
+     * Returns validated editor semantics derived from canonical metadata.
+     *
+     * @return typed editor semantics
+     */
+    public PropertyEditorDescriptor editor() {
+        return editor;
+    }
+
+    /**
      * Returns accepted resource-reference namespaces, or an empty set for any namespace.
      *
      * @return accepted reference namespaces
@@ -406,6 +417,7 @@ public final class PropertyDescriptor {
                 && defaultValue.equals(descriptor.defaultValue)
                 && presentation.equals(descriptor.presentation)
                 && editorMetadata.equals(descriptor.editorMetadata)
+                && editor.equals(descriptor.editor)
                 && acceptedReferenceKinds.equals(descriptor.acceptedReferenceKinds);
     }
 
@@ -420,6 +432,7 @@ public final class PropertyDescriptor {
                 defaultValue,
                 presentation,
                 editorMetadata,
+                editor,
                 acceptedReferenceKinds);
     }
 
@@ -427,8 +440,8 @@ public final class PropertyDescriptor {
     public String toString() {
         return "PropertyDescriptor[id=" + id + ", valueKind=" + valueKind + ", elementKind=" + elementKind
                 + ", exactElementCount=" + exactElementCount + ", required=" + required + ", defaultValue="
-                + defaultValue + ", presentation=" + presentation + ", editorMetadata=" + editorMetadata
-                + ", acceptedReferenceKinds=" + acceptedReferenceKinds + ']';
+                + defaultValue + ", presentation=" + presentation + ", editorMetadata=" + editorMetadata + ", editor="
+                + editor + ", acceptedReferenceKinds=" + acceptedReferenceKinds + ']';
     }
 
     /** Rejects a default inconsistent with this property. */

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InitializeParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InitializeResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProtocolVersion;
@@ -207,6 +208,8 @@ public final class AuthoringProtocolServer {
                 success(
                         id,
                         service.openDefinition(readParams(request, DefinitionOpenParams.class), initializedLocale()));
+            case INSPECTOR_READ ->
+                success(id, service.readInspector(readParams(request, InspectorReadParams.class), initializedLocale()));
             case SERVICE_SHUTDOWN -> shutdown(id);
         };
     }

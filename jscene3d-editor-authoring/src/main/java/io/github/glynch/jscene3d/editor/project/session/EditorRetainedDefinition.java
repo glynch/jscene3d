@@ -46,8 +46,8 @@ public record EditorRetainedDefinition(
         if (!source.isAbsolute()) {
             throw new IllegalArgumentException("source must be absolute");
         }
-        if (editable != (origin == Origin.AUTHORED)) {
-            throw new IllegalArgumentException("only authored definitions are editable");
+        if (editable && origin != Origin.AUTHORED) {
+            throw new IllegalArgumentException("generated definitions cannot be editable");
         }
         if (!id.equals(content.id()) || kind != content.kind()) {
             throw new IllegalArgumentException("definition identity and content must agree");

@@ -21,6 +21,8 @@ enum AuthoringProtocolMethod {
     PROJECT_CLOSE("project/close"),
     /** Resolves and retains a structural definition with its complete hierarchy snapshot. */
     DEFINITION_OPEN("definition/open"),
+    /** Reads one complete generation- and revision-checked Inspector snapshot. */
+    INSPECTOR_READ("inspector/read"),
     /** Performs orderly service shutdown. */
     SERVICE_SHUTDOWN("service/shutdown");
 

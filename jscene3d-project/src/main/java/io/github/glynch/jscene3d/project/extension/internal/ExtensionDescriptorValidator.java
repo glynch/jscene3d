@@ -589,18 +589,26 @@ public final class ExtensionDescriptorValidator {
             return Optional.empty();
         }
         DescriptorPresentation metadata = presentation(displayName, description);
-        if (elementKind.isPresent()) {
-            return Optional.of(arrayProperty(
-                    id, elementKind.orElseThrow(), exactElementCount, required, defaultValue, metadata, editor));
+        try {
+            if (elementKind.isPresent()) {
+                return Optional.of(arrayProperty(
+                        id, elementKind.orElseThrow(), exactElementCount, required, defaultValue, metadata, editor));
+            }
+            if (required) {
+                return Optional.of(PropertyDescriptor.required(id, valueKind, metadata, editor, acceptedReferences));
+            }
+            if (defaultValue.isPresent()) {
+                return Optional.of(PropertyDescriptor.optionalWithDefault(
+                        id, valueKind, defaultValue.orElseThrow(), metadata, editor, acceptedReferences));
+            }
+            return Optional.of(PropertyDescriptor.optional(id, valueKind, metadata, editor, acceptedReferences));
+        } catch (IllegalArgumentException exception) {
+            diagnostics.error(
+                    ExtensionDiagnosticCode.PROPERTY_EDITOR_INVALID,
+                    exception.getMessage() == null ? "invalid property editor metadata" : exception.getMessage(),
+                    location + "/editor");
+            return Optional.empty();
         }
-        if (required) {
-            return Optional.of(PropertyDescriptor.required(id, valueKind, metadata, editor, acceptedReferences));
-        }
-        if (defaultValue.isPresent()) {
-            return Optional.of(PropertyDescriptor.optionalWithDefault(
-                    id, valueKind, defaultValue.orElseThrow(), metadata, editor, acceptedReferences));
-        }
-        return Optional.of(PropertyDescriptor.optional(id, valueKind, metadata, editor, acceptedReferences));
     }
 
     /** Creates the declared homogeneous array variant after common validation. */

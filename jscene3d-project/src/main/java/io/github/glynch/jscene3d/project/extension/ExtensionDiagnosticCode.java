@@ -69,6 +69,8 @@ public enum ExtensionDiagnosticCode implements DiagnosticCode {
     PROPERTY_DEFAULT_INVALID("extension.property.default", "A property default value is invalid"),
     /** A registered property is duplicated. */
     PROPERTY_DUPLICATE("extension.property.duplicate", "A registered property is duplicated"),
+    /** Property editor metadata is incompatible with the declared structural shape. */
+    PROPERTY_EDITOR_INVALID("extension.property.editor", "Property editor metadata is invalid"),
     /** A registered property kind is invalid. */
     PROPERTY_KIND_INVALID("extension.property.kind", "A registered property kind is invalid"),
     /** A property reference kind is duplicated. */

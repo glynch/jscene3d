@@ -9,6 +9,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionSnapshot;
+import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectCloseResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
@@ -99,7 +102,10 @@ final class AuthoringProjectServiceTest {
         assertThat(worldSnapshot.roots()).hasSize(1);
         assertThat(entity.opened()).isTrue();
         var entitySnapshot = Objects.requireNonNull(entity.definition());
-        assertThat(entitySnapshot.context().kind()).isEqualTo("entity-definition");
+        assertThat(entitySnapshot.context())
+                .returns("entity-definition", DefinitionSnapshot.DefinitionContext::kind)
+                .returns("authored", DefinitionSnapshot.DefinitionContext::origin)
+                .returns(false, DefinitionSnapshot.DefinitionContext::editable);
         assertThat(entitySnapshot.roots())
                 .singleElement()
                 .satisfies(root -> assertThat(root.occurrence().entityPath()).hasSize(1));
@@ -107,6 +113,45 @@ final class AuthoringProjectServiceTest {
                 .hasSize(2);
         assertThat(stale.opened()).isFalse();
         assertThat(stale.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_GENERATION_CONFLICT);
+    }
+
+    /** Reads a complete current Inspector snapshot and rejects stale or mismatched identity. */
+    @Test
+    void readsInspectorWithGenerationRevisionAndTargetChecks() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        DefinitionOpenResult definition =
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+        DefinitionSnapshot retained = Objects.requireNonNull(definition.definition());
+        DefinitionSnapshot.SemanticTarget target = retained.roots().getFirst().target();
+
+        InspectorReadResult read =
+                service.readInspector(new InspectorReadParams(1L, retained.revision(), target), Locale.FRENCH);
+        InspectorReadResult staleGeneration =
+                service.readInspector(new InspectorReadParams(2L, retained.revision(), target), Locale.ENGLISH);
+        InspectorReadResult staleRevision =
+                service.readInspector(new InspectorReadParams(1L, retained.revision() + 1, target), Locale.ENGLISH);
+        InspectorReadResult mismatched = service.readInspector(
+                new InspectorReadParams(
+                        1L,
+                        retained.revision(),
+                        new DefinitionSnapshot.SemanticTarget(
+                                target.kind(), target.source(), "different-identity", target.occurrence())),
+                Locale.ENGLISH);
+
+        assertThat(read.read()).isTrue();
+        assertThat(read.projectGeneration()).isEqualTo(1L);
+        assertThat(Objects.requireNonNull(read.snapshot()))
+                .returns(retained.revision(), snapshot -> snapshot.revision())
+                .returns("Player", snapshot -> snapshot.title())
+                .returns("authored", snapshot -> snapshot.definitionOrigin())
+                .returns("local", snapshot -> snapshot.provenance());
+        assertThat(Objects.requireNonNull(read.snapshot()).groups())
+                .singleElement()
+                .returns("Entité", group -> group.label());
+        assertThat(staleGeneration.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_GENERATION_CONFLICT);
+        assertThat(staleRevision.failureCode()).isEqualTo(AuthoringProjectService.INSPECTOR_STALE);
+        assertThat(mismatched.failureCode()).isEqualTo(AuthoringProjectService.INSPECTOR_TARGET_INVALID);
     }
 
     /** Accepts the selected descriptor path without encoding its filename in the protocol. */

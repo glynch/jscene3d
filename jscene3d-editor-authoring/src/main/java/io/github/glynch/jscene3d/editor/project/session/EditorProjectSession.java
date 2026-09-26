@@ -11,7 +11,10 @@ import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjection;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjector;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
+import io.github.glynch.jscene3d.editor.workbench.inspector.EditorInspectorProjector;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProjection;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.editor.workbench.workingcopy.EditorWorldWorkingCopy;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -26,6 +29,7 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
+import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
@@ -312,6 +316,63 @@ public final class EditorProjectSession implements AutoCloseable {
         return hierarchy;
     }
 
+    /**
+     * Projects one Java-issued semantic target against the current retained definition revision.
+     *
+     * @param target semantic target previously returned by the current hierarchy
+     * @param expectedRevision definition revision observed by the caller
+     * @return complete immutable Inspector snapshot
+     * @throws IllegalStateException if the revision, retained definition, or occurrence is stale
+     * @throws IllegalArgumentException if the supplied target does not match current Java state
+     */
+    public InspectorProjection inspect(InspectorTarget target, long expectedRevision) {
+        ensureOpen();
+        requireRevision(expectedRevision);
+        InspectorTarget validTarget = Objects.requireNonNull(target, "target");
+        HierarchyOccurrenceId occurrence = validTarget
+                .occurrence()
+                .orElseThrow(() -> new IllegalArgumentException("Inspector target must have a hierarchy occurrence"));
+        RetainedState retained = Optional.ofNullable(retainedDefinitions.get(occurrence.definition()))
+                .orElseThrow(() ->
+                        new IllegalStateException("Inspector definition is not retained: " + occurrence.definition()));
+        EditorRetainedDefinition current = snapshot(retained);
+        EditorHierarchyNode node = current.hierarchy().roots().stream()
+                .map(root -> findNode(root, occurrence))
+                .flatMap(Optional::stream)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("hierarchy occurrence is not current: " + occurrence));
+        if (!node.inspectorTarget().equals(validTarget)) {
+            throw new IllegalArgumentException("Inspector target does not match current hierarchy state");
+        }
+        List<EntityEntry> roots = scopeRoots(current.content());
+        ResolvedInspectorEntry resolved = resolveEntry(
+                roots,
+                occurrence.entityPath(),
+                false,
+                roots,
+                new HierarchyOccurrenceId(occurrence.definition(), List.of()));
+        InspectorProjection.Provenance provenance =
+                resolved.generated() ? InspectorProjection.Provenance.GENERATED : InspectorProjection.Provenance.LOCAL;
+        InspectorProjection.DefinitionOrigin definitionOrigin =
+                current.origin() == EditorRetainedDefinition.Origin.AUTHORED
+                        ? InspectorProjection.DefinitionOrigin.AUTHORED
+                        : InspectorProjection.DefinitionOrigin.GENERATED;
+        EditorInspectorProjector.Context context = new EditorInspectorProjector.Context(
+                validTarget,
+                definitionOrigin,
+                provenance,
+                node.isEditable(),
+                types,
+                resolved.scopeRoots(),
+                resolved.scopeOccurrence(),
+                assets);
+        return switch (resolved.entry()) {
+            case LocalEntity entity -> EditorInspectorProjector.entity(entity, context);
+            case EntityPlacement placement ->
+                EditorInspectorProjector.placement(placement, resolvePlacementDefinition(placement), context);
+        };
+    }
+
     /** Returns all authoritative session state changes.
      *
      * @return session change stream
@@ -531,7 +592,8 @@ public final class EditorProjectSession implements AutoCloseable {
                 state.id().equals(startupWorld.current().id())
                         ? new EditorRetainedDefinition.Content.World(startupWorld.current())
                         : state.content();
-        boolean editable = state.origin() == EditorRetainedDefinition.Origin.AUTHORED;
+        boolean editable = state.origin() == EditorRetainedDefinition.Origin.AUTHORED
+                && state.id().equals(startupWorld.current().id());
         EditorHierarchyProjection projection =
                 switch (content) {
                     case EditorRetainedDefinition.Content.World world ->
@@ -575,6 +637,55 @@ public final class EditorProjectSession implements AutoCloseable {
                 .map(child -> findNode(child, occurrence))
                 .flatMap(Optional::stream)
                 .findFirst();
+    }
+
+    /** Returns the directly authored roots of one retained structural definition. */
+    private static List<EntityEntry> scopeRoots(EditorRetainedDefinition.Content content) {
+        return switch (content) {
+            case EditorRetainedDefinition.Content.World world ->
+                world.definition().roots();
+            case EditorRetainedDefinition.Content.Entity entity ->
+                List.of(entity.definition().root());
+        };
+    }
+
+    /** Resolves one occurrence path, traversing placed definitions without adding a wrapper entity. */
+    private ResolvedInspectorEntry resolveEntry(
+            List<EntityEntry> roots,
+            List<EntityId> path,
+            boolean generated,
+            List<EntityEntry> scopeRoots,
+            HierarchyOccurrenceId scopeOccurrence) {
+        if (path.isEmpty()) {
+            throw new IllegalArgumentException("Inspector occurrence must identify an entity or placement");
+        }
+        EntityEntry entry = roots.stream()
+                .filter(candidate -> candidate.id().equals(path.getFirst()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Inspector occurrence path is not current"));
+        if (path.size() == 1) {
+            return new ResolvedInspectorEntry(entry, generated, scopeRoots, scopeOccurrence);
+        }
+        List<EntityId> remainder = path.subList(1, path.size());
+        return switch (entry) {
+            case LocalEntity entity ->
+                resolveEntry(entity.children(), remainder, generated, scopeRoots, scopeOccurrence);
+            case EntityPlacement placement -> {
+                EntityDefinition definition = resolvePlacementDefinition(placement)
+                        .orElseThrow(() -> new IllegalStateException("placed definition is unavailable"));
+                yield resolveEntry(
+                        definition.root().children(),
+                        remainder,
+                        true,
+                        definition.root().children(),
+                        scopeOccurrence.child(placement.id()));
+            }
+        };
+    }
+
+    /** Resolves a placement through the session's authoritative definition graph. */
+    private Optional<EntityDefinition> resolvePlacementDefinition(EntityPlacement placement) {
+        return definitions.loadEntity(placement.definition(), types).definition();
     }
 
     private static void requireEntity(EditorHierarchyNode node, EntityId id) {
@@ -663,6 +774,16 @@ public final class EditorProjectSession implements AutoCloseable {
             Objects.requireNonNull(origin, "origin");
             Objects.requireNonNull(source, "source");
             Objects.requireNonNull(content, "content");
+        }
+    }
+
+    /** One resolved occurrence and whether traversal crossed a placement boundary. */
+    private record ResolvedInspectorEntry(
+            EntityEntry entry, boolean generated, List<EntityEntry> scopeRoots, HierarchyOccurrenceId scopeOccurrence) {
+        private ResolvedInspectorEntry {
+            Objects.requireNonNull(entry, "entry");
+            scopeRoots = List.copyOf(scopeRoots);
+            Objects.requireNonNull(scopeOccurrence, "scopeOccurrence");
         }
     }
 }

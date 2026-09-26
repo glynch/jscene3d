@@ -486,14 +486,14 @@ public class StandardPhysics3dDescriptors {
 
     /** Creates one array-backed authored spatial property. */
     private static PropertyDescriptor vectorProperty(
-            PropertyId id, String name, ProjectValue defaultValue, String semantic) {
-        return PropertyDescriptor.optionalWithDefault(
+            PropertyId id, String name, ProjectValue.ArrayValue defaultValue, String semantic) {
+        return PropertyDescriptor.optionalArrayWithDefault(
                 id.value(),
-                ProjectValueKind.ARRAY,
+                ProjectValueKind.NUMBER,
+                defaultValue.values().size(),
                 defaultValue,
                 DescriptorPresentation.named(name),
-                Map.of("semantic", new ProjectValue.TextValue(semantic)),
-                Set.of());
+                Map.of("semantic", new ProjectValue.TextValue(semantic)));
     }
 
     /** Creates one integer-valued authored property. */

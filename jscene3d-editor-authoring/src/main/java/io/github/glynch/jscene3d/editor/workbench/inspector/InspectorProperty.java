@@ -6,7 +6,6 @@ package io.github.glynch.jscene3d.editor.workbench.inspector;
 
 import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
-import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -54,14 +53,27 @@ public record InspectorProperty(
     /**
      * Typed projected value and provenance.
      *
-     * @param value authored or default value, empty when unset
+     * @param authoredValue value explicitly present in authored data
+     * @param defaultValue value declared by descriptor metadata
+     * @param effectiveValue authored value or descriptor default, empty when unset
      * @param origin value provenance
+     * @param validity current semantic validity
+     * @param editable whether a future mutation may target this property
      */
-    public record State(Optional<ProjectValue> value, Origin origin) {
+    public record State(
+            Optional<InspectorValue> authoredValue,
+            Optional<InspectorValue> defaultValue,
+            Optional<InspectorValue> effectiveValue,
+            Origin origin,
+            Validity validity,
+            boolean editable) {
         /** Validates typed state. */
         public State {
-            Objects.requireNonNull(value, "value");
+            Objects.requireNonNull(authoredValue, "authoredValue");
+            Objects.requireNonNull(defaultValue, "defaultValue");
+            Objects.requireNonNull(effectiveValue, "effectiveValue");
             Objects.requireNonNull(origin, "origin");
+            Objects.requireNonNull(validity, "validity");
         }
     }
 
@@ -73,5 +85,17 @@ public record InspectorProperty(
         DEFAULT,
         /** Neither authored nor default value is present. */
         UNSET
+    }
+
+    /** Semantic validity independent of value provenance and editability. */
+    public enum Validity {
+        /** The effective value satisfies currently available metadata. */
+        VALID,
+        /** A required property has neither an authored value nor a default. */
+        REQUIRED_UNSET,
+        /** A semantic reference or authored target cannot currently be resolved. */
+        BROKEN_REFERENCE,
+        /** Exact property descriptor metadata is unavailable. */
+        METADATA_UNAVAILABLE
     }
 }

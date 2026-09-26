@@ -64,7 +64,12 @@ final class AuthoringProtocolServerTest {
         assertThat(response.at("/result/capabilities"))
                 .extracting(JsonNode::asText)
                 .containsExactly(
-                        "project/open", "project/replace", "project/close", "definition/open", "service/shutdown");
+                        "project/open",
+                        "project/replace",
+                        "project/close",
+                        "definition/open",
+                        "inspector/read",
+                        "service/shutdown");
         assertThat(server.isInitialized()).isTrue();
         assertThat(server.clientLocale()).contains(Locale.forLanguageTag("en-GB"));
     }
@@ -86,7 +91,7 @@ final class AuthoringProtocolServerTest {
         JsonNode response = response(initialize(1, 7));
 
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(1);
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(2);
         assertThat(server.isInitialized()).isTrue();
     }
 
@@ -220,6 +225,36 @@ final class AuthoringProtocolServerTest {
                 .isEqualTo(AuthoringTestProject.ENTITY_ID);
         assertThat(response.at("/result/definition/roots/0/target/source").asText())
                 .endsWith("worlds/main.world.json");
+    }
+
+    /** Dispatches one complete Inspector snapshot using the Java-issued hierarchy target. */
+    @Test
+    void dispatchesInspectorRead() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        response(initialize(1, 2));
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
+        long generation = opened.at("/result/projectGeneration").asLong();
+        JsonNode definition = response(request(
+                3,
+                "definition/open",
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                        + "\"}"));
+        long revision = definition.at("/result/definition/revision").asLong();
+        JsonNode target = definition.at("/result/definition/roots/0/target");
+        String params = "{\"expectedProjectGeneration\":" + generation + ",\"expectedDefinitionRevision\":" + revision
+                + ",\"target\":" + target + "}";
+
+        JsonNode inspection = response(request(4, "inspector/read", params));
+
+        assertThat(inspection.at("/result/read").asBoolean()).isTrue();
+        assertThat(inspection.at("/result/projectGeneration").asLong()).isEqualTo(generation);
+        assertThat(inspection.at("/result/snapshot/revision").asLong()).isEqualTo(revision);
+        assertThat(inspection.at("/result/snapshot/title").asText()).isEqualTo("Player");
+        assertThat(inspection.at("/result/snapshot/groups/0/kind").asText()).isEqualTo("entity");
+        assertThat(inspection
+                        .at("/result/snapshot/groups/0/properties/0/state/effectiveValue/kind")
+                        .asText())
+                .isEqualTo("boolean");
     }
 
     /** Ignores unknown optional initialization fields as required for additive evolution. */

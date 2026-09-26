@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionSnapshot;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorSnapshot;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectCloseResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
@@ -152,6 +153,35 @@ final class AuthoringProjectServiceTest {
         assertThat(staleGeneration.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_GENERATION_CONFLICT);
         assertThat(staleRevision.failureCode()).isEqualTo(AuthoringProjectService.INSPECTOR_STALE);
         assertThat(mismatched.failureCode()).isEqualTo(AuthoringProjectService.INSPECTOR_TARGET_INVALID);
+    }
+
+    /** Projects Euler semantics and exact degree components through the complete service boundary. */
+    @Test
+    void projectsEulerRotationInspectorSemantics() throws IOException {
+        AuthoringTestProject.writeEulerRotationProject(temporaryDirectory);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        DefinitionOpenResult definition =
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+        DefinitionSnapshot retained = Objects.requireNonNull(definition.definition());
+
+        InspectorReadResult read = service.readInspector(
+                new InspectorReadParams(
+                        1L, retained.revision(), retained.roots().getFirst().target()),
+                Locale.ENGLISH);
+        var property = Objects.requireNonNull(read.snapshot())
+                .groups()
+                .get(1)
+                .properties()
+                .getFirst();
+        var value = (InspectorSnapshot.ArrayValue)
+                Objects.requireNonNull(property.state().effectiveValue());
+
+        assertThat(property.constraints().editor().semantic()).isEqualTo("euler-rotation");
+        assertThat(property.constraints().elementKind()).isEqualTo("number");
+        assertThat(property.constraints().exactElementCount()).isEqualTo(3);
+        assertThat(value.values())
+                .extracting(component -> ((InspectorSnapshot.NumberValue) component).decimal())
+                .containsExactly("0", "90.0000000000000000001", "-2.5");
     }
 
     /** Accepts the selected descriptor path without encoding its filename in the protocol. */

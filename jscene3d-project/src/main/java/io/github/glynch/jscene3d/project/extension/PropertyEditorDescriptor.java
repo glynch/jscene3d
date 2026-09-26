@@ -168,6 +168,8 @@ public final class PropertyEditorDescriptor {
             }
             case VECTOR2 -> requireFixedNumericArray(valueKind, elementKind, exactElementCount, 2, "vector2");
             case VECTOR3 -> requireFixedNumericArray(valueKind, elementKind, exactElementCount, 3, "vector3");
+            case EULER_ROTATION ->
+                requireFixedNumericArray(valueKind, elementKind, exactElementCount, 3, "Euler rotation");
             case QUATERNION -> requireFixedNumericArray(valueKind, elementKind, exactElementCount, 4, "quaternion");
             case LINEAR_COLOR -> requireFixedNumericArray(valueKind, elementKind, exactElementCount, 3, "linear color");
         }

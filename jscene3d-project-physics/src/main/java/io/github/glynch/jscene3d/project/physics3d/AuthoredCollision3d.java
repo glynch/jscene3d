@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.physics3d;
 
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.spatial3d.AuthoredEulerRotation3d;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.util.Map;
@@ -26,8 +27,8 @@ final class AuthoredCollision3d {
         }
         Vector3f position =
                 vector3(require(properties, Physics3dDescriptors.localPositionProperty()), "local-position");
-        Quaternionf orientation =
-                quaternion(require(properties, Physics3dDescriptors.localOrientationProperty()), "local-orientation");
+        Quaternionf orientation = AuthoredEulerRotation3d.toQuaternion(
+                require(properties, Physics3dDescriptors.localOrientationProperty()), "local-orientation");
         int category = integer(require(properties, Physics3dDescriptors.categoryBitsProperty()), "category-bits");
         int mask = integer(require(properties, Physics3dDescriptors.maskBitsProperty()), "mask-bits");
         return new Shape(reference.reference(), position, orientation, new CollisionFilter3d(category, mask));
@@ -76,18 +77,6 @@ final class AuthoredCollision3d {
                         number(array.values().get(0), name),
                         number(array.values().get(1), name),
                         number(array.values().get(2), name)),
-                name);
-    }
-
-    /** Reads one finite non-zero four-number orientation. */
-    private static Quaternionf quaternion(ProjectValue value, String name) {
-        ProjectValue.ArrayValue array = array(value, 4, name);
-        return CollisionPreconditions.requireOrientation(
-                new Quaternionf(
-                        number(array.values().get(0), name),
-                        number(array.values().get(1), name),
-                        number(array.values().get(2), name),
-                        number(array.values().get(3), name)),
                 name);
     }
 

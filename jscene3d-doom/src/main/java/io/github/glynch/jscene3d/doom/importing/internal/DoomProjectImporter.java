@@ -51,6 +51,7 @@ import io.github.glynch.jscene3d.project.importing.extension.ImportPreparationCo
 import io.github.glynch.jscene3d.project.importing.extension.ProjectImporter;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dDescriptors;
 import io.github.glynch.jscene3d.project.physics3d.Physics3dResourceWriter;
+import io.github.glynch.jscene3d.project.spatial3d.AuthoredEulerRotation3d;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.spatial3d.resource.Spatial3dResourceWriter;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -1131,10 +1132,9 @@ final class DoomProjectImporter implements ProjectImporter {
                 throw new IllegalArgumentException("floor trigger has no positive vertical span: " + linedefIndex);
             }
             float yaw = (float) Math.atan2(-deltaZ, deltaX);
-            float halfYaw = yaw * 0.5F;
             return new TriggerVolume(
                     numbers(midpoint(startX, endX), midpoint(bottom, top), midpoint(startZ, endZ)),
-                    numbers(0.0F, (float) Math.sin(halfYaw), 0.0F, (float) Math.cos(halfYaw)),
+                    AuthoredEulerRotation3d.fromRadians(0.0F, yaw, 0.0F),
                     width,
                     top - bottom);
         }

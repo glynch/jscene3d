@@ -12,6 +12,9 @@ public final class PropertyEditorSemantics {
     /** Three-axis numeric vector. */
     public static final String VECTOR3 = "vector3";
 
+    /** Three-axis Euler rotation authored in degrees and applied in XYZ order. */
+    public static final String EULER_ROTATION = "euler-rotation";
+
     /** Four-axis normalized quaternion. */
     public static final String QUATERNION = "quaternion";
 

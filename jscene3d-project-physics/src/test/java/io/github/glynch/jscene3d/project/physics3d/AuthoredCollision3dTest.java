@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.physics3d;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.offset;
 
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.joml.Quaternionf;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -58,21 +60,34 @@ final class AuthoredCollision3dTest {
     /** Rejects invalid orientations and collision-filter integers. */
     @Test
     void rejectsInvalidOrientationAndFilterValues() {
-        Map<PropertyId, ProjectValue> zeroOrientation = replaced(
-                Physics3dDescriptors.localOrientationProperty(), array(number(0), number(0), number(0), number(0)));
+        Map<PropertyId, ProjectValue> staleQuaternion = replaced(
+                Physics3dDescriptors.localOrientationProperty(), array(number(0), number(0), number(0), number(1)));
         Map<PropertyId, ProjectValue> textCategory =
                 replaced(Physics3dDescriptors.categoryBitsProperty(), new ProjectValue.TextValue("all"));
         Map<PropertyId, ProjectValue> fractionalMask = replaced(Physics3dDescriptors.maskBitsProperty(), number("1.5"));
 
-        assertThatThrownBy(() -> AuthoredCollision3d.shape(zeroOrientation))
+        assertThatThrownBy(() -> AuthoredCollision3d.shape(staleQuaternion))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-zero");
+                .hasMessageContaining("exactly 3");
         assertThatThrownBy(() -> AuthoredCollision3d.shape(textCategory))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must be an integer");
         assertThatThrownBy(() -> AuthoredCollision3d.shape(fractionalMask))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("32-bit integer");
+    }
+
+    /** Uses the same canonical XYZ-degree convention as authored transforms. */
+    @Test
+    void convertsAuthoredOrientationToRuntimeQuaternion() {
+        Map<PropertyId, ProjectValue> properties =
+                replaced(Physics3dDescriptors.localOrientationProperty(), array(number(30), number(45), number(60)));
+
+        AuthoredCollision3d.Shape shape = AuthoredCollision3d.shape(properties);
+
+        Quaternionf expected = new Quaternionf()
+                .rotationXYZ((float) Math.toRadians(30), (float) Math.toRadians(45), (float) Math.toRadians(60));
+        assertThat(Math.abs(shape.localOrientation().dot(expected))).isCloseTo(1.0F, offset(1.0E-5F));
     }
 
     /** Decodes effective authored character settings and rejects invalid numeric values. */
@@ -113,7 +128,7 @@ final class AuthoredCollision3dTest {
                 Physics3dDescriptors.localPositionProperty(),
                 array(number(0), number(0), number(0)),
                 Physics3dDescriptors.localOrientationProperty(),
-                array(number(0), number(0), number(0), number(1)),
+                array(number(0), number(0), number(0)),
                 Physics3dDescriptors.categoryBitsProperty(),
                 number(1),
                 Physics3dDescriptors.maskBitsProperty(),

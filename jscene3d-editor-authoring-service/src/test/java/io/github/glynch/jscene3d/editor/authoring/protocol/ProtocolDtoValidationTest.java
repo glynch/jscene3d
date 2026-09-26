@@ -153,6 +153,59 @@ final class ProtocolDtoValidationTest {
         assertThat(json.toString()).doesNotContain("editorMetadata", "semanticMetadata");
     }
 
+    /** Serializes Euler semantics beside exact three-component decimal values. */
+    @Test
+    void serializesEulerRotationInspectorSemantics() {
+        InspectorSnapshot.Value rotation = new InspectorSnapshot.ArrayValue(
+                "array",
+                List.of(
+                        new InspectorSnapshot.NumberValue("number", "0"),
+                        new InspectorSnapshot.NumberValue("number", "90.0000000000000000001"),
+                        new InspectorSnapshot.NumberValue("number", "-2.5")));
+        InspectorSnapshot snapshot = new InspectorSnapshot(
+                0,
+                new DefinitionSnapshot.SemanticTarget(
+                        "local-entity",
+                        "file:///project/world.json",
+                        "entity-a",
+                        new DefinitionSnapshot.Occurrence("world-a", List.of("entity-a"))),
+                "Entity",
+                "authored",
+                "local",
+                false,
+                List.of(new InspectorSnapshot.TargetGroup(
+                        "rotation",
+                        "component",
+                        "Rotation",
+                        null,
+                        "component-a",
+                        new InspectorSnapshot.ComponentTypeDto("example/rotation", 1),
+                        "available",
+                        false,
+                        List.of(new InspectorSnapshot.Property(
+                                "rotation",
+                                "Rotation",
+                                null,
+                                "array",
+                                false,
+                                new InspectorSnapshot.Constraints(
+                                        "number",
+                                        3,
+                                        List.of(),
+                                        new InspectorSnapshot.EditorSemantics("euler-rotation", null, null)),
+                                new InspectorSnapshot.PropertyState(
+                                        rotation, null, rotation, "authored", "valid", false),
+                                null)))));
+
+        JsonNode json = new ObjectMapper().valueToTree(snapshot);
+
+        assertThat(json.at("/groups/0/properties/0/constraints/editor/semantic").asText())
+                .isEqualTo("euler-rotation");
+        assertThat(json.at("/groups/0/properties/0/state/effectiveValue/values/1/decimal")
+                        .asText())
+                .isEqualTo("90.0000000000000000001");
+    }
+
     /** Creates one valid project summary for result-shape validation. */
     private static ProjectSummary summary() {
         return new ProjectSummary(

@@ -19,6 +19,7 @@ import io.github.glynch.jscene3d.project.importing.SourceItem;
 import io.github.glynch.jscene3d.project.importing.extension.ImportInspectionContext;
 import io.github.glynch.jscene3d.project.importing.extension.ImportPreparationContext;
 import io.github.glynch.jscene3d.project.importing.extension.ProjectImporter;
+import io.github.glynch.jscene3d.project.spatial3d.AuthoredEulerRotation3d;
 import io.github.glynch.jscene3d.project.spatial3d.resource.Spatial3dResourceWriter;
 import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -176,7 +177,8 @@ final class GltfProjectImporter implements ProjectImporter {
             String importId, String locator, GltfProjectContent.Transform transform) {
         Map<PropertyId, ProjectValue> properties = new LinkedHashMap<>();
         properties.put(StandardSpatial3dDescriptors.positionProperty(), vector(transform.position()));
-        properties.put(StandardSpatial3dDescriptors.orientationProperty(), quaternion(transform.orientation()));
+        properties.put(
+                StandardSpatial3dDescriptors.orientationProperty(), authoredOrientation(transform.orientation()));
         properties.put(StandardSpatial3dDescriptors.scaleProperty(), vector(transform.scale()));
         return component(importId, locator, StandardSpatial3dDescriptors.transformType(), properties);
     }
@@ -198,10 +200,9 @@ final class GltfProjectImporter implements ProjectImporter {
         return new ProjectValue.ArrayValue(List.of(number(vector.x()), number(vector.y()), number(vector.z())));
     }
 
-    /** Creates one portable four-component quaternion. */
-    private static ProjectValue.ArrayValue quaternion(Quaternionfc value) {
-        return new ProjectValue.ArrayValue(
-                List.of(number(value.x()), number(value.y()), number(value.z()), number(value.w())));
+    /** Converts one source quaternion to canonical authored XYZ Euler degrees. */
+    static ProjectValue.ArrayValue authoredOrientation(Quaternionfc orientation) {
+        return AuthoredEulerRotation3d.fromQuaternion(orientation);
     }
 
     /** Creates one portable decimal value. */

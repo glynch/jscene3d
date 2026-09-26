@@ -53,7 +53,7 @@ final class Spatial3dDescriptorsTest {
         });
         assertThat(properties)
                 .extracting(PropertyDescriptor::exactElementCount)
-                .containsExactly(Optional.of(3), Optional.of(4), Optional.of(3));
+                .containsExactly(Optional.of(3), Optional.of(3), Optional.of(3));
         assertThat(properties.get(0).editorMetadata())
                 .containsEntry(
                         PropertyDescriptorKeys.EDITOR_SEMANTIC,
@@ -61,13 +61,13 @@ final class Spatial3dDescriptorsTest {
         assertThat(properties.get(1).editorMetadata())
                 .containsEntry(
                         PropertyDescriptorKeys.EDITOR_SEMANTIC,
-                        new ProjectValue.TextValue(PropertyEditorSemantics.QUATERNION));
+                        new ProjectValue.TextValue(PropertyEditorSemantics.EULER_ROTATION));
         assertThat(properties.get(2).editorMetadata())
                 .containsEntry(
                         PropertyDescriptorKeys.EDITOR_SEMANTIC,
                         new ProjectValue.TextValue(PropertyEditorSemantics.VECTOR3));
         assertThat(array(properties.get(0))).containsExactly(0.0F, 0.0F, 0.0F);
-        assertThat(array(properties.get(1))).containsExactly(0.0F, 0.0F, 0.0F, 1.0F);
+        assertThat(array(properties.get(1))).containsExactly(0.0F, 0.0F, 0.0F);
         assertThat(array(properties.get(2))).containsExactly(1.0F, 1.0F, 1.0F);
     }
 

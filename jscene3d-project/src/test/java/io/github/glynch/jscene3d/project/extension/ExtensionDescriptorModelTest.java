@@ -184,6 +184,67 @@ final class ExtensionDescriptorModelTest {
         assertThat(unknown.editorMetadata()).containsKey("vendor-data");
     }
 
+    /** Defines Euler rotation as an exact three-number degree vector in canonical XYZ order. */
+    @Test
+    void validatesEulerRotationEditorSemantic() {
+        PropertyDescriptor rotation = PropertyDescriptor.optionalArray(
+                "rotation",
+                ProjectValueKind.NUMBER,
+                3,
+                PRESENTATION,
+                Map.of("semantic", new ProjectValue.TextValue(PropertyEditorSemantics.EULER_ROTATION)));
+
+        assertThat(rotation.editor().semantic()).isEqualTo(PropertyEditorSemantic.EULER_ROTATION);
+        assertThat(rotation.editor().semantic().serializedName()).isEqualTo("euler-rotation");
+        assertThat(rotation.valueKind()).isEqualTo(ProjectValueKind.ARRAY);
+        assertThat(rotation.elementKind()).contains(ProjectValueKind.NUMBER);
+        assertThat(rotation.exactElementCount()).contains(3);
+    }
+
+    /** Keeps genuine quaternion semantics available independently of ordinary orientation properties. */
+    @Test
+    void validatesQuaternionEditorSemantic() {
+        PropertyDescriptor quaternion = PropertyDescriptor.optionalArray(
+                "quaternion",
+                ProjectValueKind.NUMBER,
+                4,
+                PRESENTATION,
+                Map.of("semantic", new ProjectValue.TextValue(PropertyEditorSemantics.QUATERNION)));
+
+        assertThat(quaternion.editor().semantic()).isEqualTo(PropertyEditorSemantic.QUATERNION);
+        assertThat(quaternion.exactElementCount()).contains(4);
+    }
+
+    /** Keeps the established semantic wire names stable while adding Euler rotation. */
+    @Test
+    void keepsExistingPropertyEditorSemanticWireNames() {
+        assertThat(PropertyEditorSemantic.VECTOR2.serializedName()).isEqualTo("vector2");
+        assertThat(PropertyEditorSemantic.VECTOR3.serializedName()).isEqualTo("vector3");
+        assertThat(PropertyEditorSemantic.QUATERNION.serializedName()).isEqualTo("quaternion");
+        assertThat(PropertyEditorSemantic.LINEAR_COLOR.serializedName()).isEqualTo("color-linear");
+    }
+
+    /** Rejects Euler semantics on every incompatible structural shape. */
+    @Test
+    void rejectsIncompatibleEulerRotationEditorSemantics() {
+        Map<String, ProjectValue> euler =
+                Map.of("semantic", new ProjectValue.TextValue(PropertyEditorSemantics.EULER_ROTATION));
+        Set<ResourceReference.Kind> noReferences = Set.of();
+
+        assertThatThrownBy(() -> PropertyDescriptor.optional(
+                        "rotation", ProjectValueKind.NUMBER, PRESENTATION, euler, noReferences))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ARRAY<NUMBER>[3]");
+        assertThatThrownBy(() ->
+                        PropertyDescriptor.optionalArray("rotation", ProjectValueKind.NUMBER, 2, PRESENTATION, euler))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ARRAY<NUMBER>[3]");
+        assertThatThrownBy(() ->
+                        PropertyDescriptor.optionalArray("rotation", ProjectValueKind.TEXT, 3, PRESENTATION, euler))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ARRAY<NUMBER>[3]");
+    }
+
     /** Rejects known semantic metadata that conflicts with the declared structural shape. */
     @Test
     void rejectsIncompatibleTypedEditorSemantics() {

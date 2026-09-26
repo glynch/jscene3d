@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.gltf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.offset;
 
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -34,6 +35,7 @@ import io.github.glynch.jscene3d.project.runtime.ImportedRuntimeResources;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
+import io.github.glynch.jscene3d.project.spatial3d.AuthoredEulerRotation3d;
 import io.github.glynch.jscene3d.project.spatial3d.Material3dResource;
 import io.github.glynch.jscene3d.project.spatial3d.Mesh3dResource;
 import io.github.glynch.jscene3d.project.spatial3d.MeshRenderer3d;
@@ -42,6 +44,7 @@ import io.github.glynch.jscene3d.project.spatial3d.Spatial3dResourceLoaders;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +52,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import org.joml.Quaternionf;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -164,6 +168,16 @@ final class GltfProjectImportTest {
                 .definition()
                 .orElseThrow();
         LocalEntity sourceNode = (LocalEntity) generated.root().children().getFirst();
+        ComponentDefinition transformDefinition = sourceNode.components().stream()
+                .filter(component -> component
+                        .type()
+                        .equals(StandardSpatial3dDescriptors.transformType().id()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(transformDefinition.properties().get(StandardSpatial3dDescriptors.orientationProperty()))
+                .isInstanceOfSatisfying(
+                        ProjectValue.ArrayValue.class,
+                        orientation -> assertThat(orientation.values()).hasSize(3));
         ComponentDefinition rendererDefinition = sourceNode.components().stream()
                 .filter(component -> component
                         .type()
@@ -211,6 +225,32 @@ final class GltfProjectImportTest {
         assertThatThrownBy(() -> GltfConverter.loadProject(textured, 1))
                 .isInstanceOf(GltfLoadException.class)
                 .hasMessageContaining("textures in project imports");
+    }
+
+    /** Publishes glTF quaternions as concise canonical XYZ degrees without changing their orientation. */
+    @Test
+    void convertsSourceQuaternionOrientationsToAuthoredEulerDegrees() {
+        assertImportedOrientation(new Quaternionf(), List.of("0", "0", "0"));
+        assertImportedOrientation(new Quaternionf().rotationX((float) Math.PI / 2.0F), List.of("90", "0", "0"));
+        assertImportedOrientation(
+                new Quaternionf().rotationXYZ(radians(23), radians(-41), radians(67)), List.of("23", "-41", "67"));
+    }
+
+    /** Verifies the authored spelling and orientation equivalence for one imported quaternion. */
+    private static void assertImportedOrientation(Quaternionf source, List<String> expectedDegrees) {
+        var authored = GltfProjectImporter.authoredOrientation(source);
+
+        assertThat(authored.values())
+                .map(ProjectValue.NumberValue.class::cast)
+                .extracting(number -> number.value().toString())
+                .containsExactlyElementsOf(expectedDegrees);
+        Quaternionf runtime = AuthoredEulerRotation3d.toQuaternion(authored, "orientation");
+        assertThat(Math.abs(runtime.dot(source))).isCloseTo(1.0F, offset(1.0E-5F));
+    }
+
+    /** Converts one degree angle to radians. */
+    private static float radians(int degrees) {
+        return (float) Math.toRadians(degrees);
     }
 
     /** Creates one manager through service-discovered glTF registration. */

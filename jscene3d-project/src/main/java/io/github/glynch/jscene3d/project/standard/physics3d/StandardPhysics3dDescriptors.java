@@ -16,6 +16,8 @@ import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
+import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeScope;
@@ -394,9 +396,17 @@ public class StandardPhysics3dDescriptors {
                                 DescriptorPresentation.named("Shape"),
                                 Map.of(),
                                 Set.of()),
-                        vectorProperty(LOCAL_POSITION, "Local position", numbers(0.0F, 0.0F, 0.0F), "vector3"),
                         vectorProperty(
-                                LOCAL_ORIENTATION, "Local orientation", numbers(0.0F, 0.0F, 0.0F, 1.0F), "quaternion"),
+                                LOCAL_POSITION,
+                                "Local position",
+                                numbers(0.0F, 0.0F, 0.0F),
+                                PropertyEditorSemantics.VECTOR3),
+                        vectorProperty(
+                                LOCAL_ORIENTATION,
+                                "Local orientation",
+                                "Shape-local Euler rotation in degrees, applied in canonical XYZ order",
+                                numbers(0.0F, 0.0F, 0.0F),
+                                PropertyEditorSemantics.EULER_ROTATION),
                         integerProperty(CATEGORY_BITS, "Category bits", 1),
                         integerProperty(MASK_BITS, "Mask bits", -1)))
                 .multiplicity(ComponentMultiplicity.MULTIPLE)
@@ -493,7 +503,19 @@ public class StandardPhysics3dDescriptors {
                 defaultValue.values().size(),
                 defaultValue,
                 DescriptorPresentation.named(name),
-                Map.of("semantic", new ProjectValue.TextValue(semantic)));
+                Map.of(PropertyDescriptorKeys.EDITOR_SEMANTIC, new ProjectValue.TextValue(semantic)));
+    }
+
+    /** Creates one described array-backed authored spatial property. */
+    private static PropertyDescriptor vectorProperty(
+            PropertyId id, String name, String description, ProjectValue.ArrayValue defaultValue, String semantic) {
+        return PropertyDescriptor.optionalArrayWithDefault(
+                id.value(),
+                ProjectValueKind.NUMBER,
+                defaultValue.values().size(),
+                defaultValue,
+                DescriptorPresentation.described(name, description),
+                Map.of(PropertyDescriptorKeys.EDITOR_SEMANTIC, new ProjectValue.TextValue(semantic)));
     }
 
     /** Creates one integer-valued authored property. */

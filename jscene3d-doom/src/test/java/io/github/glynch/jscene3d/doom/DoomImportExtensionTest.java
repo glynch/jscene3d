@@ -187,6 +187,7 @@ final class DoomImportExtensionTest {
                         "\"raised-height\" : 2.0",
                         "\"lowered-height\" : 0.0",
                         "\"name\" : \"Walk-over trigger 0\"",
+                        "\"orientation\" : [ 0, 90, 0 ]",
                         "\"category-bits\" : 16.0",
                         "\"mask-bits\" : 2.0",
                         "\"endpointId\" : \"overlap-entered\"",

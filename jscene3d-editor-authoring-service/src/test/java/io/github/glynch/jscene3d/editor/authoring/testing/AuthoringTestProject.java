@@ -170,6 +170,64 @@ public final class AuthoringTestProject {
                 """);
     }
 
+    /**
+     * Writes a project whose component descriptor declares one Euler rotation property.
+     *
+     * @param root fixture project root
+     * @throws IOException when fixture files cannot be written
+     */
+    public static void writeEulerRotationProject(Path root) throws IOException {
+        write(root, DESCRIPTOR);
+        writeFile(root, "src/main/resources/META-INF/jscene3d/extension.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/extension-1.json",
+                  "schemaVersion":1,
+                  "id":"example.authoring-test",
+                  "version":"1.0.0",
+                  "engineRequires":">=0.1.0-SNAPSHOT <0.2.0",
+                  "displayName":"Authoring Test",
+                  "types":[],
+                  "components":[{
+                    "id":"example.authoring-test/rotation",
+                    "typeVersion":1,
+                    "displayName":"Rotation",
+                    "properties":[{
+                      "id":"rotation",
+                      "valueKind":"array",
+                      "elementKind":"number",
+                      "exactElementCount":3,
+                      "defaultValue":[0,90.0000000000000000001,-2.5],
+                      "displayName":"Rotation",
+                      "editor":{"semantic":"euler-rotation"}
+                    }]
+                  }]
+                }
+                """);
+        writeFile(root, "worlds/main.world.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/world-definition-1.json",
+                  "assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656",
+                  "assetType":"world-definition",
+                  "formatVersion":1,
+                  "name":"Opening World",
+                  "connections":[],
+                  "roots":[{
+                    "entryType":"local",
+                    "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
+                    "name":"Player",
+                    "enabled":true,
+                    "components":[{
+                      "componentId":"635b219c-7604-4d6f-a021-664a7d609195",
+                      "type":"example.authoring-test/rotation",
+                      "typeVersion":1,
+                      "properties":{}
+                    }],
+                    "children":[]
+                  }]
+                }
+                """);
+    }
+
     /** Writes one UTF-8 fixture file below the project root. */
     private static void writeFile(Path root, String relativePath, String content) throws IOException {
         Path path = root.resolve(relativePath);

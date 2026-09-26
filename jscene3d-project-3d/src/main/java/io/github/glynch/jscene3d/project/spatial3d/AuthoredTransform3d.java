@@ -37,7 +37,10 @@ final class AuthoredTransform3d {
     static AuthoredTransform3d from(Map<PropertyId, ProjectValue> properties) {
         Map<PropertyId, ProjectValue> values = Objects.requireNonNull(properties, "properties");
         Vector3f position = vector3(values, Spatial3dDescriptors.positionProperty());
-        Quaternionf orientation = quaternion(values, Spatial3dDescriptors.orientationProperty());
+        PropertyId orientationProperty = Spatial3dDescriptors.orientationProperty();
+        Quaternionf orientation = AuthoredEulerRotation3d.toQuaternion(
+                Objects.requireNonNull(values.get(orientationProperty), orientationProperty + " property"),
+                orientationProperty.value());
         Vector3f scale = vector3(values, Spatial3dDescriptors.scaleProperty());
         return new AuthoredTransform3d(position, orientation, scale);
     }
@@ -61,20 +64,6 @@ final class AuthoredTransform3d {
     private static Vector3f vector3(Map<PropertyId, ProjectValue> properties, PropertyId property) {
         List<ProjectValue> values = array(properties, property, 3);
         return new Vector3f(number(values, 0, property), number(values, 1, property), number(values, 2, property));
-    }
-
-    /** Decodes and normalizes one exact four-number quaternion. */
-    private static Quaternionf quaternion(Map<PropertyId, ProjectValue> properties, PropertyId property) {
-        List<ProjectValue> values = array(properties, property, 4);
-        Quaternionf result = new Quaternionf(
-                number(values, 0, property),
-                number(values, 1, property),
-                number(values, 2, property),
-                number(values, 3, property));
-        if (result.lengthSquared() == 0.0F) {
-            throw new IllegalArgumentException(property + " must not be a zero-length quaternion");
-        }
-        return result.normalize();
     }
 
     /** Requires one effective property to be an array with the exact expected size. */

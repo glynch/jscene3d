@@ -4,7 +4,9 @@
  */
 package io.github.glynch.jscene3d.project.spatial3d;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.offset;
 
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
@@ -13,27 +15,40 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.joml.Quaternionf;
 import org.junit.jupiter.api.Test;
 
 /** Exercises numeric validation kept behind the Transform3d factory boundary. */
 final class AuthoredTransform3dTest {
-    /** Rejects an orientation which cannot define a rotation. */
+    /** Converts authored XYZ degrees to the runtime quaternion representation. */
     @Test
-    void rejectsZeroLengthOrientation() {
+    void convertsAuthoredOrientationToRuntimeQuaternion() {
         Map<PropertyId, ProjectValue> properties =
-                properties(numbers("0", "0", "0"), numbers("0", "0", "0", "0"), numbers("1", "1", "1"));
+                properties(numbers("0", "0", "0"), numbers("30", "45", "60"), numbers("1", "1", "1"));
+
+        AuthoredTransform3d transform = AuthoredTransform3d.from(properties);
+
+        Quaternionf expected = new Quaternionf()
+                .rotationXYZ((float) Math.toRadians(30), (float) Math.toRadians(45), (float) Math.toRadians(60));
+        assertThat(Math.abs(transform.orientation().dot(expected))).isCloseTo(1.0F, offset(1.0E-5F));
+    }
+
+    /** Rejects the obsolete four-element quaternion representation. */
+    @Test
+    void rejectsStaleQuaternionOrientation() {
+        Map<PropertyId, ProjectValue> properties =
+                properties(numbers("0", "0", "0"), numbers("0", "0", "0", "1"), numbers("1", "1", "1"));
 
         assertThatThrownBy(() -> AuthoredTransform3d.from(properties))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("zero-length quaternion");
+                .hasMessageContaining("exactly 3");
     }
 
     /** Rejects a non-numeric array entry after structural array validation. */
     @Test
     void rejectsNonNumericEntry() {
         ProjectValue.ArrayValue position = array(number("0"), new ProjectValue.TextValue("invalid"), number("0"));
-        Map<PropertyId, ProjectValue> properties =
-                properties(position, numbers("0", "0", "0", "1"), numbers("1", "1", "1"));
+        Map<PropertyId, ProjectValue> properties = properties(position, numbers("0", "0", "0"), numbers("1", "1", "1"));
 
         assertThatThrownBy(() -> AuthoredTransform3d.from(properties))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -44,7 +59,7 @@ final class AuthoredTransform3dTest {
     @Test
     void rejectsNonFiniteFloatConversion() {
         Map<PropertyId, ProjectValue> properties =
-                properties(numbers("1E10000", "0", "0"), numbers("0", "0", "0", "1"), numbers("1", "1", "1"));
+                properties(numbers("1E10000", "0", "0"), numbers("0", "0", "0"), numbers("1", "1", "1"));
 
         assertThatThrownBy(() -> AuthoredTransform3d.from(properties))
                 .isInstanceOf(IllegalArgumentException.class)

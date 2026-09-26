@@ -468,9 +468,9 @@ public class StandardSpatial3dDescriptors {
         PropertyDescriptor orientation = vectorProperty(
                 ORIENTATION,
                 "Orientation",
-                "Normalized local XYZW quaternion",
-                numbers(0.0F, 0.0F, 0.0F, 1.0F),
-                PropertyEditorSemantics.QUATERNION);
+                "Local Euler rotation in degrees, applied in canonical XYZ order",
+                numbers(0.0F, 0.0F, 0.0F),
+                PropertyEditorSemantics.EULER_ROTATION);
         PropertyDescriptor scale = vectorProperty(
                 SCALE, "Scale", "Local XYZ scale", numbers(1.0F, 1.0F, 1.0F), PropertyEditorSemantics.VECTOR3);
         return ComponentTypeDescriptor.builder(

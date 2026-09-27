@@ -171,6 +171,39 @@ public final class AuthoredDefinitionDocument {
     }
 
     /**
+     * Returns whether another document represents the same authored tree state.
+     *
+     * <p>This comparison deliberately excludes object identity, persisted-source fingerprint, and serialized
+     * formatting. It is the semantic/tree equality used by authored working copies to derive dirty state.
+     *
+     * @param other document to compare
+     * @return whether both documents contain the same authored definition state
+     */
+    public boolean hasSameAuthoredState(AuthoredDefinitionDocument other) {
+        AuthoredDefinitionDocument validOther = Objects.requireNonNull(other, "other");
+        return id().equals(validOther.id()) && kind() == validOther.kind() && tree.equals(validOther.tree);
+    }
+
+    /**
+     * Returns this authored state associated with another document's persisted-source baseline.
+     *
+     * <p>The supplied document must identify the same retained source. This operation performs no I/O and does not
+     * claim that either document was saved; a future persistence transaction supplies the successfully reloaded or
+     * otherwise baselined document.
+     *
+     * @param persistedBaseline document carrying the established persisted-source fingerprint
+     * @return this authored state carrying the supplied persisted-source baseline
+     */
+    public AuthoredDefinitionDocument withPersistedSourceBaseline(AuthoredDefinitionDocument persistedBaseline) {
+        AuthoredDefinitionDocument baseline = Objects.requireNonNull(persistedBaseline, "persistedBaseline");
+        if (!id().equals(baseline.id()) || kind() != baseline.kind() || !source().equals(baseline.source())) {
+            throw new IllegalArgumentException("persisted baseline must identify the same authored source");
+        }
+        return new AuthoredDefinitionDocument(
+                assets, definitions, types, metadata, tree, content, baseline.sourceFingerprint);
+    }
+
+    /**
      * Serializes the retained tree with deterministic pretty printing and one trailing newline.
      *
      * @return detached complete UTF-8 authored JSON
@@ -243,6 +276,33 @@ public final class AuthoredDefinitionDocument {
         return validateCandidate(candidateTree);
     }
 
+    /**
+     * Creates a validated candidate with one authored entity or placement enabled state replaced.
+     *
+     * <p>This preserves the existing Java authoring behavior while routing it through the same source-preserving
+     * candidate validation path as component-property mutations.
+     *
+     * @param entity source-local entity or placement identity
+     * @param enabled replacement enabled state
+     * @return accepted copied document, structured validation rejection, or invalid target
+     */
+    public CandidateResult setEntityEnabled(EntityId entity, boolean enabled) {
+        EntityId validEntity = Objects.requireNonNull(entity, "entity");
+        ObjectNode candidateTree = tree.deepCopy();
+        Optional<ObjectNode> entry = entry(candidateTree, validEntity);
+        if (entry.isEmpty()) {
+            return new CandidateResult.InvalidEntityTarget(validEntity);
+        }
+        ObjectNode value = entry.orElseThrow();
+        boolean current =
+                value.path("enabled").isMissingNode() || value.path("enabled").booleanValue();
+        if (current == enabled) {
+            return new CandidateResult.Accepted(this, false);
+        }
+        value.put("enabled", enabled);
+        return validateCandidate(candidateTree);
+    }
+
     /** Serializes a detached tree through the one retained-document formatting policy. */
     static byte[] serializeTree(JsonNode tree) {
         try {
@@ -291,6 +351,40 @@ public final class AuthoredDefinitionDocument {
         return kind() == AssetKind.WORLD_DEFINITION
                 ? propertiesInEntries(candidate.get("roots"), target)
                 : propertiesInEntry(candidate.get("root"), target);
+    }
+
+    /** Finds one source-local entity or placement by stable identity. */
+    private Optional<ObjectNode> entry(ObjectNode candidate, EntityId target) {
+        return kind() == AssetKind.WORLD_DEFINITION
+                ? entryInEntries(candidate.get("roots"), target)
+                : entryInEntry(candidate.get("root"), target);
+    }
+
+    /** Searches one authored entry array recursively in source order. */
+    private static Optional<ObjectNode> entryInEntries(JsonNode entries, EntityId target) {
+        if (entries == null || !entries.isArray()) {
+            return Optional.empty();
+        }
+        for (JsonNode entry : entries) {
+            Optional<ObjectNode> found = entryInEntry(entry, target);
+            if (found.isPresent()) {
+                return found;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Searches one authored entry and locally authored descendants. */
+    private static Optional<ObjectNode> entryInEntry(JsonNode entry, EntityId target) {
+        if (!(entry instanceof ObjectNode object)) {
+            return Optional.empty();
+        }
+        if (target.toString().equals(object.path("entityId").textValue())) {
+            return Optional.of(object);
+        }
+        return "local".equals(object.path("entryType").textValue())
+                ? entryInEntries(object.get("children"), target)
+                : Optional.empty();
     }
 
     /** Searches one authored entry array recursively in source order. */
@@ -417,7 +511,10 @@ public final class AuthoredDefinitionDocument {
 
     /** Closed outcome of patching a copied source tree and reparsing it authoritatively. */
     public sealed interface CandidateResult
-            permits CandidateResult.Accepted, CandidateResult.Rejected, CandidateResult.InvalidTarget {
+            permits CandidateResult.Accepted,
+                    CandidateResult.Rejected,
+                    CandidateResult.InvalidTarget,
+                    CandidateResult.InvalidEntityTarget {
         /** Accepted coherent candidate document.
          *
          * @param document validated candidate or the original document for a no-op
@@ -454,6 +551,17 @@ public final class AuthoredDefinitionDocument {
             public InvalidTarget {
                 Objects.requireNonNull(target, "target");
                 Objects.requireNonNull(reason, "reason");
+            }
+        }
+
+        /** Entity or placement identity that is not present in this authored source.
+         *
+         * @param entity requested source-local identity
+         */
+        record InvalidEntityTarget(EntityId entity) implements CandidateResult {
+            /** Validates the invalid entity identity. */
+            public InvalidEntityTarget {
+                Objects.requireNonNull(entity, "entity");
             }
         }
     }

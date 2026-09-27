@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.project.asset;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.glynch.jscene3d.project.component.ComponentId;
@@ -375,6 +376,58 @@ final class AuthoredDefinitionDocumentTest {
         AuthoredDefinitionDocument.CandidateResult result = original.set(target, new ProjectValue.TextValue("after"));
 
         assertThat(result).isInstanceOf(AuthoredDefinitionDocument.CandidateResult.InvalidTarget.class);
+    }
+
+    /** Applies entity-enabled candidates to both authored definition kinds and reports no-op or invalid targets. */
+    @Test
+    void setsEntityEnabledAcrossWorldAndEntityDocuments() throws IOException {
+        AuthoredDefinitionDocument world = load(WORLD_ID);
+        AuthoredDefinitionDocument entity = load(ENTITY_DEFINITION_ID);
+
+        AuthoredDefinitionDocument changedWorld = accepted(world.setEntityEnabled(ENTITY_ID, false));
+        AuthoredDefinitionDocument changedEntity = accepted(entity.setEntityEnabled(ENTITY_ID, false));
+        AuthoredDefinitionDocument.CandidateResult unchanged = changedWorld.setEntityEnabled(ENTITY_ID, false);
+        AuthoredDefinitionDocument.CandidateResult missing =
+                world.setEntityEnabled(EntityId.from("ffffffff-ffff-4fff-8fff-ffffffffffff"), false);
+
+        assertThat(tree(changedWorld).path("roots").path(0).path("enabled").booleanValue())
+                .isFalse();
+        assertThat(tree(changedEntity).path("root").path("enabled").booleanValue())
+                .isFalse();
+        assertThat(((AuthoredDefinitionDocument.CandidateResult.Accepted) unchanged).changed())
+                .isFalse();
+        assertThat(missing).isInstanceOf(AuthoredDefinitionDocument.CandidateResult.InvalidEntityTarget.class);
+    }
+
+    /** Compares authored tree state independently of object identity and persisted-source fingerprint. */
+    @Test
+    void comparesSemanticAuthoredState() {
+        AuthoredDefinitionDocument original = load(WORLD_ID);
+        AuthoredDefinitionDocument changed =
+                accepted(original.set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("after")));
+        AuthoredDefinitionDocument restored =
+                accepted(changed.set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("before")));
+
+        assertThat(original.hasSameAuthoredState(changed)).isFalse();
+        assertThat(original.hasSameAuthoredState(restored)).isTrue();
+        assertThat(original.hasSameAuthoredState(load(ENTITY_DEFINITION_ID))).isFalse();
+    }
+
+    /** Associates current authored state with only a compatible persisted-source baseline. */
+    @Test
+    void adoptsCompatiblePersistedSourceBaseline() {
+        AuthoredDefinitionDocument original = load(WORLD_ID);
+        AuthoredDefinitionDocument changed =
+                accepted(original.set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("after")));
+        AuthoredDefinitionDocument other = load(ENTITY_DEFINITION_ID);
+
+        AuthoredDefinitionDocument rebased = changed.withPersistedSourceBaseline(original);
+
+        assertThat(rebased.hasSameAuthoredState(changed)).isTrue();
+        assertThat(rebased.sourceFingerprint()).isEqualTo(original.sourceFingerprint());
+        assertThatThrownBy(() -> changed.withPersistedSourceBaseline(other))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("same authored source");
     }
 
     /** Uses exact source content rather than timestamps or file size for conflict detection. */

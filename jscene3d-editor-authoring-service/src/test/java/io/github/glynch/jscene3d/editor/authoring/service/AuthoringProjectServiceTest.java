@@ -21,9 +21,11 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
 import io.github.glynch.jscene3d.editor.authoring.testing.AuthoringTestProject;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringMutation;
 import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
+import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
@@ -106,7 +108,7 @@ final class AuthoringProjectServiceTest {
         assertThat(entitySnapshot.context())
                 .returns("entity-definition", DefinitionSnapshot.DefinitionContext::kind)
                 .returns("authored", DefinitionSnapshot.DefinitionContext::origin)
-                .returns(false, DefinitionSnapshot.DefinitionContext::editable);
+                .returns(true, DefinitionSnapshot.DefinitionContext::editable);
         assertThat(entitySnapshot.roots())
                 .singleElement()
                 .satisfies(root -> assertThat(root.occurrence().entityPath()).hasSize(1));
@@ -292,10 +294,11 @@ final class AuthoringProjectServiceTest {
         ProjectOpenResult opened = service.openProject(new ProjectOpenParams(active.toString()));
         EditorProjectSession retained = service.activeSession().orElseThrow();
         InspectorMutationTarget.EntityEnabled target = enabledTarget(retained);
-        retained.mutate(target, new ProjectValue.BooleanValue(false), retained.revision());
-        retained.mutate(target, new ProjectValue.BooleanValue(true), retained.revision());
-        retained.undo();
-        long revision = retained.revision();
+        AssetId world = AssetId.from(AuthoringTestProject.WORLD_ASSET_ID);
+        retained.mutate(world, target, new AuthoringMutation.Set(new ProjectValue.BooleanValue(false)), 0L);
+        retained.mutate(world, target, new AuthoringMutation.Set(new ProjectValue.BooleanValue(true)), 1L);
+        retained.undo(world, 2L);
+        long revision = retained.definitionState(world).orElseThrow().revision();
 
         ProjectReplaceResult result = service.replaceProject(
                 new ProjectReplaceParams(Objects.requireNonNull(opened.projectGeneration()), invalid.toString()));
@@ -306,12 +309,12 @@ final class AuthoringProjectServiceTest {
                 .singleElement()
                 .returns("project.directory.missing", diagnostic -> diagnostic.code());
         assertThat(service.activeSession()).containsSame(retained);
-        assertThat(retained.revision()).isEqualTo(revision);
+        assertThat(retained.definitionState(world)).get().returns(revision, state -> state.revision());
         assertThat(retained.isDirty()).isTrue();
         assertThat(retained.startupWorld().roots().getFirst().isEnabled()).isFalse();
-        assertThat(retained.canUndo()).isTrue();
-        assertThat(retained.canRedo()).isTrue();
-        retained.redo();
+        assertThat(retained.definitionState(world)).get().returns(true, state -> state.canUndo());
+        assertThat(retained.definitionState(world)).get().returns(true, state -> state.canRedo());
+        retained.redo(world, revision);
         assertThat(retained.startupWorld().roots().getFirst().isEnabled()).isTrue();
         assertThat(service.closeProject().invalidatedProjectGeneration()).isEqualTo(1L);
     }
@@ -326,7 +329,11 @@ final class AuthoringProjectServiceTest {
         ProjectOpenResult opened = service.openProject(new ProjectOpenParams(active.toString()));
         EditorProjectSession replaced = service.activeSession().orElseThrow();
         InspectorMutationTarget.EntityEnabled target = enabledTarget(replaced);
-        replaced.mutate(target, new ProjectValue.BooleanValue(false), replaced.revision());
+        replaced.mutate(
+                AssetId.from(AuthoringTestProject.WORLD_ASSET_ID),
+                target,
+                new AuthoringMutation.Set(new ProjectValue.BooleanValue(false)),
+                0L);
 
         ProjectReplaceResult result = service.replaceProject(
                 new ProjectReplaceParams(Objects.requireNonNull(opened.projectGeneration()), replacement.toString()));

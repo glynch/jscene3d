@@ -272,10 +272,6 @@ public final class AuthoringProjectService implements AutoCloseable {
         if (activeProjectGeneration != validParams.expectedProjectGeneration()) {
             return inspectorFailure(PROJECT_GENERATION_CONFLICT);
         }
-        if (session.revision() != validParams.expectedDefinitionRevision()) {
-            return inspectorFailure(INSPECTOR_STALE);
-        }
-
         try {
             InspectorProjection projection =
                     session.inspect(inspectorTarget(validParams.target()), validParams.expectedDefinitionRevision());

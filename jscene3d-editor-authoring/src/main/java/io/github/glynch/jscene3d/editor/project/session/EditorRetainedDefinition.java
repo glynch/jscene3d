@@ -19,7 +19,7 @@ import java.util.Objects;
  * @param origin authored or generated origin
  * @param editable whether authoring mutations are permitted
  * @param source logical source location
- * @param revision current session authoring revision
+ * @param revision current per-definition authoring revision
  * @param content current immutable domain definition
  * @param hierarchy complete hierarchy projection
  */

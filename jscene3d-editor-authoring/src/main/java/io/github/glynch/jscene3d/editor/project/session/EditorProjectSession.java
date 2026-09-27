@@ -21,6 +21,7 @@ import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetKind;
 import io.github.glynch.jscene3d.project.asset.AssetMetadata;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
 import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
@@ -239,6 +240,13 @@ public final class EditorProjectSession implements AutoCloseable {
     public List<AssetId> retainedDefinitionIds() {
         ensureOpen();
         return List.copyOf(retainedDefinitions.keySet());
+    }
+
+    /** Returns the session-owned source-preserving state after an authored definition has been retained. */
+    Optional<AuthoredDefinitionDocument> retainedAuthoredDocument(AssetId id) {
+        ensureOpen();
+        RetainedState retained = retainedDefinitions.get(Objects.requireNonNull(id, "id"));
+        return retained == null ? Optional.empty() : retained.authoredDocument();
     }
 
     /** Returns whether startup-world content differs from its saved baseline.
@@ -542,38 +550,53 @@ public final class EditorProjectSession implements AutoCloseable {
 
     /** Loads one definition whose kind and filesystem source were established by the authored catalog. */
     private DefinitionRetentionResult retainAuthored(AssetMetadata metadata) {
-        return switch (metadata.kind()) {
-            case WORLD_DEFINITION -> retainAuthoredWorld(metadata);
-            case ENTITY_DEFINITION -> {
-                DefinitionLoadResult<EntityDefinition> result =
-                        definitions.loadEntity(AssetRef.to(metadata.id()), types);
-                yield retainLoaded(
-                        result,
-                        AssetKind.ENTITY_DEFINITION,
-                        EditorRetainedDefinition.Origin.AUTHORED,
-                        result.definition().map(EditorRetainedDefinition.Content.Entity::new));
-            }
-        };
+        AuthoredDefinitionDocument.LoadResult result =
+                AuthoredDefinitionDocument.load(authoredAssets, definitions, types, metadata.id());
+        if (result.document().isEmpty()) {
+            return new DefinitionRetentionResult(Optional.empty(), result.diagnostics());
+        }
+        AuthoredDefinitionDocument document = result.document().orElseThrow();
+        return metadata.kind() == AssetKind.WORLD_DEFINITION
+                ? retainAuthoredWorld(metadata, document, result.diagnostics())
+                : retainAuthoredDocument(document, result.diagnostics());
     }
 
     /** Reuses the startup working copy or loads another authored world as immutable content. */
-    private DefinitionRetentionResult retainAuthoredWorld(AssetMetadata metadata) {
+    private DefinitionRetentionResult retainAuthoredWorld(
+            AssetMetadata metadata, AuthoredDefinitionDocument document, List<ProjectDiagnostic> loadingDiagnostics) {
         if (metadata.id().equals(startupWorld.current().id())) {
             RetainedState state = new RetainedState(
                     metadata.id(),
                     AssetKind.WORLD_DEFINITION,
                     EditorRetainedDefinition.Origin.AUTHORED,
                     metadata.path().toUri(),
-                    new EditorRetainedDefinition.Content.World(startupWorld.current()));
+                    new EditorRetainedDefinition.Content.World(startupWorld.current()),
+                    Optional.of(document));
             retainedDefinitions.put(metadata.id(), state);
-            return new DefinitionRetentionResult(Optional.of(snapshot(state)), List.of());
+            return new DefinitionRetentionResult(Optional.of(snapshot(state)), loadingDiagnostics);
         }
-        DefinitionLoadResult<WorldDefinition> result = definitions.loadWorld(AssetRef.to(metadata.id()), types);
-        return retainLoaded(
-                result,
-                AssetKind.WORLD_DEFINITION,
+        return retainAuthoredDocument(document, loadingDiagnostics);
+    }
+
+    /** Retains one authored document and its matching domain projection as the session authority. */
+    private DefinitionRetentionResult retainAuthoredDocument(
+            AuthoredDefinitionDocument document, List<ProjectDiagnostic> loadingDiagnostics) {
+        EditorRetainedDefinition.Content content =
+                switch (document.content()) {
+                    case AuthoredDefinitionDocument.Content.World world ->
+                        new EditorRetainedDefinition.Content.World(world.definition());
+                    case AuthoredDefinitionDocument.Content.Entity entity ->
+                        new EditorRetainedDefinition.Content.Entity(entity.definition());
+                };
+        RetainedState state = new RetainedState(
+                document.id(),
+                document.kind(),
                 EditorRetainedDefinition.Origin.AUTHORED,
-                result.definition().map(EditorRetainedDefinition.Content.World::new));
+                document.source().toUri(),
+                content,
+                Optional.of(document));
+        retainedDefinitions.put(document.id(), state);
+        return new DefinitionRetentionResult(Optional.of(snapshot(state)), loadingDiagnostics);
     }
 
     /** Resolves the only currently publishable generated structural kind. */
@@ -596,7 +619,7 @@ public final class EditorProjectSession implements AutoCloseable {
             return new DefinitionRetentionResult(Optional.empty(), result.diagnostics());
         }
         EditorRetainedDefinition.Content loaded = content.orElseThrow();
-        RetainedState state = new RetainedState(loaded.id(), kind, origin, result.source(), loaded);
+        RetainedState state = new RetainedState(loaded.id(), kind, origin, result.source(), loaded, Optional.empty());
         retainedDefinitions.put(loaded.id(), state);
         return new DefinitionRetentionResult(Optional.of(snapshot(state)), result.diagnostics());
     }
@@ -842,13 +865,18 @@ public final class EditorProjectSession implements AutoCloseable {
             AssetKind kind,
             EditorRetainedDefinition.Origin origin,
             URI source,
-            EditorRetainedDefinition.Content content) {
+            EditorRetainedDefinition.Content content,
+            Optional<AuthoredDefinitionDocument> authoredDocument) {
         private RetainedState {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(kind, "kind");
             Objects.requireNonNull(origin, "origin");
             Objects.requireNonNull(source, "source");
             Objects.requireNonNull(content, "content");
+            Objects.requireNonNull(authoredDocument, "authoredDocument");
+            if ((origin == EditorRetainedDefinition.Origin.AUTHORED) != authoredDocument.isPresent()) {
+                throw new IllegalArgumentException("only authored definitions retain authored document state");
+            }
         }
     }
 

@@ -8,7 +8,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
-import io.github.glynch.jscene3d.project.asset.AssetDiagnosticCode;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
@@ -27,6 +26,7 @@ import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
+import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
@@ -158,7 +158,7 @@ final class Spatial3dWorldCompositionTest {
 
         assertThat(result.world()).isEmpty();
         assertThat(result.diagnostics()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo(AssetDiagnosticCode.COMPONENT_PROPERTY_VALUE_INVALID);
+            assertThat(diagnostic.code()).isEqualTo(PropertyValidationDiagnosticCode.ARRAY_LENGTH);
             assertThat(diagnostic.location()).isEqualTo("/roots/0/components/0/properties/position");
         });
         assertThat(spatial.isClosed()).isFalse();

@@ -110,6 +110,33 @@ public final class DefinitionDocumentReader {
     }
 
     /**
+     * Reads one complete authored entity definition from caller-owned exact source bytes.
+     *
+     * @param projectRoot normalized project root
+     * @param metadata trusted catalog metadata
+     * @param input candidate document content, retained by the caller
+     * @return immutable definition and ordered diagnostics
+     */
+    public static ReadResult<EntityDefinition> readEntity(Path projectRoot, AssetMetadata metadata, InputStream input) {
+        DefinitionDocumentReader reader = new DefinitionDocumentReader(
+                projectRoot, metadata.path().toUri(), metadata.id(), metadata.kind(), metadata.formatVersion());
+        try {
+            return reader.readEntity(Objects.requireNonNull(input, "input"));
+        } catch (JsonProcessingException exception) {
+            reader.diagnostics.error(
+                    AssetDiagnosticCode.JSON_INVALID,
+                    "entity definition is invalid JSON: " + exception.getOriginalMessage(),
+                    "");
+        } catch (IOException exception) {
+            reader.diagnostics.error(
+                    AssetDiagnosticCode.FILE_READ_FAILED,
+                    "entity definition cannot be read: " + exception.getMessage(),
+                    "");
+        }
+        return reader.failure();
+    }
+
+    /**
      * Reads one complete generated entity-definition document from caller-owned input.
      *
      * @param projectRoot normalized project root used to resolve project references
@@ -152,6 +179,35 @@ public final class DefinitionDocumentReader {
         try (InputStream input = Files.newInputStream(metadata.path())) {
             RawDefinitionDocuments.WorldDocument raw =
                     ProjectJsonReader.strict().read(input, RawDefinitionDocuments.WorldDocument.class);
+            return reader.validateWorld(raw);
+        } catch (JsonProcessingException exception) {
+            reader.diagnostics.error(
+                    AssetDiagnosticCode.JSON_INVALID,
+                    "world definition is invalid JSON: " + exception.getOriginalMessage(),
+                    "");
+        } catch (IOException exception) {
+            reader.diagnostics.error(
+                    AssetDiagnosticCode.FILE_READ_FAILED,
+                    "world definition cannot be read: " + exception.getMessage(),
+                    "");
+        }
+        return reader.failure();
+    }
+
+    /**
+     * Reads one complete authored world definition from caller-owned exact source bytes.
+     *
+     * @param projectRoot normalized project root
+     * @param metadata trusted catalog metadata
+     * @param input candidate document content, retained by the caller
+     * @return immutable definition and ordered diagnostics
+     */
+    public static ReadResult<WorldDefinition> readWorld(Path projectRoot, AssetMetadata metadata, InputStream input) {
+        DefinitionDocumentReader reader = new DefinitionDocumentReader(
+                projectRoot, metadata.path().toUri(), metadata.id(), metadata.kind(), metadata.formatVersion());
+        try {
+            RawDefinitionDocuments.WorldDocument raw = ProjectJsonReader.strict()
+                    .read(Objects.requireNonNull(input, "input"), RawDefinitionDocuments.WorldDocument.class);
             return reader.validateWorld(raw);
         } catch (JsonProcessingException exception) {
             reader.diagnostics.error(

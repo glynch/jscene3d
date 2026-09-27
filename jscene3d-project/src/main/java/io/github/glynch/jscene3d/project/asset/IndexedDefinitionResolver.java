@@ -31,4 +31,24 @@ final class IndexedDefinitionResolver implements DefinitionResolver {
         return DefinitionGraphLoader.loadWorld(
                 definitions, Objects.requireNonNull(reference, "reference"), Objects.requireNonNull(types, "types"));
     }
+
+    @Override
+    public DefinitionLoadResult<EntityDefinition> loadAuthoredEntity(
+            AssetMetadata metadata, byte[] content, RegisteredTypeCatalog types) {
+        AssetMetadata validMetadata = Objects.requireNonNull(metadata, "metadata");
+        DefinitionAssetIndex candidate =
+                definitions.withAuthoredOverride(validMetadata, Objects.requireNonNull(content, "content"));
+        return DefinitionGraphLoader.loadEntity(
+                candidate, AssetRef.to(validMetadata.id()), Objects.requireNonNull(types, "types"));
+    }
+
+    @Override
+    public DefinitionLoadResult<WorldDefinition> loadAuthoredWorld(
+            AssetMetadata metadata, byte[] content, RegisteredTypeCatalog types) {
+        AssetMetadata validMetadata = Objects.requireNonNull(metadata, "metadata");
+        DefinitionAssetIndex candidate =
+                definitions.withAuthoredOverride(validMetadata, Objects.requireNonNull(content, "content"));
+        return DefinitionGraphLoader.loadWorld(
+                candidate, AssetRef.to(validMetadata.id()), Objects.requireNonNull(types, "types"));
+    }
 }

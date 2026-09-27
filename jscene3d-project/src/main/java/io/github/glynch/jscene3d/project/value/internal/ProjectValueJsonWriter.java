@@ -4,14 +4,22 @@
  */
 package io.github.glynch.jscene3d.project.value.internal;
 
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.github.glynch.jscene3d.project.entity.ComponentTarget;
+import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 
 /** Canonical JSON serialization shared by project documents containing portable values. */
 public final class ProjectValueJsonWriter {
+    private static final JsonFactory JSON_FACTORY = new JsonFactory();
+
     /** Prevents construction of this stateless writer. */
     private ProjectValueJsonWriter() {
         throw new AssertionError("ProjectValueJsonWriter cannot be instantiated");
@@ -50,6 +58,26 @@ public final class ProjectValueJsonWriter {
             case ProjectValue.ReferenceValue referenceValue -> writeReference(json, referenceValue);
             case ProjectValue.EntityTargetValue targetValue -> writeEntityTarget(json, targetValue);
             case ProjectValue.ComponentTargetValue targetValue -> writeComponentTarget(json, targetValue);
+        }
+    }
+
+    /**
+     * Encodes one value into the same authored JSON shape used by project document writers.
+     *
+     * @param value structural project value
+     * @return detached JSON tree value
+     */
+    public static JsonNode toJsonNode(ProjectValue value) {
+        Objects.requireNonNull(value, "value");
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (JsonGenerator json = JSON_FACTORY.createGenerator(output)) {
+                writeValue(json, value);
+            }
+            JsonNode encoded = ProjectJsonReader.strict().readTree(new ByteArrayInputStream(output.toByteArray()));
+            return Objects.requireNonNull(encoded, "encoded value");
+        } catch (IOException exception) {
+            throw new AssertionError("In-memory ProjectValue encoding must succeed", exception);
         }
     }
 

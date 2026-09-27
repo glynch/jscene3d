@@ -49,6 +49,17 @@ final class DefinitionAssetIndex {
         return Optional.ofNullable(sources.get(id));
     }
 
+    /** Returns an immutable copy with one trusted authored root supplied from candidate bytes. */
+    DefinitionAssetIndex withAuthoredOverride(AssetMetadata metadata, byte[] content) {
+        Map<AssetId, Source> overridden = new LinkedHashMap<>(sources);
+        Source current = overridden.get(metadata.id());
+        if (current == null || !current.matches(metadata)) {
+            throw new IllegalArgumentException("authored source is not present in this resolver: " + metadata.id());
+        }
+        overridden.put(metadata.id(), Source.authored(metadata, content));
+        return new DefinitionAssetIndex(projectRoot, overridden);
+    }
+
     /** One authored file or generated in-memory definition document. */
     static final class Source {
         private final AssetId id;
@@ -85,6 +96,17 @@ final class DefinitionAssetIndex {
                     null);
         }
 
+        /** Creates one authored source whose exact content is already retained by the caller. */
+        static Source authored(AssetMetadata metadata, byte[] content) {
+            return new Source(
+                    metadata.id(),
+                    metadata.kind(),
+                    metadata.formatVersion(),
+                    metadata.path().toUri(),
+                    metadata,
+                    Objects.requireNonNull(content, "content"));
+        }
+
         /** Creates one generated entity-definition source. */
         static Source generatedEntity(AssetId id, URI source, byte[] content) {
             return new Source(id, AssetKind.ENTITY_DEFINITION, AssetCatalog.FORMAT_VERSION, source, null, content);
@@ -102,22 +124,41 @@ final class DefinitionAssetIndex {
             return logicalSource;
         }
 
+        /** Returns whether metadata still identifies this exact authored catalog entry. */
+        boolean matches(AssetMetadata candidate) {
+            return metadata != null && metadata.equals(candidate);
+        }
+
         /** Reads and structurally validates this source as an entity definition. */
         DefinitionDocumentReader.ReadResult<EntityDefinition> readEntity(Path projectRoot) {
-            if (metadata != null) {
+            if (metadata != null && content == null) {
                 return DefinitionDocumentReader.readEntity(projectRoot, metadata);
             }
+            if (metadata != null) {
+                byte[] sourceContent = Objects.requireNonNull(content, "authored content");
+                return DefinitionDocumentReader.readEntity(
+                        projectRoot,
+                        metadata,
+                        new ByteArrayInputStream(Arrays.copyOf(sourceContent, sourceContent.length)));
+            }
+            byte[] generatedContent = Objects.requireNonNull(content, "generated content");
             return DefinitionDocumentReader.readEntity(
                     projectRoot,
                     logicalSource,
                     id,
                     formatVersion,
-                    new ByteArrayInputStream(
-                            Arrays.copyOf(Objects.requireNonNull(content, "generated content"), content.length)));
+                    new ByteArrayInputStream(Arrays.copyOf(generatedContent, generatedContent.length)));
         }
 
         /** Reads and structurally validates this authored source as a world definition. */
         DefinitionDocumentReader.ReadResult<WorldDefinition> readWorld(Path projectRoot) {
+            if (content != null) {
+                byte[] sourceContent = content;
+                return DefinitionDocumentReader.readWorld(
+                        projectRoot,
+                        Objects.requireNonNull(metadata, "authored world metadata"),
+                        new ByteArrayInputStream(Arrays.copyOf(sourceContent, sourceContent.length)));
+            }
             return DefinitionDocumentReader.readWorld(
                     projectRoot, Objects.requireNonNull(metadata, "authored world metadata"));
         }
@@ -143,6 +184,16 @@ final class DefinitionAssetIndex {
                 throw new IllegalArgumentException(
                         "definition asset ID is already present at " + previous.source() + ": " + id);
             }
+        }
+
+        /** Replaces one authored source with copied candidate bytes for one normal graph load. */
+        Builder overrideAuthored(AssetMetadata metadata, byte[] content) {
+            Source current = sources.get(metadata.id());
+            if (current == null || !current.matches(metadata)) {
+                throw new IllegalArgumentException("authored source is not present in this catalog: " + metadata.id());
+            }
+            sources.put(metadata.id(), Source.authored(metadata, content));
+            return this;
         }
 
         /** Copies the completed index. */

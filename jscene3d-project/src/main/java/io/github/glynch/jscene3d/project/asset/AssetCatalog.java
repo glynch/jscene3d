@@ -132,4 +132,26 @@ public final class AssetCatalog implements DefinitionResolver {
                 Objects.requireNonNull(reference, "reference"),
                 Objects.requireNonNull(types, "types"));
     }
+
+    @Override
+    public DefinitionLoadResult<EntityDefinition> loadAuthoredEntity(
+            AssetMetadata metadata, byte[] content, RegisteredTypeCatalog types) {
+        AssetMetadata validMetadata = Objects.requireNonNull(metadata, "metadata");
+        DefinitionAssetIndex definitions = DefinitionAssetIndex.builder(this)
+                .overrideAuthored(validMetadata, Objects.requireNonNull(content, "content"))
+                .build();
+        return DefinitionGraphLoader.loadEntity(
+                definitions, AssetRef.to(validMetadata.id()), Objects.requireNonNull(types, "types"));
+    }
+
+    @Override
+    public DefinitionLoadResult<WorldDefinition> loadAuthoredWorld(
+            AssetMetadata metadata, byte[] content, RegisteredTypeCatalog types) {
+        AssetMetadata validMetadata = Objects.requireNonNull(metadata, "metadata");
+        DefinitionAssetIndex definitions = DefinitionAssetIndex.builder(this)
+                .overrideAuthored(validMetadata, Objects.requireNonNull(content, "content"))
+                .build();
+        return DefinitionGraphLoader.loadWorld(
+                definitions, AssetRef.to(validMetadata.id()), Objects.requireNonNull(types, "types"));
+    }
 }

@@ -17,7 +17,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -95,7 +97,7 @@ final class Physics3dResourceTest {
         assertThat(resource.isClosed()).isTrue();
     }
 
-    /** Round-trips independently published triangle collision geometry through its public resource seam. */
+    /** Round-trips triangle geometry and rejects incompatible or incomplete payload envelopes. */
     @Test
     void writesAndLoadsTriangleMesh() throws IOException {
         float[] positions = {0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 3.0F, 0.0F};
@@ -128,6 +130,19 @@ final class Physics3dResourceTest {
         assertThatThrownBy(() -> loader.load(definition, malformedContent))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("invalid magic value");
+
+        byte[] unsupportedVersion = payloadOutput.toByteArray();
+        ByteBuffer.wrap(unsupportedVersion).putInt(Integer.BYTES, 2);
+        ResourceContent unsupportedVersionContent = reference -> new ByteArrayInputStream(unsupportedVersion);
+        assertThatThrownBy(() -> loader.load(definition, unsupportedVersionContent))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("unsupported triangle-mesh collision payload version");
+
+        byte[] trailingData = Arrays.copyOf(payloadOutput.toByteArray(), payloadOutput.size() + 1);
+        ResourceContent trailingContent = reference -> new ByteArrayInputStream(trailingData);
+        assertThatThrownBy(() -> loader.load(definition, trailingContent))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("contains trailing data");
     }
 
     /** Covers non-finite geometry rejection and both asymmetric filter mismatch paths. */

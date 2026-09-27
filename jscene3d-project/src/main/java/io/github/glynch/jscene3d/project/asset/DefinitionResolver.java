@@ -28,4 +28,32 @@ public interface DefinitionResolver {
      * @return loaded definition or ordered diagnostics
      */
     DefinitionLoadResult<WorldDefinition> loadWorld(AssetRef<WorldDefinition> reference, RegisteredTypeCatalog types);
+
+    /**
+     * Resolves an authored entity graph while replacing its root source with caller-owned candidate bytes.
+     *
+     * <p>The override must identify an authored source already present in this resolver. It is copied before use and
+     * affects only this load. This is the authoritative reparse seam for source-preserving authored documents.
+     *
+     * @param metadata trusted authored catalog metadata
+     * @param content complete candidate JSON source
+     * @param types resolved safe component metadata
+     * @return loaded candidate definition or ordered diagnostics
+     */
+    DefinitionLoadResult<EntityDefinition> loadAuthoredEntity(
+            AssetMetadata metadata, byte[] content, RegisteredTypeCatalog types);
+
+    /**
+     * Resolves an authored world graph while replacing its root source with caller-owned candidate bytes.
+     *
+     * <p>The override must identify an authored source already present in this resolver. It is copied before use and
+     * affects only this load. This is the authoritative reparse seam for source-preserving authored documents.
+     *
+     * @param metadata trusted authored catalog metadata
+     * @param content complete candidate JSON source
+     * @param types resolved safe component metadata
+     * @return loaded candidate world or ordered diagnostics
+     */
+    DefinitionLoadResult<WorldDefinition> loadAuthoredWorld(
+            AssetMetadata metadata, byte[] content, RegisteredTypeCatalog types);
 }

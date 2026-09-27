@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetKind;
+import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolvers;
 import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
@@ -100,6 +101,14 @@ final class EditorProjectSessionTest {
                     .flatExtracting(section -> section.properties())
                     .allMatch(property -> property.mutationTarget().isEmpty());
             assertThat(session.retainedDefinitionIds()).containsExactlyInAnyOrder(WORLD_ID, DEFINITION_ID);
+            AuthoredDefinitionDocument retainedWorld =
+                    session.retainedAuthoredDocument(WORLD_ID).orElseThrow();
+            AuthoredDefinitionDocument retainedEntity =
+                    session.retainedAuthoredDocument(DEFINITION_ID).orElseThrow();
+            session.retainDefinition(WORLD_ID);
+            assertThat(session.retainedAuthoredDocument(WORLD_ID)).containsSame(retainedWorld);
+            assertThat(retainedWorld.verifySource()).isEqualTo(AuthoredDefinitionDocument.SourceStatus.MATCH);
+            assertThat(retainedEntity.content()).isInstanceOf(AuthoredDefinitionDocument.Content.Entity.class);
         }
     }
 
@@ -168,6 +177,8 @@ final class EditorProjectSessionTest {
             assertThat(projection.sections())
                     .flatExtracting(section -> section.properties())
                     .allMatch(property -> property.mutationTarget().isEmpty());
+            assertThat(session.retainedAuthoredDocument(GENERATED_DEFINITION_ID))
+                    .isEmpty();
         }
     }
 

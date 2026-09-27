@@ -12,5 +12,4 @@ module io.github.glynch.jscene3d.editor.authoring.service {
 
     exports io.github.glynch.jscene3d.editor.authoring.protocol;
     exports io.github.glynch.jscene3d.editor.authoring.protocol.framing;
-    exports io.github.glynch.jscene3d.editor.authoring.service;
 }

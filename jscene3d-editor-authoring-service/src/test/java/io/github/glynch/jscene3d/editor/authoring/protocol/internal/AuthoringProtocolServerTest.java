@@ -112,7 +112,11 @@ final class AuthoringProtocolServerTest {
         JsonNode response = response(request(1, "project/close", "{}"));
 
         assertThat(response.at("/error/code").asInt()).isEqualTo(-32002);
-        assertThat(service.activeSession()).isEmpty();
+
+        response(initialize(1, 0));
+        JsonNode closed = response(request(2, "project/close", "{}"));
+
+        assertThat(closed.at("/result/closed").asBoolean()).isFalse();
     }
 
     /** Preserves the initialization requirement before revealing whether an unknown method exists. */
@@ -194,10 +198,11 @@ final class AuthoringProtocolServerTest {
 
         assertThat(replacement.at("/result/outcome").asText()).isEqualTo("candidateRejected");
         assertThat(replacement.at("/result/diagnostics/0/code").asText()).isEqualTo("project.directory.missing");
-        assertThat(service.activeSession())
-                .get()
-                .extracting(session -> session.project().root())
-                .isEqualTo(first.toRealPath());
+
+        JsonNode closed = response(request(4, "project/close", "{}"));
+
+        assertThat(closed.at("/result/closed").asBoolean()).isTrue();
+        assertThat(closed.at("/result/invalidatedProjectGeneration").asLong()).isEqualTo(generation);
     }
 
     /** Serializes a complete ordered hierarchy snapshot with stable semantic identities. */
@@ -326,13 +331,17 @@ final class AuthoringProtocolServerTest {
 
     /** Accepts the notification envelope without emitting a response or mutating service state. */
     @Test
-    void acceptsOneWayNotificationEnvelope() {
+    void acceptsOneWayNotificationEnvelope() throws IOException {
         Optional<String> response =
                 server.processMessage("{\"jsonrpc\":\"2.0\",\"method\":\"client/ready\",\"params\":{}}");
 
         assertThat(response).isEmpty();
         assertThat(server.isInitialized()).isFalse();
-        assertThat(service.activeSession()).isEmpty();
+
+        response(initialize(1, 0));
+        JsonNode closed = response(request(2, "project/close", "{}"));
+
+        assertThat(closed.at("/result/closed").asBoolean()).isFalse();
     }
 
     /** Treats clean owning-connection EOF as orderly process cleanup. */

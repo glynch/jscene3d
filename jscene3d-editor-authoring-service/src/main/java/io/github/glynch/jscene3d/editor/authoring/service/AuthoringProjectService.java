@@ -294,7 +294,7 @@ public final class AuthoringProjectService implements AutoCloseable {
      *
      * @return active authoring session, when open
      */
-    public synchronized Optional<EditorProjectSession> activeSession() {
+    synchronized Optional<EditorProjectSession> activeSession() {
         ensureOpen();
         return Optional.ofNullable(activeSession);
     }

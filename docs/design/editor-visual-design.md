@@ -1,6 +1,9 @@
 # JScene3D editor visual design
 
-Status: accepted on 2026-09-11.
+Status: historical and superseded on 2026-09-27.
+
+This design targeted the retired JavaFX editor. Its visual research is retained
+as history and does not define the supported Code OSS-based editor.
 
 This document records the visual direction for the native JScene3D editor. It
 turns the selected mockups into an implementable product system without changing

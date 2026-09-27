@@ -46,12 +46,8 @@
         <module>jscene3d-project-physics</module>
         <module>jscene3d-project-desktop</module>
         <module>jscene3d-project-export</module>
-        <module>jscene3d-editor-api</module>
         <module>jscene3d-editor-authoring</module>
         <module>jscene3d-editor-authoring-service</module>
-        <module>jscene3d-editor-lsp</module>
-        <module>jscene3d-editor-java</module>
-        <module>jscene3d-editor</module>
         <module>jscene3d-audio</module>
         <module>jscene3d-lwjgl</module>
         <module>jscene3d-iosurface-macos</module>
@@ -82,7 +78,6 @@
         <assertj.version>3.27.7</assertj.version>
         <build.helper.maven.version>3.6.1</build.helper.maven.version>
         <checkstyle.version>13.8.0</checkstyle.version>
-        <gson.version>2.14.0</gson.version>
         <jackson.version>2.22.2</jackson.version>
         <error.prone.version>2.50.0</error.prone.version>
         <forbiddenapis.version>3.10</forbiddenapis.version>
@@ -96,10 +91,6 @@
         <junit.version>6.1.3</junit.version>
         <kotlin.version>2.1.0</kotlin.version>
         <lwjgl.version>3.4.3</lwjgl.version>
-        <lsp4j.version>1.0.0</lsp4j.version>
-        <javafx.version>21.0.12</javafx.version>
-        <monaco-editor.version>0.55.1</monaco-editor.version>
-        <openglfx.version>4.2.3</openglfx.version>
         <nullaway.version>0.14.0</nullaway.version>
         <node.version>v24.18.0</node.version>
         <npm.version>11.16.0</npm.version>
@@ -111,7 +102,6 @@
         <maven.compiler.version>3.15.0</maven.compiler.version>
         <maven.deploy.version>3.1.4</maven.deploy.version>
         <maven.dependency.version>3.10.0</maven.dependency.version>
-        <download.maven.version>2.1.0</download.maven.version>
         <maven.enforcer.version>3.6.3</maven.enforcer.version>
         <maven.failsafe.version>3.5.6</maven.failsafe.version>
         <maven.install.version>3.1.4</maven.install.version>
@@ -180,49 +170,9 @@
                 <version>${jspecify.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.google.code.gson</groupId>
-                <artifactId>gson</artifactId>
-                <version>${gson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.lsp4j</groupId>
-                <artifactId>org.eclipse.lsp4j</artifactId>
-                <version>${lsp4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.lsp4j</groupId>
-                <artifactId>org.eclipse.lsp4j.jsonrpc</artifactId>
-                <version>${lsp4j.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-controls</artifactId>
-                <version>${javafx.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-graphics</artifactId>
-                <version>${javafx.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-web</artifactId>
-                <version>${javafx.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.webjars.npm</groupId>
-                <artifactId>monaco-editor</artifactId>
-                <version>${monaco-editor.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.huskerdev</groupId>
-                <artifactId>openglfx-lwjgl</artifactId>
-                <version>${openglfx.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -291,27 +241,12 @@
             </dependency>
             <dependency>
                 <groupId>io.github.glynch</groupId>
-                <artifactId>jscene3d-editor-api</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-editor-authoring</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-editor-authoring-service</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.glynch</groupId>
-                <artifactId>jscene3d-editor-lsp</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.glynch</groupId>
-                <artifactId>jscene3d-editor-java</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -480,11 +415,6 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
                     <version>${maven.dependency.version}</version>
-                </plugin>
-                <plugin>
-                    <groupId>io.github.download-maven-plugin</groupId>
-                    <artifactId>download-maven-plugin</artifactId>
-                    <version>${download.maven.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

@@ -19,9 +19,9 @@ path. Settings need to preserve that safe discovery boundary.
 Core modules and extensions use one declarative `SettingDefinition` model. Each
 definition supplies a stable namespaced key, value type, default, label,
 description, category, project scope, order, and type-specific constraints. The
-toolkit-independent `jscene3d-configuration` module owns these contracts so project
-loading, the extension API, and the JavaFX editor can depend on them without
-reversing module dependencies.
+toolkit-independent `jscene3d-configuration` module owns these contracts so
+project loading and editor adapters can depend on them without reversing module
+dependencies.
 
 Extension descriptors contribute settings through an optional top-level
 `settings` array. The project loader validates those declarations without executing
@@ -36,7 +36,7 @@ a diagnostic and resolves to its declared default.
 The editor generates the Project Settings UI from the registry. Boolean,
 enumeration, integer, number, string, and path settings receive built-in controls.
 Changes are validated and atomically persisted immediately; contributors do not
-provide JavaFX controls or serializers. Reset removes the project override and
+provide frontend controls or serializers. Reset removes the project override and
 reveals the declared default.
 
 Activated extensions receive a read-only `EditorConfiguration` through their

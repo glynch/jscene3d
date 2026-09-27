@@ -1,7 +1,11 @@
 # Editor language-server support
 
-Status: planned on 2026-09-13. The architectural direction is accepted; exact
-interfaces and lower-level types remain subject to implementation review.
+Status: superseded on 2026-09-27.
+
+This document records the retired JavaFX/LSP4J/JDT LS design. The supported
+Code OSS editor now owns Java language tooling through its extension platform;
+the Java repository no longer provides this client or JDT LS distribution.
+The remainder is preserved as historical design evidence.
 
 ## Purpose
 

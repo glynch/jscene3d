@@ -1,5 +1,12 @@
 # Use JavaFX for the visual editor
 
+Status: superseded.
+
+The JavaFX visual editor described here was retired after the Code OSS-based
+editor became the supported product. The current frontend and headless Java
+backend boundary are summarized in the root [README](../../README.md#run-the-editor).
+This ADR remains as historical architectural evidence.
+
 The JScene3D visual editor will use JavaFX for its native desktop shell and
 OpenGLFX for an embedded viewport rendered by the actual JScene3D renderer.
 JavaFX provides a modern, styleable Java UI toolkit without requiring a

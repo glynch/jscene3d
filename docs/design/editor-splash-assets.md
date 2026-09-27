@@ -1,5 +1,10 @@
 # JScene3D editor splash assets
 
+Status: historical and superseded on 2026-09-27.
+
+These assets belonged to the retired JavaFX editor. This document is retained
+only as provenance and design history.
+
 The production editor splash uses independently controllable artwork and live
 JavaFX content.
 

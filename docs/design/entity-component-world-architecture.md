@@ -1100,32 +1100,17 @@ construction is not a second runtime composition model.
 
 ## Visual editor host
 
-The visual editor is a native JavaFX application. JavaFX owns the editor shell,
-including its menus, hierarchy, inspectors, asset browser, diagnostics, tabs,
-and layout. Its central viewport uses the actual JScene3D OpenGL renderer through
-OpenGLFX. The editor will not maintain a parallel WebGL, WebGPU, or Three.js
-renderer merely to display project content.
+The supported visual editor is the Code OSS-based product. Code OSS owns the
+workbench, source editing, Java tooling, hierarchy, Inspector, diagnostics,
+tabs, and layout. It communicates with the persistent
+`jscene3d-editor-authoring-service` process, which delegates safe project and
+authoring behavior to `jscene3d-editor-authoring`.
 
-The focused JavaFX/OpenGLFX prototype proved actual JScene3D rendering,
-physical and logical resizing, JavaFX-managed input and focus, ordered resource
-disposal, named-module execution, and a relocatable packaged macOS application.
-Other desktop platforms remain subject to equivalent qualification.
-
-`jscene3d-lwjgl` exposes `RenderSurface` as the renderer-host seam. Its adapter
-activates the host-owned context and correct presentation framebuffer, returns
-one consistent `RenderSurfaceSize`, and releases the renderer's exclusive access
-without destroying the surface or context. JScene3D's GLFW integration and the
-editor's OpenGLFX integration use separate adapters at that seam. The renderer
-owns GPU realizations; the host owns the window or control, context lifetime,
-frame scheduling, and final presentation. This contract also prevents renderer
-internals from assuming that presentation always targets framebuffer zero.
-
-The initial editor and preview runtime share one JVM and communicate through
-ordinary Java contracts. HTTP, JSON RPC, or gRPC is not introduced between
-them. A separately hosted preview process and an IPC protocol may be added later
-if crash isolation or hot restart provides enough value to justify that extra
-boundary. JavaFX and OpenGLFX are editor dependencies and are never
-included in exported games unless a game explicitly uses them itself.
+The current macOS viewport uses `jscene3d-iosurface-macos` for native rendering
+support. This keeps native renderer lifecycle behind an explicit host boundary
+without introducing a parallel authored-project or scene model in the frontend.
+The earlier JavaFX/OpenGLFX prototype and in-process editor proved useful
+renderer-host lifecycle principles, but that product stack is retired.
 
 ## Screen presentation components
 

@@ -1,5 +1,10 @@
 # Editor visual redesign implementation plan
 
+Status: historical and superseded on 2026-09-27.
+
+This plan targeted the retired JavaFX editor. It is retained as implementation
+history and is not a plan for the supported Code OSS-based editor.
+
 This plan applies the accepted
 [editor visual design](../design/editor-visual-design.md) to the existing
 `jscene3d-editor` application. Work proceeds in independently verifiable slices

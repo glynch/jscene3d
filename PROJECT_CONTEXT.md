@@ -51,10 +51,10 @@ Its major capabilities and subsystems include:
 - project asset, import, and publication infrastructure;
 - application export and desktop hosting;
 - genre-independent game-runtime facilities;
-- a native JavaFX visual editor;
-- Monaco-based source editing;
-- Java language tooling integration;
-- an embedded editor viewport using the real JScene3D renderer through OpenGLFX.
+- a Code OSS-based editor and workbench;
+- a persistent headless Java authoring service;
+- headless project-session, hierarchy, Inspector, and authoring-domain support;
+- native macOS IOSurface rendering support for the Code OSS/Electron viewport.
 
 Three.js is an important conceptual and example reference for JScene3D, but JScene3D is **not a Java port of Three.js and does not attempt API compatibility with Three.js**.
 
@@ -175,8 +175,8 @@ Examples include:
 
 - physics is renderer-independent;
 - the game-facing `World` and `Entity` model is not the renderer's `Scene` and `Object3D` model;
-- the editor extension API does not expose JavaFX controls;
-- language-support APIs do not expose LSP4J or JDT LS implementation types;
+- the Java authoring domain does not expose Code OSS or Electron UI types;
+- the Code OSS product owns Java language tooling rather than the Java authoring modules;
 - build callers request semantic build intentions rather than constructing Maven command lines;
 - settings contributors declare settings rather than constructing controls or serializers;
 - importers publish canonical project assets rather than creating a parallel runtime object model.
@@ -397,7 +397,8 @@ Concurrent rendering from multiple render threads and explicit OpenGL object sha
 
 `RenderSurface` is the renderer-host abstraction that allows the same renderer to operate in different presentation environments.
 
-The GLFW desktop integration and JavaFX/OpenGLFX editor integration use separate adapters at this seam.
+The GLFW desktop integration and the Code OSS/macOS IOSurface integration use
+separate adapters at this seam.
 
 The host owns:
 
@@ -418,7 +419,9 @@ The host supplies the active presentation framebuffer and one consistent surface
 
 Renderer internals must not assume that rendering always targets framebuffer zero.
 
-This boundary is particularly important to the editor because the JavaFX workbench embeds the actual JScene3D renderer rather than maintaining a second WebGL, WebGPU, or Three.js implementation.
+This boundary is particularly important to the editor because the Code OSS
+product uses current native rendering support rather than maintaining a second
+WebGL, WebGPU, or Three.js implementation.
 
 ### Renderer-Managed Transform Uniforms
 
@@ -1519,7 +1522,7 @@ Its public model must not depend on:
 
 - OpenGL;
 - LWJGL rendering objects;
-- JavaFX;
+- UI-toolkit types;
 - game-specific Entity types;
 - Doom-specific concepts.
 
@@ -1745,13 +1748,32 @@ Application-specific menu presentation and behavior remain authored application 
 
 ## Editor Architecture and Current Implementation
 
-The JScene3D editor is a native JavaFX desktop application built around the same project, runtime, rendering, diagnostic, and extension concepts used elsewhere in the engine.
+The supported JScene3D editor is the Code OSS-based product. Its current
+architecture is:
+
+```text
+Code OSS JScene3D frontend
+        ↓
+jscene3d-editor-authoring-service
+        ↓
+jscene3d-editor-authoring
+```
+
+Code OSS owns the workbench, source editing, and Java language tooling.
+`jscene3d-editor-authoring-service` is the persistent headless Java process.
+`jscene3d-editor-authoring` owns safe project sessions, hierarchy, Inspector,
+diagnostics, and authoring-domain behavior. `jscene3d-iosurface-macos` provides
+current native rendering support for the Code OSS/Electron viewport.
 
 The editor must not become a parallel model of the project merely because it presents that project graphically.
 
-### Native JavaFX Workbench
+The remaining JavaFX-specific subsections in this chapter are retained only as
+historical design context. They describe the retired JavaFX editor stack and are
+superseded by the Code OSS architecture above.
 
-JavaFX owns the native editor shell and ordinary desktop controls.
+### Historical JavaFX Workbench (Superseded)
+
+JavaFX owned the retired native editor shell and ordinary desktop controls.
 
 This includes workbench concepts such as:
 
@@ -1771,7 +1793,7 @@ JavaFX is an editor implementation technology.
 
 It must not leak into toolkit-independent extension contracts or project/runtime models.
 
-### Embedded JScene3D Viewport
+### Historical Embedded JScene3D Viewport (Superseded)
 
 The central scene viewport uses OpenGLFX to host the actual JScene3D OpenGL renderer.
 
@@ -1845,9 +1867,11 @@ For example:
 - runtime-created Entities appear only in live runtime inspection;
 - runtime inspection does not automatically write live state into authored content.
 
-### Current Editor State
+### Historical JavaFX Editor State (Superseded)
 
-The current implementation has progressed significantly beyond older README descriptions of the editor as only a read-only project loader and preview.
+Before retirement, the JavaFX implementation had progressed significantly beyond
+older README descriptions of the editor as only a read-only project loader and
+preview.
 
 Current editor screenshots and newer implementation material show a workbench containing:
 
@@ -1873,7 +1897,7 @@ Current editor screenshots and newer implementation material show a workbench co
 
 When source code and older README text disagree about editor capability, inspect the current implementation rather than assuming the README remains complete.
 
-### Current Visual Direction
+### Historical JavaFX Visual Direction (Superseded)
 
 The accepted editor visual language is quiet and technical.
 
@@ -1895,7 +1919,7 @@ Indigo is used primarily for concepts such as:
 
 Red, green, and blue remain available for conventional spatial-axis semantics and should not become general interface accents.
 
-### Custom JavaFX Theme
+### Historical Custom JavaFX Theme (Superseded)
 
 JScene3D deliberately maintains its own JavaFX visual theme.
 
@@ -2024,9 +2048,14 @@ Long technical detail belongs in:
 
 Status contributions should expose meaningful state rather than lengthy implementation telemetry.
 
-## Editor Extension and Workbench Architecture
+## Historical JavaFX Editor Extension and Workbench Architecture (Superseded)
 
-The editor extension architecture separates semantic contributions from JavaFX presentation.
+This section records the retired in-process JavaFX editor extension architecture.
+It is not a current interface contract. Code OSS now owns the workbench and
+extension presentation, while Java authoring behavior remains behind the
+authoring-service process boundary.
+
+The historical editor extension architecture separated semantic contributions from JavaFX presentation.
 
 Extensions describe what they contribute.
 
@@ -3081,11 +3110,16 @@ The Project browser answers questions about JScene3D concepts such as:
 
 Both may ultimately open resources through shared editor infrastructure, but they represent different semantic projections.
 
-## Java Language Server Architecture
+## Historical JavaFX Language Server Architecture (Superseded)
 
-Java language support is intended to provide genuine IDE behavior while preserving a language-neutral editor architecture.
+The JavaFX/LSP4J/JDT LS architecture in this section is retained as historical
+design evidence. The supported Code OSS editor now owns Java language tooling;
+the deleted Java modules and this design are not current architecture.
 
-The accepted direction uses Eclipse JDT Language Server for Java and LSP4J for the Java-side Language Server Protocol implementation.
+The historical Java language support design intended to provide genuine IDE behavior while preserving a language-neutral editor architecture.
+
+The historical accepted direction used Eclipse JDT Language Server for Java and
+LSP4J for the Java-side Language Server Protocol implementation.
 
 Exact lower-level interfaces may evolve during implementation, but the architectural boundaries are established.
 
@@ -3819,15 +3853,21 @@ Important module responsibilities include:
 - `jscene3d-project-physics`: descriptor-backed authored physics Components and their integration with the renderer-independent physics module;
 - `jscene3d-project-desktop`: standard native project host providing windowing, input, frame driving, rendering, and project execution;
 - `jscene3d-project-export`: build-tool-independent application-directory assembly and native packaging support;
-- `jscene3d-editor-api`: toolkit-independent editor extension contracts;
-- `jscene3d-editor`: native JavaFX workbench and editor presentation;
+- `jscene3d-editor-authoring`: headless project sessions, hierarchy, Inspector,
+  diagnostics, and authoring-domain behavior;
+- `jscene3d-editor-authoring-service`: persistent Java process and protocol
+  boundary used by the Code OSS frontend;
+- `jscene3d-iosurface-macos`: native macOS IOSurface rendering support for the
+  Code OSS/Electron viewport architecture;
 - `jscene3d-wad`: generic WAD validation, provenance, bounded lump access, and layering;
 - `jscene3d-wad-import`: generic WAD project-import adapter;
 - `jscene3d-doom`: reusable Doom map discovery, decoding, validation, and project import;
 - `jscene3d-game`: genre-independent World timing, semantic input, and game/physics coordination;
 - `jscene3d-audio`: OpenAL-backed audio concepts and implementation.
 
-Additional editor modules may own focused capabilities such as language-server or bundled Java support according to the accepted editor architecture.
+The Code OSS product owns frontend workbench and Java language tooling. The Java
+repository does not provide a separate in-process editor API, LSP4J client, or
+bundled JDT LS distribution.
 
 Do not move functionality between modules merely to reduce the number of classes in one package. Dependency direction and responsibility should justify module boundaries.
 
@@ -4013,7 +4053,9 @@ Published metadata and source headers should consistently identify the project l
 
 Third-party assets retain their own licenses and attribution requirements rather than being silently relicensed under Apache 2.0.
 
-Bundled examples, models, textures, audio, JDT LS distributions, and other third-party material must retain the appropriate notices and provenance required by their licenses.
+Bundled examples, models, textures, audio, editor extensions, and other
+third-party material must retain the appropriate notices and provenance required
+by their licenses.
 
 ## Testing, Verification, and Development Expectations
 
@@ -4047,8 +4089,8 @@ Examples include:
 
 - World composition tests using controlled Runtime Resource and WorldModule implementations;
 - build-coordinator tests using controllable build adapters;
-- language orchestration tests using fake language adapters or controlled LSP endpoints;
-- editor projection tests using toolkit-independent models;
+- authoring-service protocol tests using controlled clients or a real spawned JVM;
+- editor projection tests using headless authoring models;
 - settings tests using controlled persistence adapters;
 - workspace-state tests using deterministic snapshots/storage;
 - physics tests without constructing a renderer.
@@ -4062,7 +4104,7 @@ Integration tests are appropriate when the behavior being verified depends on a 
 Examples include:
 
 - Maven adapter behavior against a temporary Maven project;
-- JDT LS integration against a controlled Java workspace;
+- Code OSS extension integration against a controlled Java workspace;
 - OpenGL rendering behavior;
 - packaged resource discovery;
 - glTF loading across real supported files;
@@ -4078,7 +4120,7 @@ Normal unit tests must not unexpectedly download external tools or distributions
 Examples include:
 
 - Maven distributions;
-- JDT LS;
+- editor extension distributions;
 - native tools;
 - external model/assets.
 
@@ -4100,7 +4142,7 @@ Renderer-independent modules should remain testable without creating:
 
 - a window;
 - an OpenGL context;
-- a JavaFX Application;
+- a desktop application;
 - a complete Game Application.
 
 Examples include:
@@ -4122,7 +4164,7 @@ Native qualification may be required for:
 
 - OpenGL context behavior;
 - framebuffer handling;
-- OpenGLFX integration;
+- IOSurface integration;
 - renderer cleanup;
 - high-DPI surface sizing;
 - shader compilation;
@@ -4135,7 +4177,8 @@ Do not claim equivalent Windows or Linux support merely because platform-neutral
 
 ### Editor Verification
 
-Editor features should separate semantic/headless verification from native JavaFX interaction verification.
+Editor features should separate semantic/headless Java verification from Code OSS
+extension and workbench verification.
 
 Where possible, test:
 
@@ -4150,15 +4193,16 @@ Where possible, test:
 
 through toolkit-independent interfaces.
 
-Use native JavaFX tests and manual editor qualification for behavior that genuinely depends on:
+Use focused Code OSS extension tests and manual source-editor qualification for
+behavior that genuinely depends on:
 
 - focus;
 - keyboard events;
 - layout;
 - scaling;
 - accessibility;
-- WebView;
-- OpenGLFX;
+- webviews or custom editors;
+- IOSurface rendering;
 - native window lifecycle.
 
 ### Visual Qualification
@@ -4504,7 +4548,9 @@ Some broader command surfaces remain staged.
 
 The command palette, complete keybinding customization, and full command catalogue should not be assumed complete solely because their architecture is accepted.
 
-New command behavior should nevertheless use the existing stable command model rather than introducing temporary JavaFX-only handlers that will later need replacement.
+New command behavior should nevertheless use the existing stable command model
+rather than introducing temporary extension-local UI handlers that will later
+need replacement.
 
 ### Editor Settings Status
 
@@ -4540,25 +4586,15 @@ Settings-backed Project inclusion/exclusion behavior is planned.
 
 Do not assume that the documented glob configuration is already active without checking current implementation.
 
-### Java Language Server Status
+### Java Language Tooling Status
 
-Java language-server architecture is accepted and is an active high-priority editor direction.
+The Code OSS product owns current Java language tooling through its pinned and
+bundled extension configuration. The `threejs-java` repository does not provide
+an in-process LSP4J client or a bundled JDT LS distribution.
 
-The design deliberately stages implementation.
-
-The current repository may contain portions of:
-
-- LSP lifecycle;
-- JDT LS process management;
-- Java project support;
-- diagnostics;
-- Monaco bridge infrastructure;
-- completion;
-- status integration.
-
-The exact current slice must be determined from source and tests.
-
-Do not infer implementation merely from the design document's complete roadmap.
+Determine the exact supported tooling slice from current Code OSS source,
+configuration, tests, and behavior rather than from the superseded JavaFX-era
+language-server design.
 
 In particular, later capabilities such as:
 
@@ -4682,8 +4718,8 @@ Examples of boundaries that should not be bypassed casually include:
 - Entity/World versus Scene/Object3D;
 - WorldModule interfaces versus backend implementations;
 - working copies versus direct resource writes;
-- language-neutral editor APIs versus LSP4J;
-- command model versus JavaFX event handlers;
+- Java authoring-domain APIs versus Code OSS workbench presentation;
+- declarative command contributions versus extension-local UI handlers;
 - settings module versus direct JSON parsing;
 - build coordinator versus direct Maven invocation;
 - generated imports versus source assets.

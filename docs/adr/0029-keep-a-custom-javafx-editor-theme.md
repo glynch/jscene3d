@@ -1,6 +1,9 @@
 # Keep a custom JavaFX editor theme
 
-Status: accepted on 2026-09-11.
+Status: superseded on 2026-09-27.
+
+This decision applied to the retired JavaFX editor. It remains as historical
+evidence and does not govern the supported Code OSS-based editor.
 
 The JScene3D editor will retain its purpose-built JavaFX CSS theme rather than
 adopt AtlantaFX. A temporary A/B spike established that AtlantaFX 2.1.0 is

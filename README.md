@@ -2,7 +2,7 @@
 
 JScene3D is a modular Java 21 3D engine with a renderer-independent scene graph,
 OpenGL desktop backend, physics, audio, asset import, descriptor-authored entity
-worlds, application export, and a JavaFX editor preview.
+worlds, application export, and a Code OSS-based editor.
 
 ## Learn JScene3D
 
@@ -53,42 +53,21 @@ internal development smoke test; applications do not receive raw OpenGL access.
 
 ## Run the editor
 
-Launch the native JavaFX editor shell with:
+The supported editor front end is the separate Code OSS-based JScene3D product.
+Use that repository's source-development workflow to build and launch it. The
+Java backend in this repository is intentionally headless:
 
-```shell
-./tools/scripts/run-editor.sh
+```text
+Code OSS JScene3D frontend
+        ↓
+jscene3d-editor-authoring-service
+        ↓
+jscene3d-editor-authoring
 ```
 
-The script incrementally packages the editor and prepares its runtime module
-path with tests skipped. Maven completes before the script explicitly launches
-the editor; no Maven lifecycle phase opens a user interface.
-
-Pass a project directory to open it immediately:
-
-```shell
-./tools/scripts/run-editor.sh /path/to/project
-```
-
-Build the standalone macOS ARM64 editor disk image with:
-
-```shell
-./mvnw clean verify -pl jscene3d-editor -am -Peditor-distribution-macos-arm64
-```
-
-The resulting `jscene3d-editor/target/distribution/jscene3d-editor-1.0.0-macos-arm64.dmg`
-contains the native editor application and its trimmed Java runtime. The build
-requires an Apple Silicon Mac and verifies both the application signature and
-the completed disk image.
-
-The JavaFX editor embeds the JScene3D renderer through OpenGLFX. It loads the
-project manifest, safe extension descriptors, authored assets, published import
-generations, and startup world without executing application code. The entry
-world is composed with real spatial presentation and inert implementations for
-non-presentation components, giving the hierarchy, asset catalog, diagnostics,
-and viewport a consistent view of the descriptor-authored project. Project-open
-telemetry reports manifest and asset loading, import resolution, preview
-composition, and first presentation. The current editor is a read-only loader
-and preview; inspector editing and saving are not implemented yet.
+The service owns the persistent process boundary used by Code OSS, while the
+authoring artifact owns project sessions, hierarchy, Inspector, diagnostics,
+and authored-document behavior.
 
 ## Run examples
 
@@ -740,11 +719,12 @@ license notices, and exact selected filenames are recorded beside the assets in
 - `jscene3d-project-export`: build-tool-independent assembly of relocatable
   application directories from authored project data, completed import publications,
   and caller-resolved runtime JARs, plus macOS application-image and DMG packaging.
-- `jscene3d-editor-api`: toolkit-independent editor extension contracts for
-  commands and placements, lifetime-managed subscriptions, logical tree and
-  collection views, status items, window messages, and diagnostic publication.
-- `jscene3d-editor`: read-only JavaFX project loading, descriptor inspection,
-  diagnostics, hierarchy and asset views, and an embedded JScene3D viewport.
+- `jscene3d-editor-authoring`: headless project sessions, hierarchy, Inspector,
+  diagnostics, and authoring-domain behavior for editor clients.
+- `jscene3d-editor-authoring-service`: persistent process and protocol boundary
+  used by the Code OSS JScene3D frontend.
+- `jscene3d-iosurface-macos`: native macOS IOSurface rendering support for the
+  current Code OSS/Electron viewport architecture.
 - `jscene3d-wad`: optional, renderer-independent WAD validation, provenance,
   bounded lump access, and explicit archive layering.
 - `jscene3d-wad-import`: optional project-import adapter exposing WAD archives

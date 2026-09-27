@@ -1,6 +1,10 @@
 # Editor Settings and Workspace State
 
-Status: accepted direction recorded on 2026-09-14; implementation is deferred.
+Status: historical and superseded on 2026-09-27.
+
+This document describes workspace state for the retired JavaFX workbench. Code
+OSS now owns frontend workspace state; the remainder is retained as design
+history.
 
 ## Purpose
 

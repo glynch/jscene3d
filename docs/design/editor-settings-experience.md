@@ -1,6 +1,10 @@
 # Editor Settings Experience
 
-Status: planned on 2026-09-13.
+Status: historical and superseded on 2026-09-27.
+
+This document describes the settings experience planned for the retired JavaFX
+workbench. Code OSS now owns editor settings presentation; the remainder is
+retained as design history.
 
 ## Purpose
 

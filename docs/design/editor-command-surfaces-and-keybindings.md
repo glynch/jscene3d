@@ -1,7 +1,10 @@
 # Editor command surfaces and keybindings
 
-Status: direction recorded on 2026-09-13; detailed interaction design is
-deferred until implementation.
+Status: historical and superseded on 2026-09-27.
+
+This document describes the retired in-process JavaFX workbench. Code OSS now
+owns command surfaces and keybindings; the remainder is retained as design
+history.
 
 ## Purpose
 

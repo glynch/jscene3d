@@ -1,6 +1,10 @@
 # Declare menus and dialogs without toolkit controls
 
-Status: accepted on 2026-09-12.
+Status: superseded on 2026-09-27.
+
+This decision described the retired in-process JavaFX workbench API. Code OSS
+now owns command surfaces and modal presentation. The document remains as
+historical design evidence.
 
 ## Context
 

@@ -1,6 +1,10 @@
 # Editor project builds
 
-Status: accepted direction recorded on 2026-09-14; implementation is in progress.
+Status: historical and superseded on 2026-09-27.
+
+This document describes build integration for the retired JavaFX workbench.
+Code OSS now owns frontend build-task integration; the remainder is retained as
+design history.
 
 ## Purpose
 

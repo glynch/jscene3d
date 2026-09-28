@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.internal.AtomicProjectFileWriter;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonTreeWriter;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -97,27 +98,44 @@ public final class AuthoredDefinitionDocument {
         if (read.status() != SourceStatus.MATCH) {
             return failure(sourceDiagnostic(source.path(), read));
         }
-        byte[] bytes = read.content().orElseThrow();
+        return loadBytes(
+                validAssets,
+                validDefinitions,
+                validTypes,
+                source,
+                read.content().orElseThrow());
+    }
+
+    /** Loads already confined exact bytes through the normal tree and definition validation path. */
+    private static LoadResult loadBytes(
+            AssetCatalog assets,
+            DefinitionResolver definitions,
+            RegisteredTypeCatalog types,
+            AssetMetadata metadata,
+            byte[] bytes) {
         ObjectNode tree;
         try {
             JsonNode parsed = ProjectJsonReader.strict().readTree(new ByteArrayInputStream(bytes));
             if (!(parsed instanceof ObjectNode object)) {
                 return failure(diagnostic(
-                        source.path(), AssetDiagnosticCode.JSON_INVALID, "authored definition root must be an object"));
+                        metadata.path(),
+                        AssetDiagnosticCode.JSON_INVALID,
+                        "authored definition root must be an object"));
             }
             tree = object;
         } catch (JsonProcessingException exception) {
-            return failure(diagnostic(source.path(), AssetDiagnosticCode.JSON_INVALID, exception.getOriginalMessage()));
+            return failure(
+                    diagnostic(metadata.path(), AssetDiagnosticCode.JSON_INVALID, exception.getOriginalMessage()));
         } catch (IOException exception) {
-            return failure(diagnostic(source.path(), AssetDiagnosticCode.FILE_READ_FAILED, exception.toString()));
+            return failure(diagnostic(metadata.path(), AssetDiagnosticCode.FILE_READ_FAILED, exception.toString()));
         }
-        DefinitionLoadResult<?> loaded = loadCandidate(validDefinitions, validTypes, source, bytes);
+        DefinitionLoadResult<?> loaded = loadCandidate(definitions, types, metadata, bytes);
         if (!loaded.isValid()) {
             return new LoadResult(Optional.empty(), loaded.diagnostics());
         }
-        Content content = content(source.kind(), loaded.definition().orElseThrow());
+        Content content = content(metadata.kind(), loaded.definition().orElseThrow());
         AuthoredDefinitionDocument document = new AuthoredDefinitionDocument(
-                validAssets, validDefinitions, validTypes, source, tree, content, SourceFingerprint.sha256(bytes));
+                assets, definitions, types, metadata, tree, content, SourceFingerprint.sha256(bytes));
         return new LoadResult(Optional.of(document), loaded.diagnostics());
     }
 
@@ -224,6 +242,63 @@ public final class AuthoredDefinitionDocument {
         }
         SourceFingerprint current = SourceFingerprint.sha256(read.content().orElseThrow());
         return sourceFingerprint.equals(current) ? SourceStatus.MATCH : SourceStatus.CONTENT_CHANGED;
+    }
+
+    /**
+     * Persists the retained source-preserving tree after exact-byte conflict and confinement verification.
+     *
+     * <p>The existing atomic project writer replaces the already resolved in-project physical source. Success returns
+     * a coherent copy carrying the SHA-256 fingerprint of the exact bytes supplied to that writer. This document is
+     * never mutated, including when verification or writing fails.
+     *
+     * @return saved document, source conflict/lifecycle failure, or write failure
+     */
+    public SaveResult save() {
+        SourceRead read = readSource(assets.root(), metadata.path());
+        if (read.status() != SourceStatus.MATCH) {
+            return new SaveResult.SourceFailure(read.status(), sourceDiagnostic(metadata.path(), read));
+        }
+        SourceFingerprint physicalFingerprint =
+                SourceFingerprint.sha256(read.content().orElseThrow());
+        if (!sourceFingerprint.equals(physicalFingerprint)) {
+            SourceRead changed = new SourceRead(
+                    SourceStatus.CONTENT_CHANGED,
+                    Optional.empty(),
+                    read.resolvedSource(),
+                    "source content differs from the persisted baseline");
+            return new SaveResult.SourceFailure(
+                    SourceStatus.CONTENT_CHANGED, sourceDiagnostic(metadata.path(), changed));
+        }
+        byte[] serialized = serialize();
+        try {
+            AtomicProjectFileWriter.write(read.resolvedSource().orElseThrow(), serialized);
+        } catch (IOException | SecurityException exception) {
+            return new SaveResult.WriteFailure(
+                    diagnostic(metadata.path(), AssetDiagnosticCode.FILE_WRITE_FAILED, exception.toString()));
+        }
+        AuthoredDefinitionDocument saved = new AuthoredDefinitionDocument(
+                assets, definitions, types, metadata, tree, content, SourceFingerprint.sha256(serialized));
+        return new SaveResult.Saved(saved);
+    }
+
+    /**
+     * Reloads the current physical authored source and validates it as a complete replacement document.
+     *
+     * <p>Unlike save, reload deliberately accepts exact-byte external changes. Source lifecycle failures and invalid
+     * documents are returned without changing this document.
+     *
+     * @return loaded document, source lifecycle failure, or structured validation rejection
+     */
+    public ReloadResult reload() {
+        SourceRead read = readSource(assets.root(), metadata.path());
+        if (read.status() != SourceStatus.MATCH) {
+            return new ReloadResult.SourceFailure(read.status(), sourceDiagnostic(metadata.path(), read));
+        }
+        LoadResult loaded =
+                loadBytes(assets, definitions, types, metadata, read.content().orElseThrow());
+        return loaded.document()
+                .<ReloadResult>map(ReloadResult.Loaded::new)
+                .orElseGet(() -> new ReloadResult.Rejected(loaded.diagnostics()));
     }
 
     /**
@@ -439,24 +514,39 @@ public final class AuthoredDefinitionDocument {
             Path realRoot = projectRoot.toRealPath();
             Path realSource = source.toRealPath();
             if (!realSource.startsWith(realRoot)) {
-                return new SourceRead(SourceStatus.SOURCE_OUTSIDE_PROJECT, Optional.empty(), "source escapes project");
+                return new SourceRead(
+                        SourceStatus.SOURCE_OUTSIDE_PROJECT,
+                        Optional.empty(),
+                        Optional.of(realSource),
+                        "source escapes project");
             }
             if (!Files.isRegularFile(realSource) || !Files.isReadable(realSource)) {
-                return new SourceRead(SourceStatus.SOURCE_INACCESSIBLE, Optional.empty(), "source is not readable");
+                return new SourceRead(
+                        SourceStatus.SOURCE_INACCESSIBLE,
+                        Optional.empty(),
+                        Optional.of(realSource),
+                        "source is not readable");
             }
-            return new SourceRead(SourceStatus.MATCH, Optional.of(Files.readAllBytes(realSource)), "");
+            return new SourceRead(
+                    SourceStatus.MATCH, Optional.of(Files.readAllBytes(realSource)), Optional.of(realSource), "");
         } catch (NoSuchFileException exception) {
-            return new SourceRead(SourceStatus.SOURCE_MISSING, Optional.empty(), exception.toString());
+            return new SourceRead(
+                    SourceStatus.SOURCE_MISSING, Optional.empty(), Optional.empty(), exception.toString());
         } catch (IOException | SecurityException exception) {
-            return new SourceRead(SourceStatus.SOURCE_INACCESSIBLE, Optional.empty(), exception.toString());
+            return new SourceRead(
+                    SourceStatus.SOURCE_INACCESSIBLE, Optional.empty(), Optional.empty(), exception.toString());
         }
     }
 
     /** Creates one structured source diagnostic. */
     private static ProjectDiagnostic sourceDiagnostic(Path source, SourceRead read) {
-        AssetDiagnosticCode code = read.status() == SourceStatus.SOURCE_OUTSIDE_PROJECT
-                ? AssetDiagnosticCode.PATH_ESCAPES_ROOT
-                : AssetDiagnosticCode.FILE_READ_FAILED;
+        AssetDiagnosticCode code =
+                switch (read.status()) {
+                    case CONTENT_CHANGED -> AssetDiagnosticCode.CATALOG_STALE;
+                    case SOURCE_OUTSIDE_PROJECT -> AssetDiagnosticCode.PATH_ESCAPES_ROOT;
+                    case SOURCE_MISSING, SOURCE_INACCESSIBLE -> AssetDiagnosticCode.FILE_READ_FAILED;
+                    case MATCH -> throw new IllegalArgumentException("matching source has no diagnostic");
+                };
         return diagnostic(source, code, read.detail());
     }
 
@@ -566,6 +656,92 @@ public final class AuthoredDefinitionDocument {
         }
     }
 
+    /** Closed outcome of atomically persisting one retained authored document. */
+    public sealed interface SaveResult permits SaveResult.Saved, SaveResult.SourceFailure, SaveResult.WriteFailure {
+        /** Successful exact-byte persistence.
+         *
+         * @param document coherent authored state carrying the new persisted fingerprint
+         */
+        record Saved(AuthoredDefinitionDocument document) implements SaveResult {
+            /** Validates the saved document. */
+            public Saved {
+                Objects.requireNonNull(document, "document");
+            }
+        }
+
+        /** Source verification rejected persistence before any write.
+         *
+         * @param status stable source conflict or lifecycle status
+         * @param diagnostic structured source diagnostic
+         */
+        record SourceFailure(SourceStatus status, ProjectDiagnostic diagnostic) implements SaveResult {
+            /** Validates a non-matching source failure. */
+            public SourceFailure {
+                Objects.requireNonNull(status, "status");
+                Objects.requireNonNull(diagnostic, "diagnostic");
+                if (status == SourceStatus.MATCH) {
+                    throw new IllegalArgumentException("source failure cannot report a match");
+                }
+            }
+        }
+
+        /** Atomic writer failure after successful source verification.
+         *
+         * @param diagnostic structured write diagnostic
+         */
+        record WriteFailure(ProjectDiagnostic diagnostic) implements SaveResult {
+            /** Validates the write diagnostic. */
+            public WriteFailure {
+                Objects.requireNonNull(diagnostic, "diagnostic");
+            }
+        }
+    }
+
+    /** Closed outcome of reloading and validating the current physical authored source. */
+    public sealed interface ReloadResult
+            permits ReloadResult.Loaded, ReloadResult.SourceFailure, ReloadResult.Rejected {
+        /** Successfully loaded replacement document.
+         *
+         * @param document coherent validated disk state
+         */
+        record Loaded(AuthoredDefinitionDocument document) implements ReloadResult {
+            /** Validates the loaded document. */
+            public Loaded {
+                Objects.requireNonNull(document, "document");
+            }
+        }
+
+        /** Physical source lifecycle failure.
+         *
+         * @param status stable source lifecycle status
+         * @param diagnostic structured source diagnostic
+         */
+        record SourceFailure(SourceStatus status, ProjectDiagnostic diagnostic) implements ReloadResult {
+            /** Validates a source lifecycle failure. */
+            public SourceFailure {
+                Objects.requireNonNull(status, "status");
+                Objects.requireNonNull(diagnostic, "diagnostic");
+                if (status == SourceStatus.MATCH || status == SourceStatus.CONTENT_CHANGED) {
+                    throw new IllegalArgumentException("reload source failure must be a lifecycle failure");
+                }
+            }
+        }
+
+        /** Physical source parsed or validated unsuccessfully.
+         *
+         * @param diagnostics immutable ordered validation diagnostics
+         */
+        record Rejected(List<ProjectDiagnostic> diagnostics) implements ReloadResult {
+            /** Copies non-empty rejection diagnostics. */
+            public Rejected {
+                diagnostics = List.copyOf(diagnostics);
+                if (diagnostics.isEmpty()) {
+                    throw new IllegalArgumentException("reload rejection requires diagnostics");
+                }
+            }
+        }
+    }
+
     /** Stable reason that a semantic property target cannot be patched in this authored source. */
     public enum InvalidTargetReason {
         /** The entity is a placement, is absent, or does not own the requested local component. */
@@ -649,12 +825,15 @@ public final class AuthoredDefinitionDocument {
     private static final class SourceRead {
         private final SourceStatus status;
         private final Optional<byte[]> content;
+        private final Optional<Path> resolvedSource;
         private final String detail;
 
         /** Stores defensively copied source bytes when reading succeeded. */
-        private SourceRead(SourceStatus status, Optional<byte[]> content, String detail) {
+        private SourceRead(
+                SourceStatus status, Optional<byte[]> content, Optional<Path> resolvedSource, String detail) {
             this.status = Objects.requireNonNull(status, "status");
             this.content = content.map(byte[]::clone);
+            this.resolvedSource = Objects.requireNonNull(resolvedSource, "resolvedSource");
             this.detail = Objects.requireNonNull(detail, "detail");
         }
 
@@ -666,6 +845,11 @@ public final class AuthoredDefinitionDocument {
         /** Returns a defensive copy of successfully read source bytes. */
         private Optional<byte[]> content() {
             return content.map(byte[]::clone);
+        }
+
+        /** Returns the real source resolved during confinement verification. */
+        private Optional<Path> resolvedSource() {
+            return resolvedSource;
         }
 
         /** Returns bounded technical detail for a source diagnostic. */

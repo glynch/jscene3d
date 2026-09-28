@@ -110,7 +110,7 @@ public final class AuthoredEulerRotation3d {
         if (!Float.isFinite(radians)) {
             throw new IllegalArgumentException(name + " angle must be finite");
         }
-        BigDecimal rounded = BigDecimal.valueOf(Math.toDegrees((double) radians))
+        BigDecimal rounded = BigDecimal.valueOf(Math.toDegrees(radians))
                 .setScale(DERIVED_DEGREE_SCALE, RoundingMode.HALF_EVEN)
                 .stripTrailingZeros();
         if (rounded.signum() == 0) {

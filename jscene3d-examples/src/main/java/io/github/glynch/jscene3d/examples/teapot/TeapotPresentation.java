@@ -19,6 +19,8 @@ import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.textures.Texture;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /** Owns the replaceable geometry and material presentations of the interactive Utah teapot. */
@@ -260,17 +262,22 @@ public final class TeapotPresentation implements AutoCloseable {
                 .blinnProportions(!originalProportions)
                 .build();
         try {
-            BufferGeometry flat = FlatShadedGeometry.create(smooth);
-            try {
-                BufferGeometry wire = WireframeGeometry.create(smooth);
-                return new GeometrySet(smooth, flat, wire);
-            } catch (RuntimeException exception) {
-                flat.close();
-                throw exception;
-            }
+            return createGeometrySet(smooth);
         } catch (RuntimeException exception) {
             smooth.close();
             throw exception;
+        }
+    }
+
+    /** Generates the derived geometry variants and releases them if ownership cannot be transferred. */
+    private static GeometrySet createGeometrySet(BufferGeometry smooth) {
+        try (GeometryAssembly assembly = new GeometryAssembly()) {
+            GeometrySet geometrySet = new GeometrySet(
+                    smooth,
+                    assembly.own(FlatShadedGeometry.create(smooth)),
+                    assembly.own(WireframeGeometry.create(smooth)));
+            assembly.transfer();
+            return geometrySet;
         }
     }
 
@@ -376,6 +383,28 @@ public final class TeapotPresentation implements AutoCloseable {
             wireframe.close();
             flat.close();
             smooth.close();
+        }
+    }
+
+    /** Owns derived geometries until a complete geometry set accepts them. */
+    private static final class GeometryAssembly implements AutoCloseable {
+        private final List<BufferGeometry> geometries = new ArrayList<>(2);
+
+        /** Registers a derived geometry for cleanup until ownership transfers. */
+        private BufferGeometry own(BufferGeometry geometry) {
+            geometries.add(geometry);
+            return geometry;
+        }
+
+        /** Relinquishes all registered geometries without closing them. */
+        private void transfer() {
+            geometries.clear();
+        }
+
+        @Override
+        public void close() {
+            geometries.forEach(BufferGeometry::close);
+            geometries.clear();
         }
     }
 

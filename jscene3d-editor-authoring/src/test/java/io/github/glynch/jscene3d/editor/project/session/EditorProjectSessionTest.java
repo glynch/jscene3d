@@ -24,6 +24,7 @@ import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolvers;
 import io.github.glynch.jscene3d.project.asset.DefinitionWriter;
+import io.github.glynch.jscene3d.project.asset.SourceFingerprint;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
@@ -43,6 +44,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -229,6 +231,227 @@ final class EditorProjectSessionTest {
         }
     }
 
+    /** Saves a dirty world without changing revision or history and tracks the saved state through undo and redo. */
+    @Test
+    void savesWorldAndPreservesPersistedHistorySemantics() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            InspectorMutationTarget.ComponentProperty target = worldProperty(session, SPEED);
+            List<AuthoringDefinitionChange> changes = definitionChanges(session);
+            set(session, WORLD_ID, target, number("2"), 0L);
+
+            AuthoringPersistenceResult saved = session.saveDefinition(WORLD_ID, 1L);
+            set(session, WORLD_ID, target, number("3"), 1L);
+            AuthoringMutationResult backToSaved = session.undo(WORLD_ID, 2L);
+            AuthoringMutationResult backToOriginal = session.undo(WORLD_ID, 3L);
+            AuthoringMutationResult savedAgain = session.redo(WORLD_ID, 4L);
+
+            assertPersistenceOutcome(saved, AuthoringPersistenceResult.Outcome.SAVED, 1L, false, true, false);
+            assertOutcome(backToSaved, AuthoringMutationResult.Outcome.ACCEPTED, 3L, false, true, true);
+            assertOutcome(backToOriginal, AuthoringMutationResult.Outcome.ACCEPTED, 4L, true, false, true);
+            assertOutcome(savedAgain, AuthoringMutationResult.Outcome.ACCEPTED, 5L, false, true, true);
+            assertThat(Files.readString(worldSource(), StandardCharsets.UTF_8)).contains("\"speed\" : 2");
+            assertThat(changes)
+                    .extracting(AuthoringDefinitionChange::kind)
+                    .containsExactly(
+                            AuthoringDefinitionChange.Kind.SET,
+                            AuthoringDefinitionChange.Kind.PERSISTED,
+                            AuthoringDefinitionChange.Kind.SET,
+                            AuthoringDefinitionChange.Kind.UNDO,
+                            AuthoringDefinitionChange.Kind.UNDO,
+                            AuthoringDefinitionChange.Kind.REDO);
+        }
+    }
+
+    /** Gives authored entity definitions the same source-preserving save lifecycle as worlds. */
+    @Test
+    void savesAuthoredEntityDefinition() throws Exception {
+        try (EditorProjectSession session = session()) {
+            EditorRetainedDefinition entity = retain(session, ENTITY_DEFINITION_ID);
+            InspectorMutationTarget.ComponentProperty target = entityProperty(entity, SPEED);
+            set(session, ENTITY_DEFINITION_ID, target, number("5.000000000000000000000000000001"), 0L);
+
+            AuthoringPersistenceResult result = session.saveDefinition(ENTITY_DEFINITION_ID, 1L);
+            AuthoredDefinitionDocument saved =
+                    session.retainedAuthoredDocument(ENTITY_DEFINITION_ID).orElseThrow();
+            set(session, ENTITY_DEFINITION_ID, target, number("6"), 1L);
+            AuthoringPersistenceResult reverted = session.revertDefinition(ENTITY_DEFINITION_ID, 2L);
+            EditorRetainedDefinition retained = retain(session, ENTITY_DEFINITION_ID);
+            InspectorProjection inspection =
+                    session.inspect(retained.hierarchy().roots().getFirst().inspectorTarget(), retained.revision());
+
+            assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.SAVED, 1L, false, true, false);
+            assertThat(Files.readString(entitySource(), StandardCharsets.UTF_8))
+                    .contains("5.000000000000000000000000000001");
+            assertThat(saved.sourceFingerprint())
+                    .isEqualTo(SourceFingerprint.sha256(Files.readAllBytes(entitySource())));
+            assertPersistenceOutcome(reverted, AuthoringPersistenceResult.Outcome.REVERTED, 3L, false, false, false);
+            assertThat(property(inspection, SPEED).state().authoredValue())
+                    .contains(new InspectorValue.NumberValue(new BigDecimal("5.000000000000000000000000000001")));
+        }
+    }
+
+    /** Treats a clean save as a verified no-op without rewriting or notifying. */
+    @Test
+    void cleanSaveIsNoOp() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            List<AuthoringDefinitionChange> changes = definitionChanges(session);
+            byte[] before = Files.readAllBytes(worldSource());
+            FileTime timestamp = Files.getLastModifiedTime(worldSource());
+
+            AuthoringPersistenceResult result = session.saveDefinition(WORLD_ID, 0L);
+            AuthoringPersistenceResult staleSave = session.saveDefinition(WORLD_ID, 1L);
+            AuthoringPersistenceResult staleRevert = session.revertDefinition(WORLD_ID, 1L);
+
+            assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.NO_OP, 0L, false, false, false);
+            assertPersistenceOutcome(
+                    staleSave, AuthoringPersistenceResult.Outcome.STALE_REVISION, 0L, false, false, false);
+            assertPersistenceOutcome(
+                    staleRevert, AuthoringPersistenceResult.Outcome.STALE_REVISION, 0L, false, false, false);
+            assertThat(Files.readAllBytes(worldSource())).isEqualTo(before);
+            assertThat(Files.getLastModifiedTime(worldSource())).isEqualTo(timestamp);
+            assertThat(changes).isEmpty();
+        }
+    }
+
+    /** Rejects an exact-byte external conflict without changing working-copy state, history, or notifications. */
+    @Test
+    void saveRejectsExternalSameSizeChangeAtomically() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            InspectorMutationTarget.ComponentProperty target = worldProperty(session, SPEED);
+            List<AuthoringDefinitionChange> changes = definitionChanges(session);
+            set(session, WORLD_ID, target, number("2"), 0L);
+            AuthoredDefinitionDocument before =
+                    session.retainedAuthoredDocument(WORLD_ID).orElseThrow();
+            FileTime timestamp = Files.getLastModifiedTime(worldSource());
+            String external =
+                    Files.readString(worldSource(), StandardCharsets.UTF_8).replace("\"speed\":1", "\"speed\":9");
+            Files.writeString(worldSource(), external, StandardCharsets.UTF_8);
+            Files.setLastModifiedTime(worldSource(), timestamp);
+
+            AuthoringPersistenceResult result = session.saveDefinition(WORLD_ID, 1L);
+
+            assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.SOURCE_CHANGED, 1L, true, true, false);
+            assertThat(session.retainedAuthoredDocument(WORLD_ID)).containsSame(before);
+            assertThat(Files.readString(worldSource(), StandardCharsets.UTF_8)).isEqualTo(external);
+            assertThat(changes)
+                    .containsExactly(change(WORLD_ID, 1L, true, true, false, AuthoringDefinitionChange.Kind.SET));
+        }
+    }
+
+    /** Reverts dirty authored state to disk, increments revision, and clears abandoned edit history. */
+    @Test
+    void revertsDirtyWorldAndClearsHistory() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            List<AuthoringDefinitionChange> changes = definitionChanges(session);
+            set(session, WORLD_ID, worldProperty(session, SPEED), number("2"), 0L);
+
+            AuthoringPersistenceResult result = session.revertDefinition(WORLD_ID, 1L);
+            InspectorProjection inspection =
+                    session.inspect(session.hierarchy().roots().getFirst().inspectorTarget(), 2L);
+
+            assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.REVERTED, 2L, false, false, false);
+            assertThat(property(inspection, SPEED).state().authoredValue())
+                    .contains(new InspectorValue.NumberValue(BigDecimal.ONE));
+            assertThat(session.undo(WORLD_ID, 2L).outcome())
+                    .isEqualTo(AuthoringMutationResult.Outcome.UNDO_UNAVAILABLE);
+            assertThat(changes)
+                    .extracting(AuthoringDefinitionChange::kind)
+                    .containsExactly(AuthoringDefinitionChange.Kind.SET, AuthoringDefinitionChange.Kind.REVERTED);
+        }
+    }
+
+    /** Revert intentionally accepts a valid external disk state as the new current and persisted state. */
+    @Test
+    void revertAcceptsExternalDiskState() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            set(session, WORLD_ID, worldProperty(session, SPEED), number("2"), 0L);
+            String external =
+                    Files.readString(worldSource(), StandardCharsets.UTF_8).replace("\"speed\":1", "\"speed\":3");
+            Files.writeString(worldSource(), external, StandardCharsets.UTF_8);
+
+            AuthoringPersistenceResult result = session.revertDefinition(WORLD_ID, 1L);
+            InspectorProjection inspection =
+                    session.inspect(session.hierarchy().roots().getFirst().inspectorTarget(), 2L);
+            AuthoredDefinitionDocument current =
+                    session.retainedAuthoredDocument(WORLD_ID).orElseThrow();
+
+            assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.REVERTED, 2L, false, false, false);
+            assertThat(property(inspection, SPEED).state().authoredValue())
+                    .contains(new InspectorValue.NumberValue(new BigDecimal("3")));
+            assertThat(current.sourceFingerprint())
+                    .isEqualTo(SourceFingerprint.sha256(Files.readAllBytes(worldSource())));
+        }
+    }
+
+    /** Rejects malformed and semantically invalid disk replacements without changing authoritative memory. */
+    @Test
+    void revertRejectsInvalidDiskContentAtomically() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            set(session, WORLD_ID, worldProperty(session, SPEED), number("2"), 0L);
+            AuthoredDefinitionDocument before =
+                    session.retainedAuthoredDocument(WORLD_ID).orElseThrow();
+            List<AuthoringDefinitionChange> changes = definitionChanges(session);
+            Files.writeString(worldSource(), "{", StandardCharsets.UTF_8);
+
+            AuthoringPersistenceResult malformed = session.revertDefinition(WORLD_ID, 1L);
+            writeWorld();
+            String invalid = Files.readString(worldSource(), StandardCharsets.UTF_8)
+                    .replace("\"speed\":1", "\"speed\":\"fast\"");
+            Files.writeString(worldSource(), invalid, StandardCharsets.UTF_8);
+            AuthoringPersistenceResult semantic = session.revertDefinition(WORLD_ID, 1L);
+
+            assertPersistenceOutcome(
+                    malformed, AuthoringPersistenceResult.Outcome.VALIDATION_REJECTED, 1L, true, true, false);
+            assertPersistenceOutcome(
+                    semantic, AuthoringPersistenceResult.Outcome.VALIDATION_REJECTED, 1L, true, true, false);
+            assertThat(session.retainedAuthoredDocument(WORLD_ID)).containsSame(before);
+            assertThat(changes).isEmpty();
+        }
+    }
+
+    /** Rejects missing save and revert sources without modifying the dirty working copy. */
+    @Test
+    void persistenceRejectsMissingSourceAtomically() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            set(session, WORLD_ID, worldProperty(session, SPEED), number("2"), 0L);
+            Files.delete(worldSource());
+
+            AuthoringPersistenceResult save = session.saveDefinition(WORLD_ID, 1L);
+            AuthoringPersistenceResult revert = session.revertDefinition(WORLD_ID, 1L);
+
+            assertPersistenceOutcome(save, AuthoringPersistenceResult.Outcome.SOURCE_MISSING, 1L, true, true, false);
+            assertPersistenceOutcome(revert, AuthoringPersistenceResult.Outcome.SOURCE_MISSING, 1L, true, true, false);
+            assertThat(session.definitionState(WORLD_ID)).get().returns(true, AuthoringDefinitionState::dirty);
+        }
+    }
+
+    /** Refreshes a formatting-only physical fingerprint without incrementing content revision or notifying. */
+    @Test
+    void formattingOnlyRevertKeepsRevisionAndHistory() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            List<AuthoringDefinitionChange> changes = definitionChanges(session);
+            String reformatted = Files.readString(worldSource(), StandardCharsets.UTF_8) + "\n";
+            Files.writeString(worldSource(), reformatted, StandardCharsets.UTF_8);
+
+            AuthoringPersistenceResult result = session.revertDefinition(WORLD_ID, 0L);
+            AuthoredDefinitionDocument current =
+                    session.retainedAuthoredDocument(WORLD_ID).orElseThrow();
+
+            assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.REVERTED, 0L, false, false, false);
+            assertThat(current.sourceFingerprint())
+                    .isEqualTo(SourceFingerprint.sha256(Files.readAllBytes(worldSource())));
+            assertThat(changes).isEmpty();
+        }
+    }
+
     /** Keeps generated definitions immutable through mutation and history session entry points. */
     @Test
     void rejectsGeneratedDefinitionOperationsAsNonEditable() throws Exception {
@@ -249,6 +472,10 @@ final class EditorProjectSessionTest {
                     .isEqualTo(AuthoringMutationResult.Outcome.NON_EDITABLE);
             assertThat(session.redo(GENERATED_DEFINITION_ID, 0L).outcome())
                     .isEqualTo(AuthoringMutationResult.Outcome.NON_EDITABLE);
+            assertThat(session.saveDefinition(GENERATED_DEFINITION_ID, 0L).outcome())
+                    .isEqualTo(AuthoringPersistenceResult.Outcome.NON_EDITABLE);
+            assertThat(session.revertDefinition(GENERATED_DEFINITION_ID, 0L).outcome())
+                    .isEqualTo(AuthoringPersistenceResult.Outcome.NON_EDITABLE);
             assertThat(session.definitionState(GENERATED_DEFINITION_ID)).isEmpty();
         }
     }
@@ -364,6 +591,16 @@ final class EditorProjectSessionTest {
                 session.hierarchy().roots().getFirst().occurrence(), WORLD_ENTITY_ID, WORLD_COMPONENT_ID, property);
     }
 
+    /** Creates one component-property target in a retained authored entity definition. */
+    private static InspectorMutationTarget.ComponentProperty entityProperty(
+            EditorRetainedDefinition retained, PropertyId property) {
+        return new InspectorMutationTarget.ComponentProperty(
+                retained.hierarchy().roots().getFirst().occurrence(),
+                DEFINITION_ENTITY_ID,
+                DEFINITION_COMPONENT_ID,
+                property);
+    }
+
     /** Applies one SET through the public session entry point. */
     private static AuthoringMutationResult set(
             EditorProjectSession session,
@@ -388,6 +625,22 @@ final class EditorProjectSessionTest {
                 .returns(dirty, AuthoringMutationResult::dirty)
                 .returns(canUndo, AuthoringMutationResult::canUndo)
                 .returns(canRedo, AuthoringMutationResult::canRedo);
+    }
+
+    /** Asserts one complete structured persistence result. */
+    private static void assertPersistenceOutcome(
+            AuthoringPersistenceResult result,
+            AuthoringPersistenceResult.Outcome outcome,
+            long revision,
+            boolean dirty,
+            boolean canUndo,
+            boolean canRedo) {
+        assertThat(result)
+                .returns(outcome, AuthoringPersistenceResult::outcome)
+                .returns(revision, AuthoringPersistenceResult::revision)
+                .returns(dirty, AuthoringPersistenceResult::dirty)
+                .returns(canUndo, AuthoringPersistenceResult::canUndo)
+                .returns(canRedo, AuthoringPersistenceResult::canRedo);
     }
 
     /** Creates one expected authored-definition notification. */
@@ -562,6 +815,14 @@ final class EditorProjectSessionTest {
         Path target = projectRoot.resolve(relativePath);
         Files.createDirectories(target.getParent());
         Files.writeString(target, content, StandardCharsets.UTF_8);
+    }
+
+    private Path worldSource() {
+        return projectRoot.resolve("worlds/main.world.json");
+    }
+
+    private Path entitySource() {
+        return projectRoot.resolve("entities/reusable.entity.json");
     }
 
     /** Creates one exact decimal project number. */

@@ -92,9 +92,14 @@ final class EditorComponentSectionProjector {
                 Optional.ofNullable(component.properties().get(id));
         Optional<ProjectValue> defaultValue = descriptor.defaultValue();
         Optional<ProjectValue> displayed = authored.or(() -> defaultValue);
-        InspectorProperty.Origin origin = authored.isPresent()
-                ? InspectorProperty.Origin.AUTHORED
-                : displayed.isPresent() ? InspectorProperty.Origin.DEFAULT : InspectorProperty.Origin.UNSET;
+        InspectorProperty.Origin origin;
+        if (authored.isPresent()) {
+            origin = InspectorProperty.Origin.AUTHORED;
+        } else if (displayed.isPresent()) {
+            origin = InspectorProperty.Origin.DEFAULT;
+        } else {
+            origin = InspectorProperty.Origin.UNSET;
+        }
         InspectorConstraints constraints = new InspectorConstraints(
                 descriptor.elementKind(),
                 descriptor.exactElementCount(),
@@ -106,13 +111,16 @@ final class EditorComponentSectionProjector {
         Optional<InspectorValue> authoredInspection = authored.map(values::project);
         Optional<InspectorValue> defaultInspection = defaultValue.map(values::project);
         Optional<InspectorValue> effectiveInspection = displayed.map(values::project);
-        InspectorProperty.Validity validity = displayed.isEmpty() && descriptor.isRequired()
-                ? InspectorProperty.Validity.REQUIRED_UNSET
-                : effectiveInspection
-                                .filter(EditorComponentSectionProjector::containsBrokenReference)
-                                .isPresent()
-                        ? InspectorProperty.Validity.BROKEN_REFERENCE
-                        : InspectorProperty.Validity.VALID;
+        InspectorProperty.Validity validity;
+        if (displayed.isEmpty() && descriptor.isRequired()) {
+            validity = InspectorProperty.Validity.REQUIRED_UNSET;
+        } else if (effectiveInspection
+                .filter(EditorComponentSectionProjector::containsBrokenReference)
+                .isPresent()) {
+            validity = InspectorProperty.Validity.BROKEN_REFERENCE;
+        } else {
+            validity = InspectorProperty.Validity.VALID;
+        }
         return new InspectorProperty(
                 id.value(),
                 new InspectorProperty.Presentation(

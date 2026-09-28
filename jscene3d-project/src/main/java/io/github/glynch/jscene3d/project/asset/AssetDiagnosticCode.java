@@ -12,6 +12,8 @@ public enum AssetDiagnosticCode implements DiagnosticCode {
     ROOT_INVALID("asset.root", "The project asset root is not a readable directory"),
     /** An asset file cannot be read. */
     FILE_READ_FAILED("asset.file.read", "The asset file could not be read"),
+    /** An asset file cannot be written. */
+    FILE_WRITE_FAILED("asset.file.write", "The asset file could not be written"),
     /** A discovered asset resolves outside the project root. */
     PATH_ESCAPES_ROOT("asset.path.escape", "The asset resolves outside the project root"),
     /** An asset document is invalid JSON. */

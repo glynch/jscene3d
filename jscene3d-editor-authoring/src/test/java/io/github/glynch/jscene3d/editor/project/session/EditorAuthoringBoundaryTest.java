@@ -56,6 +56,7 @@ final class EditorAuthoringBoundaryTest {
                                 Stream.of(method.getReturnType()), Arrays.stream(method.getParameterTypes()))
                         .toList())
                 .extracting(Class::getPackageName)
+                .isNotEmpty()
                 .noneMatch(name -> name.startsWith("io.github.glynch.jscene3d.editor.command")
                         || name.startsWith("io.github.glynch.jscene3d.editor.lifecycle")
                         || name.startsWith("io.github.glynch.jscene3d.editor.selection")

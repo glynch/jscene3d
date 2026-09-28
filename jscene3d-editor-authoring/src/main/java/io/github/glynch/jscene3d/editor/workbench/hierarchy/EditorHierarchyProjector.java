@@ -103,13 +103,13 @@ public final class EditorHierarchyProjector {
                 entriesEditable,
                 root,
                 state);
-        EditorHierarchyProjection.Context context = new EditorHierarchyProjection.Context(
+        EditorHierarchyProjection.Context definitionContext = new EditorHierarchyProjection.Context(
                 definition.id(),
                 AssetKind.ENTITY_DEFINITION,
                 AuthoringText.literal(definition.name()),
                 validSource,
                 definitionEditable);
-        return new EditorHierarchyProjection(context, List.of(entityRoot));
+        return new EditorHierarchyProjection(definitionContext, List.of(entityRoot));
     }
 
     private EditorHierarchyNode projectEntry(

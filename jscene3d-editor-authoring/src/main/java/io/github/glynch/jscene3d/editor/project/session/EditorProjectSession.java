@@ -300,6 +300,36 @@ public final class EditorProjectSession implements AutoCloseable {
         return editableWorkingCopyResult(id, expectedRevision, HistoryOperation.REDO);
     }
 
+    /**
+     * Atomically saves one authored definition after persisted-fingerprint conflict verification.
+     *
+     * @param id authoritative definition identity
+     * @param expectedRevision definition revision observed by the caller
+     * @return structured save, no-op, conflict, write, concurrency, or editability outcome
+     */
+    public AuthoringPersistenceResult saveDefinition(AssetId id, long expectedRevision) {
+        ensureOpen();
+        AssetId validId = Objects.requireNonNull(id, "id");
+        return authoredWorkingCopy(validId)
+                .map(workingCopy -> workingCopy.save(expectedRevision))
+                .orElseGet(() -> persistenceFailure(validId, expectedRevision));
+    }
+
+    /**
+     * Reloads and validates one authored definition from its current trusted physical source.
+     *
+     * @param id authoritative definition identity
+     * @param expectedRevision definition revision observed by the caller
+     * @return structured revert, no-op, validation, source, concurrency, or editability outcome
+     */
+    public AuthoringPersistenceResult revertDefinition(AssetId id, long expectedRevision) {
+        ensureOpen();
+        AssetId validId = Objects.requireNonNull(id, "id");
+        return authoredWorkingCopy(validId)
+                .map(workingCopy -> workingCopy.revert(expectedRevision))
+                .orElseGet(() -> persistenceFailure(validId, expectedRevision));
+    }
+
     /** Establishes a future successfully persisted authored document as the in-memory baseline. */
     AuthoringMutationResult markPersisted(
             AssetId id, AuthoredDefinitionDocument baselinedDocument, long expectedRevision) {
@@ -800,6 +830,18 @@ public final class EditorProjectSession implements AutoCloseable {
                 ? Math.max(0L, expectedRevision)
                 : snapshot(retained).revision();
         return new AuthoringMutationResult(id, outcome, currentRevision, false, false, false, List.of());
+    }
+
+    /** Returns a generated-definition or unknown-definition persistence failure. */
+    private AuthoringPersistenceResult persistenceFailure(AssetId id, long expectedRevision) {
+        RetainedState retained = retainedDefinitions.get(id);
+        AuthoringPersistenceResult.Outcome outcome = retained instanceof GeneratedRetainedState
+                ? AuthoringPersistenceResult.Outcome.NON_EDITABLE
+                : AuthoringPersistenceResult.Outcome.INVALID_TARGET;
+        long currentRevision = retained == null
+                ? Math.max(0L, expectedRevision)
+                : snapshot(retained).revision();
+        return new AuthoringPersistenceResult(id, outcome, currentRevision, false, false, false, List.of());
     }
 
     /** Creates one operation result from the current working-copy state. */

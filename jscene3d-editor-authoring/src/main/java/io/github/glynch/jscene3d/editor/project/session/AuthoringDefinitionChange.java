@@ -38,7 +38,9 @@ public record AuthoringDefinitionChange(
         UNDO,
         /** One prior transaction was redone. */
         REDO,
-        /** Current authored state became the in-memory persisted baseline without disk I/O. */
-        PERSISTED
+        /** Current authored state became the persisted baseline without a content revision. */
+        PERSISTED,
+        /** Reloaded physical content replaced current authored state and reset edit history. */
+        REVERTED
     }
 }

@@ -186,6 +186,44 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         return result(AuthoringMutationResult.Outcome.ACCEPTED, List.of());
     }
 
+    /** Persists current authored state without changing content revision or edit history. */
+    AuthoringPersistenceResult save(long expectedRevision) {
+        ensureOpen();
+        Optional<AuthoringPersistenceResult> stale = stalePersistence(expectedRevision);
+        if (stale.isPresent()) {
+            return stale.orElseThrow();
+        }
+        if (!isDirty()) {
+            AuthoredDefinitionDocument.SourceStatus status = current.verifySource();
+            return status == AuthoredDefinitionDocument.SourceStatus.MATCH
+                    ? persistenceResult(AuthoringPersistenceResult.Outcome.NO_OP, List.of())
+                    : persistenceResult(sourceOutcome(status), List.of());
+        }
+        return switch (current.save()) {
+            case AuthoredDefinitionDocument.SaveResult.Saved saved -> acceptSave(saved.document());
+            case AuthoredDefinitionDocument.SaveResult.SourceFailure failure ->
+                persistenceResult(sourceOutcome(failure.status()), List.of(failure.diagnostic()));
+            case AuthoredDefinitionDocument.SaveResult.WriteFailure failure ->
+                persistenceResult(AuthoringPersistenceResult.Outcome.WRITE_FAILED, List.of(failure.diagnostic()));
+        };
+    }
+
+    /** Reloads and validates physical authored source, accepting legitimate external changes. */
+    AuthoringPersistenceResult revert(long expectedRevision) {
+        ensureOpen();
+        Optional<AuthoringPersistenceResult> stale = stalePersistence(expectedRevision);
+        if (stale.isPresent()) {
+            return stale.orElseThrow();
+        }
+        return switch (current.reload()) {
+            case AuthoredDefinitionDocument.ReloadResult.Loaded loaded -> acceptReload(loaded.document());
+            case AuthoredDefinitionDocument.ReloadResult.SourceFailure failure ->
+                persistenceResult(sourceOutcome(failure.status()), List.of(failure.diagnostic()));
+            case AuthoredDefinitionDocument.ReloadResult.Rejected rejected ->
+                persistenceResult(AuthoringPersistenceResult.Outcome.VALIDATION_REJECTED, rejected.diagnostics());
+        };
+    }
+
     /** Returns locally authored entity identities modified from the persisted semantic baseline. */
     Set<EntityId> modifiedEntityIds() {
         ensureOpen();
@@ -249,10 +287,64 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
                 : Optional.of(result(AuthoringMutationResult.Outcome.STALE_REVISION, List.of()));
     }
 
+    /** Establishes the exact successfully persisted bytes as the current semantic and physical baseline. */
+    private AuthoringPersistenceResult acceptSave(AuthoredDefinitionDocument saved) {
+        current = saved;
+        persisted = saved;
+        emit(AuthoringDefinitionChange.Kind.PERSISTED);
+        return persistenceResult(AuthoringPersistenceResult.Outcome.SAVED, List.of());
+    }
+
+    /** Accepts one validated physical source while applying the defined revision and history semantics. */
+    private AuthoringPersistenceResult acceptReload(AuthoredDefinitionDocument loaded) {
+        boolean contentChanged = !current.hasSameAuthoredState(loaded);
+        boolean fingerprintChanged = !current.sourceFingerprint().equals(loaded.sourceFingerprint());
+        boolean wasDirty = isDirty();
+        if (!contentChanged && !fingerprintChanged && !wasDirty) {
+            return persistenceResult(AuthoringPersistenceResult.Outcome.NO_OP, List.of());
+        }
+        current = loaded;
+        persisted = loaded;
+        if (contentChanged) {
+            undoHistory.clear();
+            redoHistory.clear();
+            revision++;
+            emit(AuthoringDefinitionChange.Kind.REVERTED);
+        } else if (wasDirty) {
+            emit(AuthoringDefinitionChange.Kind.PERSISTED);
+        }
+        return persistenceResult(AuthoringPersistenceResult.Outcome.REVERTED, List.of());
+    }
+
+    /** Returns a stale persistence outcome before any source I/O occurs. */
+    private Optional<AuthoringPersistenceResult> stalePersistence(long expectedRevision) {
+        return expectedRevision == revision
+                ? Optional.empty()
+                : Optional.of(persistenceResult(AuthoringPersistenceResult.Outcome.STALE_REVISION, List.of()));
+    }
+
+    /** Maps the project-layer source model to the public authoring persistence vocabulary. */
+    private static AuthoringPersistenceResult.Outcome sourceOutcome(AuthoredDefinitionDocument.SourceStatus status) {
+        return switch (status) {
+            case CONTENT_CHANGED -> AuthoringPersistenceResult.Outcome.SOURCE_CHANGED;
+            case SOURCE_MISSING -> AuthoringPersistenceResult.Outcome.SOURCE_MISSING;
+            case SOURCE_INACCESSIBLE -> AuthoringPersistenceResult.Outcome.SOURCE_INACCESSIBLE;
+            case SOURCE_OUTSIDE_PROJECT -> AuthoringPersistenceResult.Outcome.SOURCE_OUTSIDE_PROJECT;
+            case MATCH -> throw new IllegalArgumentException("matching source has no failure outcome");
+        };
+    }
+
     /** Creates one result from the current authoritative state. */
     private AuthoringMutationResult result(
             AuthoringMutationResult.Outcome outcome, List<ProjectDiagnostic> diagnostics) {
         return new AuthoringMutationResult(
+                current.id(), outcome, revision, isDirty(), canUndo(), canRedo(), diagnostics);
+    }
+
+    /** Creates one persistence result from current authoritative lifecycle state. */
+    private AuthoringPersistenceResult persistenceResult(
+            AuthoringPersistenceResult.Outcome outcome, List<ProjectDiagnostic> diagnostics) {
+        return new AuthoringPersistenceResult(
                 current.id(), outcome, revision, isDirty(), canUndo(), canRedo(), diagnostics);
     }
 

@@ -29,6 +29,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -528,12 +530,165 @@ final class AuthoredDefinitionDocumentTest {
             Files.createSymbolicLink(worldSource, outside);
             assertThat(document.verifySource())
                     .isEqualTo(AuthoredDefinitionDocument.SourceStatus.SOURCE_OUTSIDE_PROJECT);
+            AuthoredDefinitionDocument.SaveResult save = document.save();
+            assertThat(((AuthoredDefinitionDocument.SaveResult.SourceFailure) save).status())
+                    .isEqualTo(AuthoredDefinitionDocument.SourceStatus.SOURCE_OUTSIDE_PROJECT);
         } catch (UnsupportedOperationException exception) {
             Assumptions.abort("symbolic links are not supported");
         } finally {
             Files.deleteIfExists(worldSource);
             Files.deleteIfExists(outside);
         }
+    }
+
+    /** Persists source-preserving world and entity trees and fingerprints the exact replacement bytes. */
+    @Test
+    void savesWorldAndEntityWithExactPersistedFingerprints() throws IOException {
+        AuthoredDefinitionDocument changedWorld =
+                accepted(load(WORLD_ID).set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("after")));
+        AuthoredDefinitionDocument changedEntity =
+                accepted(load(ENTITY_DEFINITION_ID).set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("after")));
+
+        AuthoredDefinitionDocument savedWorld = saved(changedWorld.save());
+        AuthoredDefinitionDocument savedEntity = saved(changedEntity.save());
+
+        assertThat(bytes(worldSource)).isEqualTo(changedWorld.serialize());
+        assertThat(bytes(entitySource)).isEqualTo(changedEntity.serialize());
+        assertThat(savedWorld.sourceFingerprint()).isEqualTo(SourceFingerprint.sha256(bytes(worldSource)));
+        assertThat(savedEntity.sourceFingerprint()).isEqualTo(SourceFingerprint.sha256(bytes(entitySource)));
+        assertThat(property(savedWorld, "required-number").decimalValue()).isEqualByComparingTo(EXACT_NUMBER);
+        assertThat(fieldNames(property(savedWorld, "nested"))).containsExactly("zeta", "alpha", "tiny");
+        assertThat(property(savedWorld, "nested")
+                        .path("zeta")
+                        .path(2)
+                        .path("$ref")
+                        .textValue())
+                .isEqualTo("asset:model");
+        assertThat(property(savedWorld, "nested")
+                        .path("alpha")
+                        .path("$target")
+                        .path("entityId")
+                        .textValue())
+                .isEqualTo(ENTITY_ID.toString());
+        assertThat(property(savedEntity, "nested").path("second").path(1).decimalValue())
+                .isEqualByComparingTo("3");
+    }
+
+    /** Rejects a same-size external change even when its original timestamp is restored. */
+    @Test
+    void rejectsConflictingSaveWithoutChangingDiskOrCandidate() throws IOException {
+        AuthoredDefinitionDocument changed =
+                accepted(load(WORLD_ID).set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("after")));
+        byte[] candidate = changed.serialize();
+        FileTime originalTimestamp = Files.getLastModifiedTime(worldSource);
+        byte[] external = bytes(worldSource);
+        external[indexOf(external, "Preserved World")] = 'p';
+        Files.write(worldSource, external);
+        Files.setLastModifiedTime(worldSource, originalTimestamp);
+
+        AuthoredDefinitionDocument.SaveResult result = changed.save();
+
+        assertThat(result).isInstanceOf(AuthoredDefinitionDocument.SaveResult.SourceFailure.class);
+        assertThat(((AuthoredDefinitionDocument.SaveResult.SourceFailure) result).status())
+                .isEqualTo(AuthoredDefinitionDocument.SourceStatus.CONTENT_CHANGED);
+        assertThat(bytes(worldSource)).isEqualTo(external);
+        assertThat(changed.serialize()).isEqualTo(candidate);
+    }
+
+    /** Reports bounded source lifecycle failures before save can invoke the atomic writer. */
+    @Test
+    void rejectsMissingAndInaccessibleSaveSources() throws IOException {
+        AuthoredDefinitionDocument missing = load(WORLD_ID);
+        AuthoredDefinitionDocument inaccessible = load(ENTITY_DEFINITION_ID);
+        Files.delete(worldSource);
+        Files.delete(entitySource);
+        Files.createDirectory(entitySource);
+
+        AuthoredDefinitionDocument.SaveResult missingResult = missing.save();
+        AuthoredDefinitionDocument.SaveResult inaccessibleResult = inaccessible.save();
+
+        assertThat(((AuthoredDefinitionDocument.SaveResult.SourceFailure) missingResult).status())
+                .isEqualTo(AuthoredDefinitionDocument.SourceStatus.SOURCE_MISSING);
+        assertThat(((AuthoredDefinitionDocument.SaveResult.SourceFailure) inaccessibleResult).status())
+                .isEqualTo(AuthoredDefinitionDocument.SourceStatus.SOURCE_INACCESSIBLE);
+    }
+
+    /** Leaves disk and candidate state unchanged when the atomic writer cannot create its sibling temporary file. */
+    @Test
+    void reportsAtomicWriterFailureWithoutChangingAcceptedState() throws IOException {
+        Path parent = worldSource.getParent();
+        Assumptions.assumeTrue(Files.getFileStore(parent).supportsFileAttributeView("posix"));
+        AuthoredDefinitionDocument changed =
+                accepted(load(WORLD_ID).set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("after")));
+        byte[] before = bytes(worldSource);
+        Set<PosixFilePermission> originalPermissions = Files.getPosixFilePermissions(parent);
+        try {
+            Files.setPosixFilePermissions(parent, PosixFilePermissions.fromString("r-x------"));
+            Assumptions.assumeFalse(Files.isWritable(parent));
+
+            AuthoredDefinitionDocument.SaveResult result = changed.save();
+
+            assertThat(result).isInstanceOf(AuthoredDefinitionDocument.SaveResult.WriteFailure.class);
+            assertThat(((AuthoredDefinitionDocument.SaveResult.WriteFailure) result)
+                            .diagnostic()
+                            .code()
+                            .code())
+                    .isEqualTo("asset.file.write");
+            assertThat(bytes(worldSource)).isEqualTo(before);
+            assertThat(property(changed, "optional-text").textValue()).isEqualTo("after");
+        } finally {
+            Files.setPosixFilePermissions(parent, originalPermissions);
+        }
+    }
+
+    /** Reloads externally changed content while rejecting malformed content atomically. */
+    @Test
+    void reloadsExternalSourceAndRejectsMalformedReplacement() throws IOException {
+        AuthoredDefinitionDocument original = load(WORLD_ID);
+        Files.writeString(worldSource, WORLD_SOURCE.replace("\"before\"", "\"external\""), StandardCharsets.UTF_8);
+
+        AuthoredDefinitionDocument reloaded = loaded(original.reload());
+        Files.writeString(worldSource, "{", StandardCharsets.UTF_8);
+        AuthoredDefinitionDocument.ReloadResult malformed = reloaded.reload();
+
+        assertThat(property(reloaded, "optional-text").textValue()).isEqualTo("external");
+        assertThat(reloaded.sourceFingerprint()).isEqualTo(SourceFingerprint.sha256(bytesBeforeMalformed()));
+        assertThat(malformed).isInstanceOf(AuthoredDefinitionDocument.ReloadResult.Rejected.class);
+        assertThat(((AuthoredDefinitionDocument.ReloadResult.Rejected) malformed).diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains("asset.json");
+        assertThat(property(reloaded, "optional-text").textValue()).isEqualTo("external");
+    }
+
+    /** Rejects a physical source whose stable identity no longer matches the catalog identity. */
+    @Test
+    void reloadRejectsWrongDefinitionIdentity() throws IOException {
+        AuthoredDefinitionDocument original = load(WORLD_ID);
+        Files.writeString(
+                worldSource,
+                WORLD_SOURCE.replace(WORLD_ID.toString(), ENTITY_DEFINITION_ID.toString()),
+                StandardCharsets.UTF_8);
+
+        AuthoredDefinitionDocument.ReloadResult result = original.reload();
+
+        assertThat(result).isInstanceOf(AuthoredDefinitionDocument.ReloadResult.Rejected.class);
+        assertThat(((AuthoredDefinitionDocument.ReloadResult.Rejected) result).diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .contains("asset.catalog.stale");
+        assertThat(original.id()).isEqualTo(WORLD_ID);
+    }
+
+    /** Returns the expected source lifecycle outcome when reload cannot access the retained source. */
+    @Test
+    void rejectsReloadOfMissingSource() throws IOException {
+        AuthoredDefinitionDocument document = load(ENTITY_DEFINITION_ID);
+        Files.delete(entitySource);
+
+        AuthoredDefinitionDocument.ReloadResult result = document.reload();
+
+        assertThat(result).isInstanceOf(AuthoredDefinitionDocument.ReloadResult.SourceFailure.class);
+        assertThat(((AuthoredDefinitionDocument.ReloadResult.SourceFailure) result).status())
+                .isEqualTo(AuthoredDefinitionDocument.SourceStatus.SOURCE_MISSING);
     }
 
     private AuthoredDefinitionDocument load(AssetId id) {
@@ -545,6 +700,20 @@ final class AuthoredDefinitionDocumentTest {
     private static AuthoredDefinitionDocument accepted(AuthoredDefinitionDocument.CandidateResult result) {
         assertThat(result).isInstanceOf(AuthoredDefinitionDocument.CandidateResult.Accepted.class);
         return ((AuthoredDefinitionDocument.CandidateResult.Accepted) result).document();
+    }
+
+    private static AuthoredDefinitionDocument saved(AuthoredDefinitionDocument.SaveResult result) {
+        assertThat(result).isInstanceOf(AuthoredDefinitionDocument.SaveResult.Saved.class);
+        return ((AuthoredDefinitionDocument.SaveResult.Saved) result).document();
+    }
+
+    private static AuthoredDefinitionDocument loaded(AuthoredDefinitionDocument.ReloadResult result) {
+        assertThat(result).isInstanceOf(AuthoredDefinitionDocument.ReloadResult.Loaded.class);
+        return ((AuthoredDefinitionDocument.ReloadResult.Loaded) result).document();
+    }
+
+    private byte[] bytesBeforeMalformed() {
+        return WORLD_SOURCE.replace("\"before\"", "\"external\"").getBytes(StandardCharsets.UTF_8);
     }
 
     private static JsonNode tree(AuthoredDefinitionDocument document) throws IOException {

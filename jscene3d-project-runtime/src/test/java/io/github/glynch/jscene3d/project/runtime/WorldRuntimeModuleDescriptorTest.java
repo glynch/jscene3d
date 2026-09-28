@@ -33,8 +33,17 @@ final class WorldRuntimeModuleDescriptorTest {
                         "io.github.glynch.jscene3d.project.runtime",
                         "io.github.glynch.jscene3d.project.runtime.extension");
         assertThat(descriptor.uses()).containsExactly(ComponentRuntimeExtension.class.getName());
+    }
+
+    /** Keeps project importing as a non-transitive implementation dependency. */
+    @Test
+    void requiresProjectImportingWithoutTransitiveReadability() {
+        ModuleDescriptor descriptor = getClass().getModule().getDescriptor();
+
         assertThat(descriptor.requires())
-                .extracting(ModuleDescriptor.Requires::name)
-                .contains("io.github.glynch.jscene3d.project.importing");
+                .filteredOn(requirement -> requirement.name().equals("io.github.glynch.jscene3d.project.importing"))
+                .singleElement()
+                .satisfies(requirement -> assertThat(requirement.modifiers())
+                        .doesNotContain(ModuleDescriptor.Requires.Modifier.TRANSITIVE));
     }
 }

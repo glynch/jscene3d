@@ -31,7 +31,7 @@ import io.github.glynch.jscene3d.project.imports.ImportLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.Entity;
-import io.github.glynch.jscene3d.project.runtime.ImportedRuntimeResources;
+import io.github.glynch.jscene3d.project.runtime.PublishedRuntimeResources;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
@@ -192,8 +192,11 @@ final class GltfProjectImportTest {
                         runtimeTypes,
                         List.of(new Spatial3dRuntimeExtension()),
                         List.of(WorldModuleBinding.of(Spatial3dWorldModule.class, spatial)),
-                        ImportedRuntimeResources.create(
-                                project, runtimeTypes, List.of(definition), manager, Spatial3dResourceLoaders.all()))
+                        PublishedRuntimeResources.load(
+                                project,
+                                runtimeTypes,
+                                temporaryDirectory.resolve("cache"),
+                                Spatial3dResourceLoaders.all()))
                 .world()
                 .orElseThrow();
         Entity runtimeNode = world.roots().getFirst().children().getFirst();

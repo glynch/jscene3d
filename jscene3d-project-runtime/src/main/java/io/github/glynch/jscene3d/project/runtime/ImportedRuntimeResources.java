@@ -77,7 +77,7 @@ public final class ImportedRuntimeResources {
      * @param loaders runtime loaders for supported resource types
      * @return synchronous runtime-resource provider
      */
-    public static RuntimeResourceProvider create(
+    static RuntimeResourceProvider create(
             GameProject project,
             RegisteredTypeCatalog catalog,
             Collection<ImportDefinition> imports,

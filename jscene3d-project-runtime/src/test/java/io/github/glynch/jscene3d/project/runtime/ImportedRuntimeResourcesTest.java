@@ -31,9 +31,12 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -130,6 +133,20 @@ final class ImportedRuntimeResourcesTest {
                 ImportedRuntimeResources.create(project, catalog(), List.of(new TestLoader()));
 
         assertResource(provider, ResourceReference.asset("resource-doc"), "project payload");
+    }
+
+    /** Keeps imported-artifact assembly inside the runtime module boundary. */
+    @Test
+    void keepsImportedArtifactFactoryNonPublic() throws NoSuchMethodException {
+        Method factory = ImportedRuntimeResources.class.getDeclaredMethod(
+                "create",
+                GameProject.class,
+                RegisteredTypeCatalog.class,
+                Collection.class,
+                ImportedArtifactLookup.class,
+                Collection.class);
+
+        assertThat(Modifier.isPublic(factory.getModifiers())).isFalse();
     }
 
     /** Rejects requested Java types and publication metadata that disagree with serialized content. */

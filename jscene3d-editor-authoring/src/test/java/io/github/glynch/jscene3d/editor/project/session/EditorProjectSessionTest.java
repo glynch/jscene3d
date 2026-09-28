@@ -452,11 +452,228 @@ final class EditorProjectSessionTest {
         }
     }
 
+    /** Restores dirty world state into a new session and continues normal mutation and B2 save. */
+    @Test
+    void restoresDirtyWorldAndContinuesMutationAndSave() throws Exception {
+        byte[] backup;
+        byte[] persistedSource;
+        try (EditorProjectSession original = session()) {
+            retain(original, WORLD_ID);
+            set(original, WORLD_ID, worldProperty(original, SPEED), number("2"), 0L);
+            persistedSource = Files.readAllBytes(worldSource());
+
+            AuthoringBackupResult captured = original.backupDefinition(WORLD_ID, 1L);
+            backup = captured.backup().orElseThrow().encode();
+
+            assertBackupOutcome(captured, AuthoringBackupResult.Outcome.BACKED_UP, 1L, true, true, false);
+            assertThat(Files.readAllBytes(worldSource())).isEqualTo(persistedSource);
+            assertThat(original.definitionState(WORLD_ID))
+                    .get()
+                    .returns(1L, AuthoringDefinitionState::revision)
+                    .returns(true, AuthoringDefinitionState::dirty);
+        }
+
+        try (EditorProjectSession restored = loadSession()) {
+            retain(restored, WORLD_ID);
+            List<AuthoringDefinitionChange> changes = definitionChanges(restored);
+            AuthoringRestoreResult recovery = restored.restoreDefinition(WORLD_ID, 0L, backup);
+            InspectorProjection recovered =
+                    restored.inspect(restored.hierarchy().roots().getFirst().inspectorTarget(), 1L);
+
+            assertRestoreOutcome(recovery, AuthoringRestoreResult.Outcome.RESTORED, 1L, true, false, false);
+            assertThat(property(recovered, SPEED).state().authoredValue())
+                    .contains(new InspectorValue.NumberValue(new BigDecimal("2")));
+            assertThat(restored.undo(WORLD_ID, 1L).outcome())
+                    .isEqualTo(AuthoringMutationResult.Outcome.UNDO_UNAVAILABLE);
+
+            set(restored, WORLD_ID, worldProperty(restored, SPEED), number("3"), 1L);
+            AuthoringPersistenceResult saved = restored.saveDefinition(WORLD_ID, 2L);
+
+            assertPersistenceOutcome(saved, AuthoringPersistenceResult.Outcome.SAVED, 2L, false, true, false);
+            assertThat(Files.readString(worldSource(), StandardCharsets.UTF_8)).contains("\"speed\" : 3");
+            assertThat(changes)
+                    .extracting(AuthoringDefinitionChange::kind)
+                    .containsExactly(
+                            AuthoringDefinitionChange.Kind.RESTORED,
+                            AuthoringDefinitionChange.Kind.SET,
+                            AuthoringDefinitionChange.Kind.PERSISTED);
+        }
+    }
+
+    /** Restores exact dirty entity state into a new session and continues through the existing B2 revert. */
+    @Test
+    void restoresDirtyEntityAndContinuesRevert() throws Exception {
+        byte[] backup;
+        try (EditorProjectSession original = session()) {
+            EditorRetainedDefinition entity = retain(original, ENTITY_DEFINITION_ID);
+            set(
+                    original,
+                    ENTITY_DEFINITION_ID,
+                    entityProperty(entity, SPEED),
+                    number("5.000000000000000000000000000001"),
+                    0L);
+            backup = original.backupDefinition(ENTITY_DEFINITION_ID, 1L)
+                    .backup()
+                    .orElseThrow()
+                    .encode();
+        }
+
+        try (EditorProjectSession restored = loadSession()) {
+            EditorRetainedDefinition entity = retain(restored, ENTITY_DEFINITION_ID);
+            List<AuthoringDefinitionChange> changes = definitionChanges(restored);
+            AuthoringRestoreResult recovery = restored.restoreDefinition(ENTITY_DEFINITION_ID, 0L, backup);
+            EditorRetainedDefinition recovered = retain(restored, ENTITY_DEFINITION_ID);
+            InspectorProjection inspection =
+                    restored.inspect(recovered.hierarchy().roots().getFirst().inspectorTarget(), 1L);
+
+            assertRestoreOutcome(recovery, AuthoringRestoreResult.Outcome.RESTORED, 1L, true, false, false);
+            assertThat(property(inspection, SPEED).state().authoredValue())
+                    .contains(new InspectorValue.NumberValue(new BigDecimal("5.000000000000000000000000000001")));
+
+            AuthoringPersistenceResult reverted = restored.revertDefinition(ENTITY_DEFINITION_ID, 1L);
+
+            assertPersistenceOutcome(reverted, AuthoringPersistenceResult.Outcome.REVERTED, 2L, false, false, false);
+            assertThat(changes)
+                    .extracting(AuthoringDefinitionChange::kind)
+                    .containsExactly(AuthoringDefinitionChange.Kind.RESTORED, AuthoringDefinitionChange.Kind.REVERTED);
+            assertThat(entity.revision()).isZero();
+        }
+    }
+
+    /** Restores a clean backup as a true no-op without inventing dirtiness, revision, history, or notification. */
+    @Test
+    void cleanBackupRestoreIsNoOp() throws Exception {
+        byte[] backup;
+        byte[] source;
+        try (EditorProjectSession original = session()) {
+            source = Files.readAllBytes(worldSource());
+            AuthoringBackupResult captured = original.backupDefinition(WORLD_ID, 0L);
+            backup = captured.backup().orElseThrow().encode();
+
+            assertBackupOutcome(captured, AuthoringBackupResult.Outcome.BACKED_UP, 0L, false, false, false);
+            assertThat(Files.readAllBytes(worldSource())).isEqualTo(source);
+        }
+
+        try (EditorProjectSession restored = loadSession()) {
+            retain(restored, WORLD_ID);
+            List<AuthoringDefinitionChange> changes = definitionChanges(restored);
+
+            AuthoringRestoreResult result = restored.restoreDefinition(WORLD_ID, 0L, backup);
+
+            assertRestoreOutcome(result, AuthoringRestoreResult.Outcome.NO_OP, 0L, false, false, false);
+            assertThat(changes).isEmpty();
+            assertThat(Files.readAllBytes(worldSource())).isEqualTo(source);
+        }
+    }
+
+    /** Rejects recovery when the newly loaded physical source no longer matches the backup baseline. */
+    @Test
+    void restoreRejectsExternalSourceChangeAtomically() throws Exception {
+        byte[] backup;
+        try (EditorProjectSession original = session()) {
+            set(original, WORLD_ID, worldProperty(original, SPEED), number("2"), 0L);
+            backup = original.backupDefinition(WORLD_ID, 1L)
+                    .backup()
+                    .orElseThrow()
+                    .encode();
+        }
+        String external =
+                Files.readString(worldSource(), StandardCharsets.UTF_8).replace("\"speed\":1", "\"speed\":3");
+        Files.writeString(worldSource(), external, StandardCharsets.UTF_8);
+
+        try (EditorProjectSession restored = loadSession()) {
+            retain(restored, WORLD_ID);
+            List<AuthoringDefinitionChange> changes = definitionChanges(restored);
+            AuthoredDefinitionDocument before =
+                    restored.retainedAuthoredDocument(WORLD_ID).orElseThrow();
+
+            AuthoringRestoreResult result = restored.restoreDefinition(WORLD_ID, 0L, backup);
+            InspectorProjection inspection =
+                    restored.inspect(restored.hierarchy().roots().getFirst().inspectorTarget(), 0L);
+
+            assertRestoreOutcome(result, AuthoringRestoreResult.Outcome.SOURCE_CHANGED, 0L, false, false, false);
+            assertThat(restored.retainedAuthoredDocument(WORLD_ID)).containsSame(before);
+            assertThat(property(inspection, SPEED).state().authoredValue())
+                    .contains(new InspectorValue.NumberValue(new BigDecimal("3")));
+            assertThat(Files.readString(worldSource(), StandardCharsets.UTF_8)).isEqualTo(external);
+            assertThat(changes).isEmpty();
+        }
+    }
+
+    /** Rejects malformed, incompatible, mismatched, and invalid backups without changing working-copy state. */
+    @Test
+    void restoreFailuresAreAtomic() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            set(session, WORLD_ID, worldProperty(session, SPEED), number("2"), 0L);
+            byte[] valid = session.backupDefinition(WORLD_ID, 1L)
+                    .backup()
+                    .orElseThrow()
+                    .encode();
+            AuthoredDefinitionDocument before =
+                    session.retainedAuthoredDocument(WORLD_ID).orElseThrow();
+            byte[] disk = Files.readAllBytes(worldSource());
+            List<AuthoringDefinitionChange> changes = definitionChanges(session);
+
+            List<AuthoringRestoreResult.Outcome> outcomes = List.of(
+                            session.restoreDefinition(WORLD_ID, 1L, "{".getBytes(StandardCharsets.UTF_8)),
+                            session.restoreDefinition(
+                                    WORLD_ID, 1L, replaceBackup(valid, "\"version\" : 1", "\"version\" : 2")),
+                            session.restoreDefinition(
+                                    WORLD_ID, 1L, replaceBackup(valid, "\"projectId\"", "\"unexpected\"")),
+                            session.restoreDefinition(
+                                    WORLD_ID,
+                                    1L,
+                                    replaceBackup(valid, "example.session-test", "different.session-test")),
+                            session.restoreDefinition(
+                                    WORLD_ID,
+                                    1L,
+                                    replaceBackup(valid, WORLD_ID.toString(), ENTITY_DEFINITION_ID.toString())),
+                            session.restoreDefinition(
+                                    WORLD_ID, 1L, replaceBackup(valid, "world-definition", "entity-definition")),
+                            session.restoreDefinition(
+                                    WORLD_ID,
+                                    1L,
+                                    replaceBackup(valid, "worlds/main.world.json", "worlds/other.world.json")),
+                            session.restoreDefinition(
+                                    WORLD_ID, 1L, replaceBackup(valid, "\"speed\" : 2", "\"speed\" : \"fast\"")),
+                            session.restoreDefinition(WORLD_ID, 2L, valid))
+                    .stream()
+                    .map(AuthoringRestoreResult::outcome)
+                    .toList();
+
+            assertThat(outcomes)
+                    .containsExactly(
+                            AuthoringRestoreResult.Outcome.BACKUP_MALFORMED,
+                            AuthoringRestoreResult.Outcome.BACKUP_UNSUPPORTED,
+                            AuthoringRestoreResult.Outcome.BACKUP_INVALID,
+                            AuthoringRestoreResult.Outcome.PROJECT_MISMATCH,
+                            AuthoringRestoreResult.Outcome.DEFINITION_MISMATCH,
+                            AuthoringRestoreResult.Outcome.KIND_MISMATCH,
+                            AuthoringRestoreResult.Outcome.SOURCE_MISMATCH,
+                            AuthoringRestoreResult.Outcome.VALIDATION_REJECTED,
+                            AuthoringRestoreResult.Outcome.STALE_REVISION);
+            assertThat(session.retainedAuthoredDocument(WORLD_ID)).containsSame(before);
+            assertThat(session.definitionState(WORLD_ID))
+                    .get()
+                    .returns(1L, AuthoringDefinitionState::revision)
+                    .returns(true, AuthoringDefinitionState::dirty)
+                    .returns(true, AuthoringDefinitionState::canUndo)
+                    .returns(false, AuthoringDefinitionState::canRedo);
+            assertThat(Files.readAllBytes(worldSource())).isEqualTo(disk);
+            assertThat(changes).isEmpty();
+        }
+    }
+
     /** Keeps generated definitions immutable through mutation and history session entry points. */
     @Test
     void rejectsGeneratedDefinitionOperationsAsNonEditable() throws Exception {
         URI source = URI.create("jscene3d-import:/models/generated.entity.json");
         try (EditorProjectSession session = sessionWithGeneratedDefinition(source)) {
+            byte[] authoredBackup = session.backupDefinition(WORLD_ID, 0L)
+                    .backup()
+                    .orElseThrow()
+                    .encode();
             EditorRetainedDefinition generated = retain(session, GENERATED_DEFINITION_ID);
             EditorHierarchyNode root = generated.hierarchy().roots().getFirst();
             InspectorMutationTarget.ComponentProperty target = new InspectorMutationTarget.ComponentProperty(
@@ -476,6 +693,11 @@ final class EditorProjectSessionTest {
                     .isEqualTo(AuthoringPersistenceResult.Outcome.NON_EDITABLE);
             assertThat(session.revertDefinition(GENERATED_DEFINITION_ID, 0L).outcome())
                     .isEqualTo(AuthoringPersistenceResult.Outcome.NON_EDITABLE);
+            assertThat(session.backupDefinition(GENERATED_DEFINITION_ID, 0L).outcome())
+                    .isEqualTo(AuthoringBackupResult.Outcome.NON_EDITABLE);
+            assertThat(session.restoreDefinition(GENERATED_DEFINITION_ID, 0L, authoredBackup)
+                            .outcome())
+                    .isEqualTo(AuthoringRestoreResult.Outcome.NON_EDITABLE);
             assertThat(session.definitionState(GENERATED_DEFINITION_ID)).isEmpty();
         }
     }
@@ -556,10 +778,19 @@ final class EditorProjectSessionTest {
     void rejectsUnknownDefinitionIdentity() throws Exception {
         try (EditorProjectSession session = session()) {
             DefinitionRetentionResult result = session.retainDefinition(GENERATED_DEFINITION_ID);
+            byte[] backup = session.backupDefinition(WORLD_ID, 0L)
+                    .backup()
+                    .orElseThrow()
+                    .encode();
 
             assertThat(result.definition()).isEmpty();
             assertThat(result.diagnostics()).isNotEmpty();
             assertThat(session.retainedDefinitionIds()).isEmpty();
+            assertThat(session.backupDefinition(GENERATED_DEFINITION_ID, 0L).outcome())
+                    .isEqualTo(AuthoringBackupResult.Outcome.INVALID_TARGET);
+            assertThat(session.restoreDefinition(GENERATED_DEFINITION_ID, 0L, backup)
+                            .outcome())
+                    .isEqualTo(AuthoringRestoreResult.Outcome.INVALID_TARGET);
         }
     }
 
@@ -643,6 +874,38 @@ final class EditorProjectSessionTest {
                 .returns(canRedo, AuthoringPersistenceResult::canRedo);
     }
 
+    /** Asserts one complete structured recovery-capture result. */
+    private static void assertBackupOutcome(
+            AuthoringBackupResult result,
+            AuthoringBackupResult.Outcome outcome,
+            long revision,
+            boolean dirty,
+            boolean canUndo,
+            boolean canRedo) {
+        assertThat(result)
+                .returns(outcome, AuthoringBackupResult::outcome)
+                .returns(revision, AuthoringBackupResult::revision)
+                .returns(dirty, AuthoringBackupResult::dirty)
+                .returns(canUndo, AuthoringBackupResult::canUndo)
+                .returns(canRedo, AuthoringBackupResult::canRedo);
+    }
+
+    /** Asserts one complete structured recovery-restore result. */
+    private static void assertRestoreOutcome(
+            AuthoringRestoreResult result,
+            AuthoringRestoreResult.Outcome outcome,
+            long revision,
+            boolean dirty,
+            boolean canUndo,
+            boolean canRedo) {
+        assertThat(result)
+                .returns(outcome, AuthoringRestoreResult::outcome)
+                .returns(revision, AuthoringRestoreResult::revision)
+                .returns(dirty, AuthoringRestoreResult::dirty)
+                .returns(canUndo, AuthoringRestoreResult::canUndo)
+                .returns(canRedo, AuthoringRestoreResult::canRedo);
+    }
+
     /** Creates one expected authored-definition notification. */
     private static AuthoringDefinitionChange change(
             AssetId id,
@@ -663,8 +926,20 @@ final class EditorProjectSessionTest {
                 .orElseThrow();
     }
 
+    /** Replaces one required UTF-8 fragment in encoded recovery test data. */
+    private static byte[] replaceBackup(byte[] encoded, String before, String after) {
+        String source = new String(encoded, StandardCharsets.UTF_8);
+        assertThat(source).contains(before);
+        return source.replace(before, after).getBytes(StandardCharsets.UTF_8);
+    }
+
     private EditorProjectSession session() throws IOException {
         writeProject();
+        return loadSession();
+    }
+
+    /** Loads the existing fixture sources without rewriting externally changed disk state. */
+    private EditorProjectSession loadSession() {
         return new EditorProjectLoader("0.1.0-SNAPSHOT", getClass().getClassLoader())
                 .load(projectRoot)
                 .session()

@@ -41,6 +41,8 @@ public record AuthoringDefinitionChange(
         /** Current authored state became the persisted baseline without a content revision. */
         PERSISTED,
         /** Reloaded physical content replaced current authored state and reset edit history. */
-        REVERTED
+        REVERTED,
+        /** Validated recovery content replaced current authored state and reset new-session edit history. */
+        RESTORED
     }
 }

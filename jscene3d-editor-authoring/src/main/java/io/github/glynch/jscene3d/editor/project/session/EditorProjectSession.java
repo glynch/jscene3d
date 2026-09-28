@@ -330,6 +330,38 @@ public final class EditorProjectSession implements AutoCloseable {
                 .orElseGet(() -> persistenceFailure(validId, expectedRevision));
     }
 
+    /**
+     * Captures deterministic recovery state for one authored definition without writing its source.
+     *
+     * @param id authoritative definition identity
+     * @param expectedRevision definition revision observed by the caller
+     * @return structured backup, concurrency, target, or editability outcome
+     */
+    public AuthoringBackupResult backupDefinition(AssetId id, long expectedRevision) {
+        ensureOpen();
+        AssetId validId = Objects.requireNonNull(id, "id");
+        return authoredWorkingCopy(validId)
+                .map(workingCopy -> workingCopy.backup(project.identity().id(), expectedRevision))
+                .orElseGet(() -> backupFailure(validId, expectedRevision));
+    }
+
+    /**
+     * Restores deterministic recovery bytes after strict parsing, identity checks, and authoritative validation.
+     *
+     * @param id authoritative target definition identity
+     * @param expectedRevision new-session definition revision observed by the caller
+     * @param encodedBackup untrusted complete backup JSON bytes
+     * @return structured restore, conflict, validation, concurrency, target, or editability outcome
+     */
+    public AuthoringRestoreResult restoreDefinition(AssetId id, long expectedRevision, byte[] encodedBackup) {
+        ensureOpen();
+        AssetId validId = Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(encodedBackup, "encodedBackup");
+        return authoredWorkingCopy(validId)
+                .map(workingCopy -> workingCopy.restore(project.identity().id(), encodedBackup, expectedRevision))
+                .orElseGet(() -> restoreFailure(validId, expectedRevision));
+    }
+
     /** Establishes a future successfully persisted authored document as the in-memory baseline. */
     AuthoringMutationResult markPersisted(
             AssetId id, AuthoredDefinitionDocument baselinedDocument, long expectedRevision) {
@@ -842,6 +874,30 @@ public final class EditorProjectSession implements AutoCloseable {
                 ? Math.max(0L, expectedRevision)
                 : snapshot(retained).revision();
         return new AuthoringPersistenceResult(id, outcome, currentRevision, false, false, false, List.of());
+    }
+
+    /** Returns a generated-definition or unknown-definition backup failure. */
+    private AuthoringBackupResult backupFailure(AssetId id, long expectedRevision) {
+        RetainedState retained = retainedDefinitions.get(id);
+        AuthoringBackupResult.Outcome outcome = retained instanceof GeneratedRetainedState
+                ? AuthoringBackupResult.Outcome.NON_EDITABLE
+                : AuthoringBackupResult.Outcome.INVALID_TARGET;
+        long currentRevision = retained == null
+                ? Math.max(0L, expectedRevision)
+                : snapshot(retained).revision();
+        return new AuthoringBackupResult(id, outcome, currentRevision, false, false, false, Optional.empty());
+    }
+
+    /** Returns a generated-definition or unknown-definition restore failure. */
+    private AuthoringRestoreResult restoreFailure(AssetId id, long expectedRevision) {
+        RetainedState retained = retainedDefinitions.get(id);
+        AuthoringRestoreResult.Outcome outcome = retained instanceof GeneratedRetainedState
+                ? AuthoringRestoreResult.Outcome.NON_EDITABLE
+                : AuthoringRestoreResult.Outcome.INVALID_TARGET;
+        long currentRevision = retained == null
+                ? Math.max(0L, expectedRevision)
+                : snapshot(retained).revision();
+        return new AuthoringRestoreResult(id, outcome, currentRevision, false, false, false, List.of());
     }
 
     /** Creates one operation result from the current working-copy state. */

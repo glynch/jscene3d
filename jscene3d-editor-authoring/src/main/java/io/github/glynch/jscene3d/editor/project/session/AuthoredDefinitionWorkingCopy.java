@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.project.session;
 
 import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.project.session.internal.AuthoringChangeSource;
+import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionBackup;
 import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -195,9 +196,10 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         }
         if (!isDirty()) {
             AuthoredDefinitionDocument.SourceStatus status = current.verifySource();
-            return status == AuthoredDefinitionDocument.SourceStatus.MATCH
-                    ? persistenceResult(AuthoringPersistenceResult.Outcome.NO_OP, List.of())
-                    : persistenceResult(sourceOutcome(status), List.of());
+            AuthoringPersistenceResult.Outcome outcome = status == AuthoredDefinitionDocument.SourceStatus.MATCH
+                    ? AuthoringPersistenceResult.Outcome.NO_OP
+                    : sourceOutcome(status);
+            return persistenceResult(outcome, List.of());
         }
         return switch (current.save()) {
             case AuthoredDefinitionDocument.SaveResult.Saved saved -> acceptSave(saved.document());
@@ -221,6 +223,31 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
                 persistenceResult(sourceOutcome(failure.status()), List.of(failure.diagnostic()));
             case AuthoredDefinitionDocument.ReloadResult.Rejected rejected ->
                 persistenceResult(AuthoringPersistenceResult.Outcome.VALIDATION_REJECTED, rejected.diagnostics());
+        };
+    }
+
+    /** Captures current recovery state without changing content, lifecycle state, history, revision, or disk. */
+    AuthoringBackupResult backup(String projectId, long expectedRevision) {
+        ensureOpen();
+        if (expectedRevision != revision) {
+            return backupResult(AuthoringBackupResult.Outcome.STALE_REVISION, Optional.empty());
+        }
+        AuthoredDefinitionBackup backup = AuthoredDefinitionBackup.create(projectId, current);
+        return backupResult(AuthoringBackupResult.Outcome.BACKED_UP, Optional.of(backup));
+    }
+
+    /** Strictly decodes and restores recovery state against this working copy's persisted physical baseline. */
+    AuthoringRestoreResult restore(String projectId, byte[] encodedBackup, long expectedRevision) {
+        ensureOpen();
+        if (expectedRevision != revision) {
+            return restoreResult(AuthoringRestoreResult.Outcome.STALE_REVISION, List.of());
+        }
+        AuthoredDefinitionBackup.DecodeResult decoded =
+                AuthoredDefinitionBackup.decode(Objects.requireNonNull(encodedBackup, "encodedBackup"));
+        return switch (decoded) {
+            case AuthoredDefinitionBackup.DecodeResult.Decoded accepted -> restore(projectId, accepted.backup());
+            case AuthoredDefinitionBackup.DecodeResult.Rejected rejected ->
+                restoreResult(decodeOutcome(rejected.failure()), List.of());
         };
     }
 
@@ -316,6 +343,32 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         return persistenceResult(AuthoringPersistenceResult.Outcome.REVERTED, List.of());
     }
 
+    /** Validates decoded recovery identity and content before any working-copy state changes. */
+    private AuthoringRestoreResult restore(String projectId, AuthoredDefinitionBackup backup) {
+        return switch (backup.restore(projectId, current)) {
+            case AuthoredDefinitionBackup.RestoreResult.Restored restored -> acceptRestore(restored.document());
+            case AuthoredDefinitionBackup.RestoreResult.IdentityRejected rejected ->
+                restoreResult(identityOutcome(rejected.mismatch()), List.of());
+            case AuthoredDefinitionBackup.RestoreResult.SourceConflict ignored ->
+                restoreResult(AuthoringRestoreResult.Outcome.SOURCE_CHANGED, List.of());
+            case AuthoredDefinitionBackup.RestoreResult.ValidationRejected rejected ->
+                restoreResult(AuthoringRestoreResult.Outcome.VALIDATION_REJECTED, rejected.diagnostics());
+        };
+    }
+
+    /** Accepts validated recovery content as one new-session content transition with no inherited history. */
+    private AuthoringRestoreResult acceptRestore(AuthoredDefinitionDocument restored) {
+        if (current.hasSameAuthoredState(restored)) {
+            return restoreResult(AuthoringRestoreResult.Outcome.NO_OP, List.of());
+        }
+        current = restored;
+        undoHistory.clear();
+        redoHistory.clear();
+        revision++;
+        emit(AuthoringDefinitionChange.Kind.RESTORED);
+        return restoreResult(AuthoringRestoreResult.Outcome.RESTORED, List.of());
+    }
+
     /** Returns a stale persistence outcome before any source I/O occurs. */
     private Optional<AuthoringPersistenceResult> stalePersistence(long expectedRevision) {
         return expectedRevision == revision
@@ -334,6 +387,25 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         };
     }
 
+    /** Maps strict project-layer decoding failures to the public recovery vocabulary. */
+    private static AuthoringRestoreResult.Outcome decodeOutcome(AuthoredDefinitionBackup.DecodeFailure failure) {
+        return switch (failure) {
+            case MALFORMED -> AuthoringRestoreResult.Outcome.BACKUP_MALFORMED;
+            case UNSUPPORTED_FORMAT -> AuthoringRestoreResult.Outcome.BACKUP_UNSUPPORTED;
+            case INVALID_STRUCTURE -> AuthoringRestoreResult.Outcome.BACKUP_INVALID;
+        };
+    }
+
+    /** Maps stable project-layer identity dimensions to the public recovery vocabulary. */
+    private static AuthoringRestoreResult.Outcome identityOutcome(AuthoredDefinitionBackup.IdentityMismatch mismatch) {
+        return switch (mismatch) {
+            case PROJECT -> AuthoringRestoreResult.Outcome.PROJECT_MISMATCH;
+            case DEFINITION -> AuthoringRestoreResult.Outcome.DEFINITION_MISMATCH;
+            case KIND -> AuthoringRestoreResult.Outcome.KIND_MISMATCH;
+            case SOURCE -> AuthoringRestoreResult.Outcome.SOURCE_MISMATCH;
+        };
+    }
+
     /** Creates one result from the current authoritative state. */
     private AuthoringMutationResult result(
             AuthoringMutationResult.Outcome outcome, List<ProjectDiagnostic> diagnostics) {
@@ -345,6 +417,19 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
     private AuthoringPersistenceResult persistenceResult(
             AuthoringPersistenceResult.Outcome outcome, List<ProjectDiagnostic> diagnostics) {
         return new AuthoringPersistenceResult(
+                current.id(), outcome, revision, isDirty(), canUndo(), canRedo(), diagnostics);
+    }
+
+    /** Creates one backup-capture result from current authoritative lifecycle state. */
+    private AuthoringBackupResult backupResult(
+            AuthoringBackupResult.Outcome outcome, Optional<AuthoredDefinitionBackup> backup) {
+        return new AuthoringBackupResult(current.id(), outcome, revision, isDirty(), canUndo(), canRedo(), backup);
+    }
+
+    /** Creates one restore result from current authoritative lifecycle state. */
+    private AuthoringRestoreResult restoreResult(
+            AuthoringRestoreResult.Outcome outcome, List<ProjectDiagnostic> diagnostics) {
+        return new AuthoringRestoreResult(
                 current.id(), outcome, revision, isDirty(), canUndo(), canRedo(), diagnostics);
     }
 

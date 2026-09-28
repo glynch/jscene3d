@@ -181,6 +181,135 @@ final class AuthoredDefinitionDocumentTest {
         assertThat(entity.sourceFingerprint()).isEqualTo(SourceFingerprint.sha256(bytes(entitySource)));
     }
 
+    /** Round-trips deterministic world recovery state without losing retained extension values or source order. */
+    @Test
+    void backsUpAndRestoresSourcePreservingWorldState() throws IOException {
+        AuthoredDefinitionDocument persisted = load(WORLD_ID);
+        AuthoredDefinitionDocument current =
+                accepted(persisted.set(OPTIONAL_TEXT_TARGET, new ProjectValue.TextValue("recovered")));
+        AuthoredDefinitionBackup backup = AuthoredDefinitionBackup.create("example.backup-test", current);
+
+        byte[] encoded = backup.encode();
+        AuthoredDefinitionBackup decoded = decoded(encoded);
+        AuthoredDefinitionDocument restored = restored(decoded.restore("example.backup-test", persisted));
+        JsonNode restoredProperties = properties(restored);
+
+        assertThat(decoded.encode()).isEqualTo(encoded);
+        assertThat(decoded)
+                .returns(WORLD_ID, AuthoredDefinitionBackup::definition)
+                .returns(AssetKind.WORLD_DEFINITION, AuthoredDefinitionBackup::kind)
+                .returns("worlds/map01.world.json", AuthoredDefinitionBackup::source)
+                .returns(persisted.sourceFingerprint().hexadecimal(), AuthoredDefinitionBackup::persistedSourceSha256);
+        assertThat(restored.sourceFingerprint()).isEqualTo(persisted.sourceFingerprint());
+        assertThat(restoredProperties.path("optional-text").textValue()).isEqualTo("recovered");
+        assertThat(fieldNames(restoredProperties.path("nested"))).containsExactly("zeta", "alpha", "tiny");
+        assertThat(restoredProperties
+                        .path("nested")
+                        .path("zeta")
+                        .path(2)
+                        .path("$ref")
+                        .textValue())
+                .isEqualTo("asset:model");
+        assertThat(restoredProperties
+                        .path("nested")
+                        .path("alpha")
+                        .path("$target")
+                        .path("entityId")
+                        .textValue())
+                .isEqualTo(ENTITY_ID.toString());
+        assertThat(restoredProperties.path("nested").path("tiny").decimalValue())
+                .isEqualByComparingTo("0.000000000000000000000000000001");
+        assertThat(bytes(worldSource)).isEqualTo(WORLD_SOURCE.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Applies the same deterministic recovery envelope and exact-decimal semantics to entity definitions. */
+    @Test
+    void backsUpAndRestoresEntityStateWithExactDecimals() throws IOException {
+        AuthoredDefinitionDocument persisted = load(ENTITY_DEFINITION_ID);
+        AuthoredDefinitionDocument.ComponentPropertyTarget target =
+                new AuthoredDefinitionDocument.ComponentPropertyTarget(
+                        ENTITY_ID, COMPONENT_ID, new PropertyId("optional-number"));
+        AuthoredDefinitionDocument current =
+                accepted(persisted.set(target, new ProjectValue.NumberValue(new BigDecimal(EXACT_NUMBER))));
+
+        AuthoredDefinitionBackup backup = decoded(
+                AuthoredDefinitionBackup.create("example.backup-test", current).encode());
+        AuthoredDefinitionDocument restored = restored(backup.restore("example.backup-test", persisted));
+
+        assertThat(backup.kind()).isEqualTo(AssetKind.ENTITY_DEFINITION);
+        assertThat(property(restored, "optional-number").decimalValue()).isEqualByComparingTo(EXACT_NUMBER);
+        assertThat(StreamSupport.stream(
+                                property(restored, "nested").path("second").spliterator(), false)
+                        .map(JsonNode::intValue)
+                        .toList())
+                .containsExactly(2, 3);
+        assertThat(bytes(entitySource)).isEqualTo(ENTITY_SOURCE.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Rejects malformed, unsupported, duplicate-member, and structurally invalid recovery envelopes. */
+    @Test
+    void strictlyRejectsInvalidBackupEncoding() {
+        byte[] valid = AuthoredDefinitionBackup.create("example.backup-test", load(WORLD_ID))
+                .encode();
+        byte[] unsupported = replace(valid, "\"version\" : 1", "\"version\" : 2");
+        byte[] unknown = replace(valid, "\"projectId\"", "\"unexpected\"");
+        byte[] duplicate = replace(
+                valid,
+                "\"projectId\" : \"example.backup-test\"",
+                "\"projectId\" : \"example.backup-test\", \"projectId\" : \"example.backup-test\"");
+
+        assertDecodeFailure("{".getBytes(StandardCharsets.UTF_8), AuthoredDefinitionBackup.DecodeFailure.MALFORMED);
+        assertDecodeFailure(unsupported, AuthoredDefinitionBackup.DecodeFailure.UNSUPPORTED_FORMAT);
+        assertDecodeFailure(unknown, AuthoredDefinitionBackup.DecodeFailure.INVALID_STRUCTURE);
+        assertDecodeFailure(duplicate, AuthoredDefinitionBackup.DecodeFailure.MALFORMED);
+    }
+
+    /** Identifies each stable target mismatch and persisted-source conflict before validating backup content. */
+    @Test
+    void rejectsMismatchedBackupIdentityAndPersistedFingerprint() throws IOException {
+        AuthoredDefinitionDocument target = load(WORLD_ID);
+        AuthoredDefinitionBackup original = AuthoredDefinitionBackup.create("example.backup-test", target);
+        AuthoredDefinitionBackup wrongDefinition = tampered(
+                original, "\"assetId\" : \"" + WORLD_ID + "\"", "\"assetId\" : \"" + ENTITY_DEFINITION_ID + "\"");
+        AuthoredDefinitionBackup wrongKind =
+                tampered(original, "\"kind\" : \"world-definition\"", "\"kind\" : \"entity-definition\"");
+        AuthoredDefinitionBackup wrongSource = tampered(
+                original, "\"source\" : \"worlds/map01.world.json\"", "\"source\" : \"worlds/other.world.json\"");
+        AuthoredDefinitionBackup wrongFingerprint =
+                tampered(original, original.persistedSourceSha256(), "0".repeat(64));
+
+        assertIdentityMismatch(
+                original.restore("different.project", target), AuthoredDefinitionBackup.IdentityMismatch.PROJECT);
+        assertIdentityMismatch(
+                wrongDefinition.restore("example.backup-test", target),
+                AuthoredDefinitionBackup.IdentityMismatch.DEFINITION);
+        assertIdentityMismatch(
+                wrongKind.restore("example.backup-test", target), AuthoredDefinitionBackup.IdentityMismatch.KIND);
+        assertIdentityMismatch(
+                wrongSource.restore("example.backup-test", target), AuthoredDefinitionBackup.IdentityMismatch.SOURCE);
+        assertThat(wrongFingerprint.restore("example.backup-test", target))
+                .isInstanceOf(AuthoredDefinitionBackup.RestoreResult.SourceConflict.class);
+    }
+
+    /** Rejects semantically invalid recovery content through normal authoritative definition validation. */
+    @Test
+    void rejectsSemanticallyInvalidBackupContent() throws IOException {
+        AuthoredDefinitionDocument target = load(WORLD_ID);
+        AuthoredDefinitionBackup backup = AuthoredDefinitionBackup.create("example.backup-test", target);
+        AuthoredDefinitionBackup invalid = tampered(
+                backup,
+                "\"required-number\" : 1234567890.123456789012345678901234567890",
+                "\"required-number\" : \"invalid\"");
+
+        AuthoredDefinitionBackup.RestoreResult result = invalid.restore("example.backup-test", target);
+
+        assertThat(result).isInstanceOf(AuthoredDefinitionBackup.RestoreResult.ValidationRejected.class);
+        assertThat(((AuthoredDefinitionBackup.RestoreResult.ValidationRejected) result).diagnostics())
+                .isNotEmpty();
+        assertThat(property(target, "required-number").decimalValue()).isEqualByComparingTo(EXACT_NUMBER);
+        assertThat(bytes(worldSource)).isEqualTo(WORLD_SOURCE.getBytes(StandardCharsets.UTF_8));
+    }
+
     /** Replaces one world property on a copied tree and preserves the accepted document. */
     @Test
     void setsWorldPropertyOnValidatedCopy() throws IOException {
@@ -695,6 +824,47 @@ final class AuthoredDefinitionDocumentTest {
         AuthoredDefinitionDocument.LoadResult result = AuthoredDefinitionDocument.load(assets, assets, types, id);
         assertThat(result.diagnostics()).isEmpty();
         return result.document().orElseThrow();
+    }
+
+    /** Returns one successfully decoded backup or fails with its bounded decoding result. */
+    private static AuthoredDefinitionBackup decoded(byte[] encoded) {
+        AuthoredDefinitionBackup.DecodeResult result = AuthoredDefinitionBackup.decode(encoded);
+        assertThat(result).isInstanceOf(AuthoredDefinitionBackup.DecodeResult.Decoded.class);
+        return ((AuthoredDefinitionBackup.DecodeResult.Decoded) result).backup();
+    }
+
+    /** Returns one successfully restored document or fails with its bounded recovery result. */
+    private static AuthoredDefinitionDocument restored(AuthoredDefinitionBackup.RestoreResult result) {
+        assertThat(result).isInstanceOf(AuthoredDefinitionBackup.RestoreResult.Restored.class);
+        return ((AuthoredDefinitionBackup.RestoreResult.Restored) result).document();
+    }
+
+    /** Reencodes one backup after replacing an exact serialized fragment. */
+    private static AuthoredDefinitionBackup tampered(AuthoredDefinitionBackup backup, String before, String after) {
+        return decoded(replace(backup.encode(), before, after));
+    }
+
+    /** Replaces one required UTF-8 fragment in encoded test data. */
+    private static byte[] replace(byte[] encoded, String before, String after) {
+        String source = new String(encoded, StandardCharsets.UTF_8);
+        assertThat(source).contains(before);
+        return source.replace(before, after).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Asserts one bounded backup decoding failure. */
+    private static void assertDecodeFailure(byte[] encoded, AuthoredDefinitionBackup.DecodeFailure expected) {
+        AuthoredDefinitionBackup.DecodeResult result = AuthoredDefinitionBackup.decode(encoded);
+        assertThat(result).isInstanceOf(AuthoredDefinitionBackup.DecodeResult.Rejected.class);
+        assertThat(((AuthoredDefinitionBackup.DecodeResult.Rejected) result).failure())
+                .isEqualTo(expected);
+    }
+
+    /** Asserts one stable backup-to-target identity mismatch. */
+    private static void assertIdentityMismatch(
+            AuthoredDefinitionBackup.RestoreResult result, AuthoredDefinitionBackup.IdentityMismatch expected) {
+        assertThat(result).isInstanceOf(AuthoredDefinitionBackup.RestoreResult.IdentityRejected.class);
+        assertThat(((AuthoredDefinitionBackup.RestoreResult.IdentityRejected) result).mismatch())
+                .isEqualTo(expected);
     }
 
     private static AuthoredDefinitionDocument accepted(AuthoredDefinitionDocument.CandidateResult result) {

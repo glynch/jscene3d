@@ -14,6 +14,7 @@ import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.internal.AtomicProjectFileWriter;
+import io.github.glynch.jscene3d.project.internal.Preconditions;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonTreeWriter;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -228,6 +229,24 @@ public final class AuthoredDefinitionDocument {
      */
     public byte[] serialize() {
         return serializeTree(tree);
+    }
+
+    /** Returns a detached tree for the project-layer backup envelope. */
+    ObjectNode backupTree() {
+        return tree.deepCopy();
+    }
+
+    /** Returns the portable project-relative identity of the trusted authored source. */
+    String backupSourceIdentity() {
+        Path relative = assets.root().relativize(metadata.path());
+        String portable = relative.toString().replace(relative.getFileSystem().getSeparator(), "/");
+        return Preconditions.requirePortableLocator(portable, "source");
+    }
+
+    /** Reparses and validates one detached recovery tree against this document's authoritative source identity. */
+    CandidateResult restoreBackupTree(ObjectNode backupTree) {
+        return validateCandidate(
+                Objects.requireNonNull(backupTree, "backupTree").deepCopy());
     }
 
     /**

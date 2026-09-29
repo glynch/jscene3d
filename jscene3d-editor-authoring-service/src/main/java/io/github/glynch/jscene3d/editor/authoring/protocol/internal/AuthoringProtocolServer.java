@@ -10,7 +10,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionMutationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOperationParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionRestoreParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InitializeParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InitializeResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
@@ -208,6 +211,38 @@ public final class AuthoringProtocolServer {
                 success(
                         id,
                         service.openDefinition(readParams(request, DefinitionOpenParams.class), initializedLocale()));
+            case DEFINITION_MUTATE ->
+                success(
+                        id,
+                        service.mutateDefinition(
+                                readParams(request, DefinitionMutationParams.class), initializedLocale()));
+            case DEFINITION_UNDO ->
+                success(
+                        id,
+                        service.undoDefinition(
+                                readParams(request, DefinitionOperationParams.class), initializedLocale()));
+            case DEFINITION_REDO ->
+                success(
+                        id,
+                        service.redoDefinition(
+                                readParams(request, DefinitionOperationParams.class), initializedLocale()));
+            case DEFINITION_SAVE ->
+                success(
+                        id,
+                        service.saveDefinition(
+                                readParams(request, DefinitionOperationParams.class), initializedLocale()));
+            case DEFINITION_REVERT ->
+                success(
+                        id,
+                        service.revertDefinition(
+                                readParams(request, DefinitionOperationParams.class), initializedLocale()));
+            case DEFINITION_BACKUP ->
+                success(id, service.backupDefinition(readParams(request, DefinitionOperationParams.class)));
+            case DEFINITION_RESTORE_BACKUP ->
+                success(
+                        id,
+                        service.restoreDefinition(
+                                readParams(request, DefinitionRestoreParams.class), initializedLocale()));
             case INSPECTOR_READ ->
                 success(id, service.readInspector(readParams(request, InspectorReadParams.class), initializedLocale()));
             case SERVICE_SHUTDOWN -> shutdown(id);

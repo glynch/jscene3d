@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.editor.project.session;
 
 import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.project.session.internal.AuthoringChangeSource;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionBackup;
 import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
 import io.github.glynch.jscene3d.project.component.ComponentId;
@@ -255,6 +256,13 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
     Set<EntityId> modifiedEntityIds() {
         ensureOpen();
         return AuthoredDefinitionStates.modifiedEntityIds(current.content(), persisted.content());
+    }
+
+    /** Returns whether one stable Inspector mutation target differs from the persisted semantic baseline. */
+    boolean isModified(InspectorMutationTarget target) {
+        ensureOpen();
+        return AuthoredDefinitionStates.isModified(
+                current.content(), persisted.content(), Objects.requireNonNull(target, "target"));
     }
 
     /** Releases listeners and rejects every subsequent operation. */

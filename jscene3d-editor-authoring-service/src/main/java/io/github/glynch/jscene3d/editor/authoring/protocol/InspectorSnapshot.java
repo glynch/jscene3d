@@ -185,6 +185,7 @@ public record InspectorSnapshot(
      * @param origin authored, default, or unset
      * @param validity current semantic validity
      * @param editable whether a mutation target is present
+     * @param modified whether the authored target differs from its persisted baseline
      */
     public record PropertyState(
             @Nullable Value authoredValue,
@@ -192,7 +193,8 @@ public record InspectorSnapshot(
             @Nullable Value effectiveValue,
             String origin,
             String validity,
-            boolean editable) {
+            boolean editable,
+            boolean modified) {
         /** Validates state labels. */
         public PropertyState {
             Objects.requireNonNull(origin, "origin");

@@ -4,7 +4,9 @@
  */
 package io.github.glynch.jscene3d.editor.project.session;
 
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
+import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
@@ -13,6 +15,8 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /** Compares authored definition projections for modified-entity presentation. */
@@ -28,6 +32,47 @@ final class AuthoredDefinitionStates {
         Set<EntityId> modified = new LinkedHashSet<>();
         collectModifiedEntries(currentRoots, persistedEntries, modified);
         return Set.copyOf(modified);
+    }
+
+    /** Compares one stable mutation target with its exact persisted authored value. */
+    static boolean isModified(
+            AuthoredDefinitionDocument.Content current,
+            AuthoredDefinitionDocument.Content persisted,
+            InspectorMutationTarget target) {
+        Map<EntityId, EntityEntry> currentEntries = new HashMap<>();
+        Map<EntityId, EntityEntry> persistedEntries = new HashMap<>();
+        indexEntries(roots(current), currentEntries);
+        indexEntries(roots(persisted), persistedEntries);
+        return switch (target) {
+            case InspectorMutationTarget.EntityEnabled enabled -> {
+                EntityEntry currentEntry = currentEntries.get(enabled.entity());
+                EntityEntry persistedEntry = persistedEntries.get(enabled.entity());
+                yield currentEntry == null
+                        || persistedEntry == null
+                        || currentEntry.isEnabled() != persistedEntry.isEnabled();
+            }
+            case InspectorMutationTarget.ComponentProperty property -> {
+                Optional<ComponentDefinition> currentComponent = component(currentEntries, property);
+                Optional<ComponentDefinition> persistedComponent = component(persistedEntries, property);
+                yield currentComponent.isEmpty()
+                        || persistedComponent.isEmpty()
+                        || !Objects.equals(
+                                currentComponent.orElseThrow().properties().get(property.property()),
+                                persistedComponent.orElseThrow().properties().get(property.property()));
+            }
+        };
+    }
+
+    /** Resolves one local component named by a stable Inspector mutation target. */
+    private static Optional<ComponentDefinition> component(
+            Map<EntityId, EntityEntry> entries, InspectorMutationTarget.ComponentProperty target) {
+        EntityEntry entry = entries.get(target.entity());
+        if (!(entry instanceof LocalEntity local)) {
+            return Optional.empty();
+        }
+        return local.components().stream()
+                .filter(component -> component.id().equals(target.component()))
+                .findFirst();
     }
 
     /** Returns direct authored roots for either structural definition kind. */

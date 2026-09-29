@@ -14,6 +14,8 @@ import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceI
 import io.github.glynch.jscene3d.editor.workbench.inspector.EditorInspectorProjector;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProjection;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProperty;
+import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorSection;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -430,11 +432,61 @@ public final class EditorProjectSession implements AutoCloseable {
                 resolved.scopeRoots(),
                 resolved.scopeOccurrence(),
                 assets);
-        return switch (resolved.entry()) {
-            case LocalEntity entity -> EditorInspectorProjector.entity(entity, context);
-            case EntityPlacement placement ->
-                EditorInspectorProjector.placement(placement, resolvePlacementDefinition(placement), context);
-        };
+        InspectorProjection projection =
+                switch (resolved.entry()) {
+                    case LocalEntity entity -> EditorInspectorProjector.entity(entity, context);
+                    case EntityPlacement placement ->
+                        EditorInspectorProjector.placement(placement, resolvePlacementDefinition(placement), context);
+                };
+        return retained instanceof AuthoredRetainedState(AuthoredDefinitionWorkingCopy workingCopy)
+                ? withModificationState(projection, workingCopy)
+                : projection;
+    }
+
+    /** Decorates editable Inspector properties from the working copy's authoritative persisted baseline. */
+    private static InspectorProjection withModificationState(
+            InspectorProjection projection, AuthoredDefinitionWorkingCopy workingCopy) {
+        List<InspectorSection> sections = projection.sections().stream()
+                .map(section -> new InspectorSection(
+                        section.identity(),
+                        section.kind(),
+                        section.label(),
+                        section.description(),
+                        section.componentId(),
+                        section.componentType(),
+                        section.metadataAvailable(),
+                        section.editable(),
+                        section.properties().stream()
+                                .map(property -> withModificationState(property, workingCopy))
+                                .toList()))
+                .toList();
+        return new InspectorProjection(
+                projection.target(),
+                projection.title(),
+                projection.definitionOrigin(),
+                projection.provenance(),
+                projection.editable(),
+                sections);
+    }
+
+    /** Decorates one property only when it exposes an authoritative mutation target. */
+    private static InspectorProperty withModificationState(
+            InspectorProperty property, AuthoredDefinitionWorkingCopy workingCopy) {
+        boolean modified =
+                property.mutationTarget().map(workingCopy::isModified).orElse(false);
+        InspectorProperty.State state = property.state();
+        return new InspectorProperty(
+                property.identity(),
+                property.presentation(),
+                new InspectorProperty.State(
+                        state.authoredValue(),
+                        state.defaultValue(),
+                        state.effectiveValue(),
+                        state.origin(),
+                        state.validity(),
+                        state.editable(),
+                        modified),
+                property.mutationTarget());
     }
 
     /** Returns all authoritative session state changes.
@@ -541,6 +593,48 @@ public final class EditorProjectSession implements AutoCloseable {
             case InspectorMutationTarget.ComponentProperty property ->
                 mutateProperty(workingCopy, property, validMutation, expectedRevision);
         };
+    }
+
+    /**
+     * Rejects a syntactically invalid mutation candidate after applying the normal identity and revision checks.
+     *
+     * <p>Protocol adapters use this when an exact scalar literal cannot be represented as a {@link ProjectValue}.
+     * The working copy remains authoritative for the unchanged revision, dirty state, and history availability.
+     *
+     * @param definition authoritative definition identity
+     * @param target stable semantic mutation target
+     * @param expectedRevision definition revision observed by the caller
+     * @param diagnostics ordered candidate-validation diagnostics
+     * @return validation rejection, stale revision, invalid target, or editability outcome
+     */
+    public AuthoringMutationResult rejectMutation(
+            AssetId definition,
+            InspectorMutationTarget target,
+            long expectedRevision,
+            List<ProjectDiagnostic> diagnostics) {
+        ensureOpen();
+        AssetId validDefinition = Objects.requireNonNull(definition, "definition");
+        InspectorMutationTarget validTarget = Objects.requireNonNull(target, "target");
+        List<ProjectDiagnostic> validDiagnostics = List.copyOf(diagnostics);
+        if (validDiagnostics.isEmpty()) {
+            throw new IllegalArgumentException("mutation rejection requires diagnostics");
+        }
+        Optional<AuthoredDefinitionWorkingCopy> authored = authoredWorkingCopy(validDefinition);
+        if (authored.isEmpty()) {
+            return retainedFailure(validDefinition, expectedRevision);
+        }
+        AuthoredDefinitionWorkingCopy workingCopy = authored.orElseThrow();
+        if (workingCopy.state().revision() != expectedRevision) {
+            return result(workingCopy, AuthoringMutationResult.Outcome.STALE_REVISION, List.of());
+        }
+        if (!validTarget.occurrence().definition().equals(validDefinition)) {
+            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
+        }
+        Optional<EditorHierarchyNode> node = editableNode(validDefinition, validTarget.occurrence());
+        if (node.isEmpty() || !matchesEntity(node.orElseThrow(), validTarget)) {
+            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
+        }
+        return result(workingCopy, AuthoringMutationResult.Outcome.VALIDATION_REJECTED, validDiagnostics);
     }
 
     /** Returns whether this session has released its subscriptions and working copy.

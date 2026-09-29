@@ -135,7 +135,8 @@ final class EditorComponentSectionProjector {
                         effectiveInspection,
                         origin,
                         validity,
-                        mutation.isPresent()),
+                        mutation.isPresent(),
+                        false),
                 mutation);
     }
 
@@ -176,6 +177,7 @@ final class EditorComponentSectionProjector {
                         Optional.of(projected),
                         InspectorProperty.Origin.AUTHORED,
                         InspectorProperty.Validity.METADATA_UNAVAILABLE,
+                        false,
                         false),
                 Optional.empty());
     }

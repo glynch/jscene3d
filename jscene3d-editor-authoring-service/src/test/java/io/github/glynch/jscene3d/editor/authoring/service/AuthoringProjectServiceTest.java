@@ -7,8 +7,10 @@ package io.github.glynch.jscene3d.editor.authoring.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionMutationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOperationResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionSnapshot;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadResult;
@@ -29,7 +31,9 @@ import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import org.junit.jupiter.api.AfterEach;
@@ -139,7 +143,10 @@ final class AuthoringProjectServiceTest {
                         1L,
                         retained.revision(),
                         new DefinitionSnapshot.SemanticTarget(
-                                target.kind(), target.source(), "different-identity", target.occurrence())),
+                                target.kind(),
+                                target.source(),
+                                "different-identity",
+                                Objects.requireNonNull(target.occurrence()))),
                 Locale.ENGLISH);
 
         assertThat(read.read()).isTrue();
@@ -184,6 +191,85 @@ final class AuthoringProjectServiceTest {
         assertThat(value.values())
                 .extracting(component -> ((InspectorSnapshot.NumberValue) component).decimal())
                 .containsExactly("0", "90.0000000000000000001", "-2.5");
+    }
+
+    /** Parses every first-slice scalar candidate in Java while preserving exact decimal text. */
+    @Test
+    @SuppressWarnings("NullAway") // Candidate transport variants deliberately leave the alternate field null.
+    void mutatesSupportedScalarCandidatesThroughServiceBoundary() throws IOException {
+        AuthoringTestProject.writeScalarPropertyProject(temporaryDirectory);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        DefinitionSnapshot definition = Objects.requireNonNull(
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID))
+                        .definition());
+        InspectorSnapshot inspector = Objects.requireNonNull(service.readInspector(
+                        new InspectorReadParams(
+                                1L,
+                                definition.revision(),
+                                definition.roots().getFirst().target()),
+                        Locale.ENGLISH)
+                .snapshot());
+
+        DefinitionOperationResult booleanResult =
+                mutate(inspector, "visible", 0L, new DefinitionMutationParams.CandidateValue("boolean", false, null));
+        DefinitionOperationResult integerResult = mutate(
+                inspector,
+                "count",
+                1L,
+                new DefinitionMutationParams.CandidateValue("integer", null, "12345678901234567890"));
+        DefinitionOperationResult numberResult = mutate(
+                inspector,
+                "precision",
+                2L,
+                new DefinitionMutationParams.CandidateValue("number", null, "0.00000000000000000001"));
+        DefinitionOperationResult textResult = mutate(
+                inspector, "title", 3L, new DefinitionMutationParams.CandidateValue("text", null, "Exact title"));
+        DefinitionOperationResult rejected =
+                mutate(inspector, "count", 4L, new DefinitionMutationParams.CandidateValue("integer", null, "1.5"));
+        DefinitionOperationResult malformed = mutate(
+                inspector,
+                "precision",
+                4L,
+                new DefinitionMutationParams.CandidateValue("number", null, "not-a-number"));
+
+        assertThat(List.of(booleanResult, integerResult, numberResult, textResult))
+                .extracting(DefinitionOperationResult::outcome)
+                .containsExactly("accepted", "accepted", "accepted", "accepted");
+        assertThat(textResult)
+                .returns(4L, DefinitionOperationResult::revision)
+                .returns(true, DefinitionOperationResult::dirty)
+                .returns(true, DefinitionOperationResult::canUndo);
+        assertThat(rejected)
+                .returns("validation-rejected", DefinitionOperationResult::outcome)
+                .returns(4L, DefinitionOperationResult::revision)
+                .returns(true, DefinitionOperationResult::dirty)
+                .satisfies(result -> assertThat(result.diagnostics())
+                        .singleElement()
+                        .returns("property.integer", diagnostic -> diagnostic.code()));
+        assertThat(malformed)
+                .returns("validation-rejected", DefinitionOperationResult::outcome)
+                .returns(4L, DefinitionOperationResult::revision)
+                .returns(true, DefinitionOperationResult::dirty)
+                .satisfies(result -> assertThat(result.diagnostics())
+                        .singleElement()
+                        .returns("property.kind", diagnostic -> diagnostic.code()));
+        String source = Files.readString(temporaryDirectory.resolve("worlds/main.world.json"));
+        assertThat(source).contains("\"precision\":1.25", "\"title\":\"Player\"");
+
+        InspectorSnapshot refreshed = Objects.requireNonNull(service.readInspector(
+                        new InspectorReadParams(
+                                1L, 4L, definition.roots().getFirst().target()),
+                        Locale.ENGLISH)
+                .snapshot());
+        assertThat(property(refreshed, "count").state().effectiveValue())
+                .isEqualTo(new InspectorSnapshot.NumberValue("number", "12345678901234567890"));
+        assertThat(property(refreshed, "count").state().modified()).isTrue();
+        assertThat(property(refreshed, "precision").state().effectiveValue())
+                .isEqualTo(new InspectorSnapshot.NumberValue("number", "0.00000000000000000001"));
+        assertThat(property(refreshed, "precision").state().modified()).isTrue();
+        assertThat(property(refreshed, "title").state().effectiveValue())
+                .isEqualTo(new InspectorSnapshot.TextValue("text", "Exact title"));
+        assertThat(property(refreshed, "title").state().modified()).isTrue();
     }
 
     /** Accepts the selected descriptor path without encoding its filename in the protocol. */
@@ -458,5 +544,39 @@ final class AuthoringProjectServiceTest {
         EditorHierarchyNode entity = session.hierarchy().roots().getFirst();
         return new InspectorMutationTarget.EntityEnabled(
                 entity.occurrence(), EntityId.from(AuthoringTestProject.ENTITY_ID));
+    }
+
+    /** Mutates one scalar property using the Java-issued target from the initial Inspector snapshot. */
+    @SuppressWarnings("NullAway") // The assertion fixture guarantees the projected mutation target is present.
+    private DefinitionOperationResult mutate(
+            InspectorSnapshot inspector,
+            String propertyId,
+            long revision,
+            DefinitionMutationParams.CandidateValue value) {
+        InspectorSnapshot.ComponentPropertyMutation target = (InspectorSnapshot.ComponentPropertyMutation)
+                property(inspector, propertyId).mutationTarget();
+        return service.mutateDefinition(
+                new DefinitionMutationParams(
+                        1L,
+                        AuthoringTestProject.WORLD_ASSET_ID,
+                        revision,
+                        "set",
+                        new DefinitionMutationParams.MutationTarget(
+                                target.kind(),
+                                target.occurrence(),
+                                target.entityId(),
+                                target.componentId(),
+                                target.propertyId()),
+                        value),
+                Locale.ENGLISH);
+    }
+
+    /** Finds one scalar property in the fixture's registered component section. */
+    private static InspectorSnapshot.Property property(InspectorSnapshot inspector, String propertyId) {
+        return inspector.groups().stream()
+                .flatMap(group -> group.properties().stream())
+                .filter(property -> property.identity().equals(propertyId))
+                .findFirst()
+                .orElseThrow();
     }
 }

@@ -222,12 +222,14 @@ final class EditorProjectSessionTest {
             assertOutcome(changed, AuthoringMutationResult.Outcome.ACCEPTED, 1L, true, true, false);
             assertThat(property(inspection, SPEED).state().authoredValue())
                     .contains(new InspectorValue.NumberValue(new BigDecimal("5")));
+            assertThat(property(inspection, SPEED).state().modified()).isTrue();
             session.undo(ENTITY_DEFINITION_ID, 1L);
             EditorRetainedDefinition restored = retain(session, ENTITY_DEFINITION_ID);
             InspectorProjection restoredInspection =
                     session.inspect(restored.hierarchy().roots().getFirst().inspectorTarget(), restored.revision());
             assertThat(property(restoredInspection, SPEED).state().authoredValue())
                     .contains(new InspectorValue.NumberValue(BigDecimal.ONE));
+            assertThat(property(restoredInspection, SPEED).state().modified()).isFalse();
         }
     }
 
@@ -270,8 +272,12 @@ final class EditorProjectSessionTest {
             EditorRetainedDefinition entity = retain(session, ENTITY_DEFINITION_ID);
             InspectorMutationTarget.ComponentProperty target = entityProperty(entity, SPEED);
             set(session, ENTITY_DEFINITION_ID, target, number("5.000000000000000000000000000001"), 0L);
+            InspectorProjection dirtyInspection =
+                    session.inspect(entity.hierarchy().roots().getFirst().inspectorTarget(), 1L);
 
             AuthoringPersistenceResult result = session.saveDefinition(ENTITY_DEFINITION_ID, 1L);
+            InspectorProjection savedInspection =
+                    session.inspect(entity.hierarchy().roots().getFirst().inspectorTarget(), 1L);
             AuthoredDefinitionDocument saved =
                     session.retainedAuthoredDocument(ENTITY_DEFINITION_ID).orElseThrow();
             set(session, ENTITY_DEFINITION_ID, target, number("6"), 1L);
@@ -281,6 +287,8 @@ final class EditorProjectSessionTest {
                     session.inspect(retained.hierarchy().roots().getFirst().inspectorTarget(), retained.revision());
 
             assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.SAVED, 1L, false, true, false);
+            assertThat(property(dirtyInspection, SPEED).state().modified()).isTrue();
+            assertThat(property(savedInspection, SPEED).state().modified()).isFalse();
             assertThat(Files.readString(entitySource(), StandardCharsets.UTF_8))
                     .contains("5.000000000000000000000000000001");
             assertThat(saved.sourceFingerprint())
@@ -288,6 +296,7 @@ final class EditorProjectSessionTest {
             assertPersistenceOutcome(reverted, AuthoringPersistenceResult.Outcome.REVERTED, 3L, false, false, false);
             assertThat(property(inspection, SPEED).state().authoredValue())
                     .contains(new InspectorValue.NumberValue(new BigDecimal("5.000000000000000000000000000001")));
+            assertThat(property(inspection, SPEED).state().modified()).isFalse();
         }
     }
 

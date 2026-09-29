@@ -68,6 +68,13 @@ final class AuthoringProtocolServerTest {
                         "project/replace",
                         "project/close",
                         "definition/open",
+                        "definition/mutate",
+                        "definition/undo",
+                        "definition/redo",
+                        "definition/save",
+                        "definition/revert",
+                        "definition/backup",
+                        "definition/restoreBackup",
                         "inspector/read",
                         "service/shutdown");
         assertThat(server.isInitialized()).isTrue();
@@ -91,7 +98,7 @@ final class AuthoringProtocolServerTest {
         JsonNode response = response(initialize(1, 7));
 
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(2);
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(4);
         assertThat(server.isInitialized()).isTrue();
     }
 
@@ -260,6 +267,107 @@ final class AuthoringProtocolServerTest {
                         .at("/result/snapshot/groups/0/properties/0/state/effectiveValue/kind")
                         .asText())
                 .isEqualTo("boolean");
+    }
+
+    /** Dispatches the complete authored-definition lifecycle without losing exact scalar literals. */
+    @Test
+    void dispatchesAuthoredDefinitionLifecycle() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        response(initialize(1, 3));
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
+        long generation = opened.at("/result/projectGeneration").asLong();
+        JsonNode definition = response(request(
+                3,
+                "definition/open",
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                        + "\"}"));
+        JsonNode occurrence = definition.at("/result/definition/roots/0/occurrence");
+        String identity = "\"expectedProjectGeneration\":" + generation + ",\"assetId\":\""
+                + AuthoringTestProject.WORLD_ASSET_ID + "\",\"expectedDefinitionRevision\":";
+        String target = "{\"kind\":\"entity-enabled\",\"occurrence\":" + occurrence + ",\"entityId\":\""
+                + AuthoringTestProject.ENTITY_ID + "\"}";
+
+        JsonNode mutated = response(request(
+                4,
+                "definition/mutate",
+                "{" + identity + "0,\"operation\":\"set\",\"target\":" + target
+                        + ",\"value\":{\"kind\":\"boolean\",\"value\":false}}"));
+        JsonNode undone = response(request(
+                5,
+                "definition/undo",
+                "{" + identity + mutated.at("/result/revision").asLong() + "}"));
+        JsonNode redone = response(request(
+                6,
+                "definition/redo",
+                "{" + identity + undone.at("/result/revision").asLong() + "}"));
+        JsonNode backup = response(request(
+                7,
+                "definition/backup",
+                "{" + identity + redone.at("/result/revision").asLong() + "}"));
+        JsonNode restored = response(request(
+                8,
+                "definition/restoreBackup",
+                "{" + identity + redone.at("/result/revision").asLong() + ",\"backup\":"
+                        + JSON.writeValueAsString(backup.at("/result/backup").asText()) + "}"));
+        JsonNode saved = response(request(
+                9,
+                "definition/save",
+                "{" + identity + restored.at("/result/revision").asLong() + "}"));
+        JsonNode editedAfterSave = response(request(
+                10,
+                "definition/mutate",
+                "{" + identity + saved.at("/result/revision").asLong()
+                        + ",\"operation\":\"set\",\"target\":" + target
+                        + ",\"value\":{\"kind\":\"boolean\",\"value\":true}}"));
+        JsonNode reverted = response(request(
+                11,
+                "definition/revert",
+                "{" + identity + editedAfterSave.at("/result/revision").asLong() + "}"));
+
+        assertThat(mutated.at("/result/outcome").asText()).isEqualTo("accepted");
+        assertThat(mutated.at("/result/dirty").asBoolean()).isTrue();
+        assertThat(undone.at("/result/outcome").asText()).isEqualTo("accepted");
+        assertThat(redone.at("/result/outcome").asText()).isEqualTo("accepted");
+        assertThat(backup.at("/result/outcome").asText()).isEqualTo("backed-up");
+        assertThat(backup.at("/result/backup").asText()).isNotEmpty();
+        assertThat(restored.at("/result/outcome").asText()).isEqualTo("no-op");
+        assertThat(saved.at("/result/outcome").asText()).isEqualTo("saved");
+        assertThat(editedAfterSave.at("/result/outcome").asText()).isEqualTo("accepted");
+        assertThat(reverted.at("/result/outcome").asText()).isEqualTo("reverted");
+    }
+
+    /** Returns structured validation for a malformed numeric candidate and keeps serving requests. */
+    @Test
+    void reportsMalformedNumericMutationWithoutTerminatingConnection() throws IOException {
+        AuthoringTestProject.writeScalarPropertyProject(temporaryDirectory);
+        response(initialize(1, 3));
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
+        long generation = opened.at("/result/projectGeneration").asLong();
+        JsonNode definition = response(request(
+                3,
+                "definition/open",
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                        + "\"}"));
+        JsonNode occurrence = definition.at("/result/definition/roots/0/occurrence");
+        String target = "{\"kind\":\"component-property\",\"occurrence\":" + occurrence
+                + ",\"entityId\":\"" + AuthoringTestProject.ENTITY_ID + "\",\"componentId\":\""
+                + AuthoringTestProject.SCALAR_COMPONENT_ID + "\",\"propertyId\":\"precision\"}";
+
+        JsonNode rejected = response(request(
+                4,
+                "definition/mutate",
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\""
+                        + AuthoringTestProject.WORLD_ASSET_ID
+                        + "\",\"expectedDefinitionRevision\":0,\"operation\":\"set\",\"target\":" + target
+                        + ",\"value\":{\"kind\":\"number\",\"literal\":\"not-a-number\"}}"));
+        JsonNode closed = response(request(5, "project/close", "{}"));
+
+        assertThat(rejected.at("/result/outcome").asText()).isEqualTo("validation-rejected");
+        assertThat(rejected.at("/result/revision").asLong()).isZero();
+        assertThat(rejected.at("/result/dirty").asBoolean()).isFalse();
+        assertThat(rejected.at("/result/diagnostics/0/code").asText()).isEqualTo("property.kind");
+        assertThat(closed.at("/result/closed").asBoolean()).isTrue();
+        assertThat(closed.at("/result/invalidatedProjectGeneration").asLong()).isEqualTo(generation);
     }
 
     /** Ignores unknown optional initialization fields as required for additive evolution. */

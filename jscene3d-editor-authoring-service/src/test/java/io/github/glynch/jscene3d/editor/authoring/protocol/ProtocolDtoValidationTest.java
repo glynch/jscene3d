@@ -14,6 +14,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** Exercises invariants enforced at the versioned wire-DTO boundary. */
+@SuppressWarnings("NullAway") // DTO contract tests intentionally exercise nullable wire shapes.
 final class ProtocolDtoValidationTest {
     /** Rejects negative major or minor protocol components independently. */
     @Test
@@ -143,7 +144,8 @@ final class ProtocolDtoValidationTest {
                                         null,
                                         List.of(),
                                         new InspectorSnapshot.EditorSemantics("default", null, null)),
-                                new InspectorSnapshot.PropertyState(exact, null, exact, "authored", "valid", false),
+                                new InspectorSnapshot.PropertyState(
+                                        exact, null, exact, "authored", "valid", false, false),
                                 null)))));
 
         JsonNode json = new ObjectMapper().valueToTree(snapshot);
@@ -195,7 +197,7 @@ final class ProtocolDtoValidationTest {
                                         List.of(),
                                         new InspectorSnapshot.EditorSemantics("euler-rotation", null, null)),
                                 new InspectorSnapshot.PropertyState(
-                                        rotation, null, rotation, "authored", "valid", false),
+                                        rotation, null, rotation, "authored", "valid", false, false),
                                 null)))));
 
         JsonNode json = new ObjectMapper().valueToTree(snapshot);
@@ -250,6 +252,113 @@ final class ProtocolDtoValidationTest {
         assertThat(componentTarget.occurrence()).isEqualTo(occurrence);
         assertThat(minimum.decimal()).isEqualTo("-1.25");
         assertThat(minimum.inclusive()).isTrue();
+    }
+
+    /** Enforces the closed SET/REMOVE and exact scalar candidate transport vocabulary. */
+    @Test
+    void validatesDefinitionMutationParams() {
+        DefinitionMutationParams.MutationTarget target = new DefinitionMutationParams.MutationTarget(
+                "entity-enabled", new DefinitionSnapshot.Occurrence("world", List.of("entity")), "entity", null, null);
+
+        assertThat(new DefinitionMutationParams.CandidateValue("number", null, "0.00000000000000000001").literal())
+                .isEqualTo("0.00000000000000000001");
+        assertThatThrownBy(() -> new DefinitionMutationParams(1L, "world", 0L, "reset", target, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("set or remove");
+        assertThatThrownBy(() -> new DefinitionMutationParams(1L, "world", 0L, "set", target, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("value");
+        assertThatThrownBy(() -> new DefinitionMutationParams.CandidateValue("boolean", null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("boolean");
+    }
+
+    /** Rejects every invalid generation, revision, identity, and candidate variant in operation DTOs. */
+    @Test
+    void rejectsInvalidDefinitionOperationContracts() {
+        DefinitionSnapshot.Occurrence occurrence = new DefinitionSnapshot.Occurrence("world", List.of("entity"));
+        DefinitionMutationParams.MutationTarget target =
+                new DefinitionMutationParams.MutationTarget("entity-enabled", occurrence, "entity", null, null);
+        DefinitionMutationParams.CandidateValue text =
+                new DefinitionMutationParams.CandidateValue("text", null, "value");
+
+        assertThatThrownBy(() -> new DefinitionMutationParams(0L, "world", 0L, "set", target, text))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> new DefinitionMutationParams(1L, " ", 0L, "set", target, text))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+        assertThatThrownBy(() -> new DefinitionMutationParams(1L, "world", -1L, "set", target, text))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-negative");
+        assertThatThrownBy(() -> new DefinitionMutationParams(1L, "world", 0L, "remove", target, text))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("value");
+
+        assertThatThrownBy(() -> new DefinitionMutationParams.MutationTarget(
+                        "entity-enabled", occurrence, "entity", "component", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot contain");
+        assertThatThrownBy(() -> new DefinitionMutationParams.MutationTarget(
+                        "component-property", occurrence, "entity", null, "property"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires");
+        assertThatThrownBy(
+                        () -> new DefinitionMutationParams.MutationTarget("unknown", occurrence, "entity", null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unsupported");
+
+        assertThatThrownBy(() -> new DefinitionMutationParams.CandidateValue("boolean", true, "true"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only value");
+        assertThatThrownBy(() -> new DefinitionMutationParams.CandidateValue("integer", true, "1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only literal");
+        assertThatThrownBy(() -> new DefinitionMutationParams.CandidateValue("unknown", null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unsupported");
+
+        assertThatThrownBy(() -> new DefinitionOperationParams(0L, "world", 0L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> new DefinitionOperationParams(1L, " ", 0L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+        assertThatThrownBy(() -> new DefinitionOperationParams(1L, "world", -1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-negative");
+    }
+
+    /** Rejects inconsistent lifecycle results and recovery requests at the JSON boundary. */
+    @Test
+    void rejectsInvalidDefinitionLifecycleResults() {
+        List<ProjectDiagnosticDto> noDiagnostics = List.of();
+
+        assertThatThrownBy(() -> new DefinitionOperationResult(" ", "accepted", 0L, false, false, false, noDiagnostics))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+        assertThatThrownBy(() ->
+                        new DefinitionOperationResult("world", "accepted", -1L, false, false, false, noDiagnostics))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-negative");
+        assertThatThrownBy(() -> new DefinitionBackupResult("world", "backed-up", 0L, true, false, false, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("backup");
+        assertThatThrownBy(() -> new DefinitionBackupResult("world", "no-op", 0L, false, false, false, "bytes"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("backup");
+        assertThatThrownBy(() -> new DefinitionRestoreParams(0L, "world", 0L, "bytes"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> new DefinitionRestoreParams(1L, " ", 0L, "bytes"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+        assertThatThrownBy(() -> new DefinitionRestoreParams(1L, "world", -1L, "bytes"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-negative");
+        assertThatThrownBy(() -> new DefinitionRestoreParams(1L, "world", 0L, " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
     }
 
     /** Creates one valid project summary for result-shape validation. */

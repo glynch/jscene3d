@@ -129,7 +129,8 @@ public final class EditorInspectorProjector {
                         Optional.of(projected),
                         InspectorProperty.Origin.AUTHORED,
                         InspectorProperty.Validity.VALID,
-                        mutationTarget.isPresent()),
+                        mutationTarget.isPresent(),
+                        false),
                 mutationTarget);
     }
 

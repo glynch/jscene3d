@@ -4,8 +4,13 @@
  */
 package io.github.glynch.jscene3d.editor.authoring.service;
 
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionBackupResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionMutationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOperationParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOperationResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionRestoreParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionSnapshot;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadResult;
@@ -20,6 +25,11 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
 import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringBackupResult;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringMutation;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringMutationResult;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringPersistenceResult;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringRestoreResult;
 import io.github.glynch.jscene3d.editor.project.session.DefinitionRetentionResult;
 import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.project.session.EditorRetainedDefinition;
@@ -34,19 +44,27 @@ import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorValue;
 import io.github.glynch.jscene3d.i18n.MessageSource;
 import io.github.glynch.jscene3d.i18n.resourcebundle.ResourceBundleMessageSource;
 import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
+import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyNumericBound;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -255,6 +273,135 @@ public final class AuthoringProjectService implements AutoCloseable {
     }
 
     /**
+     * Applies one exact scalar SET or property REMOVE through the authoritative working copy.
+     *
+     * @param params mutation identity, target, operation, and candidate value
+     * @param locale initialized client display locale
+     * @return authoritative operation state and localized validation diagnostics
+     */
+    public synchronized DefinitionOperationResult mutateDefinition(DefinitionMutationParams params, Locale locale) {
+        ensureOpen();
+        DefinitionMutationParams validParams = Objects.requireNonNull(params, "params");
+        Locale validLocale = Objects.requireNonNull(locale, "locale");
+        EditorProjectSession session = operationSession(validParams.expectedProjectGeneration());
+        if (session == null) {
+            return operationFailure(validParams.assetId(), validParams.expectedDefinitionRevision());
+        }
+        AssetId definition = AssetId.from(validParams.assetId());
+        InspectorMutationTarget target = mutationTarget(validParams.target());
+        AuthoringMutation mutation;
+        try {
+            mutation = "remove".equals(validParams.operation())
+                    ? new AuthoringMutation.Remove()
+                    : new AuthoringMutation.Set(projectValue(Objects.requireNonNull(validParams.value(), "value")));
+        } catch (NumberFormatException exception) {
+            return invalidNumericLiteral(session, definition, target, validParams, validLocale);
+        }
+        AuthoringMutationResult result =
+                session.mutate(definition, target, mutation, validParams.expectedDefinitionRevision());
+        return operationResult(result, validLocale);
+    }
+
+    /**
+     * Invokes Java-owned undo for one authored definition.
+     *
+     * @param params definition identity and expected revision
+     * @param locale initialized client display locale
+     * @return authoritative operation state and localized diagnostics
+     */
+    public synchronized DefinitionOperationResult undoDefinition(DefinitionOperationParams params, Locale locale) {
+        return historyOperation(params, locale, true);
+    }
+
+    /**
+     * Invokes Java-owned redo for one authored definition.
+     *
+     * @param params definition identity and expected revision
+     * @param locale initialized client display locale
+     * @return authoritative operation state and localized diagnostics
+     */
+    public synchronized DefinitionOperationResult redoDefinition(DefinitionOperationParams params, Locale locale) {
+        return historyOperation(params, locale, false);
+    }
+
+    /**
+     * Invokes B2 source-preserving save for one authored definition.
+     *
+     * @param params definition identity and expected revision
+     * @param locale initialized client display locale
+     * @return authoritative operation state and localized diagnostics
+     */
+    public synchronized DefinitionOperationResult saveDefinition(DefinitionOperationParams params, Locale locale) {
+        return persistenceOperation(params, locale, true);
+    }
+
+    /**
+     * Invokes B2 authoritative revert for one authored definition.
+     *
+     * @param params definition identity and expected revision
+     * @param locale initialized client display locale
+     * @return authoritative operation state and localized diagnostics
+     */
+    public synchronized DefinitionOperationResult revertDefinition(DefinitionOperationParams params, Locale locale) {
+        return persistenceOperation(params, locale, false);
+    }
+
+    /**
+     * Captures the exact B3 recovery representation without interpreting it in the client.
+     *
+     * @param params definition identity and expected revision
+     * @return authoritative operation state and opaque recovery representation
+     */
+    public synchronized DefinitionBackupResult backupDefinition(DefinitionOperationParams params) {
+        ensureOpen();
+        DefinitionOperationParams validParams = Objects.requireNonNull(params, "params");
+        EditorProjectSession session = operationSession(validParams.expectedProjectGeneration());
+        if (session == null) {
+            return new DefinitionBackupResult(
+                    validParams.assetId(),
+                    "invalid-target",
+                    validParams.expectedDefinitionRevision(),
+                    false,
+                    false,
+                    false,
+                    null);
+        }
+        AuthoringBackupResult result =
+                session.backupDefinition(AssetId.from(validParams.assetId()), validParams.expectedDefinitionRevision());
+        return new DefinitionBackupResult(
+                result.definition().toString(),
+                serialized(result.outcome()),
+                result.revision(),
+                result.dirty(),
+                result.canUndo(),
+                result.canRedo(),
+                result.backup()
+                        .map(backup -> Base64.getEncoder().encodeToString(backup.encode()))
+                        .orElse(null));
+    }
+
+    /**
+     * Restores B3 recovery bytes into the newly loaded authoritative working copy.
+     *
+     * @param params definition identity, expected revision, and opaque recovery representation
+     * @param locale initialized client display locale
+     * @return authoritative operation state and localized diagnostics
+     */
+    public synchronized DefinitionOperationResult restoreDefinition(DefinitionRestoreParams params, Locale locale) {
+        ensureOpen();
+        DefinitionRestoreParams validParams = Objects.requireNonNull(params, "params");
+        Locale validLocale = Objects.requireNonNull(locale, "locale");
+        EditorProjectSession session = operationSession(validParams.expectedProjectGeneration());
+        if (session == null) {
+            return operationFailure(validParams.assetId(), validParams.expectedDefinitionRevision());
+        }
+        byte[] backup = Base64.getDecoder().decode(validParams.backup());
+        AuthoringRestoreResult result = session.restoreDefinition(
+                AssetId.from(validParams.assetId()), validParams.expectedDefinitionRevision(), backup);
+        return operationResult(result, validLocale);
+    }
+
+    /**
      * Reads one complete generation- and revision-checked Inspector snapshot.
      *
      * @param params optimistic concurrency context and Java-issued target
@@ -422,6 +569,68 @@ public final class AuthoringProjectService implements AutoCloseable {
         return new InspectorTarget(kind, URI.create(target.source()), target.identity(), occurrence);
     }
 
+    /** Maps one mutation target that was previously issued in an Inspector snapshot. */
+    private static InspectorMutationTarget mutationTarget(DefinitionMutationParams.MutationTarget target) {
+        HierarchyOccurrenceId occurrence = new HierarchyOccurrenceId(
+                AssetId.from(target.occurrence().definitionAssetId()),
+                target.occurrence().entityPath().stream().map(EntityId::from).toList());
+        EntityId entity = EntityId.from(target.entityId());
+        return switch (target.kind()) {
+            case "entity-enabled" -> new InspectorMutationTarget.EntityEnabled(occurrence, entity);
+            case "component-property" ->
+                new InspectorMutationTarget.ComponentProperty(
+                        occurrence,
+                        entity,
+                        ComponentId.from(Objects.requireNonNull(target.componentId(), "componentId")),
+                        new PropertyId(Objects.requireNonNull(target.propertyId(), "propertyId")));
+            default -> throw new IllegalArgumentException("Unsupported mutation target kind: " + target.kind());
+        };
+    }
+
+    /** Maps an exact supported scalar transport candidate without binary floating-point conversion. */
+    private static ProjectValue projectValue(DefinitionMutationParams.CandidateValue value) {
+        return switch (value.kind()) {
+            case "boolean" -> new ProjectValue.BooleanValue(Objects.requireNonNull(value.value(), "value"));
+            case "integer", "number" ->
+                new ProjectValue.NumberValue(new BigDecimal(Objects.requireNonNull(value.literal(), "literal")));
+            case "text" -> new ProjectValue.TextValue(Objects.requireNonNull(value.literal(), "literal"));
+            default -> throw new IllegalArgumentException("Unsupported mutation candidate kind: " + value.kind());
+        };
+    }
+
+    /** Returns a structured authoritative rejection for malformed exact numeric transport text. */
+    private DefinitionOperationResult invalidNumericLiteral(
+            EditorProjectSession session,
+            AssetId definition,
+            InspectorMutationTarget target,
+            DefinitionMutationParams params,
+            Locale locale) {
+        DefinitionMutationParams.CandidateValue candidate = Objects.requireNonNull(params.value(), "value");
+        URI source = session.retainDefinition(definition)
+                .definition()
+                .map(EditorRetainedDefinition::source)
+                .orElseGet(() -> session.project().root().toUri());
+        String property = target
+                        instanceof
+                        InspectorMutationTarget.ComponentProperty(
+                                var occurrence,
+                                var entity,
+                                var component,
+                                PropertyId propertyId)
+                ? propertyId.toString()
+                : "enabled";
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR,
+                PropertyValidationDiagnosticCode.KIND,
+                source,
+                "",
+                List.of(property, candidate.kind().toUpperCase(Locale.ROOT), "invalid numeric literal"),
+                Map.of("candidateKind", candidate.kind(), "technicalDetail", "numeric literal could not be parsed"));
+        AuthoringMutationResult result =
+                session.rejectMutation(definition, target, params.expectedDefinitionRevision(), List.of(diagnostic));
+        return operationResult(result, locale);
+    }
+
     /** Maps a domain projection to the explicit locale-resolved Inspector wire snapshot. */
     private static InspectorSnapshot inspectorSnapshot(long revision, InspectorProjection projection, Locale locale) {
         return new InspectorSnapshot(
@@ -501,7 +710,8 @@ public final class AuthoringProjectService implements AutoCloseable {
                                 .orElse(null),
                         state.origin().name().toLowerCase(Locale.ROOT),
                         state.validity().name().toLowerCase(Locale.ROOT).replace('_', '-'),
-                        state.editable()),
+                        state.editable(),
+                        state.modified()),
                 property.mutationTarget()
                         .map(AuthoringProjectService::mutationTarget)
                         .orElse(null));
@@ -516,53 +726,63 @@ public final class AuthoringProjectService implements AutoCloseable {
     private static InspectorSnapshot.Value inspectorValue(InspectorValue value, Locale locale) {
         return switch (value) {
             case InspectorValue.NullValue ignored -> new InspectorSnapshot.NullValue("null");
-            case InspectorValue.BooleanValue booleanValue ->
-                new InspectorSnapshot.BooleanValue("boolean", booleanValue.value());
-            case InspectorValue.NumberValue number ->
-                new InspectorSnapshot.NumberValue("number", number.value().toPlainString());
-            case InspectorValue.TextValue text -> new InspectorSnapshot.TextValue("text", text.value());
-            case InspectorValue.ArrayValue array ->
+            case InspectorValue.BooleanValue(boolean booleanValue) ->
+                new InspectorSnapshot.BooleanValue("boolean", booleanValue);
+            case InspectorValue.NumberValue(BigDecimal number) ->
+                new InspectorSnapshot.NumberValue("number", number.toPlainString());
+            case InspectorValue.TextValue(String text) -> new InspectorSnapshot.TextValue("text", text);
+            case InspectorValue.ArrayValue(List<InspectorValue> entries) ->
                 new InspectorSnapshot.ArrayValue(
                         "array",
-                        array.values().stream()
+                        entries.stream()
                                 .map(entry -> inspectorValue(entry, locale))
                                 .toList());
-            case InspectorValue.ObjectValue object -> {
+            case InspectorValue.ObjectValue(Map<String, InspectorValue> entries) -> {
                 LinkedHashMap<String, InspectorSnapshot.Value> values = new LinkedHashMap<>();
-                object.values().forEach((key, entry) -> values.put(key, inspectorValue(entry, locale)));
+                entries.forEach((key, entry) -> values.put(key, inspectorValue(entry, locale)));
                 yield new InspectorSnapshot.ObjectValue("object", values);
             }
-            case InspectorValue.ReferenceValue reference ->
+            case InspectorValue.ReferenceValue(
+                    ResourceReference reference,
+                    AuthoringText label,
+                    InspectorValue.Resolution referenceResolution,
+                    Optional<URI> revealUri) ->
                 new InspectorSnapshot.ReferenceValue(
                         "reference",
-                        serialized(reference.reference().kind()),
-                        reference.reference().locator(),
-                        resolve(reference.label(), locale),
-                        resolution(reference.resolution()),
-                        reference.revealUri().map(Object::toString).orElse(null));
-            case InspectorValue.EntityTargetValue entity ->
+                        serialized(reference.kind()),
+                        reference.locator(),
+                        resolve(label, locale),
+                        resolution(referenceResolution),
+                        revealUri.map(Object::toString).orElse(null));
+            case InspectorValue.EntityTargetValue(
+                    EntityId entity,
+                    AuthoringText label,
+                    InspectorValue.Resolution targetResolution,
+                    Optional<HierarchyOccurrenceId> targetOccurrence) ->
                 new InspectorSnapshot.EntityTargetValue(
                         "entity-target",
-                        entity.entity().toString(),
-                        resolve(entity.label(), locale),
-                        resolution(entity.resolution()),
-                        entity.occurrence()
+                        entity.toString(),
+                        resolve(label, locale),
+                        resolution(targetResolution),
+                        targetOccurrence
                                 .map(AuthoringProjectService::occurrence)
                                 .orElse(null));
-            case InspectorValue.ComponentTargetValue component ->
+            case InspectorValue.ComponentTargetValue(
+                    ComponentTarget target,
+                    AuthoringText entityLabel,
+                    AuthoringText componentLabel,
+                    Optional<ComponentType> targetType,
+                    InspectorValue.Resolution targetResolution,
+                    Optional<HierarchyOccurrenceId> targetOccurrence) ->
                 new InspectorSnapshot.ComponentTargetValue(
                         "component-target",
-                        component.target().entity().toString(),
-                        component.target().component().toString(),
-                        resolve(component.entityLabel(), locale),
-                        resolve(component.componentLabel(), locale),
-                        component
-                                .componentType()
-                                .map(AuthoringProjectService::componentType)
-                                .orElse(null),
-                        resolution(component.resolution()),
-                        component
-                                .occurrence()
+                        target.entity().toString(),
+                        target.component().toString(),
+                        resolve(entityLabel, locale),
+                        resolve(componentLabel, locale),
+                        targetType.map(AuthoringProjectService::componentType).orElse(null),
+                        resolution(targetResolution),
+                        targetOccurrence
                                 .map(AuthoringProjectService::occurrence)
                                 .orElse(null));
         };
@@ -571,18 +791,20 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Maps one future mutation identity without exposing implementation classes. */
     private static InspectorSnapshot.MutationTarget mutationTarget(InspectorMutationTarget target) {
         return switch (target) {
-            case InspectorMutationTarget.EntityEnabled entity ->
+            case InspectorMutationTarget.EntityEnabled(HierarchyOccurrenceId occurrence, EntityId entity) ->
                 new InspectorSnapshot.EntityEnabledMutation(
-                        "entity-enabled",
-                        occurrence(entity.occurrence()),
-                        entity.entity().toString());
-            case InspectorMutationTarget.ComponentProperty property ->
+                        "entity-enabled", occurrence(occurrence), entity.toString());
+            case InspectorMutationTarget.ComponentProperty(
+                    HierarchyOccurrenceId occurrence,
+                    EntityId entity,
+                    ComponentId component,
+                    PropertyId property) ->
                 new InspectorSnapshot.ComponentPropertyMutation(
                         "component-property",
-                        occurrence(property.occurrence()),
-                        property.entity().toString(),
-                        property.component().toString(),
-                        property.property().value());
+                        occurrence(occurrence),
+                        entity.toString(),
+                        component.toString(),
+                        property.value());
         };
     }
 
@@ -611,17 +833,102 @@ public final class AuthoringProjectService implements AutoCloseable {
         return resolution.name().toLowerCase(Locale.ROOT);
     }
 
+    /** Applies one history operation after generation validation. */
+    private DefinitionOperationResult historyOperation(DefinitionOperationParams params, Locale locale, boolean undo) {
+        ensureOpen();
+        DefinitionOperationParams validParams = Objects.requireNonNull(params, "params");
+        Locale validLocale = Objects.requireNonNull(locale, "locale");
+        EditorProjectSession session = operationSession(validParams.expectedProjectGeneration());
+        if (session == null) {
+            return operationFailure(validParams.assetId(), validParams.expectedDefinitionRevision());
+        }
+        AssetId definition = AssetId.from(validParams.assetId());
+        AuthoringMutationResult result = undo
+                ? session.undo(definition, validParams.expectedDefinitionRevision())
+                : session.redo(definition, validParams.expectedDefinitionRevision());
+        return operationResult(result, validLocale);
+    }
+
+    /** Applies one persistence operation after generation validation. */
+    private DefinitionOperationResult persistenceOperation(
+            DefinitionOperationParams params, Locale locale, boolean save) {
+        ensureOpen();
+        DefinitionOperationParams validParams = Objects.requireNonNull(params, "params");
+        Locale validLocale = Objects.requireNonNull(locale, "locale");
+        EditorProjectSession session = operationSession(validParams.expectedProjectGeneration());
+        if (session == null) {
+            return operationFailure(validParams.assetId(), validParams.expectedDefinitionRevision());
+        }
+        AssetId definition = AssetId.from(validParams.assetId());
+        AuthoringPersistenceResult result = save
+                ? session.saveDefinition(definition, validParams.expectedDefinitionRevision())
+                : session.revertDefinition(definition, validParams.expectedDefinitionRevision());
+        return operationResult(result, validLocale);
+    }
+
+    /** Returns the current session only when the caller's project generation remains current. */
+    private @Nullable EditorProjectSession operationSession(long expectedProjectGeneration) {
+        return activeSession != null && activeProjectGeneration == expectedProjectGeneration ? activeSession : null;
+    }
+
+    /** Creates a deterministic operation rejection when project identity is no longer current. */
+    private static DefinitionOperationResult operationFailure(String assetId, long expectedRevision) {
+        return new DefinitionOperationResult(
+                assetId, "project-generation-conflict", expectedRevision, false, false, false, List.of());
+    }
+
+    /** Maps an authoritative mutation/history result to the wire contract. */
+    private DefinitionOperationResult operationResult(AuthoringMutationResult result, Locale locale) {
+        return new DefinitionOperationResult(
+                result.definition().toString(),
+                serialized(result.outcome()),
+                result.revision(),
+                result.dirty(),
+                result.canUndo(),
+                result.canRedo(),
+                diagnostics(result.diagnostics(), locale));
+    }
+
+    /** Maps an authoritative persistence result to the wire contract. */
+    private DefinitionOperationResult operationResult(AuthoringPersistenceResult result, Locale locale) {
+        return new DefinitionOperationResult(
+                result.definition().toString(),
+                serialized(result.outcome()),
+                result.revision(),
+                result.dirty(),
+                result.canUndo(),
+                result.canRedo(),
+                diagnostics(result.diagnostics(), locale));
+    }
+
+    /** Maps an authoritative recovery result to the wire contract. */
+    private DefinitionOperationResult operationResult(AuthoringRestoreResult result, Locale locale) {
+        return new DefinitionOperationResult(
+                result.definition().toString(),
+                serialized(result.outcome()),
+                result.revision(),
+                result.dirty(),
+                result.canUndo(),
+                result.canRedo(),
+                diagnostics(result.diagnostics(), locale));
+    }
+
+    /** Serializes closed Java enum outcomes independently of enum spelling. */
+    private static String serialized(Enum<?> outcome) {
+        return outcome.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
     /** Preserves authored literals and structured Java-owned semantic text. */
     private static DefinitionSnapshot.AuthoringTextDto text(AuthoringText value) {
         return switch (value) {
-            case AuthoringText.Literal literal ->
-                new DefinitionSnapshot.AuthoringTextDto("literal", literal.value(), null, List.of());
-            case AuthoringText.Message message ->
+            case AuthoringText.Literal(String literal) ->
+                new DefinitionSnapshot.AuthoringTextDto("literal", literal, null, List.of());
+            case AuthoringText.Message(String code, String defaultMessage, List<Object> arguments) ->
                 new DefinitionSnapshot.AuthoringTextDto(
                         "message",
-                        message.defaultMessage(),
-                        message.code(),
-                        message.arguments().stream().map(Object::toString).toList());
+                        defaultMessage,
+                        code,
+                        arguments.stream().map(Object::toString).toList());
         };
     }
 

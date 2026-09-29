@@ -59,6 +59,7 @@ public record InspectorProperty(
      * @param origin value provenance
      * @param validity current semantic validity
      * @param editable whether a future mutation may target this property
+     * @param modified whether the authored target differs from its persisted baseline
      */
     public record State(
             Optional<InspectorValue> authoredValue,
@@ -66,7 +67,8 @@ public record InspectorProperty(
             Optional<InspectorValue> effectiveValue,
             Origin origin,
             Validity validity,
-            boolean editable) {
+            boolean editable,
+            boolean modified) {
         /** Validates typed state. */
         public State {
             Objects.requireNonNull(authoredValue, "authoredValue");

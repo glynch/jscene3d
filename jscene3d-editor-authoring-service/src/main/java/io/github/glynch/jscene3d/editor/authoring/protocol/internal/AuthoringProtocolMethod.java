@@ -21,6 +21,20 @@ enum AuthoringProtocolMethod {
     PROJECT_CLOSE("project/close"),
     /** Resolves and retains a structural definition with its complete hierarchy snapshot. */
     DEFINITION_OPEN("definition/open"),
+    /** Applies one exact SET or REMOVE mutation. */
+    DEFINITION_MUTATE("definition/mutate"),
+    /** Restores the preceding accepted authored state. */
+    DEFINITION_UNDO("definition/undo"),
+    /** Reapplies the next previously undone authored state. */
+    DEFINITION_REDO("definition/redo"),
+    /** Persists current authored state through the B2 lifecycle. */
+    DEFINITION_SAVE("definition/save"),
+    /** Reloads authoritative authored state through the B2 lifecycle. */
+    DEFINITION_REVERT("definition/revert"),
+    /** Captures deterministic B3 recovery state. */
+    DEFINITION_BACKUP("definition/backup"),
+    /** Restores deterministic B3 recovery state. */
+    DEFINITION_RESTORE_BACKUP("definition/restoreBackup"),
     /** Reads one complete generation- and revision-checked Inspector snapshot. */
     INSPECTOR_READ("inspector/read"),
     /** Performs orderly service shutdown. */

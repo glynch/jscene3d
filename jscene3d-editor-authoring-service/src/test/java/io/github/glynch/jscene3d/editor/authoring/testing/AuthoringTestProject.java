@@ -24,6 +24,9 @@ public final class AuthoringTestProject {
     /** Stable reusable entity-definition identity for definition-opening tests. */
     public static final String DEFINITION_ASSET_ID = "4ccdb339-9c5b-47d3-9b18-9169be5e4936";
 
+    /** Stable scalar-component identity used by mutation tests. */
+    public static final String SCALAR_COMPONENT_ID = "635b219c-7604-4d6f-a021-664a7d609195";
+
     private AuthoringTestProject() {}
 
     /**
@@ -221,6 +224,61 @@ public final class AuthoringTestProject {
                       "type":"example.authoring-test/rotation",
                       "typeVersion":1,
                       "properties":{}
+                    }],
+                    "children":[]
+                  }]
+                }
+                """);
+    }
+
+    /**
+     * Writes a project containing each scalar property supported by the first editable Inspector slice.
+     *
+     * @param root fixture project root
+     * @throws IOException when fixture files cannot be written
+     */
+    public static void writeScalarPropertyProject(Path root) throws IOException {
+        write(root, DESCRIPTOR);
+        writeFile(root, "src/main/resources/META-INF/jscene3d/extension.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/extension-1.json",
+                  "schemaVersion":1,
+                  "id":"example.authoring-test",
+                  "version":"1.0.0",
+                  "engineRequires":">=0.1.0-SNAPSHOT <0.2.0",
+                  "displayName":"Authoring Test",
+                  "types":[],
+                  "components":[{
+                    "id":"example.authoring-test/scalars",
+                    "typeVersion":1,
+                    "displayName":"Scalars",
+                    "properties":[
+                      {"id":"visible","valueKind":"boolean","required":true,"displayName":"Visible"},
+                      {"id":"count","valueKind":"number","required":true,"displayName":"Count","editor":{"semantic":"integer","minimum":0}},
+                      {"id":"precision","valueKind":"number","required":true,"displayName":"Precision"},
+                      {"id":"title","valueKind":"text","required":true,"displayName":"Title"}
+                    ]
+                  }]
+                }
+                """);
+        writeFile(root, "worlds/main.world.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/world-definition-1.json",
+                  "assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656",
+                  "assetType":"world-definition",
+                  "formatVersion":1,
+                  "name":"Opening World",
+                  "connections":[],
+                  "roots":[{
+                    "entryType":"local",
+                    "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
+                    "name":"Player",
+                    "enabled":true,
+                    "components":[{
+                      "componentId":"635b219c-7604-4d6f-a021-664a7d609195",
+                      "type":"example.authoring-test/scalars",
+                      "typeVersion":1,
+                      "properties":{"visible":true,"count":1,"precision":1.25,"title":"Player"}
                     }],
                     "children":[]
                   }]

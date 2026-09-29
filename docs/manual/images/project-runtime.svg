@@ -1,63 +1,83 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 720" role="img" aria-labelledby="title description">
-  <title id="title">JScene3D desktop and editor project pipelines</title>
-  <desc id="description">Authored project files and safe descriptors feed separate executable and editor pipelines. The executable path loads runtime extensions and produces an active world. The editor path uses inert implementations and produces a preview world.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 850" role="img" aria-labelledby="title description">
+  <title id="title">From JScene3D project content to a live world</title>
+  <desc id="description">The JScene3D descriptor, authored definitions, and published imports converge on ProjectRuntimeHost. The host produces a HostedProject containing an inactive World. Activating it produces a live World.</desc>
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L0,6 L9,3 z" fill="#536878"/>
+    <marker id="runtime-arrow" markerWidth="11" markerHeight="11" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,8 L10,4 z" fill="#526277"/>
     </marker>
     <style>
-      .label { font: 600 18px system-ui, sans-serif; fill: #17202a; }
-      .detail { font: 14px system-ui, sans-serif; fill: #34495e; }
-      .lane { font: 700 21px system-ui, sans-serif; fill: #17202a; }
-      .box { stroke-width: 3; rx: 12; }
-      .arrow { fill: none; stroke: #536878; stroke-width: 3; marker-end: url(#arrow); }
+      .title { font: 700 24px system-ui, sans-serif; fill: #172033; }
+      .detail { font: 500 18px system-ui, sans-serif; fill: #526277; }
+      .input-card { fill: #ffffff; stroke: #cbd4e1; stroke-width: 2; }
+      .flow { fill: none; stroke: #526277; stroke-width: 4; stroke-linecap: round; marker-end: url(#runtime-arrow); }
+      .icon-line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
     </style>
   </defs>
-  <rect width="1220" height="720" fill="#f7f9fb"/>
-  <line x1="320" y1="360" x2="1180" y2="360" stroke="#c9d2d9" stroke-width="2"/>
-  <text class="lane" x="350" y="45">Executable project</text>
-  <text class="lane" x="350" y="405">Editor preview</text>
-  <rect class="box" x="35" y="90" width="240" height="150" fill="#fff2cc" stroke="#bf9000"/>
-  <text class="label" x="155" y="128" text-anchor="middle">Authored project</text>
-  <text class="detail" x="155" y="162" text-anchor="middle">Manifest + definitions</text>
-  <text class="detail" x="155" y="188" text-anchor="middle">Assets + imports</text>
-  <text class="detail" x="155" y="214" text-anchor="middle">Launch configuration</text>
-  <rect class="box" x="35" y="480" width="240" height="130" fill="#d9d2e9" stroke="#674ea7"/>
-  <text class="label" x="155" y="518" text-anchor="middle">Extension descriptors</text>
-  <text class="detail" x="155" y="552" text-anchor="middle">Safe schemas</text>
-  <text class="detail" x="155" y="578" text-anchor="middle">Capabilities + actions</text>
-  <rect class="box" x="350" y="90" width="225" height="110" fill="#fce5cd" stroke="#b45f06"/>
-  <text class="label" x="462" y="132" text-anchor="middle">Runtime extensions</text>
-  <text class="detail" x="462" y="165" text-anchor="middle">Java implementations</text>
-  <rect class="box" x="350" y="235" width="225" height="90" fill="#cfe2f3" stroke="#0b5394"/>
-  <text class="label" x="462" y="272" text-anchor="middle">ProjectRuntimeHost</text>
-  <text class="detail" x="462" y="300" text-anchor="middle">Loads + composes</text>
-  <rect class="box" x="660" y="190" width="205" height="100" fill="#d9ead3" stroke="#38761d"/>
-  <text class="label" x="762" y="229" text-anchor="middle">HostedProject</text>
-  <text class="detail" x="762" y="258" text-anchor="middle">Inactive World</text>
-  <rect class="box" x="950" y="190" width="220" height="100" fill="#ead1dc" stroke="#a64d79"/>
-  <text class="label" x="1060" y="229" text-anchor="middle">Desktop player</text>
-  <text class="detail" x="1060" y="258" text-anchor="middle">Activates + advances World</text>
-  <rect class="box" x="350" y="465" width="225" height="90" fill="#cfe2f3" stroke="#0b5394"/>
-  <text class="label" x="462" y="502" text-anchor="middle">EditorProjectLoader</text>
-  <text class="detail" x="462" y="530" text-anchor="middle">Read-only project state</text>
-  <rect class="box" x="660" y="465" width="205" height="90" fill="#d0e0e3" stroke="#45818e"/>
-  <text class="label" x="762" y="502" text-anchor="middle">EditorWorldPreview</text>
-  <text class="detail" x="762" y="530" text-anchor="middle">Inert composition</text>
-  <rect class="box" x="950" y="465" width="220" height="90" fill="#d0e0e3" stroke="#45818e"/>
-  <text class="label" x="1060" y="502" text-anchor="middle">Editor</text>
-  <text class="detail" x="1060" y="530" text-anchor="middle">Inspects Preview World</text>
-  <rect class="box" x="350" y="610" width="225" height="70" fill="#e8eef2" stroke="#607d8b"/>
-  <text class="label" x="462" y="640" text-anchor="middle">Inert implementations</text>
-  <text class="detail" x="462" y="663" text-anchor="middle">Safe behavior substitutes</text>
-  <path class="arrow" d="M275 150 C310 150 315 265 350 275"/>
-  <path class="arrow" d="M275 520 C310 520 315 300 350 285"/>
-  <path class="arrow" d="M462 200 L462 235"/>
-  <path class="arrow" d="M575 280 L660 240"/>
-  <path class="arrow" d="M865 240 L950 240"/>
-  <path class="arrow" d="M275 170 C315 260 300 485 350 505"/>
-  <path class="arrow" d="M275 545 L350 520"/>
-  <path class="arrow" d="M575 510 L660 510"/>
-  <path class="arrow" d="M575 645 C625 645 610 545 660 525"/>
-  <path class="arrow" d="M865 510 L950 510"/>
+
+  <rect width="1200" height="850" rx="24" fill="#f7f9fc"/>
+
+  <g aria-label="JScene3D descriptor input">
+    <rect class="input-card" x="55" y="55" width="330" height="135" rx="18"/>
+    <rect x="55" y="55" width="330" height="6" rx="3" fill="#755ee8"/>
+    <rect x="82" y="94" width="58" height="58" rx="14" fill="#f0edff" stroke="#755ee8" stroke-width="2"/>
+    <path class="icon-line" d="M101 106 H119 L130 117 V140 H101 Z M119 106 V117 H130 M108 126 H123 M108 134 H120" stroke="#6248d8"/>
+    <text class="title" x="160" y="130">.j3d descriptor</text>
+  </g>
+
+  <g aria-label="Authored definitions input">
+    <rect class="input-card" x="435" y="55" width="330" height="135" rx="18"/>
+    <rect x="435" y="55" width="330" height="6" rx="3" fill="#18877f"/>
+    <rect x="462" y="94" width="58" height="58" rx="14" fill="#e9f8f5" stroke="#18877f" stroke-width="2"/>
+    <path class="icon-line" d="M478 110 H505 V136 H478 Z M484 116 H499 M484 123 H499 M484 130 H495 M473 115 H478 M473 132 H478" stroke="#126e68"/>
+    <text class="title" x="540" y="130">Authored definitions</text>
+  </g>
+
+  <g aria-label="Published imports input">
+    <rect class="input-card" x="815" y="55" width="330" height="135" rx="18"/>
+    <rect x="815" y="55" width="330" height="6" rx="3" fill="#c87924"/>
+    <rect x="842" y="94" width="58" height="58" rx="14" fill="#fff5e8" stroke="#c87924" stroke-width="2"/>
+    <path class="icon-line" d="M855 116 L871 107 L887 116 L871 125 Z M855 116 V134 L871 143 L887 134 V116 M871 125 V143" stroke="#a85f16"/>
+    <text class="title" x="920" y="130">Published imports</text>
+  </g>
+
+  <path class="flow" d="M220 190 C220 250 425 242 455 300"/>
+  <path class="flow" d="M600 190 V300"/>
+  <path class="flow" d="M980 190 C980 250 775 242 745 300"/>
+
+  <g aria-label="Project runtime host">
+    <rect x="330" y="300" width="540" height="125" rx="22" fill="#f0edff" stroke="#755ee8" stroke-width="3"/>
+    <circle cx="402" cy="362" r="34" fill="#ffffff" stroke="#755ee8" stroke-width="2"/>
+    <circle cx="402" cy="349" r="6" fill="#755ee8"/>
+    <circle cx="389" cy="372" r="6" fill="#755ee8"/>
+    <circle cx="415" cy="372" r="6" fill="#755ee8"/>
+    <path d="M398 354 L392 366 M406 354 L412 366 M395 372 H409" fill="none" stroke="#6248d8" stroke-width="2.5"/>
+    <text class="title" x="455" y="370">ProjectRuntimeHost</text>
+  </g>
+
+  <path class="flow" d="M600 425 V480"/>
+
+  <g aria-label="Hosted project with inactive world">
+    <rect x="390" y="480" width="420" height="115" rx="20" fill="#ffffff" stroke="#8390a3" stroke-width="2.5"/>
+    <rect x="418" y="509" width="58" height="58" rx="15" fill="#edf3f8" stroke="#8390a3" stroke-width="2"/>
+    <path class="icon-line" d="M432 524 H462 V552 H432 Z M438 518 H468 V546 H462 M432 530 H462" stroke="#526277"/>
+    <text class="title" x="500" y="531">HostedProject</text>
+    <text class="detail" x="500" y="564">+ inactive World</text>
+  </g>
+
+  <path class="flow" d="M600 595 V640"/>
+
+  <g aria-label="Activate">
+    <rect x="510" y="640" width="180" height="54" rx="27" fill="#fff5e8" stroke="#c87924" stroke-width="2.5"/>
+    <path d="M548 656 L561 667 L548 678 Z" fill="#a85f16"/>
+    <text class="title" x="580" y="675">Activate</text>
+  </g>
+
+  <path class="flow" d="M600 694 V735"/>
+
+  <g aria-label="Live world">
+    <rect x="390" y="735" width="420" height="90" rx="20" fill="#e9f8f5" stroke="#18877f" stroke-width="3"/>
+    <circle cx="447" cy="780" r="21" fill="#ffffff" stroke="#18877f" stroke-width="2"/>
+    <path d="M433 780 H461 M447 766 C440 773 440 787 447 794 M447 766 C454 773 454 787 447 794 M435 772 C443 776 451 776 459 772 M435 788 C443 784 451 784 459 788" fill="none" stroke="#126e68" stroke-width="2" stroke-linecap="round"/>
+    <text class="title" x="490" y="789">Live World</text>
+  </g>
 </svg>

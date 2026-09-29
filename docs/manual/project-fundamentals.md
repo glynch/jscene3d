@@ -15,122 +15,158 @@ The distinction between these pairs is fundamental:
 | Rendering concept | Project and game concept |
 | --- | --- |
 | `Scene` | `World` |
-| `Object3D` | `Entity` with a spatial component |
+| `Object3D` | `Entity` with a `Transform3d` component |
 | `Mesh` | Rendering component attached to an entity |
 | Direct Java construction | `WorldDefinition` and `EntityDefinition` assets |
-| Renderer frame | Scheduled world behavior followed by presentation |
+| Renderer frame loop | World lifecycle, fixed simulation, and frame updates |
 
 A `Scene` is the root of the objects needed to draw an image. A `World` owns
-live entities, behavior, physics, audio, presentation modules, and runtime
-resources. A world can therefore produce a renderer scene, but the two terms
-are not interchangeable.
+the live entity hierarchy, component values, runtime resources, and host-supplied
+world modules. Spatial and presentation components can drive renderer objects,
+but a `World` is not a `Scene`, and an `Entity` is not an `Object3D`.
 
 ## From files to a running world
 
-![A project manifest, assets, and descriptors are loaded into a hosted project and composed into a live world.](images/project-runtime.svg)
+![Project files flow through ProjectRuntimeHost into an activated world.](images/project-runtime.svg)
 
 The principal stages are:
 
-1. A project manifest identifies the project, startup world, extensions,
-   assets, and launch presentation.
-2. Extension descriptors declare component types and their schemas without
-   requiring the editor to load application implementation classes.
-3. Import definitions publish source data into stable project assets.
-4. A `WorldDefinition` describes root entities and reusable definition
-   placements.
-5. For execution, `ProjectRuntimeHost` loads runtime extensions, validates the
-   project, and composes a `HostedProject` containing an inactive `World`.
-6. The desktop player activates that world, then its runtime modules update
-   behavior and present through rendering, audio, physics, and UI services.
-7. The editor instead uses `EditorProjectLoader` to create read-only editor
-   state and `EditorWorldPreview` to compose a separate world with inert
-   behavior and safe presentation implementations.
+1. The project-named `.j3d` descriptor identifies the project, engine
+   compatibility, entry and optional startup worlds, input map, extensions,
+   source assets, imports, and launch presentation.
+2. `ProjectLoader` locates and validates that descriptor as a `GameProject`
+   without loading executable extensions or running import providers.
+3. Extension descriptors provide safe type and component metadata. The asset
+   catalog identifies authored definitions, while the selected runtime
+   environment combines them with generated definitions and resources from
+   previously published imports.
+4. `ProjectRuntimeHost` discovers trusted runtime extensions, creates
+   host-selected world modules, and asks `WorldComposer` to compose the chosen
+   `WorldDefinition`.
+5. Successful composition returns a `HostedProject` containing project
+   metadata, its asset catalog, the launch request, and an inactive `World`.
+6. The manifest-selected application runtime extension may prepare that
+   project before the desktop runner activates and advances the world.
+
+Importing and execution remain separate. Import tools can run format-specific
+providers and atomically publish generated definitions or resources. Runtime
+loading reads those published generations without rediscovering or executing
+the import providers.
 
 ## Entities and components
 
-There is one runtime `Entity` type. An entity intrinsically owns identity,
-enabled state, components, child entities, and lifecycle. Rendering, physics,
-audio, animation, and game rules are supplied by components rather than entity
-subclasses.
+There is one runtime `Entity` interface rather than a hierarchy of
+game-specific entity subclasses. Each live entity has stable authored and
+runtime identity, enabled state, components, owned children, and an owning
+`World`. Rendering, physics, audio, animation, and game rules are supplied by
+components.
 
 Use a component when a capability shares the entity's identity, transform, and
 lifetime. Use a child entity when something needs an independent transform,
 identity, lifecycle, component set, or reusable definition.
 
-The hierarchy expresses ownership. Spatial inheritance is provided through a
-compatible spatial component such as `Transform3d`; it is not an unconditional
+The hierarchy expresses ownership. Spatial inheritance is provided by a
+compatible component such as `Transform3d`; it is not an unconditional
 property of every entity.
 
 ## Definitions are authored; worlds are live
 
-An `EntityDefinition` is an immutable, reusable, single-root entity hierarchy.
-Placing the same definition several times creates independent live entities
-that share authored intent rather than mutable runtime state.
+`WorldDefinition` and `EntityDefinition` are immutable authored data. `World`
+and `Entity` are live runtime state.
 
-A `WorldDefinition` contains world settings and any number of root entries. A
-root entry may be authored directly in that world or may place an
-`EntityDefinition`.
+An `EntityDefinition` is a reusable, single-root entity hierarchy with an
+optional exported contract and internal signal/action connections. Placing the
+same definition several times creates independent live entities that share
+authored intent rather than mutable runtime state.
 
-Loading a definition does not execute it. Instantiating or spawning it creates
-live entities. This separation lets the editor inspect and validate authored
-content without starting the game.
+A `WorldDefinition` has a stable identity, display name, internal connections,
+and any number of root entries. A root entry may be a locally authored entity
+or a placement of an `EntityDefinition`.
+
+Loading a definition does not execute it. Composition constructs an inactive
+world and its component values; activation begins lifecycle participation.
+Spawning a prepared entity definition creates additional live entities. This
+separation lets authoring tools inspect and validate definitions without
+starting the game.
 
 ## Descriptors and runtime implementations
 
-A component descriptor supplies stable, editor-readable metadata:
+An `ExtensionDescriptor` is inert metadata for an extension's registered
+types, components, and project settings. A component descriptor supplies:
 
-- a namespaced component type and schema version;
+- a namespaced component type and configuration version;
 - typed properties with defaults and constraints;
-- provided and required capabilities;
-- signals and actions;
-- spatial and scheduling participation;
-- the seam used to locate its runtime implementation.
+- signals, actions, and provided or required capabilities;
+- multiplicity, conflicts, and spatial attachments;
+- spatial, lifecycle, and deterministic update participation.
 
 Serialized project data refers to those stable identifiers, never to a Java
-implementation class name. The editor therefore needs the descriptor metadata
-for a game extension, not every possible game's implementation classes on its
-own classpath.
+implementation class name. Authoring tools therefore need the descriptor
+metadata for an extension, not the extension's executable implementation
+classes.
 
-When an application runs, a runtime extension registers the Java factories and
-services that implement its descriptors. Doomed Corridors can consequently own
-specialized enemy, weapon, door, floor, HUD, and menu behavior without adding
-those concepts to the general JScene3D engine or editor.
+When an application runs, a `ComponentRuntimeExtension` with the same stable
+extension identity registers the trusted Java factories that implement those
+descriptors. The application extension selected by the project descriptor can
+also prepare the composed project before activation. Doomed Corridors can
+consequently own specialized enemy, weapon, door, floor, HUD, and menu behavior
+without adding those concepts to the general JScene3D engine or editor.
 
 ## Capabilities connect components
 
 Components depend on semantic capabilities rather than concrete sibling
 classes. A transform component can provide a spatial capability, while a mesh
-renderer or collider requires it. The composer validates these relationships
-before the world becomes active.
+renderer or collider requires it. A required capability resolves to exactly
+one provider on the same entity, and the composer validates these relationships
+before publishing the inactive world.
 
 Capabilities preserve composition while avoiding a global service locator and
 avoiding direct knowledge of project-specific implementation classes.
 
-## Loading, previewing, and playing
+## Authoring stays separate from runtime
 
-The desktop player and editor consume the same authored project but use it for
-different purposes:
+The current editor boundary is:
 
-- The desktop player loads runtime implementations, activates behavior, accepts
-  input, and advances the world.
-- The editor loads safe descriptors and authored assets, then composes an inert
-  presentation preview without executing application behavior.
+```text
+Code OSS frontend
+        ↓ authoring protocol
+Java authoring service
+        ↓
+EditorProjectLoader / EditorProjectSession
+```
+
+The frontend delegates project and definition semantics to the persistent,
+headless Java authoring service. `EditorProjectLoader` loads the `.j3d`
+descriptor, project settings, safe extension descriptors, authored assets,
+import definitions, and already-published generated content. It does not load
+runtime extensions, execute arbitrary game implementation code, or construct
+an active runtime `World`.
+
+An `EditorProjectSession` exposes project metadata, diagnostics, hierarchy and
+Inspector projections, and authoritative state for retained definitions.
+Authored definitions use source-preserving working copies whose edits and
+validation remain owned by Java. Generated definitions are retained as
+read-only content. The Code OSS frontend presents this state and sends semantic
+authoring requests; it does not reimplement the project model.
+
+Runtime execution follows the separate `ProjectRuntimeHost` path, where trusted
+runtime extensions are loaded and a live world is composed and activated.
 
 This is why a Doomed Corridors map can appear in the editor even though the
 editor itself does not contain `DoomPlayerState`, `DoomDoorInteractor`, or any
 other title-specific component class.
 
-## Launch requests and playtest profiles
+## Desktop launches and playtest profiles
 
-A `ProjectLaunchRequest` describes the intent for one load operation. A normal
-request uses the project's standard entry world and parameters. A playtest
-request may select a named profile, choose a particular world, or supply local
-overrides such as a test spawn or invulnerability.
+A `ProjectLaunchRequest` selects the world and portable parameters for one
+runtime load. A standard request lets the descriptor choose the startup or
+entry world. A playtest request records a named profile, a project-relative
+world-definition path, and application-defined parameters.
 
-A `PlaytestProfile` is a reusable development preset. It is configuration from
-which a launch request can be constructed; it is not part of normal public game
-state. A future editor "Play from here" action can construct the same kind of
-request using its current world and camera position.
+A `PlaytestProfile` is a reusable local-development preset loaded from
+`playtest/profiles.json`; it is not exported project state. The desktop launcher
+currently resolves an optionally selected profile into a `ProjectLaunchRequest`
+before asking `ProjectRuntimeHost` to load the project.
 
 ## Deciding where code belongs
 
@@ -139,8 +175,10 @@ When introducing a feature, ask which layer owns the concept:
 - Put general rendering objects and algorithms in the renderer or core
   modules.
 - Put genre-independent game facilities in `jscene3d-game`.
-- Put project loading, descriptors, composition, and editor-safe metadata in
-  the project modules.
+- Put descriptors, authored data, imports, and runtime composition in the
+  focused project modules.
+- Put authoritative authoring semantics in the headless Java authoring layer
+  and editor presentation and interaction in the Code OSS frontend.
 - Put title-specific rules and component implementations in the game
   application or its extension.
 - Put content choices, configured properties, and placements in authored

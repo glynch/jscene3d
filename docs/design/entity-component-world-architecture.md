@@ -1,1220 +1,616 @@
 # Entity-component world architecture
 
-Status: accepted baseline for the first Beacon Garden implementation
-
-This document defines JScene3D's project-facing authoring and runtime model. It
-records the decisions made during the September 2026 architecture review.
-Names explicitly described as provisional remain open to refinement; the
-semantics are the implementation baseline.
-
-The design is deliberately no larger than the first useful implementation. It
-must support Beacon Garden now and remain suitable for Doomed Corridors and
-other 2D, 3D, and UI-based games. Features that are not required to establish
-that foundation are listed as deferred rather than designed speculatively.
-
-## Design references and constraints
-
-Godot and Unity are references, not specifications. Godot demonstrates the
-value of reusable hierarchical scenes, explicit physics objects with multiple
-shapes, and signals. Unity demonstrates the value of composing an object from
-independent components. JScene3D combines the useful parts without preserving
-either product's public model one-for-one.
-
-The current private codebase and provisional project formats are not
-compatibility constraints. This is the point at which to choose the coherent
-model and replace code that assumes a different one.
-
-The architecture must make these cases natural:
-
-- author a unique entity directly in a world;
-- place the same reusable definition many times with independent state;
-- spawn a prepared definition during gameplay;
-- attach a weapon to an exported skeleton attachment point;
-- import a glTF scene without creating a second public model hierarchy;
-- author rendering and collision independently;
-- give one collision object several independently transformed shapes;
-- inspect live runtime-created entities without saving them as authored
-  placements;
-- represent a bullet as an entity while allowing a particle system to manage
-  thousands of non-entity particle records internally;
-- represent Doomed Corridors' player, projectiles, pickups, doors, enemies,
-  level collision, and imported presentation using the same concepts.
-
-## Architectural summary
-
-JScene3D uses a hierarchical entity-component object architecture. It is not a
-data-oriented ECS contract.
-
-- `Entity` supplies runtime identity, ownership, enabled state, and component
-  composition.
-- Components supply spatial, rendering, physics, audio, animation, and game
-  behavior capabilities.
-- The entity hierarchy defines ownership and lifecycle. Compatible spatial
-  relationships normally follow it, but spatial attachment is a separate
-  relationship when required.
-- `EntityDefinition` is an immutable, reusable, single-root authored asset.
-- `WorldDefinition` is an authored asset containing world settings and any
-  number of root entity records or definition placements.
-- `World` is the runtime composition root. It owns root entities and runtime
-  modules such as physics, audio, rendering, scheduling, and resources. It is
-  not an entity and is not a JVM-global singleton.
-- Definitions are inert. Placing or spawning a definition creates live
-  entities; importing or loading a definition does not.
-- Static placement and dynamic spawning share one validation, composition,
-  resource, and lifecycle implementation.
-- The runtime may compile the model into dense or backend-specific structures,
-  but those structures are not part of the authoring interface.
-
-The canonical public terms are `Entity`, `Component`, `EntityDefinition`,
-`WorldDefinition`, `World`, `Asset`, and `Runtime Resource`. Avoid using `Node`,
-`SceneDefinition`, `Prefab`, `Controller`, or `ModelInstance3d` as synonyms.
-The existing renderer-level `Scene` and `Object3D` remain lower-level graphics
-concepts rather than the game-authoring model.
-
-## Authored asset model
-
-### Asset
-
-`Asset` is the umbrella term for independently stored and addressable project
-content. Asset kinds initially include:
-
-- `ProjectManifest`;
-- `WorldDefinition`;
-- `EntityDefinition`;
-- meshes, materials, textures, animation clips, audio, and collision-shape
-  assets;
-- source assets and import recipes where the existing import architecture
-  requires them.
-
-All asset kinds use the same typed persistent reference model. Code may express
-this as `AssetRef<T>`; the Java name is less important than the invariant that
-the expected asset kind is known and validated.
-
-An asset is not the same thing as its loaded runtime value. `Runtime Resource`
-is the loaded, shareable representation used by a `World` or its modules.
-
-### ProjectManifest
-
-The project manifest is descriptive and operational project metadata. It is
-not instantiated as a runtime entity. Initially it contains:
-
-- project identity and schema version;
-- the startup `WorldDefinition` reference;
-- enabled engine modules and game-module entry points;
-- asset roots and build/import configuration;
-- project-wide display and runtime defaults;
-- descriptive, legal, and compatibility metadata already required by the
-  project loader.
-
-World and entity content are referenced assets rather than embedded in the
-manifest. Loading untrusted manifest metadata remains separate from executing
-game code or importers.
-
-### WorldDefinition
-
-A `WorldDefinition` describes one runtime `World`. It contains world settings
-and zero or more root entries. A root entry is either:
-
-- an entity authored locally in that world; or
-- a placement of an `EntityDefinition`.
-
-Multiple root entities are valid. The editor must not invent a visible root
-entity merely to hold them. If a game needs a global behavior object, it authors
-an ordinary root entity with the relevant components.
-
-### EntityDefinition
-
-An `EntityDefinition` is an immutable, reusable, single-root entity hierarchy.
-It may contain:
-
-- entities authored locally in the definition;
-- placements of other `EntityDefinition` assets;
-- component configurations;
-- internal signal/action connections;
-- a deliberately exported public contract.
-
-There is no separate prefab format. Levels and reusable objects have different
-envelopes because a world has world settings and multiple roots, but all entity
-trees use the same entity/component representation.
-
-Structural definition inclusion must be acyclic. Behavioral asset references
-may be cyclic because they do not expand the hierarchy: a gun may reference a
-bullet definition, and an enemy may reference its own definition as something
-it can spawn.
-
-### Local entity or reusable definition
-
-A unique light, camera, trigger, or piece of level behavior can be authored
-directly in a `WorldDefinition`. Requiring a separate asset for every entity
-would create noise. When a local subtree becomes reusable, the editor may offer
-`Extract as Entity Definition`.
-
-The same rule applies inside an `EntityDefinition`: unique children may be
-inline, while reusable children are referenced placements.
-
-## Entity model
-
-There is one runtime `Entity` type. There are no `Entity3d`, `Entity2d`, or UI
-runtime subclasses.
-
-An entity intrinsically owns only:
-
-- runtime identity;
-- an ownership parent or `World` root membership;
-- ordered owned children;
-- local and effective enabled/lifecycle state;
-- component identities and ownership;
-- association with exactly one `World`.
-
-An entity does not contain rendering, physics, audio, animation, or update
-behavior. It does not recursively update or render its children. Runtime
-modules compile and schedule the components that participate in those
-activities.
-
-An editor may offer `Entity3d`, `Entity2d`, and UI creation presets. These are
-conveniences that create an ordinary entity and add `Transform3d`,
-`Transform2d`, or `UiLayout`; they are not serialized subtypes.
-
-### Spatial domain
-
-Primary spatial authority is declared by the component descriptor's spatial
-domain and exposed to sibling components through capability:
-
-- `Transform3d` provides `Spatial3d`;
-- `Transform2d` provides `Spatial2d`;
-- `UiLayout` provides the UI layout capability;
-- an entity with none of these is non-spatial.
-
-An entity may have at most one primary spatial-domain component. Crossing
-between domains uses an owned child entity and an explicit bridge or
-projection. A 3D renderer or collider requires `Spatial3d`; a 2D renderer or
-collider requires `Spatial2d`; a UI renderer requires the UI layout capability.
-Renderers, colliders, and other spatial consumers require the capability but do
-not themselves claim the primary spatial domain.
-
-Ownership may contain mixed domains. Spatial inheritance applies only between
-compatible domains.
-
-### Entity granularity
-
-Use a component when a capability shares the entity's identity, transform, and
-lifetime. Use an owned child entity when something needs independent identity,
-transform, lifecycle, components, attachment, or reuse.
-
-A runtime-created bullet is normally an entity. It does not appear as a placed
-entity in the authored level, but it does appear in the live hierarchy for its
-lifetime. The bullet definition remains visible and editable as a project
-asset.
-
-Particles within a `ParticleSystem` need not each be entities. A particular
-particle may be modeled as an entity when independent collision, behavior,
-selection, or identity justifies that cost. The public model does not require
-high-volume internal simulation records to be entities.
-
-## Component model
-
-A persistent component record contains:
-
-- a stable local `ComponentId`;
-- a stable namespaced component-type ID;
-- a component configuration-schema version;
-- typed authored property values.
-
-The registered `ComponentTypeDescriptor` is authoritative for:
-
-- type identity and schema version;
-- property schemas, defaults, constraints, and editor metadata;
-- provided and required capabilities;
-- allowed multiplicity and conflicts;
-- signals and actions;
-- supported spatial domain;
-- lifecycle and scheduling participation;
-- the runtime construction seam.
-
-Annotations or generated metadata may help define descriptors, but they must
-not create a second semantic model. Serialized data never contains a Java
-implementation class name.
-
-Runtime components are ordinary Java objects and may contain behavior. There
-is no privileged controller or script slot. A game may add several behavioral
-components to the same entity when their descriptors allow it.
-
-Component descriptors are safe extension metadata. They are declared in the
-extension descriptor's `components` array and can therefore be discovered and
-validated without loading executable extension code. For example:
-
-```json
-{
-  "id": "example.game/mover",
-  "typeVersion": 1,
-  "displayName": "Mover",
-  "properties": [
-    {
-      "id": "speed",
-      "valueKind": "number",
-      "required": true,
-      "displayName": "Speed"
-    }
-  ],
-  "signals": [
-    { "id": "moved", "displayName": "Moved" }
-  ],
-  "actions": [
-    { "id": "stop", "displayName": "Stop" }
-  ],
-  "requiredCapabilities": ["example.game/transform"],
-  "multiplicity": "single",
-  "conflicts": ["example.game/teleporter"],
-  "spatialDomain": "none",
-  "lifecycle": ["created", "destroyed"],
-  "updatePhases": ["after-physics"]
-}
-```
-
-`RegisteredTypeCatalog` indexes these descriptors by the exact pair of
-`ComponentTypeId` and configuration-schema version. Catalog-aware entity and
-world loading checks authored properties, multiplicity, conflicts, sibling
-capability providers, local contract targets, and local signal/action payloads.
-The structural loading overloads remain useful for an editor that must preserve
-and display definitions whose extensions are unavailable; play and export use
-catalog-aware loading and reject unresolved component types.
-
-Component dependencies use declared capabilities or explicit stable component
-identity. General `getComponent(Class<?>)` lookup and nearest-ancestor searches
-are not the dependency model. A missing, conflicting, or ambiguous required
-dependency is a validation failure before activation.
-
-Runtime behavior may also query a capability on one exact live entity, for
-example when a collision identifies the entity whose player-resource capability
-should receive a pickup. The component descriptor remains the authority for
-which component provides that capability; the query never searches ancestors,
-descendants, or the wider world. Authored relationships which already know a
-specific participant continue to use stable entity or component identity.
-
-Required external contract values must be supplied. Optional values are valid
-only when the descriptor explicitly defines meaningful behavior for absence;
-the runtime never searches the hierarchy or world for a plausible replacement.
-
-### Construction and dependency injection
-
-Trusted engine and game modules register descriptors and runtime factories
-before a `World` is composed. Construction passes through one replaceable seam,
-provisionally called `ComponentFactory`:
-
-1. the runtime allocates the complete inactive entity graph;
-2. component configurations are validated and runtime components are created;
-3. stable entity, component, asset, and public-contract references are bound;
-4. declared capability dependencies are checked;
-5. lifecycle creation begins only after the graph is complete.
-
-A future dependency-injection framework can provide an adapter at this
-construction seam. It may inject world module interfaces and game-owned
-dependencies, but it must not become part of serialized data or the public
-engine model. JScene3D does not initially depend on Spring or any other DI
-container.
-
-Executable code is registered separately by the trusted runtime extension:
-
-```java
-private static final ComponentType MOVER =
-        ComponentType.of("example.game/mover", 1);
-
-@Override
-public void register(ComponentFactoryRegistry registry) {
-    registry.register(MOVER, context ->
-            new Mover(context.properties()));
-}
-```
-
-Registration must match an exact descriptor owned by that extension. Duplicate,
-foreign, undeclared, and late registrations fail immediately. A missing factory
-for a validated component is a structured composition failure. The
-`ComponentFactoryContext` exposes the immutable authored definition, its exact
-descriptor, effective property values, and construction-time runtime-resource
-resolution; it does not expose mutable composer internals. Descriptor discovery
-and validation therefore do not depend on executable class loading, and
-serialized files never name the factory or implementation class.
-
-Components receive their owning `World` or a bounded context explicitly. They
-do not discover a static global world, create backend implementations, or use
-an implicit service locator.
-
-The first implemented composition boundary is `WorldComposer.compose(...)`.
-It loads and validates the complete authored definition graph, allocates every
-live entity before invoking a component factory, applies descriptor defaults
-and instance-contract arguments, and returns either a complete inactive
-`World` or ordered structured diagnostics. A failed composition publishes no
-world and releases already-created `AutoCloseable` component values in reverse
-construction order. The caller explicitly calls `World.activate()` after
-composition. A successful world owns its component values and the
-runtime-resource leases acquired while constructing them. It releases component
-values before their resource leases. The caller retains ownership of the
-`RuntimeResourceProvider`; only its returned leases transfer to the world.
-
-`RuntimeResourceProvider` is the host seam for acquiring shared immutable
-runtime values. Each acquisition returns an independent `RuntimeResourceLease`;
-the provider may retain one underlying value across leases and worlds. Within a
-world, the first request for a `ResourceReference` acquires one lease and later
-requests receive the identical value after type validation. The world attributes
-use to owning entities, releases a lease when its final owning entity is
-destroyed, and otherwise releases leases in reverse acquisition order during
-world cleanup. Components receive values rather than lease handles and therefore
-cannot accidentally release resources still used elsewhere.
-
-Composition constructs every component value before binding authored entity or
-component targets. A component type with `entity_target` or `component_target`
-properties returns a value implementing `ComponentReferenceBinder`. Its single
-binding callback receives a short-lived `ComponentReferenceResolver`; resolving
-by property identity produces a direct live `Entity` or component reference.
-Every binding succeeds before the inactive world is published. Binding failure
-therefore uses the same complete reverse-order rollback as factory failure and
-no lifecycle callback has yet run.
-
-After reference binding, each component type declaring signals or actions binds
-them through `ComponentEndpointBinder`. The short-lived `ComponentEndpoints`
-context supplies persistent signal handles and accepts synchronous action
-callbacks. Descriptor metadata is authoritative: every declared endpoint must
-be implemented exactly once, its direction and payload presence must match, and
-arbitrary implementation failure rolls back the whole composition. The composer
-then resolves internal connections and definition-contract exports to the exact
-live component endpoints in each definition-instance scope.
-
-The implemented boundary includes initial lifecycle activation,
-descriptor-compiled fixed and frame schedules, synchronous runtime signal
-dispatch, safe enablement and destruction commits, exact host-supplied
-world-module lookup, and world-owned runtime-resource leases. Scheduled
-callbacks and signal dispatch are enabled only after successful world activation
-and stop before world cleanup. The first 3D adapter slice adds descriptor-backed
-`Transform3d`, perspective-camera, directional-light, and mesh-renderer
-components. It maintains automatic compatible direct-parent world transforms,
-selects one explicitly authored primary camera, resolves shared mesh and material
-resources through world-owned leases, and submits the resulting presentation
-through `Spatial3dWorldModule`. Its internal `Scene`, `Object3D`, camera, light,
-and mesh objects remain adapter details. Spawning, physics, audio, and input
-adapters remain subsequent slices on top of the same composed entity graph.
-
-Project import artifacts distinguish generated `EntityDefinition` documents
-from typed runtime-resource documents and opaque payloads. Generated definitions
-use the same canonical serializer as authored definitions and can be written
-directly into importer-owned staging output without exposing cache paths.
-
-## Definition placement and composition
-
-Loading or importing an `EntityDefinition` does not create live entities. The
-editor can open a definition as its own editable document, or as a read-only
-generated document for imported content. It enters another authored hierarchy
-only when the developer explicitly places it.
-
-When a definition is placed or spawned, its root becomes the instance entity
-directly. The runtime does not add an artificial wrapper:
+Status: current implemented architecture
+
+JScene3D represents authored game structure as immutable world and entity
+definitions, then composes those definitions into live hierarchical entities.
+Components supply spatial state, rendering, physics, audio, input, animation,
+and application behavior without requiring game-specific `Entity` subclasses.
+
+This document is the authoritative design for that authored and runtime model.
+For a shorter introduction, see
+[Project and game fundamentals](../manual/project-fundamentals.md).
+
+## Architectural rules
+
+The model is built around several deliberate distinctions:
+
+- A renderer `Scene` is not a project `World`.
+- A renderer `Object3D` is not a live `Entity`.
+- `WorldDefinition` and `EntityDefinition` are immutable authored data;
+  `World` and `Entity` are live runtime state.
+- The entity hierarchy owns identity, lifetime, and structural ownership.
+- Components compose behavior instead of creating an inheritance hierarchy of
+  entity types.
+- Safe descriptors define serialized component contracts. Trusted runtime
+  extensions provide their executable implementations separately.
+- Components depend on semantic capabilities and stable targets, not concrete
+  sibling implementation classes or hierarchy searches.
+- Spatial, rendering, physics, audio, and other backend state remain behind
+  world-scoped module interfaces.
+- Rendering and collision are represented independently, even when generated
+  from the same source content.
+- Loading and authoring project data do not imply executing a project.
+
+These rules let the headless project model, runtime host, editor, importers,
+and exported applications share one definition format without sharing one
+execution environment.
+
+## Models and boundaries
+
+The main flow is:
 
 ```text
-Bullet
-├── Mesh
-└── Collision
+.j3d descriptor
+authored definitions ─┐
+published definitions ├─ DefinitionResolver
+published resources ──┘
+         ↓
+registered safe descriptors + trusted runtime extensions
+         ↓
+WorldComposer
+         ↓
+inactive World and Entity graph
+         ↓ activate
+live lifecycle, scheduling, signals, mutation, and spawning
 ```
 
-The placement supplies its stable instance identity, display name, enabled
-state, initial root transform where applicable, and exported parameter values.
-A spatial definition must have the appropriate primary transform on its root
-to receive spatial placement.
+The layers have different responsibilities:
 
-Nested definitions preserve logical instance identity, public contract, state,
-and lifecycle even if the runtime flattens their representation internally.
-Definition-instance scope is runtime bookkeeping, not a second public object in
-the live hierarchy.
+- `jscene3d-project` owns project discovery, descriptors, authored definition
+  data, extension metadata, validation, stable identities, and diagnostics.
+- `jscene3d-project-import` owns deterministic import inspection, preparation,
+  publication, and read-only access to generated artifacts.
+- `jscene3d-project-runtime` owns trusted definition composition, live worlds,
+  component factories, lifecycle, scheduling, signals, resources, and
+  structural mutation.
+- Focused modules such as `jscene3d-project-3d` and
+  `jscene3d-project-physics` provide descriptors, runtime component factories,
+  and world-module adapters for their domains.
+- `jscene3d-game` adds genre-independent game-loop, input, application, and
+  presentation facilities over the project runtime.
+- Application extensions own title-specific rules and components.
 
-Each live entity receives a fresh world-local `RuntimeEntityId`. Its authored
-asset and entity identities remain available separately for inspection and
-diagnostics. Repeated placements therefore retain the same definition-local
-IDs internally while owning distinct live entities and component values. A
-placed root reports the containing asset and placement ID publicly; descendants
-report the reusable definition asset and their definition-local IDs.
+The low-level renderer and physics modules remain usable without the project
+model. Their objects are backend implementation details when used by a
+composed project world.
 
-The live entity also reports whether it came from a local entity declaration,
-an authored definition placement, or a runtime spawn. Placement and spawn roots
-report the exact definition asset they instantiate. Children declared inside
-that definition retain local-entity provenance beneath the instance root. This
-metadata makes the existing read-only World hierarchy the live inspection
-model; the runtime does not construct a parallel diagnostic entity graph.
+## Authored project model
 
-### No authored definition inheritance
+### Project descriptor
 
-The initial model has no base definitions, derived definitions, prefab
-variants, or multi-level override chains. The editor may duplicate a definition
-as a starting-point convenience. The duplicate is independent from that point
-on.
+A JScene3D project has one project-named `.j3d` descriptor in its root. During
+the compatibility period, `jscene3d.json` is accepted only when no `.j3d`
+descriptor exists. `ProjectLoader` validates the selected descriptor into a
+`GameProject`, which retains both the normalized project root and the actual
+descriptor path.
 
-A duplicated asset receives a new `AssetId`. Its local entity and component IDs
-may remain unchanged because they are scoped by the new asset identity, which
-also preserves its internal references. Heavy referenced assets remain shared
-until deliberately duplicated.
+`GameProject` contains project identity and attribution, engine compatibility,
+runtime entry points, extension requirements, source assets, import-definition
+paths, export presets, and launch presentation. Its
+`RuntimeConfiguration` selects the application extension, gameplay entry
+world, optional startup world, optional project systems, and optional input
+map. The field names `entryScene` and `startupScene` remain in that API, but
+the referenced assets used by the current runtime host are `WorldDefinition`
+documents.
 
-### Definition encapsulation
+Loading a `GameProject` is structural and safe. It does not load runtime
+extensions, execute importers, compose a world, or initialize rendering,
+physics, or audio.
 
-A containing world or definition may configure a placed definition only
-through its public contract and standard placement state. It cannot edit the
-placed definition's private internal entities or attach arbitrary components to
-them.
+### Definition assets
 
-The public contract may export:
+`AssetCatalog` recursively discovers authored `*.world.json` and
+`*.entity.json` documents in deterministic project-relative path order. Nested
+project roots are boundaries. Each definition has a project-wide `AssetId`,
+and complete content remains unloaded until requested through a
+`DefinitionResolver`.
 
-- typed parameters;
-- typed signals;
-- typed actions;
-- declared capabilities;
-- named spatial attachment points;
-- explicitly supported resource bindings such as material slots.
+A `WorldDefinition` contains:
 
-An exported attachment point is a stable public name backed by a private
-internal spatial target. For example, a character may export `right-hand`
-without exposing its skeleton structure. A parent can attach a weapon to that
-point and remain insulated from internal reorganization.
+- its stable `AssetId` and display name;
+- root `EntityEntry` values in authored order; and
+- signal-to-action connections within the world definition.
 
-Additional behavior, physics, audio, or child structure is added by creating
-an authored wrapper definition whose local root or children compose the placed
-definition. This is ordinary composition, not inheritance or arbitrary
-refinement.
+An `EntityDefinition` contains:
+
+- its stable `AssetId` and display name;
+- exactly one locally authored root entity;
+- an `EntityContract` describing its deliberately exported surface; and
+- signal-to-action connections private to the definition.
+
+Both types are immutable. Loading them validates the complete transitive
+placement graph and, when supplied a `RegisteredTypeCatalog`, validates their
+component types, properties, capabilities, endpoints, and contracts.
+
+### Local entities and placements
+
+`EntityEntry` is a sealed authored choice between `LocalEntity` and
+`EntityPlacement`.
+
+A `LocalEntity` declares:
+
+- an `EntityId` stable within its containing definition asset;
+- an optional display name;
+- its initial local enabled state;
+- identified component definitions; and
+- owned child entries in authored order.
+
+An `EntityPlacement` references an `EntityDefinition`, supplies exported
+arguments, and declares the instance root's local identity, optional name, and
+enabled state. Composition expands the referenced definition directly into
+the placement root. It does not add a synthetic wrapper entity.
+
+Definition reuse is composition, not inheritance. There are no base or derived
+definitions and no implicit override of private internals. A reusable
+definition exposes only the members declared by its `EntityContract`.
+
+### Exported definition contracts
+
+An `EntityContract` can declare:
+
+- ordinary parameters targeting private component properties or nested
+  placement arguments;
+- resource bindings targeting resource-valued properties;
+- signals and actions backed by private or nested endpoints;
+- semantic capabilities; and
+- spatial attachment points.
+
+Required parameters and resource bindings must be supplied, and supplied
+values must match the declared structural kind. A placement can connect to an
+exported signal or action without addressing the placed definition's private
+component identities. Contract targets are validated against the complete
+definition graph.
+
+The current runtime applies parameter and resource-binding overrides through
+definition-instance scopes and resolves exported signal/action endpoints during
+composition. Capability and attachment declarations remain safe contract
+metadata for validation and tooling; they do not grant arbitrary access to a
+placed definition's private hierarchy.
 
 ## Identity and references
 
-Identity is never derived from an editable display name, hierarchy position,
-or filesystem location.
+The identity scopes are intentionally distinct:
 
-Every stored asset has a stable opaque `AssetId`. Moving or renaming its file
-does not change that identity. The project asset catalog maps IDs to current
-locations. A serialized reference contains the ID and may include a
-human-readable path/name hint used only for diagnostics.
+- `AssetId` identifies a world or entity definition across the project.
+- `EntityId` identifies an authored entry within its containing asset.
+- `ComponentId` identifies a component within its entity.
+- `RuntimeEntityId` identifies one live instance within one `World`.
 
-`EntityId` values are stable and unique within their containing authored asset.
-`ComponentId` values are stable and unique within their owning entity entry.
-Rename, reorder, and reparent operations preserve them. A persistent target is
-conceptually:
+Placed and spawned definitions receive separate definition-instance scopes.
+The same authored `EntityId` can therefore be instantiated repeatedly without
+colliding at runtime. A live `Entity` retains provenance through
+`authoredAsset()`, `authoredId()`, `instantiationKind()`, and, for placement or
+spawn roots, `instantiatedDefinition()`.
+
+Authored entity, component, property, endpoint, resource, and spatial targets
+use stable identities. They do not resolve by display name, hierarchy path,
+implementation class, nearest ancestor, or global search. Target-valued
+properties retain the definition-instance scope in which they were authored,
+including when passed through a public definition contract.
+
+## Component model
+
+### Authored component definitions
+
+A `ComponentDefinition` is immutable configuration containing:
+
+- a stable `ComponentId`;
+- a namespaced `ComponentTypeId`;
+- a positive configuration-schema version; and
+- ordered `ProjectValue` properties.
+
+Component values are data. They do not embed implementation class names or
+constructors.
+
+### Safe component descriptors
+
+A `ComponentTypeDescriptor` is authoritative inert metadata for one exact
+component type and version. It declares:
+
+- presentation metadata;
+- properties, defaults, value kinds, references, and constraints;
+- signals and actions with optional registered payload types;
+- provided and required `CapabilityId` values;
+- named spatial attachments;
+- single or multiple per-entity multiplicity;
+- conflicting component types;
+- a primary `ComponentSpatialDomain`; and
+- lifecycle and deterministic update participation.
+
+Validation rejects unknown exact component versions, invalid properties,
+duplicate single-instance types, declared conflicts, ambiguous spatial
+authority, and unsatisfied capabilities. Each required capability must have
+exactly one provider on the same entity. A component cannot both provide and
+require the same capability.
+
+Capabilities express semantic sibling dependencies. At runtime,
+`Entity.capability` selects a provider from the safe descriptor declarations
+and only then checks the caller's expected Java representation. It does not
+search parents, children, unrelated entities, or implementation types.
+
+### Descriptor and implementation separation
+
+An `ExtensionDescriptor` supplies safe metadata for registered types,
+components, settings, presentation, version, and engine compatibility. It is
+inert: it contains no implementation class names and does not load extension
+code. Multiple resolved descriptors form a deterministic
+`RegisteredTypeCatalog`.
+
+A trusted `ComponentRuntimeExtension` with the same stable extension identity
+registers executable `ComponentFactory` implementations. A factory receives a
+bounded `ComponentFactoryContext` containing the owner, inactive world,
+owner-scoped spawn target, authored definition, exact descriptor, effective
+properties, and prepared resource access. Runtime component values are
+ordinary non-null Java objects and need not extend an engine component base
+class.
+
+This division is fundamental:
 
 ```text
-AssetId + local EntityId + optional ComponentId + optional PropertyId
+ExtensionDescriptor
+  safe data for loading, validation, and authoring
+
+ComponentRuntimeExtension
+  trusted executable factories used only during runtime composition
 ```
 
-A live target additionally includes definition-instance scope. Public Java
-types should prevent accidental interchange of these identity kinds.
+## Transactional world composition
 
-Component properties persist entity and component targets as distinct portable
-value kinds. Their canonical JSON representation is:
+`WorldComposer` is the single composition boundary. It receives:
 
-```json
-{
-  "body": {
-    "$target": {
-      "entityId": "a stable entity UUID",
-      "componentId": "a stable component UUID"
-    }
-  }
-}
-```
+- a `DefinitionResolver` for authored and generated definitions;
+- the selected `WorldDefinition` reference or a validated in-memory revision;
+- a `RegisteredTypeCatalog`;
+- trusted `ComponentRuntimeExtension` implementations;
+- host-supplied `WorldModuleBinding` values; and
+- a host-owned `RuntimeResourceProvider`.
 
-Omitting `componentId` produces an `entity_target`; including it produces a
-`component_target`. The target is interpreted in the authored scope containing
-the value, not in the eventual hierarchy position. When a target value passes
-through a placed definition's public parameter, composition preserves its
-original containing instance scope. This permits an explicit public dependency
-without making a repeated definition bind back into the wrong placement.
+Composition performs these operations as one transaction:
 
-An outer asset may target a placement entity itself, but it cannot name a
-private component inside that placement. Such a dependency must be deliberately
-exported by the reusable definition's public contract. Target validation and
-runtime lookup both enforce that seam.
+1. Load and validate the root world and transitive entity-definition graph.
+2. Expand local entries and definition placements into distinct instance
+   scopes.
+3. Allocate the complete entity graph before invoking a component factory.
+4. Resolve exact descriptors and factories and merge authored values over
+   descriptor defaults and contract overrides.
+5. Construct every runtime component.
+6. Bind authored entity and component references after all factories finish.
+7. Bind every descriptor-declared signal and action implementation.
+8. Resolve authored connections to exact live endpoint addresses.
+9. Publish a complete inactive `World` only if every step succeeds.
 
-Animation tracks, component dependencies, collision-shape membership, signal
-connections, and action targets use these stable identities. They never use
-paths such as `../body` or "nearest ancestor of type X".
+Failure returns ordered `ProjectDiagnostic` values and releases constructed
+component values and resource leases. No partial world is published. A failed
+composition does not transfer ownership of host-supplied world modules; a
+successful composition does.
 
-A raw filesystem copy that duplicates an `AssetId` is an asset-catalog error.
-The editor must ask the user to resolve the duplicate rather than silently
-selecting one file.
+The resulting world is deliberately inactive. Construction establishes a
+complete graph, but semantic lifecycle and signal dispatch begin only when the
+host calls `World.activate()`.
 
-## Ownership, attachment, and reparenting
+## Live world and entity APIs
 
-The ownership hierarchy controls serialization and lifetime. Destroying an
-owner destroys its owned descendants unless an explicit transfer has already
-moved one elsewhere.
+`World` is the runtime ownership root for one composed definition. It exposes:
 
-For the common case, a compatible child spatial component uses its owning
-parent as its spatial parent. An explicit stable attachment target is used when
-ownership and spatial parentage differ, including skeleton joints, exported
-attachment points, world-space attachments, and cross-domain bridges.
+- the source `WorldDefinition`;
+- deterministic roots and lookup by `RuntimeEntityId`;
+- exact-interface world-module lookup;
+- inactive definition preparation for later spawning;
+- owner-scoped spawn targets;
+- activation and active/closed state;
+- fixed and frame advancement; and
+- enable, disable, destroy, and terminal close operations.
 
-Ownership transfer and spatial attachment are distinct runtime operations,
-although the editor may offer a combined command for the common case.
+The interface is confined to one caller-owned logical simulation thread. It is
+not a concurrent entity store and does not create its own execution thread.
 
-Any operation that changes the spatial parent must choose a transform policy:
+`Entity` is a read-only live view. It exposes authored and runtime identity,
+instantiation provenance, local and effective enabled state, destruction state,
+ownership parent and children, identified component access, local capability
+access, and its owning `World`. Mutation occurs through bounded world or
+component interfaces rather than arbitrary setters on the entity graph.
 
-- `KEEP_WORLD` recalculates local state so the entity remains visually fixed;
-- `KEEP_LOCAL` preserves local state and moves it into the new parent's space.
+## Ownership and spatial state
 
-Runtime interfaces require the policy explicitly. Ordinary editor hierarchy
-drag-and-drop defaults to `KEEP_WORLD`; explicit attach-to-mount operations
-default to `KEEP_LOCAL`.
+The entity hierarchy defines structural ownership and cleanup order. A child
+cannot outlive its owner. Local enablement combines with ancestor enablement to
+produce effective enablement. The current runtime supports composition,
+owner-scoped child spawning, enablement changes, and subtree destruction; it
+does not expose a general reparenting operation.
 
-Each spatial entity has one effective transform authority. Static objects and
-sensors consume authored/runtime transform state; kinematic movement uses the
-physics movement interface; rigid bodies produce authoritative simulation
-state; presentation may interpolate that state. Conflicting transform writers
-are rejected by descriptor validation.
+Spatial state is optional. An entity without a spatial component is still a
+valid entity. Descriptor validation permits at most one component with a
+non-`NONE` primary spatial domain on an entity.
 
-## World and runtime modules
+For the implemented 3D domain, `Transform3d` owns mutable local position,
+normalized orientation, scale, and derived local and world matrices. A direct
+ownership parent's compatible transform supplies spatial inheritance. A
+non-spatial or differently spatial parent starts a new 3D spatial root.
 
-`World` is the runtime composition root and lifetime owner for:
+`Spatial3dWorldModule` realizes transforms and transform-attached cameras,
+lights, meshes, and billboards. Its adapter may use renderer `Object3D` values
+internally, but those objects do not become project entities and are not
+exposed as the public world hierarchy.
 
-- root entities;
-- entity/component composition and mutation;
-- scheduling and clocks;
-- physics;
-- rendering coordination;
-- audio;
-- input snapshots;
-- runtime-resource loading and sharing;
-- diagnostics and external-event ingestion.
+Each live spatial entity has one effective transform authority. Static bodies
+and sensors consume entity transform state. Explicitly moved character bodies
+request motion through physics. A simulation-owned body can write its world
+pose through the transform's designated world-pose seam. Presentation reads
+the resulting spatial state rather than creating a competing entity transform.
 
-It is not an entity. It is also not a JVM-global singleton: a game world,
-editor preview, thumbnail renderer, and test world may coexist.
+## World modules and resources
 
-The owning world is explicitly available to runtime components through their
-construction or lifecycle context. A host binds each world-scoped facility to
-an exact stable Java interface extending `WorldModule`; concrete adapter classes
-are never lookup identities. `world.findModule(interfaceType)` represents an
-optional dependency and `world.requireModule(interfaceType)` represents a
-required dependency. A required lookup made by a component factory fails as a
-structured composition diagnostic at that component's authored location when
-the host omitted the binding. Lookup neither searches parent interfaces nor
-falls back to static or process-global state.
+A `WorldModule` is a world-scoped adapter for a focused runtime facility such
+as spatial presentation, physics, input, audio, or screen presentation. The
+host supplies each module through a `WorldModuleBinding` keyed by an exact
+stable interface. Lookup does not search implementation classes, parent
+interfaces, or global state.
 
-Passing a binding into composition does not itself transfer ownership. When
-composition succeeds, the published world owns every bound adapter and closes
-them in reverse binding order after releasing all entity component values. When
-composition fails, no world is published and the host retains ownership of all
-supplied adapters. Module lookup is unavailable after world closure. Separate
-worlds have separate bindings, allowing a game world, editor preview, thumbnail
-renderer, and tests to coexist without shared mutable world state.
+A successfully composed world owns the bound adapters and closes them in
+reverse binding order after components and resource leases are released. If
+composition fails before ownership transfer, the host remains responsible for
+closing them.
 
-Stable module interfaces allow useful commands and queries without exposing
-simulation stepping, internal collections, backend replacement, or
-unrestricted entity mutation.
-
-The modules are designed as deep modules: callers do not coordinate parsing,
-dependency loading, lifecycle ordering, schedule mutation, backend handles, or
-rollback themselves.
+`RuntimeResourceProvider` is the host seam for acquiring shared immutable
+runtime resources. The provider remains caller-owned. Each acquisition returns
+a distinct `RuntimeResourceLease`; the world attributes leases to their owning
+entities, shares underlying values where the provider permits, and releases a
+lease when its final owning entity is destroyed or when the world closes.
+Components receive the resource value and must not close shared values
+directly.
 
 ## Lifecycle
 
-The public lifecycle has three effective entity states:
+Component descriptors, not Java method presence alone, authorize lifecycle
+participation. A runtime value whose descriptor declares lifecycle callbacks
+implements `ComponentLifecycleCallbacks`.
 
-- **Active**: participates in behavior, physics, audio, rendering, and signals.
-- **Disabled**: remains live and retains state but does not participate.
-- **Destroyed**: permanently removed at the next safe structural commit.
+The semantic events are:
 
-Disabling a parent effectively disables its descendants. Each descendant keeps
-its own enabled flag, so re-enabling the parent does not enable a child that was
-independently disabled.
+- `CREATED`: once after the complete graph has been constructed and bound;
+- `ACTIVATED`: whenever the owning entity becomes effectively enabled in an
+  active world;
+- `DEACTIVATED`: whenever it ceases to be effectively enabled; and
+- `DESTROYED`: once before permanent release.
 
-Components opt into these semantic lifecycle points through safe descriptor
-metadata. A runtime value whose descriptor declares any lifecycle event
-implements `ComponentLifecycleCallbacks`. The descriptor remains authoritative:
-the world invokes only declared events even when the Java value overrides other
-callback methods.
+Initial activation creates every component owner-first, then activates
+components whose entities are effectively enabled. A failure compensates
+completed work in reverse order, closes component values and retained
+resources, closes owned modules, and leaves the world terminally closed.
 
-1. **Created** once, after the full graph exists and references are resolved.
-2. **Activated** whenever the component becomes effectively active.
-3. **Deactivated** whenever it ceases to be effectively active.
-4. **Destroyed** once, when permanently removed.
+Later enablement activates owner before descendant. Disablement, destruction,
+and closure deactivate and destroy in reverse ownership/construction order.
+Component values implementing `AutoCloseable` are closed after their semantic
+lifecycle ends. Cleanup continues after an individual failure while preserving
+the first failure and suppressing later ones.
 
-Creation and activation proceed owner before owned children. Deactivation and
-destruction proceed children before owner. Declared component dependencies
-determine ordering within an entity. Components without an ordering dependency
-must not rely on incidental authored or collection order.
+`World.close()` is idempotent and terminal. It stops endpoint dispatch,
+releases lifecycle participation and component values, closes resource leases,
+and finally closes owned world modules.
 
-Activation is transactional. Failure while validating, acquiring resources,
-constructing components, binding references, or registering modules rolls back
-the complete instance. Constructed component values close before acquired
-resource leases, and leases release in reverse acquisition order. A partially
-active definition instance is never observable.
+## Scheduling and time
 
-`WorldComposer.compose(...)` publishes the complete graph in an inactive state
-without invoking semantic callbacks. `World.activate()` delivers creation to
-every component and activation to components on initially enabled entities.
-The active world accepts explicit enable, disable, and destroy commands. It
-propagates effective enablement without changing independently authored child
-flags and performs permanent subtree cleanup child first. A lifecycle callback
-failure closes the world after completing cleanup and identifies the event,
-entity, and component with `WorldLifecycleException`. Spawned-instance lifecycle
-remains a later slice.
+`World.advanceFixed(Duration)` and `World.advanceFrame(Duration, float)` are
+synchronous and non-reentrant. The world owns fixed tick numbering and
+accumulated simulation time. The host owns the outer loop and supplies the
+fixed-step duration, accepted frame duration, and interpolation fraction.
 
-## Scheduling, time, and concurrency
+Descriptors can declare exactly three component-visible phases:
 
-JScene3D guarantees deterministic ordering, not bit-for-bit cross-platform
-simulation. Exact replay or lockstep networking would require additional
-numeric and physics constraints.
+- `BEFORE_PHYSICS` is the component-visible fixed-update phase for reading
+  input and requesting movement or state changes.
+- `AFTER_PHYSICS` is the component-visible fixed-update phase after physics
+  state and signals are current.
+- `FRAME_UPDATE` is the component-visible frame-update phase for presentation
+  behavior using completed simulation time and interpolation.
 
-One logical simulation thread invokes game component behavior. Rendering,
-physics, audio, loading, and other modules may use workers internally, but they
-must not invoke arbitrary entity components from those workers. Worker results
-are queued into the owning world and delivered at a defined phase, optionally
-carrying timestamps or simulation-step numbers.
+One fixed advance runs `BEFORE_PHYSICS`, then an engine-owned physics seam, then
+`AFTER_PHYSICS`. The physics seam is not a component-visible phase; bound
+`PhysicsStepWorldModule` instances advance there in host binding order and
+deliver physics signals. `FRAME_UPDATE` runs in a separate frame advance.
 
-The first runtime has two component-visible cadences:
+Only effectively enabled entities participate. Schedules are compiled from
+exact descriptor declarations and ordered deterministically, not from runtime
+registration timing.
 
-- fixed simulation updates;
-- per-frame presentation updates.
+Structural requests made by a callback commit at the next phase boundary.
+Requests made while the world is idle commit before the requesting operation
+returns. A callback cannot recursively advance or close the world.
 
-A component declares its participation through its descriptor; hierarchy and
-serialized component order do not select execution order.
+## Signals, actions, and connections
 
-The initial closed phase vocabulary is:
+A component descriptor declares named signal outputs and action inputs, each
+with either no payload or one exact registered payload type. Components that
+participate implement `ComponentEndpointBinder` to obtain `RuntimeSignal`
+handles and register `RuntimeAction` or `RuntimePayloadAction` callbacks.
 
-1. **Input acquisition**: the host publishes a stable input snapshot and
-   accepts queued external results.
-2. **Before physics**: fixed-step game behavior reads input and requests motion,
-   forces, or other simulation changes.
-3. **Physics**: the world physics module advances. This phase is engine-owned.
-4. **After physics**: physics results are synchronized and contact/overlap
-   signals are delivered; fixed-step game behavior may respond.
-5. **Frame update**: presentation-only behavior runs once per rendered frame
-   with the fixed-step interpolation fraction.
-6. **Render preparation and submission**: transforms and render state are made
-   current and submitted. This is engine-owned.
+`SignalConnection` joins a stable `EndpointTarget` signal to a stable action
+target. Targets can address a local component endpoint or an endpoint exported
+by a definition placement. Definition-instance scoping prevents one placement
+from accidentally binding another placement's private endpoint.
 
-The engine may internally subdivide a phase without expanding the public
-vocabulary. Extensions may participate in supported phases but may not add new
-global phases. Animation and transform propagation are scheduled internally at
-the points required by their declared transform authority.
+Composition requires every descriptor-declared endpoint implementation and
+resolves every connection before publishing the world. Runtime dispatch is
+synchronous and follows authored connection order. Payload identities must
+match exactly. Disabled sources do not emit, and disabled actions do not
+execute.
 
-Rendering may interpolate previous and current simulation states but must not
-alter authoritative simulation state.
-
-The implemented scheduler exposes `World.advanceFixed(step)` and
-`World.advanceFrame(elapsed, interpolation)`. The world owns the zero-based
-fixed tick and accumulated simulation time. A fixed advance runs every declared
-`before-physics` callback, reserves the engine-owned physics seam, and then runs
-every declared `after-physics` callback. A frame advance runs declared
-`frame-update` callbacks using the completed simulation time.
-
-Each completed component-visible phase is also a structural commit point. An
-accepted mutation request still commits when later component code fails that
-phase; component updates are not transactional. Fixed tick and simulation time
-advance only after both fixed component phases and their commits succeed.
-
-Any component descriptor declaring an update phase requires its runtime value
-to implement `ComponentUpdateCallbacks`; implementing that Java interface does
-not itself place a component in a schedule. Phase schedules are compiled once
-at composition and ordered by exact component type, stable authored entity
-address, and component identity rather than serialized component, sibling, or
-runtime-extension registration order. Effectively disabled entities are skipped.
-Update callbacks are synchronous, non-reentrant, and report implementation
-failure with the precise phase, live entity, and authored component identity.
-
-## Signals and actions
-
-A typed signal announces that something happened. A typed action requests that
-a known target do something. Neither is an untyped global event bus.
-
-Signals are delivered synchronously and deterministically on the simulation
-thread during their owning phase, using a stable connection snapshot.
-Structural mutation requested by a listener is deferred. Signal payloads use
-exact registered identities; the runtime does not perform implicit payload
-conversion.
-
-Connections within one authored asset address stable entity and component IDs.
-Connections across a placed definition's seam use its exported signals and
-actions. A signal may legitimately have no listeners; a required target or
-contract reference may not be silently absent.
-
-The first implemented endpoint seam compiles authored connections during world
-composition, after all component values and stable references exist but before
-the inactive world is published. Components obtain world-owned `RuntimeSignal`
-handles and register action callbacks through their descriptor-backed endpoint
-binder. Emission requires an active world, verifies the exact registered payload
-identity, ignores disabled sources, skips disabled actions, and dispatches to a
-snapshot of listeners in authored order. An unconnected signal is valid.
+There is no implicit global event bus. Structural mutation requested during
+nested signal dispatch remains deferred until the outermost dispatch finishes.
 
 ## Structural mutation and spawning
 
-All structural changes are requested through the owning world. Direct list
-mutation on an entity is not the public runtime interface.
+The live structural API is deliberately bounded:
 
-The implemented live-mutation seam is `World.enable(entity)`,
-`World.disable(entity)`, and `World.destroy(entity)`. Calls made while the world
-is idle commit synchronously because the caller is already between phases.
-Calls from update callbacks are coalesced and commit after the current
-component-visible phase. Enable and disable preserve each descendant's local
-flag while recalculating effective participation. Destruction becomes
-effectively inactive when requested, then deactivates, destroys, closes, and
-removes the complete owned subtree at commit. Retained entity references expose
-stable identity and destroyed state but no longer expose children or components.
+- `enable` and `disable` change local enablement while preserving inherited
+  effective state;
+- `destroy` permanently removes one entity and its owned subtree; and
+- `SpawnTarget` can add only direct children beneath its fixed owner.
 
-Destroyed entities are removed from live lookup, ownership traversal, update
-schedules, and endpoint routes. Repeating destruction is harmless; enablement
-commands against pending or destroyed entities fail. A lifecycle or cleanup
-failure completes as much cleanup as possible and closes the world rather than
-publishing unreliable partially active state.
+Destroy requests make a subtree stop participating immediately. Commit then
+deactivates and destroys its components, releases entity-owned resource leases,
+removes endpoint routes and schedule entries, and removes the subtree from
+world lookup and ownership traversal.
 
-Mutations commit between engine-defined phases:
+Runtime spawning has a preparation boundary. While a composed world is still
+inactive, `World.prepare` resolves and validates an `EntityDefinition` and its
+transitive graph, invokes factory preparation hooks, and retains declared
+resources. Exported resource bindings are fixed for the preparation; ordinary
+parameters remain instance-specific.
 
-- a spawned entity cannot participate in the phase that requested it;
-- once committed, it may participate in a later phase of the same simulation
-  step;
-- a destroy request marks the entity pending destruction and effectively
-  inactive immediately;
-- pending entities receive no new scheduled callbacks or signals;
-- physical removal and cleanup occur at the next structural commit.
+An active world uses an owner-scoped `SpawnTarget` to request an instance of a
+`PreparedEntityDefinition`. An idle request commits synchronously. A request
+from an update or signal callback waits for the next structural boundary and
+cannot participate in the phase that requested it. A successful transaction
+constructs, binds, activates, and then publishes the complete instance. A
+failed or cancelled `SpawnOperation` exposes no partial entity.
 
-Spawning is transactional. An entity may spawn an owned child directly. Code
-that needs a different owner must receive an explicit scoped spawn target; it
-must not gain an unrestricted global mutation escape hatch.
+## Rendering and collision
 
-The asynchronous result/handle is provisionally named `SpawnOperation` because
-the previously suggested `SpawnTicket` was rejected. The name remains open,
-but the semantics are fixed: it reports preparation, activation, cancellation,
-and structured failure without exposing a partially constructed entity.
+Rendering and collision are separate component and resource concerns. A mesh
+renderer references renderable geometry and material resources. A collision
+body references explicit collision-shape components or resources. Visible
+geometry does not become collision merely because it exists, and a collision
+shape does not imply a visible mesh.
 
-### Preparation and loading
+`Physics3dWorldModule` registers descriptor-backed static bodies, non-blocking
+sensors, and explicitly moved character bodies against an entity's
+authoritative `Transform3d` and explicitly referenced shapes. Physics detects
+contacts and overlaps; application components decide their game meaning
+through typed signals and actions.
 
-Spawning never performs blocking asset I/O on the simulation thread.
+This separation also applies to generated content. An importer can derive both
+render and collision artifacts from one source while publishing and referencing
+them independently.
 
-- Gameplay-critical definitions such as bullets, enemies, and effects are
-  prepared before use.
-- Spawning a prepared definition performs in-memory composition and activates
-  it at a safe commit point.
-- A separate asynchronous convenience operation may prepare and then spawn
-  unprepared content for loading screens or non-immediate use.
-- An immediate spawn request for unprepared content fails explicitly.
+## Authored and generated definitions
 
-Preparing an `EntityDefinition` resolves and validates its transitive
-structural and runtime-resource dependencies. Worlds retain shared immutable
-runtime resources while any active or prepared content leases them.
+`DefinitionResolver` is the common loading seam for authored and generated
+definitions. An `AssetCatalog` provides authored sources. Import publication
+can add generated entity definitions with authoritative `AssetId` values and
+generated resources with ordinary `ResourceReference` values.
 
-## Collision architecture
+Generated definitions are immutable, read-only project content. They use the
+same `EntityDefinition`, component descriptor, validation, placement, and
+composition path as authored definitions. Application-specific behavior can be
+composed around generated content through authored wrappers instead of being
+written into a disposable import cache.
 
-Rendering and collision are independently authored. A visible mesh does not
-silently become collision geometry, and a collision object need not be
-visible.
+Normal runtime loading consumes complete published import generations through
+`PublishedProjectContent` or `PublishedRuntimeResources`. It does not discover
+or execute import providers and does not read the original import source.
+Further detail is in
+[WAD and Doom integration](wad-doom-integration.md), whose publication rules
+are generic despite that document's source formats.
 
-A collision-object component represents a body or sensor and owns membership
-of one or more shapes. Each shape has:
+## Project hosting
 
-- a stable `ComponentId`;
-- an immutable collision-shape asset reference;
-- its own local transform;
-- filtering and material properties where supported.
+`ProjectRuntimeHost` is the generic manifest-driven runtime host. A load:
 
-The collision object identifies its member shapes using stable entity and
-component identities, not relative hierarchy paths. The editor may hide this
-wiring by offering shape-child creation commands.
+1. locates and validates the project descriptor;
+2. resolves safe extension descriptors and host-provided built-ins;
+3. scans authored definitions;
+4. loads an optional input map;
+5. discovers trusted runtime extensions;
+6. asks the `ProjectRuntimeEnvironment` for authored/generated content and
+   fresh world modules;
+7. composes the selected world; and
+8. invokes `prepare` only on the manifest-selected
+   `ApplicationRuntimeExtension`, if it implements that optional entry point.
 
-Physics object kinds are capabilities rather than entity subclasses. The
-initial family includes static bodies, explicitly moved character/kinematic
-bodies, dynamic rigid bodies when supported, and non-blocking sensors/areas.
-A body may have multiple shapes regardless of its kind.
+The standard load selects the optional startup world before the gameplay entry
+world. `loadEntry` selects the gameplay entry world. A `ProjectLaunchRequest`
+can instead select a project-relative world and portable application-defined
+parameters, including a named playtest request.
 
-The physics module detects contacts and overlaps and emits typed signals that
-identify both collision objects and precise shapes. Game behavior decides what
-the event means: damage, pickup, door activation, sound, scoring, or no action.
-The physics module does not infer gameplay response from rendering or entity
-names.
+Success returns a `HostedProject` containing the validated `GameProject`, the
+authored asset catalog, the launch request, and an owned inactive `World`.
+Application preparation must not activate it. The runner or host decides when
+to activate and advance the world. Closing the `HostedProject` closes its
+world.
 
-## Runtime resources and mutable state
+The selected application extension is the title entry point; merely appearing
+on the class path or implementing `ApplicationRuntimeExtension` does not cause
+application participation.
 
-Heavy runtime resources are immutable and shareable. These include meshes,
-materials, textures, collision shapes, skin/skeleton definitions, animation
-clips, and audio payloads.
+## Editor and authoring boundary
 
-All mutable state belongs to the live instance, including transforms,
-visibility, material parameters, morph weights, skeleton pose, animation
-playback, physics state, behavior state, signal subscriptions, and dynamically
-spawned children. One live instance must never mutate another by changing a
-shared runtime resource.
-
-An editor `Make Unique` operation creates a new authored asset; it does not make
-a shared runtime resource conditionally mutable.
-
-Animation tracks target persistent entity, component, and property identities.
-Targets are rebound within each live definition instance. Clips do not retain
-live Java object references.
-
-## glTF import and generated definitions
-
-Selecting a glTF scene publishes a generated, read-only `EntityDefinition`
-plus referenced mesh, material, texture, skin, animation, and other assets.
-There is no public `Model3d` resource plus `ModelInstance3d` entity/component in
-the initial architecture.
-
-The import projection is direct:
+The current editor architecture is:
 
 ```text
-glTF node                 entity
-local transform           Transform3d component
-mesh                      MeshRenderer3d component
-skinned mesh              SkinnedMeshRenderer3d component
-camera                    Camera3d component
-light                     Light3d component
-animation playback owner  animation component
-payload data              referenced immutable assets
+Code OSS frontend
+        ↓ framed authoring protocol
+Java authoring service
+        ↓
+headless editor-authoring and project model
 ```
 
-Imported cameras and lights are ordinary components. They do not automatically
-become the active camera or global light.
+The authoring service loads the `.j3d` descriptor, project settings, safe
+extension descriptors, authored definitions, import definitions, and already
+published generated definitions. It does not load runtime extensions, execute
+arbitrary application code, run import providers, or construct an active
+`World`.
 
-Generated internals are read-only and disposable. Import settings control
-scene selection, supported feature inclusion, resource mapping, exported
-attachment points, and explicitly supported material bindings. Gameplay,
-collision, audio, additional children, and behavior belong in an authored
-wrapper definition.
+`EditorProjectLoader` creates an `EditorProjectSession` that owns project
+identity, diagnostics, definition retention, hierarchy and Inspector
+projections, and authoritative authored working copies. Authored definitions
+can be changed through source-preserving, validated semantic operations;
+generated definitions remain read-only. The Code OSS frontend presents those
+projections and delegates project semantics to Java.
 
-Source inspection and import publication are editor or project-build
-operations. Normal `ProjectHost` startup consumes only complete published
-generations through `ProjectContent`; it neither executes an importer nor reads
-the original source asset. Export packaging includes the selected published
-definitions and resources, not the source-import workflow that produced them.
-
-Reimport prefers explicit source identifiers. Otherwise it uses stored source
-evidence and deterministic locators conservatively. It does not silently fuzzy
-match an uncertain target. Unresolved required targets prevent play/export and
-produce diagnostics that allow explicit remapping or source repair.
-
-The runtime may privately compile or flatten an imported hierarchy. A public
-model hierarchy should be introduced only if measured performance and real
-authoring cases demonstrate that the normal entity/component model is
-insufficient.
-
-## Project hosting and exported games
-
-Editor play and exported games enter the engine through the same `ProjectHost`
-contract. The host, rather than application source code, loads `jscene3d.json`,
-discovers the runtime extensions present in the application, scans authored
-assets, selects the optional startup scene or the entry scene, composes that
-world, and returns a `HostedProject`. Applications therefore do not generate or
-maintain a project-specific world loader.
-
-Project composition reports stable coarse-grained milestones through an
-optional `ProjectLoadProgressReporter` callback. This is progress from completed or
-starting host phases, not elapsed-time animation or estimated asset counts.
-Callbacks run on the loading thread and must return promptly, allowing a desktop
-host to keep its native window responsive while preserving the thread affinity
-required by OpenGL and audio realization.
-
-An application supplies behavior through a `ComponentRuntimeExtension`
-provider. A provider which also implements `ApplicationRuntimeExtension` may
-perform application-level preparation after composition. Discovery only makes
-a provider available; the application extension named by the project manifest
-controls which provider participates as the application entry point. Component
-participation remains controlled by authored component type declarations.
-
-The desktop host owns application lifecycle transitions requested through
-`ApplicationControl`. A distinct startup scene may implement a main menu. New
-Game transactionally loads a fresh entry world before releasing prior state,
-Show Menu retains and stops advancing gameplay, Resume returns to that exact
-world, and Quit ends the host loop. Menu rendering and command selection remain
-authored application behavior; the desktop module only owns world lifetime and
-transition semantics.
-
-Optional launch presentation is manifest data rather than a generated Java
-bootstrap. The desktop host opens the native window before world composition,
-presents a project-owned background, title, optional studio logo, middleware
-badges, and real load progress for the authored minimum duration, and displays it
-only once per process launch. Later world replacement retains the menu beneath a
-compact progress surface. A startup failure remains visible in the native window
-instead of being reduced to a terminal exception alone.
-
-The host executable selects a `ProjectRuntimeEnvironment`. The environment
-supplies the engine capabilities included in that build: built-in component
-descriptors and factories, fresh world subsystem adapters, and project-scoped
-content loading. After the manifest, safe type catalog, and authored asset
-catalog are available, it returns one `ProjectContent` containing the definition
-resolver and immutable-resource provider used by composition. That resolver may
-combine authored definitions with generated import publications without making
-the generic host depend on a particular importer. Editor preview can provide a
-preview environment while a desktop export can provide rendering, input,
-audio, physics, and imported-content adapters without changing application code
-or authored data.
-
-An exported game will package the generic launcher and host, its selected
-runtime environment and engine modules, application runtime-extension
-providers, and the project assets. Its generated platform launcher supplies the
-engine version, packaged project root, and published-content root to the generic
-`DesktopProjectLauncher`; it does not generate a Java class which knows the
-structure of the startup world. Packaging and platform launcher generation are
-derived build concerns and do not introduce another authoring format.
-
-The application-directory exporter accepts authored project data, completed import
-publications, caller-resolved runtime JARs, and an output directory through one
-build-tool-independent request. It owns runtime project-file selection,
-exclusion of imported raw sources and incomplete publication state,
-application-directory layout, relative launcher generation, and staged replacement.
-Maven or a future editor resolves the runtime artifact set but does not
-reproduce those export rules. Native bundles and archives will wrap this same
-application directory rather than assembling games independently.
-
-Runtime project-file selection includes the startup and entry scenes, launch
-presentation, declared runtime resources, and project-file references nested in
-resource properties. Editable source inputs used only to produce published
-imports remain excluded. Export dependency discovery therefore follows authored
-resource references instead of requiring every game build to maintain a
-parallel copy list.
-
-The application directory is the canonical assembled export and the first
-supported output format. It contains relative launchers, application and engine
-JARs, target-platform native dependencies, authored runtime project data, and
-published imported content. The initial directory uses a compatible installed
-Java runtime; it is relocatable on its target platform but is not claimed to be
-a single-file or cross-platform executable.
-
-Platform packaging consumes that assembled directory and adds only the runtime,
-native launcher, metadata, signing, and distribution container required by the
-target. The implementation order is the application directory on the current
-host, a macOS application bundle over that directory, and then a DMG containing
-the application bundle. Windows and Linux bundles and installers follow the
-same composition rule on their respective build hosts. Mobile targets require
-their own platform hosts and build pipelines; they do not reuse a desktop
-launcher unchanged.
-
-A conventional executable JAR is not an export target because the game needs
-target-specific native libraries and reliable native-library discovery before
-the application starts. The exporter will not create a self-extracting JAR or
-restart Java through an application bootstrapper. A ZIP or similar archive may
-distribute the assembled application directory without changing its runtime
-model.
-
-## Serialization and schema evolution
-
-The canonical authoring format is deterministic UTF-8 JSON.
-
-- Small structured assets use JSON.
-- Large mesh, texture, audio, and similar payloads remain separate binaries.
-- A compact runtime package may be generated later, but it is derived output,
-  not a second authoring format.
-- Java serialization and persisted implementation class names are forbidden.
-- Known fields are validated strictly. Explicit namespaced extension objects
-  are the escape hatch for extension-owned data.
-
-Every asset envelope records at least its `AssetId`, asset kind, and
-asset-format version. Every component record contains its component-type ID and
-configuration-schema version.
-
-Older formats may migrate deterministically in memory. Loading never silently
-rewrites source files; the editor reports the migration and persists it only
-through explicit save or migration. A newer unsupported version fails with a
-clear diagnostic.
-
-If a component type is unavailable, the editor preserves its complete
-serialized record as opaque data, displays the missing type ID, and permits
-unrelated inspection. Required unavailable components prevent play/export.
-They are never discarded merely because their descriptor is missing.
-
-The version-one entity-definition shape is:
-
-```json
-{
-  "$schema": "https://jscene3d.org/schemas/entity-definition-1.json",
-  "assetId": "4c189475-9845-4810-b7f9-af744d3cc726",
-  "assetType": "entity-definition",
-  "formatVersion": 1,
-  "name": "Bullet",
-  "contract": {
-    "parameters": [],
-    "signals": [],
-    "actions": [],
-    "capabilities": [],
-    "attachments": [],
-    "resourceBindings": []
-  },
-  "connections": [],
-  "root": {
-    "entryType": "local",
-    "entityId": "853f50a0-17dc-46ac-9f04-f772e54c44b2",
-    "name": "Bullet",
-    "enabled": true,
-    "components": [
-      {
-        "componentId": "b991ca3e-66bb-4ef0-a682-74773bbef0d0",
-        "type": "io.github.glynch.jscene3d/transform-3d",
-        "typeVersion": 1,
-        "properties": {
-          "translation": [0.0, 0.0, 0.0]
-        }
-      }
-    ],
-    "children": []
-  }
-}
-```
-
-Contract targets and connections store stable entity, component, property,
-endpoint, and attachment identities. Omitting `componentId` addresses the
-public contract of a nested definition placement; it never exposes that
-definition's private components.
+The detailed document lifecycle and frontend/session identity rules are
+defined in [JScene3D Editor architecture](editor-architecture.md). They are not
+part of runtime world composition.
 
 ## Validation and diagnostics
 
-Validation occurs before activation and reports ordered structured diagnostics.
-At minimum it detects:
+Project loading and definition composition report structured
+`ProjectDiagnostic` values with stable codes, severity, source URI, JSON
+location, and technical details. Validation is layered:
 
-- duplicate asset IDs;
-- unsupported asset or component schema versions;
-- unknown required asset/component types;
-- missing or wrong-kind asset references;
-- structural definition cycles;
-- duplicate local entity/component IDs;
-- unresolved required contract values;
-- illegal component multiplicity or capability conflicts;
-- missing or ambiguous capability dependencies;
-- incompatible spatial domains;
-- multiple transform authorities;
-- invalid signal/action payload or endpoint types;
-- invalid collision-shape membership;
-- orphaned imported targets.
+- descriptor and path validation establishes a safe project boundary;
+- structural definition loading validates schema, identities, references, and
+  transitive placement graphs;
+- descriptor-aware validation checks exact component versions, properties,
+  capabilities, multiplicity, conflicts, spatial authority, endpoints, and
+  contracts; and
+- runtime composition checks executable factory registration, construction,
+  reference binding, endpoint implementation, modules, and resources.
 
-Expected project/content failures are diagnostic data, not generic exceptions.
-Programmer-contract violations may remain exceptions.
+Operational failures are converted to structured diagnostics at the boundary
+where possible. Invalid authored or generated content does not produce a
+partially live world.
 
-## Editor projection
+## Architectural invariants
 
-The visual editor is a projection of the same definitions and descriptors used
-by JSON, Java builders, validation, and runtime composition.
+The following invariants define the current model:
 
-- The asset browser shows definitions without instantiating them.
-- Opening a definition shows its authored hierarchy. Generated imported
-  definitions are read-only.
-- Dragging a definition into a world or another definition creates a placement.
-- A placed definition appears as its root entity, with no wrapper node.
-- The inspector exposes placement state and the definition's public contract,
-  not private internals.
-- Descriptor metadata supplies component property editors, constraints,
-  signals, actions, and defaults.
-- Runtime-created entities appear only in the live hierarchy while they exist.
-- Live inspection never automatically writes runtime entities back into the
-  authored world.
-- Stable IDs are normally hidden but available for diagnostics and advanced
-  wiring.
+1. Authored definitions never become mutable live state.
+2. Every live entity belongs to exactly one world and has one ownership parent
+   or is a world root.
+3. Placement and spawn roots are the instantiated definition roots, not wrapper
+   entities.
+4. Component descriptors are the authority for validation, lifecycle,
+   scheduling, endpoints, and capabilities.
+5. Runtime extensions implement descriptors but do not redefine their safe
+   contract.
+6. Required capabilities resolve to exactly one provider on the same entity.
+7. At most one component supplies an entity's primary spatial domain.
+8. Composition is transactional and publishes only a complete inactive world.
+9. Signals dispatch synchronously through explicit authored connections.
+10. Structural mutation commits only at controlled world boundaries.
+11. Runtime resources are retained through world-owned leases.
+12. Rendering, collision, authoring, importing, and application execution keep
+    explicit ownership boundaries.
 
-Java builders and annotations may provide additional authoring front ends, but
-they must produce the same canonical immutable definitions. Arbitrary Java
-construction is not a second runtime composition model.
+## Related decisions and documentation
 
-## Visual editor host
-
-The supported visual editor is the Code OSS-based product. Code OSS owns the
-workbench, source editing, Java tooling, hierarchy, Inspector, diagnostics,
-tabs, and layout. It communicates with the persistent
-`jscene3d-editor-authoring-service` process, which delegates safe project and
-authoring behavior to `jscene3d-editor-authoring`.
-
-The current macOS viewport uses `jscene3d-iosurface-macos` for native rendering
-support. This keeps native renderer lifecycle behind an explicit host boundary
-without introducing a parallel authored-project or scene model in the frontend.
-The earlier JavaFX/OpenGLFX prototype and in-process editor proved useful
-renderer-host lifecycle principles, but that product stack is retired.
-
-## Screen presentation components
-
-Screen presentation uses the same entity and component model as the 3D world;
-it does not introduce a special HUD node type or a second hierarchy. A
-`screen-canvas` component registers one ordinary entity subtree as an overlay.
-Descendant `screen-region` components resolve anchored rectangles, while content
-components such as `screen-image` and `bitmap-number` draw descriptor-selected
-overlay-image resources into those regions.
-
-Game-specific HUD behavior remains a game component. It binds explicitly to
-game-state capabilities and generic screen-content components by stable
-component target, then updates their presentation-neutral values. Layout, glyph
-resources, and initial values therefore remain editor-visible project data; the
-game extension supplies only semantic binding that a generic editor cannot
-infer.
-
-Overlay images are screen-presentation resources, separate from 3D texture
-resources. Import may share source pixels, but runtime resource types do not
-expose renderer texture objects for screen drawing.
-
-## Initial module seams
-
-The first implementation should preserve these seams even if existing Maven
-artifact names later change:
-
-1. **Asset/definition module**: JSON loading, immutable definitions, typed IDs
-   and references, schema migration, catalogs, validation, and diagnostics.
-2. **Component registry module**: type descriptors, migrations, capability
-   requirements, and runtime construction adapters.
-3. **World composition module**: preparation, transactional instantiation,
-   lifecycle, schedules, mutation commits, signals/actions, and resource
-   leases.
-4. **3D adapter module**: built-in 3D descriptors and bridges to rendering and
-   physics without making either backend the entity model.
-5. **Host adapter**: window/game-loop integration and explicit construction of
-   a `World` from registered modules.
-
-These are responsibility seams; final Maven artifact names are selected during
-implementation rather than defining the architecture.
-
-## First implementation acceptance cases
-
-The engine foundation is ready for Beacon Garden when one project can:
-
-1. load a `ProjectManifest` and startup `WorldDefinition` from JSON;
-2. validate a world containing local entities and placed definitions;
-3. construct a `World` with explicit rendering, physics, audio, resource, and
-   scheduling module interfaces as required by the host;
-4. instantiate entities with `Transform3d`, camera, light, mesh-renderer, and
-   Java behavior components;
-5. load one generated glTF `EntityDefinition` and render an instance;
-6. prepare and spawn a reusable definition during a fixed update;
-7. activate it atomically at a phase boundary and show it in the live
-   hierarchy;
-8. author a collision body or sensor with more than one shape;
-9. deliver a typed collision/overlap signal to game behavior;
-10. disable, re-enable, and destroy an owned subtree with the documented
-    lifecycle order;
-11. fail invalid content through structured diagnostics without exposing a
-    partially constructed world.
-
-Doomed Corridors is a design validation target, not part of this first delivery.
-The same model must later express a generated/imported level, player and weapon
-composition, bullet and enemy spawning, pickup sensors, doors and switches,
-independent collision geometry, HUD/UI children, audio, and live entities at
-the required scale. Nothing in the first slice may make those cases require a
-second entity model.
-
-## Explicitly deferred
-
-The following do not block the first Beacon Garden implementation:
-
-- choosing or building a dependency-injection framework;
-- final replacement name for `SpawnOperation`;
-- data-oriented ECS storage or public queries;
-- exact cross-platform deterministic replay or lockstep networking;
-- definition inheritance or variants;
-- general imported-definition refinement;
-- a public model/model-instance hierarchy;
-- arbitrary live editing and hot reload;
-- runtime persistence/save games;
-- streaming worlds and world partitioning;
-- multiplayer replication;
-- scripting languages or visual scripting;
-- a complete 2D/UI component catalog;
-- specialized pooling or batched projectile representations;
-- final editor interaction design beyond the projection rules above.
-
-Deferred does not mean prohibited. A later feature must deepen the established
-modules or justify revisiting an invariant; it should not create a parallel
-authoring or runtime model by default.
-
-## Related decisions and plans
-
-The durable architectural choice is summarized by ADR 0026. The concrete Beacon
-Garden delivery sequence lives in its own repository so engine design and
-application implementation remain separate.
-
-## Reference designs
-
-- [Godot: Nodes and scenes](https://docs.godotengine.org/en/4.7/getting_started/step_by_step/nodes_and_scenes.html)
-- [Godot: 3D](https://docs.godotengine.org/en/4.7/tutorials/3d/index.html)
-- [Godot: Physics introduction](https://docs.godotengine.org/en/stable/tutorials/physics/physics_introduction.html)
-- [Unity: GameObjects](https://docs.unity3d.com/6000.0/Documentation/Manual/GameObjects.html)
-- [Unity: Prefabs](https://docs.unity3d.com/6000.0/Documentation/Manual/Prefabs.html)
-- [Unity: Runtime instantiation](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Object.Instantiate.html)
+- [ADR 0024: Separate physics from game integration](../adr/0024-separate-physics-from-game-integration.md)
+- [ADR 0025: Separate game applications from the game engine](../adr/0025-separate-game-applications-from-the-game-engine.md)
+- [ADR 0026: Use hierarchical entity-component worlds](../adr/0026-use-hierarchical-entity-component-worlds.md)
+- [ADR 0030: Model editable content as resource working copies](../adr/0030-model-editable-content-as-resource-working-copies.md)
+- [Project and game fundamentals](../manual/project-fundamentals.md)
+- [Editor fundamentals](../manual/editor-fundamentals.md)
+- [JScene3D Editor architecture](editor-architecture.md)
+- [WAD and Doom integration](wad-doom-integration.md)

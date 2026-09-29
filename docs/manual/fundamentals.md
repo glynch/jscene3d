@@ -12,15 +12,18 @@ geometry, material, mesh, light, and frame loop.
 
 A minimal application connects a `Scene` and `Camera` to a `Renderer`. The
 renderer draws the part of the scene visible through the camera into a render
-surface. A desktop `Window` supplies that surface and presents each completed
-frame.
+surface. `RenderSurface` is the boundary through which the renderer receives
+exclusive access to a host-owned OpenGL context and presentation framebuffer.
+For the desktop example in this chapter, a `Window` is the host and presents
+each completed frame.
 
 ![A scene and camera feed the renderer, which draws through a render surface into a window.](images/rendering-structure.svg)
 
 The important responsibilities are:
 
 - `Window` owns the native desktop window and its OpenGL context.
-- `Renderer` turns a scene and camera into pixels.
+- `RenderSurface` exposes the host context and framebuffer to a renderer.
+- `Renderer` turns a scene and camera into pixels; it does not present them.
 - `Scene` is the root of the renderer-level scene graph.
 - `Camera` defines the viewpoint and projection.
 - `Mesh` combines geometry, material, and a transform.
@@ -28,10 +31,14 @@ The important responsibilities are:
 - `Material` describes how a surface is drawn.
 - `Light` contributes illumination to light-reactive materials.
 
+For the context-local GPU realization and reuse model behind these public
+objects, see the [rendering architecture](../design/rendering-architecture.md).
+
 ## Create the window and renderer
 
-The window and renderer own native resources, so create them with
-try-with-resources:
+The window owns the native window and OpenGL context. The renderer owns its
+context-local GPU resources and exclusive access to the render surface. Create
+both with try-with-resources:
 
 ```java
 try (Window window = Window.create("JScene3D - Hello Cube");
@@ -42,6 +49,14 @@ try (Window window = Window.create("JScene3D - Hello Cube");
 
 `Window.create` initially creates a hidden window. This allows the application
 to finish constructing its first frame before calling `window.show()`.
+
+`Renderer.create(window)` is the desktop convenience overload. It adapts the
+window to the `RenderSurface` contract and claims the window's context for that
+renderer. Closing the renderer releases the claim; closing the window then
+destroys the context and native window. The declaration order above produces
+that order automatically because try-with-resources closes resources in
+reverse order. Other rendering hosts can provide a `RenderSurface` directly
+without changing the scene, camera, or renderer-level object model.
 
 ## Create the scene and camera
 
@@ -65,8 +80,11 @@ PerspectiveCamera camera = new PerspectiveCamera(
 camera.setPosition(0.0f, 0.0f, 3.0f);
 ```
 
-The camera looks down its local negative Z axis. Moving it to positive Z places
-the origin in front of it.
+JScene3D uses a right-handed coordinate system with positive Y as world up.
+The camera looks down its local negative Z axis, so moving it to positive Z
+places the origin in front of it. The complete transform, matrix, clip-space,
+and angle contract is recorded in
+[ADR 0034](../adr/0034-standardize-coordinate-and-matrix-conventions.md).
 
 The field of view, aspect ratio, and clipping distances define a viewing
 frustum. Objects outside this volume are not visible.
@@ -118,7 +136,9 @@ long previousNanos = System.nanoTime();
 while (!window.shouldClose()) {
     Window.pollEvents();
 
-    if (window.framebufferSizeChanged()) {
+    if (window.framebufferSizeChanged()
+            && window.framebufferWidth() > 0
+            && window.framebufferHeight() > 0) {
         camera.setAspectRatio(window.framebufferAspectRatio());
     }
 
@@ -141,7 +161,12 @@ rates.
 
 The camera aspect ratio is refreshed when the framebuffer size changes. Using
 the framebuffer rather than only the logical window size also handles
-high-density displays correctly.
+high-density displays correctly. A minimized window can have a zero-sized
+framebuffer, so the loop keeps the last valid aspect ratio until the window is
+drawable again. The renderer itself safely skips drawing a zero-sized surface.
+
+`renderer.render` draws into the surface's framebuffer but does not present
+it. The desktop host therefore calls `window.swapBuffers()` after each render.
 
 ## Complete example
 
@@ -189,7 +214,9 @@ public final class HelloCube {
             long previousNanos = System.nanoTime();
             while (!window.shouldClose()) {
                 Window.pollEvents();
-                if (window.framebufferSizeChanged()) {
+                if (window.framebufferSizeChanged()
+                        && window.framebufferWidth() > 0
+                        && window.framebufferHeight() > 0) {
                     camera.setAspectRatio(window.framebufferAspectRatio());
                 }
 
@@ -208,6 +235,13 @@ public final class HelloCube {
     }
 }
 ```
+
+The application owns and closes the geometry and material. `Mesh` only keeps
+references to these shareable resources; closing a mesh is neither required
+nor supported. The renderer manages the corresponding GPU resources. In the
+declaration order above, the material and geometry close first, then the
+renderer releases its GPU resources and surface claim, and finally the window
+destroys the OpenGL context.
 
 Within this repository, run the existing rotating cube example with:
 
@@ -229,6 +263,7 @@ LambertMaterial material = new LambertMaterial(Color.srgb(0x44aa88));
 scene.add(new AmbientLight(Color.WHITE, 0.2f));
 DirectionalLight keyLight = new DirectionalLight(Color.WHITE, 1.5f);
 keyLight.setPosition(2.0f, 3.0f, 4.0f);
+keyLight.setTarget(0.0f, 0.0f, 0.0f);
 scene.add(keyLight);
 ```
 

@@ -1,73 +1,86 @@
 # JScene3D Coding Standards
 
-These standards apply from the first implementation commit. They contain only
-rules relevant to JScene3D.
+These standards apply repository-wide. They describe current engineering
+rules and the verification that enforces them.
 
 ## Terminology
 
-Use the architecture vocabulary consistently:
+Use architecture vocabulary consistently:
 
-- **Component** means a logical class, package, or subsystem with an interface
-  and implementation.
-- **Artifact** means a separately built and published Maven dependency.
-- **JPMS Module** means a unit declared by `module-info.java`.
-- Avoid the unqualified term **module**, because it is ambiguous in this
-  project.
+- **Component** means an entity-composition unit in the project and runtime
+  model. Use class, package, subsystem, or service for software structure when
+  that is what is meant.
+- **Maven module** means one reactor project with its own `pom.xml`.
+- **Artifact** means a separately built or published Maven coordinate.
+- **JPMS module** means a unit declared by `module-info.java`.
+- Qualify the word **module** as Maven or JPMS whenever the distinction is not
+  already unambiguous.
 
-The definitions in `CONTEXT.md` are authoritative for domain terminology.
+The [manual](docs/manual/README.md) defines user-facing concepts, the
+[design documents](docs/design/) define current architecture, and the
+[architecture decision records](docs/adr/) record durable decisions and their
+trade-offs. Do not create a parallel context or handover document as another
+terminology authority.
 
 ## Mandatory verification
 
-Before a permanent commit, run:
+Use focused verification while developing:
+
+- run the tests and static checks for each affected Maven module;
+- compile or test direct consumers when a public or cross-module contract
+  changes;
+- run the relevant integration profile for context-dependent behavior; and
+- run Markdownlint and `git diff --check` for documentation-only changes.
+
+Do not run the complete reactor after every small edit merely as an iteration
+step. Before work is considered permanent or release-ready, however, the
+repository acceptance command is:
 
 ```shell
 ./mvnw clean verify
 ```
 
-Always include `clean`. Verification must begin from an empty Maven build-output
-state and must not succeed because stale classes, generated sources, resources,
-reports, or test output remain in `target` directories.
+Keep `clean` in this acceptance command. It prevents stale classes, generated
+sources, resources, reports, and test output in `target` directories from
+making verification pass accidentally.
 
-Every reliably machine-checkable standard belongs in the normal `verify`
-lifecycle. CI checks and reports source formatting; it never rewrites a branch
-automatically.
+The ordinary lifecycle checks formatting and reports violations; it does not
+rewrite source. Run `./mvnw spotless:apply` explicitly when formatting is
+required. Renderer changes additionally use the `render-integration` profile
+described under Testing.
 
 ## Java source and formatting
 
-- Target Java 21 and use stable features only. Production and test code must not
-  require `--enable-preview`.
+- Target Java 21 and use stable features only. Production and test code must
+  not require `--enable-preview`.
 - Use UTF-8 explicitly for source, resources, reports, and runtime text
   conversion.
-- Write generated JSON documents using deterministic, human-readable
-  indentation and terminate them with a newline. Compact JSON is appropriate
-  only when an external protocol or measured performance requirement demands
-  it.
-- Spotless with a pinned Palantir Java Format version is the only mechanical
+- Write generated JSON documents with deterministic, human-readable
+  indentation and a terminating newline. Compact JSON is appropriate only for
+  an external protocol or a measured performance requirement.
+- Spotless with the pinned Palantir Java Format version is the sole mechanical
   Java formatter.
-- Spotless removes unused imports. Checkstyle forbids wildcard imports.
-- Checkstyle enforces semantic source rules and must not duplicate formatter
+- Spotless removes unused imports. Checkstyle forbids wildcard imports and
+  fully qualified Java type references where an import should be used.
+- Checkstyle enforces semantic source rules and does not duplicate formatter
   whitespace, import-order, or line-length behavior.
-- `./mvnw clean verify` checks formatting and never rewrites source.
-- Run `./mvnw spotless:apply` explicitly to format source.
-- Do not leave public constructors or methods empty. Perform their required
-  initialization, omit them, or document why an intentionally empty body is
-  part of the public contract.
-- Keep methods and constructors at or below seven parameters. Checkstyle
-  enforces this limit. Introduce a cohesive parameter object or redesign the
-  interface when related inputs would otherwise exceed it.
-- Keep production methods at or below Sonar's cognitive-complexity threshold of
-  15. PMD enforces the same threshold during `clean verify`. When a feature adds
-  another decision branch, extract cohesive validation or behavior in the same
-  change instead of leaving a new warning for a later cleanup. Do not suppress
-  cognitive-complexity findings.
-- Do not declare arrays as record components. Java records compare arrays by
-  identity, which is almost never the intended value semantics. Use an immutable
-  class with defensive copies and deliberately implemented equality instead.
+- Do not leave public or protected constructors or methods empty. Perform the
+  required initialization, omit the member, or document and implement an
+  intentional contract without an empty body.
+- Keep methods and constructors at or below seven parameters. Introduce a
+  cohesive parameter object or redesign the interface when related inputs
+  would otherwise exceed that limit.
+- Keep production methods at or below a cognitive complexity of 15. Extract
+  cohesive validation or behavior instead of suppressing the finding.
+- Do not declare arrays as record components. Records compare arrays by
+  identity rather than content. Use an immutable class with defensive copies
+  and deliberate equality semantics.
+- Use `Math.clamp` instead of nested `Math.min` and `Math.max` expressions.
 - Promote at least one operand before integral arithmetic whose result is
-  consumed as `float`, `double`, or `long`. Casting or assigning the completed
-  result is too late to prevent overflow or truncation during the operation.
-  Centralize repeated domain-unit and coordinate conversions in a focused type
-  so callers cannot accidentally perform the arithmetic in the source type.
+  consumed as `float`, `double`, or `long`. Casting the completed result is too
+  late to prevent overflow or truncation.
+- Centralize repeated domain-unit and coordinate conversions in a focused
+  type so callers cannot accidentally perform arithmetic in the source unit.
 - Original source files use this short license header with the appropriate
   comment syntax:
 
@@ -78,167 +91,179 @@ automatically.
 
 ## Nullness and compiler analysis
 
-- Mark production packages `@NullMarked` with JSpecify.
-- Run Error Prone and NullAway in JSpecify mode over null-marked code, with
-  their error diagnostics failing the build.
-- Request all Java compiler lint checks, excluding only class-file metadata
-  diagnostics produced by JOML's deliberately old bytecode level. Maven hides
-  javac warning output because JOML's JPMS descriptor also causes an
-  individually unsuppressible Vector incubator warning whenever it is resolved.
-  Error Prone, NullAway, Checkstyle, SpotBugs, and forbidden-API diagnostics
-  remain visible and build-enforced. Re-enable javac warning output when JOML or
-  javac provides a narrow suppression for the incubator diagnostic.
+- Use JSpecify for Java nullness annotations.
+- Mark packages `@NullMarked` when they participate in strict nullness
+  analysis. New production packages should opt in unless an existing boundary
+  makes that impossible and the exception is documented.
+- NullAway runs in JSpecify mode with `OnlyNullMarked=true`; do not assume it
+  analyses an unmarked package.
+- Error Prone and NullAway error diagnostics fail compilation.
+- The compiler requests `-Xlint:all` except `classfile`. Maven currently hides
+  ordinary javac warning output because resolved third-party bytecode produces
+  warnings without a sufficiently narrow suppression. Error Prone, NullAway,
+  Checkstyle, PMD, SpotBugs, and Forbidden APIs remain visible and
+  build-enforced.
 - Runtime validation remains mandatory at public boundaries despite static
   nullness analysis.
-- Suppressions must be narrow and include a reason.
+- Suppressions must be narrow, local, and accompanied by a reason.
 
-VS Code's separate null-analysis mode is disabled so it does not compete with
-the build-authoritative NullAway configuration.
+Do not describe editor-only analysis as authoritative. The Maven compiler
+configuration is the repository's nullness and compiler-analysis contract.
 
 ## Naming
 
 - Value accessors use concise noun names such as `position()`, `parent()`, and
   `status()`, not JavaBeans `get...()` names.
-- Mutators use explicit verbs such as `setPosition(...)`. Meaningful operations
-  use domain verbs such as `add(...)`, `remove(...)`, and `detach()`.
+- Mutators use explicit verbs such as `setPosition(...)`. Meaningful
+  operations use domain verbs such as `add(...)`, `remove(...)`, and
+  `detach()`.
 - Boolean predicates use `is...()` where grammatically appropriate.
 - Use `of(...)` to compose existing values, `from(...)` for conversion, and
-  `load(...)` for I/O. Prefer a more descriptive factory when `of(...)` would
-  hide intent.
+  `load(...)` for I/O. Prefer a descriptive factory when `of(...)` would hide
+  intent.
 - Builders use `builder()` and `toBuilder()`. Builder methods use noun names.
 - Do not add builders or fluent chaining mechanically; use them only when they
-  reduce genuinely complex construction.
+  make genuinely complex construction clearer.
 - Avoid boolean parameters and overloads whose meaning is unclear at the call
   site. Prefer named value types, enums, or builders.
 - Use `Path`, `URI`, `Duration`, `Instant`, and other domain-appropriate Java
   types instead of string or primitive substitutes.
 - Treat acronyms as Java words in identifiers: `GltfLoader`, `OpenGlRenderer`,
   and `LwjglWindow`, not `GLTFLoader`, `OpenGLRenderer`, or `LWJGLWindow`.
-- Do not create generic `Util`, `Common`, `Manager`, `Service`, or `Core`
-  container classes. This rule does not prohibit the accepted
-  `jscene3d-core` artifact name.
-- Do not bury a generally reusable operation in a private helper merely because
-  it currently has one caller. Put generic argument checks in a focused internal
-  `Preconditions` component; keep class-specific invariant validation and
-  implementation behavior in the owning class.
-- Each production Maven artifact owns its internal precondition policy. Reuse
-  that component across the artifact instead of duplicating generic checks in
-  public model classes. Add focused internal components for other shared
-  policies, such as path resolution or format decoding, when those policies
-  have their own state or behavior.
+- Avoid vague `Util`, `Common`, `Manager`, `Service`, or `Core` containers. A
+  qualified manager or service name is acceptable when it represents a real
+  lifecycle or architectural boundary rather than miscellaneous operations.
+- Do not bury a generally reusable operation in a private helper merely
+  because it currently has one caller. Put generic argument checks in a
+  focused internal `Preconditions` type; keep class-specific invariant
+  validation and behavior in the owning class.
+- Each production artifact or cohesive package family owns its internal
+  precondition policy. Reuse that policy instead of duplicating generic checks
+  in public model classes.
 
 ## Static verification
 
-The normal `clean verify` lifecycle must eventually include:
+The ordinary `clean verify` lifecycle currently includes:
 
-- Spotless formatting checks.
-- Java compiler linting, Error Prone, and NullAway.
-- The checked-in semantic Checkstyle rules.
-- PMD cognitive-complexity analysis over production methods.
-- SpotBugs restricted to high-confidence findings.
-- Maven Enforcer checks for Java and Maven versions, plugin versions, dependency
-  convergence, reactor convergence, and upper dependency bounds.
-- Forbidden-API checks over production and test code using the checked-in
-  project signatures plus the bundled unsafe, deprecated, non-portable,
-  reflection, and `System.out` signatures.
+- Spotless formatting checks during `validate` using Palantir Java Format;
+- Maven Enforcer checks for Java and Maven versions, pinned plugin versions,
+  duplicate dependency versions, dependency and reactor convergence, and
+  upper dependency bounds;
+- Java compilation with Error Prone and NullAway;
+- JUnit tests on the JPMS module path;
+- Checkstyle over production and test source;
+- PMD cognitive-complexity analysis over production source;
+- high-confidence SpotBugs analysis;
+- Forbidden APIs checks over production and test bytecode;
+- JaCoCo reports and the coverage checks configured by each artifact;
+- strict public and protected Javadoc with all doclint checks enabled; and
+- Markdownlint through the `jscene3d-documentation` Maven module.
 
-The project-specific forbidden APIs require explicit character sets and prevent
-JScene3D components from constructing threads directly. Callers own execution
-threads.
+Tool and plugin versions are pinned centrally in the root `pom.xml`; the
+Markdown toolchain is pinned in `pom.xml`, `package.json`, and the lockfile.
+Do not duplicate version numbers here.
+
+The project-specific Forbidden APIs signatures require explicit character
+sets and prohibit JScene3D code from constructing threads directly. Callers or
+explicit host boundaries own execution threads.
+
+SBOM generation, vulnerability scanning, license scanning, API-baseline
+comparison, signing, and deployment are not currently bound to ordinary
+`verify`. Do not describe planned or inactive tools as build-enforced.
 
 ## Packages and JPMS
 
-- Every published artifact includes `module-info.java` and remains usable on the
-  ordinary classpath.
-- Establish responsibility-based subpackages in the first implementation commit
-  for every new Maven artifact. Do not accumulate unrelated interfaces,
-  coordinators, adapters, process launchers, parsers, persistence, and UI types
-  in the artifact's root package with the intention of reorganizing them later.
-  The root package contains only `package-info.java` and types which genuinely
-  form the artifact's central public interface; tests mirror the responsibility
+- General-purpose Java artifacts declare genuine JPMS modules. The
+  `jscene3d-documentation` POM and the platform-specific
+  `jscene3d-iosurface-macos` proof adapter are current explicit exceptions.
+- Follow the `io.github.glynch.jscene3d...` naming family for JPMS modules and
+  Java packages.
+- Establish responsibility-based subpackages when introducing a Maven module.
+  Do not collect unrelated interfaces, coordinators, adapters, launchers,
+  parsers, persistence, and UI types in one root package.
+- A root package contains only `package-info.java` and types that genuinely
+  form the artifact's central interface. Tests mirror the responsibility
   packages they exercise.
-- `jscene3d-core` uses JPMS module name
-  `io.github.glynch.jscene3d.core`.
-- `jscene3d-lwjgl` uses JPMS module name
-  `io.github.glynch.jscene3d.lwjgl`.
-- `jscene3d-gui` uses JPMS module name
-  `io.github.glynch.jscene3d.gui`.
-- Export only intentional caller packages.
-- Organize public core types by feature package: `cameras`, `geometries`,
-  `helpers`, `lights`, `materials`, `math`, `objects`, `scenes`, and `textures`.
-  Do not recreate a broad `core` package as a general dumping ground.
-- Keep renderer orchestration and its supported diagnostics and overlay boundary
-  in `render`; place render-list, program, and GPU-resource implementation in
-  unexported `render.internal` packages.
-- Keep optional GUI controls and themes in `gui`; place font, drawing-adapter,
-  and validation implementation in unexported `gui.internal` packages.
-- Keep implementation in unexported `.internal` packages and prefer
-  package-private implementation types.
-- Never use split packages across artifacts.
-- Forbid package, artifact, and JPMS dependency cycles.
+- Export only intentional caller packages. Keep implementation in unexported
+  `.internal` packages and prefer package-private implementation types.
+- Use `requires transitive` only when an exported public or protected API
+  exposes the required module. Keep implementation dependencies
+  non-transitive. Use `requires static` for compile-time-only annotation
+  dependencies such as JSpecify.
+- Never create split packages across artifacts.
+- Forbid package, Maven-artifact, and JPMS dependency cycles.
 - Avoid broad `opens`; qualify reflective access narrowly when unavoidable.
-- Build minimal external consumer fixtures on both the module path and classpath
-  during `./mvnw clean verify`.
+- Protect important exports, non-exports, and transitivity decisions with
+  focused module-descriptor tests.
 - Do not introduce an `@InternalApi` escape hatch unless cross-artifact
   implementation collaboration genuinely requires technical accessibility.
+
+The current Maven-module responsibilities belong in the
+[module overview](docs/design/module-overview.md), not in this standards file.
 
 ## Public interfaces and values
 
 - Every public or protected element in an exported package is supported caller
   interface.
 - Classes are final unless inheritance is an intentional, documented extension
-  point. Scene abstractions such as `Object3D`, `Camera`, and `Material` may be
-  designed exceptions.
-- Every exported type and public method has Javadoc covering the applicable
-  invariants, lifecycle, thread rules, ownership, failures, and performance
-  behavior.
-- Every package-private production type, constructor, and method has concise
-  Javadoc describing its internal contract. Private helpers have Javadoc when
-  their name and signature do not fully explain their role.
+  point. Scene abstractions such as `Object3D`, `Camera`, and `Material` are
+  deliberate exceptions.
+- Every exported type and public or protected member has Javadoc covering
+  applicable invariants, lifecycle, thread rules, ownership, failures, and
+  performance behavior.
+- Package-private production types, constructors, and methods have concise
+  Javadoc when they carry a non-obvious internal contract. Private helpers
+  need Javadoc only when their name and signature do not explain that contract.
 - Configuration types such as `WindowOptions` and `RendererOptions` are final,
-  immutable classes with builders and value equality.
-- Mutable scene nodes and Resource Descriptions remain intentionally mutable
-  through their controlled methods; immutability is not applied mechanically.
-- Defensively copy caller-provided arrays and collections unless an explicitly
-  documented ownership-transfer interface exists.
-- Use records only for genuinely closed scalar tuples, not configuration or
-  domain types expected to evolve.
+  immutable values with builders and value equality.
+- Mutable scene nodes and resource descriptions remain intentionally mutable
+  through controlled methods; do not apply immutability mechanically.
+- Defensively copy caller-provided arrays and collections unless a documented
+  ownership-transfer interface exists.
+- Use records for genuinely closed value aggregates with stable components,
+  not configuration or domain types expected to grow incompatibly.
 - Use `Optional<T>` only when absence is a meaningful return value. Do not use
   it for parameters.
 - A new public type must hide meaningful complexity or represent necessary
   domain vocabulary. Do not publish pass-through wrappers.
-- A public feature includes interface-level tests, Javadoc, and its focused
-  runnable Feature Example in the same coherent change.
+- A public capability includes focused interface-level tests and Javadoc.
+  Add or update a runnable example when visual or interactive behavior is part
+  of the capability; supporting DTOs and internal plumbing do not each require
+  an example.
 
 ## Interface compatibility
 
-After the first published release establishes a comparison baseline, Revapi or
-an equivalent checker compares supported exported interfaces against the latest
-release. Unexported `internal` packages are excluded using the checked-in Revapi
-configuration. Supported elements must never be excluded merely to make a
-compatibility check pass.
+JScene3D is pre-1.0. APIs, project formats, editor behavior, and Maven or JPMS
+module boundaries may change without backward compatibility before 1.0.
 
-Patch releases fail verification on source or binary incompatibility. Pre-1.0
-minor releases may approve breaking changes explicitly, with migration notes and
-prior deprecation where practical.
+Breaking changes must still be deliberate and coherent: update affected
+callers, tests, examples, schemas, and documentation in the same change, and
+provide migration guidance when external users are known to depend on the old
+contract. Do not preserve an obsolete API merely to imply a compatibility
+promise that the project has not made.
+
+The repository contains `config/revapi/analysis.xml`, but no Revapi plugin is
+currently bound to the Maven lifecycle. `clean verify` therefore does not
+compare the exported API with a released baseline. Do not claim automated API
+compatibility enforcement until such a check is configured and proven.
 
 ## Testing
 
 - Use JUnit Jupiter and AssertJ.
 - Do not adopt a mocking framework by default. Prefer real values and
   deterministic fakes at established seams.
-- Test the scene graph, transforms, validation, and Resource Descriptions
-  headlessly through their public interfaces.
-- Never use arbitrary sleeps. Use deterministic coordination when concurrency
-  eventually requires it.
-- Tests that need temporary files or directories must receive a JUnit Jupiter
+- Test public behavior headlessly wherever native rendering, audio, or another
+  platform context is not essential.
+- Never use arbitrary sleeps. Use deterministic coordination for asynchronous
+  and concurrent behavior.
+- Tests that need temporary files or directories receive a JUnit Jupiter
   `@TempDir Path`. Do not hard-code operating-system temporary paths or create
   unmanaged temporary test locations directly.
 - Keep an exception assertion's executable lambda to one invocation that may
   throw. Construct inputs and callbacks before the assertion.
-- Keep each test method below 25 assertion invocations. Split broader scenarios
-  into focused tests instead of hiding assertions in helper methods.
-- Compile every Feature Example during ordinary verification.
+- Keep each test method below 25 assertion invocations. Split broader
+  scenarios into focused tests instead of hiding assertions in helpers.
+- Compile runnable examples during ordinary verification.
 - Run context-dependent OpenGL tests with:
 
   ```shell
@@ -248,75 +273,64 @@ prior deprecation where practical.
 - OpenGL integration tests use hidden contexts, deterministic framebuffer
   rendering and pixel readback, repeated create/close cycles, and resource-leak
   assertions.
-- Run the rendering profile locally for renderer changes and across every
-  Provisional Platform during qualification.
-- Generate JaCoCo line and branch reports and enforce these per-artifact minimums
-  during ordinary verification:
+- Run the rendering profile for renderer changes on the current Verified
+  Platform. Other native targets are not verified merely because dependency
+  classifiers exist for them.
 
-  | Artifact | Line coverage | Branch coverage |
-  | --- | ---: | ---: |
-  | `jscene3d-core` | 90% | 75% |
-  | Headless LWJGL control/input core (per class) | 90% | 75% |
-  | `jscene3d-lwjgl` with `render-integration` | 85% | 65% |
-  | `jscene3d-gui` | 85% | 70% |
+JaCoCo instruments and reports Java modules through the parent build. Example
+artifacts explicitly skip percentage gates, and each library module's POM is
+the authority for any non-zero line and branch minimums. The parent defaults
+remain zero for modules that have not opted into a floor, so do not describe
+coverage enforcement as universal.
 
-  Ordinary verification enforces the headless floor individually for
-  `OrbitLimits`, `OrbitState`, the controls preconditions, `InputState`, `Key`,
-  and `MouseButton`; it does not publish a misleading whole-artifact percentage
-  for native code that cannot execute without an OpenGL context. The
-  `render-integration` profile adds native integration coverage to the same
-  execution data and enforces the whole LWJGL artifact. Raise each floor as
-  coverage improves; never lower one merely to make a change pass. Examples are
-  compiled but excluded from percentage gates because they are executable
-  documentation rather than library code.
-- Require explicit branch coverage for hierarchy-cycle rejection, lifecycle
-  transitions, public validation, and renderer cleanup regardless of the
-  percentage floors.
-- Keep JMH benchmarks in a separate profile. Benchmarks do not run during
-  ordinary verification.
+`jscene3d-lwjgl` has additional treatment: ordinary verification enforces
+per-class floors for its headless control and input core, while the
+`render-integration` profile enables a whole-artifact coverage floor using the
+native integration execution data. Raise coverage floors as coverage improves;
+never lower one merely to make a change pass. Require explicit branch coverage
+for hierarchy-cycle rejection, lifecycle transitions, public validation, and
+resource cleanup regardless of aggregate percentages.
 
 ## Dependencies and diagnostics
 
-- `jscene3d-core` initially has only JOML and JSpecify as production
-  dependencies.
-- Because JOML types appear in the supported public interface, the core JPMS
-  module requires JOML transitively.
-- `jscene3d-lwjgl` depends on core and only the required LWJGL components: LWJGL
-  core, GLFW, OpenGL, and STB.
-- `jscene3d-gui` depends on LWJGL and uses STB only for bundled TrueType font
-  rasterization. It does not receive or expose OpenGL state.
-- Exported packages never expose LWJGL types.
-- Test, benchmark, and optional integration dependencies do not leak
-  transitively.
+- Manage dependency and plugin versions centrally in the root POM. Maven
+  Enforcer protects convergence and upper bounds.
 - A production dependency must provide a capability that is costly or risky to
   implement locally. Do not add utility libraries for clear Java 21
   functionality.
-- Do not add application frameworks or a logging facade.
-- Use `System.Logger` only for sparse diagnostics and actionable platform
-  warnings. Do not automatically log an exception that is returned or thrown to
-  the caller.
-- Manage dependency and plugin versions centrally. Enforce dependency
-  convergence and upper bounds.
+- Give dependencies the narrowest correct Maven scope and JPMS requirement.
+  Test, example, optional integration, and platform-native dependencies do not
+  leak transitively without a documented reason.
+- A dependency exposed through supported API may require JPMS transitivity;
+  implementation-only dependencies must remain non-transitive.
+- Keep engine abstractions free of third-party implementation types. In
+  particular, exported non-LWJGL APIs must not expose raw LWJGL or OpenGL
+  handles.
+- Do not add application frameworks or a logging facade without an explicit
+  architectural decision.
+- Use `System.Logger` for sparse diagnostics and actionable platform warnings.
+  Do not automatically log an exception that is returned or thrown to the
+  caller.
 - Keep dependency upgrades separate from feature changes.
-- Release verification generates a CycloneDX SBOM and performs vulnerability
-  and license checks. These network- or database-dependent checks do not run in
-  every ordinary local build.
+
+See the [module overview](docs/design/module-overview.md) for the current
+dependency responsibilities. Do not reproduce a historical dependency graph
+in this file.
 
 ## Failure handling
 
 - Use standard unchecked exceptions for caller contract violations:
   `NullPointerException` for prohibited nulls, `IllegalArgumentException` for
   invalid values or relationships, `IndexOutOfBoundsException` for invalid
-  indices, and `IllegalStateException` for closed resources, wrong-thread calls,
-  or invalid lifecycle state.
-- `JScene3DException` is not prohibited. Introduce a library-specific root only
-  if concrete operational failures such as context creation, shader compilation,
-  or rendering demonstrate that callers benefit from one shared catch point.
-  Caller contract exceptions do not need to inherit from it.
+  indices, and `IllegalStateException` for closed resources, wrong-thread
+  calls, or invalid lifecycle state.
+- Introduce a library-specific exception hierarchy only when concrete
+  operational failures benefit callers through shared handling. Caller
+  contract exceptions do not need to inherit from it.
 - Focused operational exceptions expose actionable domain information rather
   than merely renaming a standard exception.
 - Exception messages identify the relevant object, offending value, required
-  relationship, shader stage, or platform error where applicable.
+  relationship, processing stage, or platform error where applicable.
 - Preserve causes and native diagnostic logs.
 - Catch the narrowest useful exception type. Never catch and discard an
   exception.
@@ -325,43 +339,65 @@ prior deprecation where practical.
 
 ## Lifecycle and threading
 
-- Scene objects are not automatically thread-safe. Document thread safety and
-  thread affinity on every relevant exported type.
-- The caller owns execution threads. JScene3D components do not create
-  background threads implicitly.
-- Renderer and window operations obey their documented context-owning or main
-  thread requirements.
-- Every public `close()` is idempotent and terminal. Cleanup occurs at most once,
-  repeated close is a no-op, and each closeable type exposes `isClosed()`.
-- Operations other than `close()` and `isClosed()` fail with
-  `IllegalStateException` after closure.
+- Document thread safety and thread affinity on every relevant exported type.
+  Scene objects are not automatically thread-safe.
+- The caller or an explicit application host owns execution threads. Library
+  components do not create background threads implicitly.
+- Renderer, window, audio, and native-surface operations obey their documented
+  owning-thread or context requirements.
+- Document ownership for every closeable value, including whether the caller,
+  aggregate, or runtime host closes it.
+- Public resource-owning `close()` operations are idempotent and terminal:
+  cleanup occurs at most once and repeated close is a no-op.
+- Stateful resources reject operations after closure with
+  `IllegalStateException`, except for `close()` and any documented lifecycle
+  query. Expose `isClosed()` when callers genuinely need to query state; do not
+  add it mechanically to one-shot registrations or internal cleanup handles.
+- Aggregate shutdown attempts all owned cleanup and preserves meaningful
+  failures rather than abandoning later resources after the first exception.
 - Do not depend on finalizers. A `Cleaner` may report a leak but is not the
   normal cleanup path for native or GPU resources.
 
 ## Editor configuration
 
-The checked-in VS Code settings:
+The checked-in `.vscode/settings.json` configures the ordinary repository
+development workspace. It is not configuration for the Code OSS-based
+JScene3D product.
 
-- Load the Maven build automatically and download dependency sources.
-- Use the same checked-in Checkstyle configuration and version as Maven.
-- Disable format-on-save so the editor does not compete with Spotless.
-- Exclude Maven `target` directories from watching, searching, and Java resource
-  discovery.
+The checked-in settings currently:
+
+- point the Java Checkstyle extension at the repository configuration and
+  pinned Checkstyle version;
+- disable Java format-on-save so the editor does not compete with Spotless;
+- exclude Maven output and log paths from relevant file, watcher, and search
+  views; and
+- associate the extension-descriptor JSON schema with its test fixture.
+
+Do not claim that editor settings configure Maven import, dependency-source
+download, or NullAway unless those settings are checked in. Maven remains the
+authoritative verification environment.
 
 ## Documentation
 
-- Every supported public capability has an automated contract or compatibility
-  test.
-- Generate supported public and protected production Javadoc during
-  `./mvnw clean verify` with all doclint checks enabled. Javadoc errors and
-  warnings fail the build. Package-private production contracts remain required
-  in source even though they are not part of the generated caller reference.
-- Compile caller examples as tests. Derive README snippets from those examples
-  so documentation cannot silently drift.
-- Keep `CONTEXT.md` focused on domain language and free of implementation
-  detail.
-- Record only hard-to-reverse, non-obvious decisions with real trade-offs as
-  ADRs.
+Use the current documentation hierarchy:
+
+- `README.md` is the concise GitHub landing page.
+- `docs/manual/` contains learning-oriented user and developer manuals.
+- `docs/design/` contains current detailed architecture and design.
+- `docs/adr/` records hard-to-reverse, non-obvious architectural decisions and
+  their trade-offs.
+- `CODING_STANDARDS.md` contains repository-wide engineering rules.
+
+Do not duplicate detailed architecture in this file. Link to the appropriate
+current document instead.
+
+- Generate public and protected production Javadoc during `clean verify` with
+  all doclint checks enabled. Errors and warnings fail the build.
+- Keep internal contracts documented in source even when they are not part of
+  generated caller Javadoc.
+- Keep examples, schemas, commands, and links synchronized with the source
+  they describe.
+- Markdownlint covers checked-in Markdown during ordinary verification.
 - Internal comments explain non-obvious reasoning, not line-by-line mechanics.
 
 ## Change hygiene
@@ -370,27 +406,32 @@ The checked-in VS Code settings:
 - Behavior changes include tests and caller documentation in the same change.
 - Keep formatting-only changes, dependency upgrades, and unrelated refactors
   separate.
-- Permanent commits pass `./mvnw clean verify` and any additional profile
-  relevant to the change.
+- Use focused verification while iterating. Before work becomes permanent or
+  release-ready, run `./mvnw clean verify` and every additional profile relevant
+  to the change.
 - Use Conventional Commits for permanent commits and pull-request titles. The
   subject form is `<type>(<optional scope>): <description>`.
-- Public-interface changes reference an ADR when the decision is hard to reverse
-  and non-obvious; otherwise the change explains why an ADR is unnecessary.
+- Reference an ADR for a public-interface decision when it is hard to reverse,
+  non-obvious, and carries real trade-offs. Otherwise explain the reasoning in
+  the change itself.
 - TODOs reference an issue and describe the missing behavior.
 - Generated files are reproducible and never edited manually.
 - Suppressions are narrow, justified locally, and reviewed. Do not maintain a
-  broad exclusion file merely to make verification pass.
+  broad exclusion solely to make verification pass.
+- Preserve unrelated working-tree changes. Do not reset, restore, clean,
+  overwrite, stage, or commit them as part of a focused task.
 
 ## Releases
 
-- Start at `0.1.0` and follow Semantic Versioning.
-- Version all published JScene3D artifacts in lockstep.
-- Preserve source and binary compatibility in `0.x` patch releases.
-- Never replace or mutate a published version.
-- Release bundles include sources, Javadoc, required Maven metadata, checksums,
-  GPG signatures, license information, and the release SBOM.
-- Declare the project license as Apache License 2.0 (`Apache-2.0`) and verify it
-  during release builds.
-- Publish pre-1.0 deployments to Maven Central with manual Portal approval.
-- Run `./mvnw clean deploy -Prelease` from the release commit.
-- Create an immutable signed tag such as `v0.1.0` for each release.
+- The repository is currently pre-1.0 and uses `0.1.0-SNAPSHOT` across the
+  reactor.
+- Use lockstep Semantic Versions for published JScene3D artifacts and never
+  replace or mutate a published coordinate.
+- Before 1.0, compatibility is not guaranteed across releases. Breaking
+  changes remain deliberate and update affected callers and documentation.
+- Declare the project license as Apache License 2.0 (`Apache-2.0`) in source and
+  Maven metadata.
+- Release-only SBOM, vulnerability, license, signing, source/Javadoc bundle,
+  Maven Central deployment, and tagging automation are not currently bound to
+  the root Maven build. Do not claim or invoke a release profile until that
+  workflow exists and has been verified.

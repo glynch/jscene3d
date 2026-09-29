@@ -1,26 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title description">
-  <title id="title">Perspective camera frustum</title>
-  <desc id="description">A top-down camera view showing near and far clipping planes, the visible frustum, and objects inside and outside it.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title description">
+  <title id="title">Perspective camera frustum and clipping planes</title>
+  <desc id="description">A top-down technical view of a camera looking through near and far clipping planes. One object inside the visible frustum is rendered. An object outside the field of view and another beyond the far plane are not rendered.</desc>
   <defs>
+    <marker id="direction-arrow" markerWidth="11" markerHeight="11" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,8 L10,4 z" fill="#526277"/>
+    </marker>
     <style>
-      .label { font: 600 19px system-ui, sans-serif; fill: #17202a; }
-      .detail { font: 16px system-ui, sans-serif; fill: #34495e; }
+      .title { font: 700 23px system-ui, sans-serif; fill: #172033; }
+      .label { font: 600 19px system-ui, sans-serif; fill: #253147; }
+      .detail { font: 500 17px system-ui, sans-serif; fill: #526277; }
+      .leader { fill: none; stroke: #8390a3; stroke-width: 2; stroke-linecap: round; }
+      .cube { stroke-width: 2.5; stroke-linejoin: round; }
     </style>
   </defs>
-  <rect width="960" height="480" fill="#f7f9fb"/>
-  <path d="M115 240 L790 55 L790 425 Z" fill="#d9ead3" stroke="#38761d" stroke-width="3"/>
-  <path d="M115 240 L790 55 M115 240 L790 425" fill="none" stroke="#38761d" stroke-width="3"/>
-  <line x1="205" y1="215" x2="205" y2="265" stroke="#674ea7" stroke-width="6"/>
-  <line x1="790" y1="55" x2="790" y2="425" stroke="#b45f06" stroke-width="6"/>
-  <path d="M65 215 L115 240 L65 265 Z" fill="#cfe2f3" stroke="#0b5394" stroke-width="3"/>
-  <circle cx="470" cy="235" r="28" fill="#44aa88" stroke="#1e6b55" stroke-width="3"/>
-  <circle cx="480" cy="60" r="28" fill="#ea9999" stroke="#990000" stroke-width="3"/>
-  <circle cx="865" cy="240" r="28" fill="#ea9999" stroke="#990000" stroke-width="3"/>
-  <text class="label" x="75" y="315">Camera</text>
-  <text class="label" x="170" y="195">Near</text>
-  <text class="label" x="755" y="35">Far</text>
-  <text class="label" x="405" y="330">Visible frustum</text>
-  <text class="detail" x="430" y="282">rendered</text>
-  <text class="detail" x="434" y="30">outside FOV</text>
-  <text class="detail" x="815" y="290">past far plane</text>
+
+  <rect width="1200" height="680" rx="24" fill="#f7f9fc"/>
+
+  <path d="M158 340 L965 105 L965 575 Z" fill="#e9e5ff" fill-opacity="0.62"/>
+  <path d="M158 340 L965 105 M158 340 L965 575" fill="none" stroke="#755ee8" stroke-width="3.5" stroke-linecap="round"/>
+
+  <line x1="260" y1="310" x2="260" y2="370" stroke="#18877f" stroke-width="5"/>
+  <line x1="965" y1="105" x2="965" y2="575" stroke="#c87924" stroke-width="4" stroke-dasharray="10 8"/>
+
+  <path d="M158 340 H1065" fill="none" stroke="#526277" stroke-width="2.5" stroke-dasharray="9 9" marker-end="url(#direction-arrow)"/>
+  <text class="detail" x="425" y="324">View direction</text>
+
+  <g aria-label="Camera">
+    <rect x="50" y="307" width="78" height="66" rx="12" fill="#f0edff" stroke="#755ee8" stroke-width="3"/>
+    <path d="M128 321 L158 309 V371 L128 359 Z" fill="#e0dafd" stroke="#755ee8" stroke-width="3" stroke-linejoin="round"/>
+    <rect x="68" y="292" width="38" height="15" rx="6" fill="#f0edff" stroke="#755ee8" stroke-width="3"/>
+    <circle cx="89" cy="340" r="12" fill="#ffffff" stroke="#6248d8" stroke-width="3"/>
+    <text class="title" x="104" y="416" text-anchor="middle">Camera</text>
+  </g>
+
+  <path class="leader" d="M260 300 V263 H335"/>
+  <text class="label" x="274" y="250">Near clipping plane</text>
+
+  <path class="leader" d="M965 95 V69 H885"/>
+  <text class="label" x="955" y="55" text-anchor="end">Far clipping plane</text>
+
+  <text class="title" x="520" y="475" text-anchor="middle">Visible frustum</text>
+  <text class="detail" x="520" y="500" text-anchor="middle">field of view</text>
+
+  <g aria-label="Object inside the frustum">
+    <path class="cube" d="M630 298 L657 312 L657 342 L630 357 L603 342 V312 Z" fill="#d8f3ee" stroke="#18877f"/>
+    <path d="M630 298 V327 M657 312 L630 327 L603 312 M630 327 V357" fill="none" stroke="#126e68" stroke-width="2.5" stroke-linejoin="round"/>
+    <text class="label" x="630" y="393" text-anchor="middle">Rendered</text>
+    <text class="detail" x="630" y="417" text-anchor="middle">inside frustum</text>
+  </g>
+
+  <g aria-label="Object outside the field of view">
+    <path class="cube" d="M520 102 L544 114 L544 141 L520 154 L496 141 V114 Z" fill="#ffffff" stroke="#8390a3"/>
+    <path d="M520 102 V128 M544 114 L520 128 L496 114 M520 128 V154" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+    <path d="M493 153 L547 101" fill="none" stroke="#a65353" stroke-width="4" stroke-linecap="round"/>
+    <text class="label" x="570" y="113">Not rendered</text>
+    <text class="detail" x="570" y="137">outside field of view</text>
+  </g>
+
+  <g aria-label="Object beyond the far clipping plane">
+    <path class="cube" d="M1070 382 L1094 394 L1094 421 L1070 434 L1046 421 V394 Z" fill="#ffffff" stroke="#8390a3"/>
+    <path d="M1070 382 V408 M1094 394 L1070 408 L1046 394 M1070 408 V434" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+    <path d="M1043 433 L1097 381" fill="none" stroke="#a65353" stroke-width="4" stroke-linecap="round"/>
+    <text class="label" x="1070" y="474" text-anchor="middle">Not rendered</text>
+    <text class="detail" x="1070" y="498" text-anchor="middle">beyond far plane</text>
+  </g>
 </svg>

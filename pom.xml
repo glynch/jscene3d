@@ -48,6 +48,7 @@
         <module>jscene3d-project-export</module>
         <module>jscene3d-editor-authoring</module>
         <module>jscene3d-editor-authoring-service</module>
+        <module>jscene3d-editor-authoring-runtime</module>
         <module>jscene3d-audio</module>
         <module>jscene3d-lwjgl</module>
         <module>jscene3d-iosurface-macos</module>

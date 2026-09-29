@@ -96,6 +96,9 @@ The WAD/Doom boundaries and publication rules are documented in
 - `jscene3d-editor-authoring-service` exposes that Java-owned authoring model to
   editor clients through a persistent process and a versioned JSON protocol
   carried over byte-accurate `Content-Length`-framed standard I/O.
+- `jscene3d-editor-authoring-runtime` assembles the service's Maven-resolved
+  runtime closure and descriptor-only extension metadata into the installed
+  source-development runtime consumed by the editor launcher.
 - `jscene3d-iosurface-macos` contains the macOS IOSurface render-surface adapter,
   native Mach transfer bridge, and Java proof host for the Code OSS rendering
   architecture. It proves the native shared-surface path; the active Code OSS

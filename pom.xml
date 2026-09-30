@@ -52,6 +52,8 @@
         <module>jscene3d-audio</module>
         <module>jscene3d-lwjgl</module>
         <module>jscene3d-iosurface-macos</module>
+        <module>jscene3d-editor-renderer</module>
+        <module>jscene3d-editor-renderer-runtime</module>
         <module>jscene3d-gui</module>
         <module>jscene3d-gltf</module>
         <module>jscene3d-wad</module>
@@ -258,6 +260,16 @@
             <dependency>
                 <groupId>io.github.glynch</groupId>
                 <artifactId>jscene3d-lwjgl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-iosurface-macos</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.glynch</groupId>
+                <artifactId>jscene3d-editor-renderer</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

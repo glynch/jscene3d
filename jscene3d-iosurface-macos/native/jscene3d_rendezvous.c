@@ -94,10 +94,11 @@ jscene3d_rendezvous_acquire(
         return result;
     }
 
-    printf(
+    fprintf(
+            stderr,
             "JNI bootstrap name: %s\n",
             bootstrap_name);
-    fflush(stdout);
+    fflush(stderr);
 
     mach_port_t server_port =
             MACH_PORT_NULL;

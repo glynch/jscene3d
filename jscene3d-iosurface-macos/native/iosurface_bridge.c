@@ -1,4 +1,4 @@
-#include "io_github_glynch_jscene3d_iosurface_macos_IOSurfaceBridge.h"
+#include <jni.h>
 
 #include <IOSurface/IOSurface.h>
 #include <mach/mach.h>
@@ -65,11 +65,12 @@ Java_io_github_glynch_jscene3d_iosurface_macos_IOSurfaceBridge_lookup(
     jscene3d_control_channel_set(
             ports.control_port);
 
-    printf(
+    fprintf(
+            stderr,
             "JNI received JScene3D control "
             "receive right: %u\n",
             ports.control_port);
-    fflush(stdout);
+    fflush(stderr);
 
     IOSurfaceRef surface =
             jscene3d_iosurface_from_mach_port(

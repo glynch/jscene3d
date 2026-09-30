@@ -1,7 +1,7 @@
 # JScene3D module overview
 
 The root `jscene3d-parent` POM supplies shared build and dependency management
-and aggregates the 30 modules below. This page is a navigation aid: it states
+and aggregates the 33 modules below. This page is a navigation aid: it states
 where responsibilities live without repeating the detailed project, editor, or
 content-integration designs.
 
@@ -99,10 +99,17 @@ The WAD/Doom boundaries and publication rules are documented in
 - `jscene3d-editor-authoring-runtime` assembles the service's Maven-resolved
   runtime closure and descriptor-only extension metadata into the installed
   source-development runtime consumed by the editor launcher.
-- `jscene3d-iosurface-macos` contains the macOS IOSurface render-surface adapter,
-  native Mach transfer bridge, and Java proof host for the Code OSS rendering
-  architecture. It proves the native shared-surface path; the active Code OSS
-  extension does not yet mount that viewport.
+- `jscene3d-iosurface-macos` contains the reusable macOS IOSurface
+  render-surface adapter and native Mach transfer bridge. Its native bridge is
+  published as a platform artifact rather than consumed from a source checkout.
+- `jscene3d-editor-renderer` is the product process host for one native editor
+  renderer session. It owns the versioned renderer protocol, lifecycle, and
+  IOSurface-backed validation scene while remaining separate from authoring and
+  future project/world hosting.
+- `jscene3d-editor-renderer-runtime` assembles the renderer host, its runtime
+  module closure, macOS ARM64 LWJGL libraries, and the IOSurface JNI bridge into
+  an independently consumable runtime archive. The active Code OSS extension
+  does not yet mount the viewport.
 
 The process boundaries, safe authoring rules, and current viewport status are
 documented in the [JScene3D Editor architecture](editor-architecture.md).

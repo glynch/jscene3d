@@ -168,12 +168,13 @@ jscene3d_control_channel_receive_surface(
         return NULL;
     }
 
-    printf(
+    fprintf(
+            stderr,
             "JNI received control-channel "
             "IOSurface: %zux%zu\n",
             IOSurfaceGetWidth(surface),
             IOSurfaceGetHeight(surface));
-    fflush(stdout);
+    fflush(stderr);
 
     return surface;
 }

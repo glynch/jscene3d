@@ -14,10 +14,11 @@ IOSurfaceRef jscene3d_iosurface_from_mach_port(
         return NULL;
     }
 
-    printf(
+    fprintf(
+            stderr,
             "JNI received IOSurface Mach port: %u\n",
             surface_port);
-    fflush(stdout);
+    fflush(stderr);
 
     IOSurfaceRef surface =
             IOSurfaceLookupFromMachPort(
@@ -34,12 +35,13 @@ IOSurfaceRef jscene3d_iosurface_from_mach_port(
         return NULL;
     }
 
-    printf(
+    fprintf(
+            stderr,
             "JNI IOSurface lookup succeeded: "
             "%zux%zu\n",
             IOSurfaceGetWidth(surface),
             IOSurfaceGetHeight(surface));
-    fflush(stdout);
+    fflush(stderr);
 
     return surface;
 }

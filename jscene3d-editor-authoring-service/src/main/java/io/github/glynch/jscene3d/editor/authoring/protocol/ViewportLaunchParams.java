@@ -9,17 +9,17 @@ import java.util.Objects;
 /** Generation-scoped request for an isolated viewport renderer launch.
  *
  * @param expectedProjectGeneration project generation observed by the client
- * @param worldAssetId authoritative world-definition identity
+ * @param sceneAssetId authoritative scene-definition identity
  */
-public record ViewportLaunchParams(long expectedProjectGeneration, String worldAssetId) {
-    /** Validates the generation and world identity text. */
+public record ViewportLaunchParams(long expectedProjectGeneration, String sceneAssetId) {
+    /** Validates the generation and Scene identity text. */
     public ViewportLaunchParams {
-        Objects.requireNonNull(worldAssetId, "worldAssetId");
+        Objects.requireNonNull(sceneAssetId, "sceneAssetId");
         if (expectedProjectGeneration <= 0) {
             throw new IllegalArgumentException("expectedProjectGeneration must be positive");
         }
-        if (worldAssetId.isBlank()) {
-            throw new IllegalArgumentException("worldAssetId must not be blank");
+        if (sceneAssetId.isBlank()) {
+            throw new IllegalArgumentException("sceneAssetId must not be blank");
         }
     }
 }

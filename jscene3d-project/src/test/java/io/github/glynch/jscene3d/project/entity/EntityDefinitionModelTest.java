@@ -13,8 +13,8 @@ import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentTypeId;
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Verifies the immutable identity, entity-definition, placement, and world-definition kernel. */
+/** Verifies the immutable identity, entity-definition, placement, and scene-definition kernel. */
 final class EntityDefinitionModelTest {
     private static final AssetId BULLET_ASSET = AssetId.from("4c189475-9845-4810-b7f9-af744d3cc726");
     private static final AssetId WORLD_ASSET = AssetId.from("8d95e0d5-7cac-42a6-bceb-931437834532");
@@ -46,7 +46,7 @@ final class EntityDefinitionModelTest {
                 reference,
                 Map.of(property("speed"), new ProjectValue.NumberValue(BigDecimal.TEN)));
         LocalEntity camera = new LocalEntity(CAMERA, "Camera", true, List.of(transformDefinition(Map.of())), List.of());
-        WorldDefinition world = new WorldDefinition(WORLD_ASSET, "Garden", List.of(camera, placement));
+        SceneDefinition world = new SceneDefinition(WORLD_ASSET, "Garden", List.of(camera, placement));
 
         assertThat(bullet.root()).isSameAs(bulletRoot);
         assertThat(world.roots()).containsExactly(camera, placement);
@@ -84,7 +84,7 @@ final class EntityDefinitionModelTest {
         List<EntityEntry> mutableChildren = new ArrayList<>();
         LocalEntity root = new LocalEntity(BULLET_ROOT, true, mutableComponents, mutableChildren);
         List<EntityEntry> mutableRoots = new ArrayList<>(List.of(root));
-        WorldDefinition world = new WorldDefinition(WORLD_ASSET, "Garden", mutableRoots);
+        SceneDefinition world = new SceneDefinition(WORLD_ASSET, "Garden", mutableRoots);
 
         mutableProperties.clear();
         mutableComponents.clear();
@@ -136,7 +136,7 @@ final class EntityDefinitionModelTest {
         LocalEntity second = new LocalEntity(CAMERA, "Second", true, List.of(), List.of());
         List<EntityEntry> roots = List.of(first, second);
 
-        assertThatThrownBy(() -> new WorldDefinition(WORLD_ASSET, "Garden", roots))
+        assertThatThrownBy(() -> new SceneDefinition(WORLD_ASSET, "Garden", roots))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("duplicate entity id", CAMERA.toString());
     }

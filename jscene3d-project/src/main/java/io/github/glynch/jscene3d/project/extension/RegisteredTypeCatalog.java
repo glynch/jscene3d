@@ -9,8 +9,6 @@ import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.resource.ResourceDefinition;
 import io.github.glynch.jscene3d.project.resource.internal.ResourceCatalogValidator;
-import io.github.glynch.jscene3d.project.scene.SceneDefinition;
-import io.github.glynch.jscene3d.project.scene.internal.SceneCatalogValidator;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -101,16 +99,6 @@ public final class RegisteredTypeCatalog {
      */
     public Optional<ComponentTypeDescriptor> findComponent(ComponentType type) {
         return Optional.ofNullable(components.get(Objects.requireNonNull(type, "type")));
-    }
-
-    /**
-     * Validates registered types, properties, and connection endpoints in one loaded scene.
-     *
-     * @param scene structurally valid scene
-     * @return ordered catalog-aware diagnostics
-     */
-    public List<ProjectDiagnostic> validate(SceneDefinition scene) {
-        return SceneCatalogValidator.validate(Objects.requireNonNull(scene, "scene"), this);
     }
 
     /**

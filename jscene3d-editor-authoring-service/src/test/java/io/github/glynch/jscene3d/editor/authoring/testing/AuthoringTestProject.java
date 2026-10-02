@@ -18,8 +18,8 @@ public final class AuthoringTestProject {
     /** Stable local entity identity used by working-copy lifecycle tests. */
     public static final String ENTITY_ID = "0b295328-b5a3-4f41-9f34-e9b4abc430a7";
 
-    /** Stable startup-world asset identity. */
-    public static final String WORLD_ASSET_ID = "e890c4c3-fb32-49d8-88b8-4e04e7a29656";
+    /** Stable Scene asset identity. */
+    public static final String SCENE_ASSET_ID = "e890c4c3-fb32-49d8-88b8-4e04e7a29656";
 
     /** Stable reusable entity-definition identity for definition-opening tests. */
     public static final String DEFINITION_ASSET_ID = "4ccdb339-9c5b-47d3-9b18-9169be5e4936";
@@ -55,7 +55,7 @@ public final class AuthoringTestProject {
                   "schemaVersion":1,
                   "identity":{"id":"example.authoring-test","name":"%s","version":"1.2.3"},
                   "engine":{"requires":">=0.1.0-SNAPSHOT <0.2.0"},
-                  "runtime":{"applicationExtension":"example.authoring-test","entryScene":"worlds/main.world.json"},
+                  "runtime":{"applicationExtension":"example.authoring-test","mainScene":{"assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656","pathHint":"worlds/main.scene.json"}},
                   "extensions":[{"id":"example.authoring-test","requires":">=1.0.0 <2.0.0"}]
                 }
                 """, projectName));
@@ -71,13 +71,13 @@ public final class AuthoringTestProject {
                   "components":[]
                 }
                 """);
-        writeFile(root, "worlds/main.world.json", """
+        writeFile(root, "worlds/main.scene.json", """
                 {
-                  "$schema":"https://jscene3d.org/schemas/world-definition-1.json",
+                  "$schema":"https://jscene3d.org/schemas/scene-definition-1.json",
                   "assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656",
-                  "assetType":"world-definition",
+                  "assetType":"scene-definition",
                   "formatVersion":1,
-                  "name":"Opening World",
+                  "name":"Opening Scene",
                   "connections":[],
                   "roots":[{
                     "entryType":"local",
@@ -108,7 +108,7 @@ public final class AuthoringTestProject {
                   "schemaVersion":1,
                   "identity":{"id":"example.authoring-test","name":"Small Authoring Project","version":"1.2.3"},
                   "engine":{"requires":">=0.1.0-SNAPSHOT <0.2.0"},
-                  "runtime":{"applicationExtension":"example.authoring-test","entryScene":"worlds/main.world.json"},
+                  "runtime":{"applicationExtension":"example.authoring-test","mainScene":{"assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656","pathHint":"worlds/main.scene.json"}},
                   "extensions":[
                     {"id":"example.authoring-test","requires":">=1.0.0 <2.0.0"},
                     {"id":"%s","requires":">=1.0.0 <2.0.0"}
@@ -206,13 +206,13 @@ public final class AuthoringTestProject {
                   }]
                 }
                 """);
-        writeFile(root, "worlds/main.world.json", """
+        writeFile(root, "worlds/main.scene.json", """
                 {
-                  "$schema":"https://jscene3d.org/schemas/world-definition-1.json",
+                  "$schema":"https://jscene3d.org/schemas/scene-definition-1.json",
                   "assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656",
-                  "assetType":"world-definition",
+                  "assetType":"scene-definition",
                   "formatVersion":1,
-                  "name":"Opening World",
+                  "name":"Opening Scene",
                   "connections":[],
                   "roots":[{
                     "entryType":"local",
@@ -261,13 +261,13 @@ public final class AuthoringTestProject {
                   }]
                 }
                 """);
-        writeFile(root, "worlds/main.world.json", """
+        writeFile(root, "worlds/main.scene.json", """
                 {
-                  "$schema":"https://jscene3d.org/schemas/world-definition-1.json",
+                  "$schema":"https://jscene3d.org/schemas/scene-definition-1.json",
                   "assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656",
-                  "assetType":"world-definition",
+                  "assetType":"scene-definition",
                   "formatVersion":1,
-                  "name":"Opening World",
+                  "name":"Opening Scene",
                   "connections":[],
                   "roots":[{
                     "entryType":"local",

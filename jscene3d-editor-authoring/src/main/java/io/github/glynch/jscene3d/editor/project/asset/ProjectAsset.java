@@ -35,8 +35,8 @@ public record ProjectAsset(String label, String identity, Kind kind, Path source
     public enum Kind {
         /** Reusable entity definition. */
         ENTITY_DEFINITION("entity-definition", "Entity definition"),
-        /** World definition. */
-        WORLD_DEFINITION("world-definition", "World definition"),
+        /** Scene definition. */
+        SCENE_DEFINITION("scene-definition", "Scene definition"),
         /** Authoritative source or resource asset. */
         SOURCE_ASSET("source-asset", "Source asset"),
         /** Source-import definition. */

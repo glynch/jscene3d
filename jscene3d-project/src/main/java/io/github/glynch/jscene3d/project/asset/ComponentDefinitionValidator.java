@@ -75,8 +75,8 @@ final class ComponentDefinitionValidator implements PropertyTargetLookup {
         return new Validation(validator.entities, validator.diagnostics.diagnostics());
     }
 
-    /** Validates one world definition and its local connections. */
-    static Validation validateWorld(
+    /** Validates one Scene definition and its local connections. */
+    static Validation validateScene(
             List<? extends EntityEntry> roots,
             List<SignalConnection> connections,
             RegisteredTypeCatalog catalog,

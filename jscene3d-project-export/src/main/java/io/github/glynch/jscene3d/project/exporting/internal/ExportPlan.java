@@ -170,8 +170,6 @@ public final class ExportPlan {
         Map<Path, ExportFile> files = new LinkedHashMap<>();
         addProjectFile(project, files, project.descriptor());
         catalog.assets().stream().map(AssetMetadata::path).forEach(path -> addProjectFile(project, files, path));
-        addProjectFile(project, files, project.runtime().entryScene());
-        project.runtime().startupScene().ifPresent(path -> addProjectFile(project, files, path));
         project.runtime().projectSystems().ifPresent(path -> addProjectFile(project, files, path));
         project.runtime().inputMap().ifPresent(path -> addProjectFile(project, files, path));
         project.imports().forEach(path -> addProjectFile(project, files, path));

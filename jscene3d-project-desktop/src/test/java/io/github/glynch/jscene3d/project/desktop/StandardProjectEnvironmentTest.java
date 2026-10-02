@@ -47,8 +47,7 @@ final class StandardProjectEnvironmentTest {
                 "requires": ">=0.1.0-SNAPSHOT <0.2.0"
               },
               "runtime": {
-                "applicationExtension": "example.desktop-test",
-                "entryScene": "main.scene.json"
+                "applicationExtension": "example.desktop-test"
               },
               "extensions": [
                 {
@@ -118,7 +117,9 @@ final class StandardProjectEnvironmentTest {
     @Test
     void combinesAuthoredDefinitionsWithPublishedProjectContent() throws IOException {
         Files.writeString(temporaryDirectory.resolve("jscene3d.json"), MANIFEST, StandardCharsets.UTF_8);
-        Files.writeString(temporaryDirectory.resolve("main.scene.json"), "test", StandardCharsets.UTF_8);
+        Files.writeString(temporaryDirectory.resolve("main.scene.json"), """
+                {"assetId":"23c4ef07-8b07-4a62-952b-262234078f7d","assetType":"scene-definition","formatVersion":1,"name":"Desktop Test","connections":[],"roots":[]}
+                """, StandardCharsets.UTF_8);
         GameProject project = new ProjectLoader("0.1.0-SNAPSHOT")
                 .load(temporaryDirectory)
                 .project()

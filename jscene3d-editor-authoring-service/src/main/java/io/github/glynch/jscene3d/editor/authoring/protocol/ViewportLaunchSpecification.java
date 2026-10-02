@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.editor.authoring.protocol;
 import java.util.List;
 import java.util.Objects;
 
-/** Java-owned inputs for one isolated project-world renderer process.
+/** Java-owned inputs for one isolated project Scene renderer process.
  *
  * @param projectGeneration active authoring project generation
  * @param projectId stable project identity
@@ -15,8 +15,8 @@ import java.util.Objects;
  * @param projectRoot normalized absolute project root
  * @param publishedContentRoot normalized absolute published-content root
  * @param engineVersion running JScene3D engine version
- * @param worldAssetId stable startup-world identity
- * @param worldName startup-world display name
+ * @param sceneAssetId stable startup-Scene identity
+ * @param sceneName Scene display name
  * @param runtimeArtifacts normalized absolute runtime artifacts configured for isolated execution
  */
 public record ViewportLaunchSpecification(
@@ -26,8 +26,8 @@ public record ViewportLaunchSpecification(
         String projectRoot,
         String publishedContentRoot,
         String engineVersion,
-        String worldAssetId,
-        String worldName,
+        String sceneAssetId,
+        String sceneName,
         List<String> runtimeArtifacts) {
     /** Validates the closed renderer-launch contract. */
     public ViewportLaunchSpecification {
@@ -39,8 +39,8 @@ public record ViewportLaunchSpecification(
         requireNonBlank(projectRoot, "projectRoot");
         requireNonBlank(publishedContentRoot, "publishedContentRoot");
         requireNonBlank(engineVersion, "engineVersion");
-        requireNonBlank(worldAssetId, "worldAssetId");
-        requireNonBlank(worldName, "worldName");
+        requireNonBlank(sceneAssetId, "sceneAssetId");
+        requireNonBlank(sceneName, "sceneName");
         runtimeArtifacts = List.copyOf(runtimeArtifacts);
         if (runtimeArtifacts.stream().anyMatch(value -> value == null || value.isBlank())) {
             throw new IllegalArgumentException("runtimeArtifacts must contain only non-blank paths");

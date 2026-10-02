@@ -43,8 +43,7 @@ public final class WadProjectImportExample {
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "io.github.glynch.jscene3d.wad",
-                "entryScene": "main.scene.json"
+                "applicationExtension": "io.github.glynch.jscene3d.wad"
               },
               "extensions": [
                 {"id": "io.github.glynch.jscene3d.wad", "requires": "0.1.0-SNAPSHOT"}
@@ -113,7 +112,9 @@ public final class WadProjectImportExample {
         Files.createDirectories(root.resolve("assets"));
         Files.createDirectories(root.resolve("imports"));
         Files.writeString(root.resolve(ProjectLoader.MANIFEST_NAME), PROJECT_MANIFEST, StandardCharsets.UTF_8);
-        Files.writeString(root.resolve("main.scene.json"), "{}", StandardCharsets.UTF_8);
+        Files.writeString(root.resolve("main.scene.json"), """
+                {"assetId":"e3bd855b-7c8c-4741-89f8-3460b6d62c34","assetType":"scene-definition","formatVersion":1,"name":"WAD Import Example","connections":[],"roots":[]}
+                """, StandardCharsets.UTF_8);
         Files.writeString(root.resolve("imports/content.import.json"), IMPORT_DEFINITION, StandardCharsets.UTF_8);
         ExampleWadFiles.writeSingleLump(
                 root.resolve("assets/content.wad"), WadKind.IWAD, "MESSAGE", "opaque example content");

@@ -38,8 +38,7 @@ final class ResourceLoaderTest {
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "example.resource-test",
-                "entryScene": "main.scene.json"
+                "applicationExtension": "example.resource-test"
               },
               "extensions": [
                 {"id": "example.resource-test", "requires": "1.0.0"}

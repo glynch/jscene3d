@@ -19,8 +19,8 @@ import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.entity.SpatialTarget;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.internal.AtomicProjectFileWriter;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueJsonWriter;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -31,10 +31,10 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Deterministic UTF-8 JSON writer for authored entity and world definitions. */
+/** Deterministic UTF-8 JSON writer for authored entity and Scene definitions. */
 public final class DefinitionWriter {
     private static final String ENTITY_SCHEMA = "https://jscene3d.org/schemas/entity-definition-1.json";
-    private static final String WORLD_SCHEMA = "https://jscene3d.org/schemas/world-definition-1.json";
+    private static final String SCENE_SCHEMA = "https://jscene3d.org/schemas/scene-definition-1.json";
     private static final JsonFactory JSON_FACTORY = new JsonFactory();
 
     /** Prevents construction of this stateless writer. */
@@ -72,31 +72,31 @@ public final class DefinitionWriter {
     }
 
     /**
-     * Writes one world definition, replacing the target only after serialization succeeds.
+     * Writes one Scene definition, replacing the target only after serialization succeeds.
      *
      * @param target output file
-     * @param definition authored world definition
+     * @param definition authored Scene definition
      * @throws IOException when the output cannot be serialized or written
      */
-    public static void write(Path target, WorldDefinition definition) throws IOException {
+    public static void write(Path target, SceneDefinition definition) throws IOException {
         Path validTarget = Objects.requireNonNull(target, "target");
-        WorldDefinition validDefinition = Objects.requireNonNull(definition, "definition");
-        writeBytes(validTarget, serializeWorld(validDefinition));
+        SceneDefinition validDefinition = Objects.requireNonNull(definition, "definition");
+        writeBytes(validTarget, serializeScene(validDefinition));
     }
 
     /**
-     * Writes one world definition to caller-owned output.
+     * Writes one Scene definition to caller-owned output.
      *
      * <p>This method consumes but does not close {@code output}.
      *
      * @param output destination owned by the caller
-     * @param definition generated world definition
+     * @param definition generated Scene definition
      * @throws IOException when the output cannot be serialized or written
      */
-    public static void write(OutputStream output, WorldDefinition definition) throws IOException {
+    public static void write(OutputStream output, SceneDefinition definition) throws IOException {
         OutputStream validOutput = Objects.requireNonNull(output, "output");
-        WorldDefinition validDefinition = Objects.requireNonNull(definition, "definition");
-        validOutput.write(serializeWorld(validDefinition));
+        SceneDefinition validDefinition = Objects.requireNonNull(definition, "definition");
+        validOutput.write(serializeScene(validDefinition));
     }
 
     /** Serializes one entity definition into a complete in-memory document. */
@@ -115,12 +115,12 @@ public final class DefinitionWriter {
         return appendNewline(output.toByteArray());
     }
 
-    /** Serializes one world definition into a complete in-memory document. */
-    private static byte[] serializeWorld(WorldDefinition definition) throws IOException {
+    /** Serializes one Scene definition into a complete in-memory document. */
+    private static byte[] serializeScene(SceneDefinition definition) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try (JsonGenerator json = JSON_FACTORY.createGenerator(output).useDefaultPrettyPrinter()) {
             json.writeStartObject();
-            writeEnvelope(json, WORLD_SCHEMA, definition.id(), AssetKind.WORLD_DEFINITION);
+            writeEnvelope(json, SCENE_SCHEMA, definition.id(), AssetKind.SCENE_DEFINITION);
             json.writeStringField("name", definition.name());
             writeConnections(json, definition.connections());
             json.writeArrayFieldStart("roots");

@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/** Structural invariants shared by world and reusable entity definitions. */
+/** Structural invariants shared by Scene and reusable entity definitions. */
 public final class EntityTreeChecks {
     /** Prevents construction of this invariant container. */
     private EntityTreeChecks() {

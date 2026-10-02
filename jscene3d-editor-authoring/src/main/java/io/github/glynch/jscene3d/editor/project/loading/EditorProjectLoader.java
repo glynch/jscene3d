@@ -9,7 +9,6 @@ import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjector;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetCatalogLoadResult;
-import io.github.glynch.jscene3d.project.asset.AssetMetadata;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
@@ -21,7 +20,6 @@ import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
 import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoadResult;
 import io.github.glynch.jscene3d.project.settings.ProjectSettingsLoader;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import io.github.glynch.jscene3d.telemetry.Telemetry;
 import io.github.glynch.jscene3d.telemetry.TelemetryOperation;
 import java.nio.file.Path;
@@ -60,7 +58,7 @@ public final class EditorProjectLoader {
     }
 
     /**
-     * Loads one project and constructs an immutable session when its startup world is usable.
+     * Loads one project and constructs a session without implicitly opening a Scene.
      *
      * @param projectDirectory project directory or descriptor path
      * @return loaded session and diagnostics
@@ -141,27 +139,12 @@ public final class EditorProjectLoader {
                 "project.assets.validate",
                 Map.of(),
                 () -> EditorProjectAssetLoader.load(project, authored, definitions, types, imports, diagnostics));
-        progress.phaseStarted(EditorLoadingPhase.LOADING_STARTUP_WORLD);
-        Optional<WorldDefinition> startupWorld = operation.measure(
-                "project.startup-world.load",
-                Map.of(),
-                () -> EditorProjectAssetLoader.loadStartupWorld(project, authored, definitions, types, diagnostics));
-        if (startupWorld.isEmpty()) {
-            return failure(diagnostics);
-        }
-
-        WorldDefinition world = startupWorld.orElseThrow();
-        Path worldSource = authored.find(world.id())
-                .map(AssetMetadata::path)
-                .orElse(project.runtime().entryScene());
-        progress.phaseStarted(EditorLoadingPhase.BUILDING_HIERARCHY);
         EditorHierarchyProjector hierarchyProjector = new EditorHierarchyProjector(definitions, types, diagnostics);
         EditorProjectSession session = operation.measure(
-                "project.hierarchy.project",
+                "project.session.open",
                 Map.of(),
                 () -> new EditorProjectSession(
-                        new EditorProjectSession.Source(
-                                project, configuration, authored, types, definitions, world, worldSource),
+                        new EditorProjectSession.Source(project, configuration, authored, types, definitions),
                         assets,
                         hierarchyProjector,
                         diagnostics));

@@ -20,7 +20,7 @@ JScene3D is developed as three related areas:
 
 - **Engine** — a Java scene graph, OpenGL renderer, assets and animation,
   physics, input, audio, and application-runtime facilities.
-- **Project and authoring platform** — authored worlds, hierarchical entities
+- **Project and authoring platform** — authored Scenes, hierarchical entities
   and components, extension descriptors, imports, validation, and safe
   source-preserving document editing.
 - **JScene3D Editor** — a Code OSS-based workbench that presents Java-owned
@@ -58,7 +58,7 @@ See [Application runtime](docs/manual/application-runtime.md).
 
 ### Projects and authoring
 
-- `WorldDefinition` and `EntityDefinition` content composed from hierarchical
+- `SceneDefinition` and `EntityDefinition` content composed from hierarchical
   entities and components.
 - Inert extension descriptors that describe title-specific types without
   loading arbitrary runtime implementations into the editor.
@@ -153,7 +153,7 @@ Scene / Object3D
 World / Entity / Component
     live project and game state
 
-WorldDefinition / EntityDefinition
+SceneDefinition / EntityDefinition
     authored or generated data
 ```
 

@@ -14,7 +14,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExten
 import io.github.glynch.jscene3d.project.runtime.internal.RuntimeCompositionException;
 import io.github.glynch.jscene3d.project.runtime.internal.RuntimeDiagnosticsException;
 import io.github.glynch.jscene3d.project.runtime.internal.WorldCompositionEngine;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Validates and transactionally composes authored worlds through registered component factories.
+ * Validates and transactionally composes authored Scenes into live Worlds through registered component factories.
  *
  * <p>The single operation hides definition loading, placement expansion, instance scoping, complete graph allocation,
  * factory registration, effective-property resolution, authored reference binding, endpoint wiring, and rollback.
@@ -48,7 +48,7 @@ public final class WorldComposer {
      * adapters and closes them after its resource leases; failed composition leaves every adapter owned by the caller.
      *
      * @param definitions stable authored and imported definition resolver
-     * @param reference startup world-definition reference
+     * @param reference Scene-definition reference
      * @param types safe resolved component descriptor catalog
      * @param extensions trusted executable runtime extensions
      * @param modules host-supplied world-module bindings in ownership and reverse-cleanup order
@@ -57,18 +57,18 @@ public final class WorldComposer {
      */
     public static WorldCompositionResult compose(
             DefinitionResolver definitions,
-            AssetRef<WorldDefinition> reference,
+            AssetRef<SceneDefinition> reference,
             RegisteredTypeCatalog types,
             Collection<ComponentRuntimeExtension> extensions,
             Collection<WorldModuleBinding<?>> modules,
             RuntimeResourceProvider resources) {
         DefinitionResolver validDefinitions = Objects.requireNonNull(definitions, "definitions");
-        AssetRef<WorldDefinition> validReference = Objects.requireNonNull(reference, "reference");
+        AssetRef<SceneDefinition> validReference = Objects.requireNonNull(reference, "reference");
         RegisteredTypeCatalog validTypes = Objects.requireNonNull(types, "types");
         List<ComponentRuntimeExtension> validExtensions = List.copyOf(extensions);
         List<WorldModuleBinding<?>> validModules = List.copyOf(modules);
         RuntimeResourceProvider validResources = Objects.requireNonNull(resources, "resources");
-        DefinitionLoadResult<WorldDefinition> loaded = validDefinitions.loadWorld(validReference, validTypes);
+        DefinitionLoadResult<SceneDefinition> loaded = validDefinitions.loadScene(validReference, validTypes);
         List<ProjectDiagnostic> diagnostics = new ArrayList<>(loaded.diagnostics());
         if (!loaded.isValid()) {
             return WorldCompositionResult.failure(diagnostics);
@@ -99,7 +99,7 @@ public final class WorldComposer {
     public static WorldCompositionResult compose(
             URI source,
             DefinitionResolver definitions,
-            WorldDefinition definition,
+            SceneDefinition definition,
             RegisteredTypeCatalog types,
             Collection<ComponentRuntimeExtension> extensions,
             Collection<WorldModuleBinding<?>> modules,
@@ -116,7 +116,7 @@ public final class WorldComposer {
     private static WorldCompositionResult composeValidated(
             URI source,
             DefinitionResolver definitions,
-            WorldDefinition definition,
+            SceneDefinition definition,
             CompositionInputs inputs,
             List<ProjectDiagnostic> diagnostics) {
         try {

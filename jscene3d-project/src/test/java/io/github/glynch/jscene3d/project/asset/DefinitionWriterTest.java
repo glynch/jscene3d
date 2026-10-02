@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,27 +24,27 @@ class DefinitionWriterTest {
 
     @Test
     void replacesCompleteDefinitionWithoutLeavingTemporaryFiles() throws IOException {
-        Path target = temporaryDirectory.resolve("worlds/test.world.json");
-        WorldDefinition first = world("First", true);
-        WorldDefinition second = world("Second", false);
+        Path target = temporaryDirectory.resolve("worlds/test.scene.json");
+        SceneDefinition first = world("First", true);
+        SceneDefinition second = world("Second", false);
 
         DefinitionWriter.write(target, first);
         DefinitionWriter.write(target, second);
 
         assertThat(Files.readString(target)).contains("\"name\" : \"Second\"").contains("\"enabled\" : false");
         try (var files = Files.list(target.getParent())) {
-            assertThat(files.map(path -> path.getFileName().toString())).containsExactly("test.world.json");
+            assertThat(files.map(path -> path.getFileName().toString())).containsExactly("test.scene.json");
         }
     }
 
-    private static WorldDefinition world(String name, boolean enabled) {
+    private static SceneDefinition world(String name, boolean enabled) {
         LocalEntity entity = new LocalEntity(
                 new EntityId(UUID.fromString("00000000-0000-0000-0000-000000000001")),
                 name,
                 enabled,
                 List.of(),
                 List.of());
-        return new WorldDefinition(
+        return new SceneDefinition(
                 new AssetId(UUID.fromString("00000000-0000-0000-0000-000000000002")), name, List.of(entity));
     }
 }

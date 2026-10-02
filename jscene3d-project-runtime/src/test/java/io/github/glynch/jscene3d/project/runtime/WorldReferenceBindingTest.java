@@ -32,9 +32,9 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegis
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBinder;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -196,10 +196,10 @@ final class WorldReferenceBindingTest {
 
     /** Writes and composes one definition and world through the supported public seam. */
     private WorldCompositionResult compose(
-            EntityDefinition definition, WorldDefinition world, ComponentRuntimeExtension extension)
+            EntityDefinition definition, SceneDefinition world, ComponentRuntimeExtension extension)
             throws IOException {
         DefinitionWriter.write(temporaryDirectory.resolve("reference.entity.json"), definition);
-        DefinitionWriter.write(temporaryDirectory.resolve("reference.world.json"), world);
+        DefinitionWriter.write(temporaryDirectory.resolve("reference.scene.json"), world);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(descriptor()));
         return WorldComposer.compose(assets, AssetRef.to(WORLD_ID), types, List.of(extension), List.of(), NO_RESOURCES);
@@ -222,25 +222,25 @@ final class WorldReferenceBindingTest {
     }
 
     /** Creates one or two placements of the reusable definition. */
-    private static WorldDefinition placedWorld(Map<PropertyId, ProjectValue> arguments, boolean twice) {
+    private static SceneDefinition placedWorld(Map<PropertyId, ProjectValue> arguments, boolean twice) {
         EntityPlacement first =
                 new EntityPlacement(FIRST_PLACEMENT, "First", true, AssetRef.to(DEFINITION_ID), arguments);
         if (!twice) {
-            return new WorldDefinition(WORLD_ID, "Reference world", List.of(first));
+            return new SceneDefinition(WORLD_ID, "Reference world", List.of(first));
         }
         EntityPlacement second =
                 new EntityPlacement(SECOND_PLACEMENT, "Second", true, AssetRef.to(DEFINITION_ID), arguments);
-        return new WorldDefinition(WORLD_ID, "Reference world", List.of(first, second));
+        return new SceneDefinition(WORLD_ID, "Reference world", List.of(first, second));
     }
 
     /** Creates an outer body and a placed definition receiving that body through its contract. */
-    private static WorldDefinition worldWithExternalBody(Map<PropertyId, ProjectValue> arguments) {
+    private static SceneDefinition worldWithExternalBody(Map<PropertyId, ProjectValue> arguments) {
         ComponentDefinition body =
                 new ComponentDefinition(BODY_COMPONENT, BODY_TYPE.id(), BODY_TYPE.version(), Map.of());
         LocalEntity external = new LocalEntity(EXTERNAL_BODY, "External", true, List.of(body), List.of());
         EntityPlacement placement =
                 new EntityPlacement(FIRST_PLACEMENT, "Placed", true, AssetRef.to(DEFINITION_ID), arguments);
-        return new WorldDefinition(WORLD_ID, "Contract reference world", List.of(external, placement));
+        return new SceneDefinition(WORLD_ID, "Contract reference world", List.of(external, placement));
     }
 
     /** Creates safe descriptors for the body and reference-binding probe. */

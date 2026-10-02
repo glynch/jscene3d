@@ -49,8 +49,7 @@ final class WadImportExtensionTest {
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "io.github.glynch.jscene3d.wad",
-                "entryScene": "main.scene.json"
+                "applicationExtension": "io.github.glynch.jscene3d.wad"
               },
               "extensions": [
                 {"id": "io.github.glynch.jscene3d.wad", "requires": "0.1.0-SNAPSHOT"}
@@ -80,7 +79,9 @@ final class WadImportExtensionTest {
         projectDirectory = Files.createDirectory(temporaryDirectory.resolve("project"));
         Files.createDirectories(projectDirectory.resolve("assets"));
         Files.createDirectories(projectDirectory.resolve("imports"));
-        Files.writeString(projectDirectory.resolve("main.scene.json"), "{}", StandardCharsets.UTF_8);
+        Files.writeString(projectDirectory.resolve("main.scene.json"), """
+                {"assetId":"98fa75e2-fd72-4d55-9033-277d7b9912fb","assetType":"scene-definition","formatVersion":1,"name":"WAD Import Test","connections":[],"roots":[]}
+                """, StandardCharsets.UTF_8);
         Files.writeString(
                 projectDirectory.resolve(ProjectLoader.MANIFEST_NAME), PROJECT_MANIFEST, StandardCharsets.UTF_8);
         wadPath = projectDirectory.resolve("assets/content.wad");

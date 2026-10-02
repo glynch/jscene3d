@@ -279,14 +279,14 @@ _Avoid_: Game Engine, Feature Example
 
 **Asset**:
 Independently stored and persistently identified project content, including
-world and entity definitions as well as meshes, materials, textures, audio,
+Scene and entity definitions as well as meshes, materials, textures, audio,
 animation, and imported content.
 _Avoid_: Runtime Resource, Java object
 
 **Project Manifest**:
-The versioned project-level asset that identifies a game project, its startup
-World Definition, enabled modules, asset roots, and project-wide configuration.
-_Avoid_: World Definition, world, entity hierarchy
+The versioned project-level asset that identifies a game project, its optional
+Main Scene, enabled modules, asset roots, and project-wide configuration.
+_Avoid_: Scene Definition, world, entity hierarchy
 
 **Project Setting**:
 A portable authored configuration value shared by collaborators through a game
@@ -318,10 +318,10 @@ Private temporary data retained specifically to recover unsaved work after an
 abnormal editor termination.
 _Avoid_: Workspace State, saved project content
 
-**World Definition**:
-An authored asset describing one World's settings and its locally authored or
-reusable root-entity placements.
-_Avoid_: Scene Definition, Prefab, Entity Definition
+**Scene Definition**:
+An authored asset describing the composition instantiated as one live World,
+including its locally authored or reusable root-entity placements.
+_Avoid_: World, Prefab, Entity Definition
 
 **Entity Definition**:
 An immutable, reusable, single-root authored entity hierarchy with component
@@ -358,7 +358,7 @@ It is neither an Entity nor a JVM-global singleton.
 _Avoid_: Scene, Project Runtime, global service locator
 
 **Placement**:
-An authored occurrence of an Entity Definition in a World Definition or
+An authored occurrence of an Entity Definition in a Scene Definition or
 another Entity Definition. Its referenced definition root becomes the live
 instance Entity without an additional wrapper.
 _Avoid_: Scene Instance node, copied definition

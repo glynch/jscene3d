@@ -30,9 +30,9 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryConte
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -358,16 +358,16 @@ final class WorldLifecycleTest {
     }
 
     /** Writes and composes one fixture world, requiring success. */
-    private World compose(WorldDefinition definition, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory)
+    private World compose(SceneDefinition definition, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory)
             throws IOException {
         return composeResult(definition, descriptor, factory).world().orElseThrow();
     }
 
     /** Writes and composes one fixture world through the public composer. */
     private WorldCompositionResult composeResult(
-            WorldDefinition definition, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory)
+            SceneDefinition definition, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("lifecycle.world.json"), definition);
+        DefinitionWriter.write(temporaryDirectory.resolve("lifecycle.scene.json"), definition);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
                 EXTENSION_ID,
@@ -396,11 +396,11 @@ final class WorldLifecycleTest {
     }
 
     /** Creates a parent and child component hierarchy with configurable root enablement. */
-    private static WorldDefinition world(boolean rootEnabled) {
+    private static SceneDefinition world(boolean rootEnabled) {
         LocalEntity child = new LocalEntity(CHILD_ID, "Child", true, List.of(component("child")), List.of());
         LocalEntity root =
                 new LocalEntity(ROOT_ID, "Parent", rootEnabled, List.of(component("parent")), List.of(child));
-        return new WorldDefinition(WORLD_ID, "Lifecycle world", List.of(root));
+        return new SceneDefinition(WORLD_ID, "Lifecycle world", List.of(root));
     }
 
     /** Creates one authored recording component. */

@@ -23,8 +23,8 @@ import io.github.glynch.jscene3d.project.extension.EndpointDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -78,43 +78,43 @@ final class DefinitionGraphLoader {
                 definition, source.map(DefinitionAssetIndex.Source::source).orElse(definitions.projectSource()));
     }
 
-    /** Loads one world and validates every transitively placed entity definition. */
-    static DefinitionLoadResult<WorldDefinition> loadWorld(
-            DefinitionAssetIndex definitions, AssetRef<WorldDefinition> reference) {
+    /** Loads one Scene and validates every transitively placed entity definition. */
+    static DefinitionLoadResult<SceneDefinition> loadScene(
+            DefinitionAssetIndex definitions, AssetRef<SceneDefinition> reference) {
         DefinitionGraphLoader loader = new DefinitionGraphLoader(definitions, null);
         Optional<DefinitionAssetIndex.Source> source =
-                loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, definitions.projectSource(), "");
-        Optional<WorldDefinition> definition = source.flatMap(loader::readWorld);
+                loader.resolve(reference.id(), AssetKind.SCENE_DEFINITION, definitions.projectSource(), "");
+        Optional<SceneDefinition> definition = source.flatMap(loader::readScene);
         if (source.isPresent() && definition.isPresent()) {
-            WorldDefinition world = definition.orElseThrow();
+            SceneDefinition scene = definition.orElseThrow();
             URI definitionSource = source.orElseThrow().source();
-            loader.validateEntries(world.roots(), EntityContract.empty(), definitionSource);
+            loader.validateEntries(scene.roots(), EntityContract.empty(), definitionSource);
             Validation components =
-                    loader.validateWorldComponents(world.roots(), world.connections(), definitionSource);
+                    loader.validateSceneComponents(scene.roots(), scene.connections(), definitionSource);
             loader.validateConnections(
-                    world.connections(), loader.indexPlacements(world.roots()), components, definitionSource);
+                    scene.connections(), loader.indexPlacements(scene.roots()), components, definitionSource);
         }
         return loader.result(
                 definition, source.map(DefinitionAssetIndex.Source::source).orElse(definitions.projectSource()));
     }
 
-    /** Loads one world graph and validates its components through safe descriptor metadata. */
-    static DefinitionLoadResult<WorldDefinition> loadWorld(
+    /** Loads one Scene graph and validates its components through safe descriptor metadata. */
+    static DefinitionLoadResult<SceneDefinition> loadScene(
             DefinitionAssetIndex definitions,
-            AssetRef<WorldDefinition> reference,
+            AssetRef<SceneDefinition> reference,
             RegisteredTypeCatalog componentTypes) {
         DefinitionGraphLoader loader = new DefinitionGraphLoader(definitions, componentTypes);
         Optional<DefinitionAssetIndex.Source> source =
-                loader.resolve(reference.id(), AssetKind.WORLD_DEFINITION, definitions.projectSource(), "");
-        Optional<WorldDefinition> definition = source.flatMap(loader::readWorld);
+                loader.resolve(reference.id(), AssetKind.SCENE_DEFINITION, definitions.projectSource(), "");
+        Optional<SceneDefinition> definition = source.flatMap(loader::readScene);
         if (source.isPresent() && definition.isPresent()) {
-            WorldDefinition world = definition.orElseThrow();
+            SceneDefinition scene = definition.orElseThrow();
             URI definitionSource = source.orElseThrow().source();
-            loader.validateEntries(world.roots(), EntityContract.empty(), definitionSource);
+            loader.validateEntries(scene.roots(), EntityContract.empty(), definitionSource);
             Validation components =
-                    loader.validateWorldComponents(world.roots(), world.connections(), definitionSource);
+                    loader.validateSceneComponents(scene.roots(), scene.connections(), definitionSource);
             loader.validateConnections(
-                    world.connections(), loader.indexPlacements(world.roots()), components, definitionSource);
+                    scene.connections(), loader.indexPlacements(scene.roots()), components, definitionSource);
         }
         return loader.result(
                 definition, source.map(DefinitionAssetIndex.Source::source).orElse(definitions.projectSource()));
@@ -127,9 +127,9 @@ final class DefinitionGraphLoader {
         return result.value();
     }
 
-    /** Reads one world definition and appends its source-local diagnostics. */
-    private Optional<WorldDefinition> readWorld(DefinitionAssetIndex.Source source) {
-        DefinitionDocumentReader.ReadResult<WorldDefinition> result = source.readWorld(definitions.projectRoot());
+    /** Reads one Scene definition and appends its source-local diagnostics. */
+    private Optional<SceneDefinition> readScene(DefinitionAssetIndex.Source source) {
+        DefinitionDocumentReader.ReadResult<SceneDefinition> result = source.readScene(definitions.projectRoot());
         diagnostics.addAll(result.diagnostics());
         return result.value();
     }
@@ -165,13 +165,13 @@ final class DefinitionGraphLoader {
         return validation;
     }
 
-    /** Validates world components when a safe component catalog was supplied. */
-    private @Nullable Validation validateWorldComponents(
+    /** Validates Scene components when a safe component catalog was supplied. */
+    private @Nullable Validation validateSceneComponents(
             List<? extends EntityEntry> roots, List<SignalConnection> connections, URI source) {
         if (componentTypes == null) {
             return null;
         }
-        Validation validation = ComponentDefinitionValidator.validateWorld(roots, connections, componentTypes, source);
+        Validation validation = ComponentDefinitionValidator.validateScene(roots, connections, componentTypes, source);
         diagnostics.addAll(validation.diagnostics());
         return validation;
     }

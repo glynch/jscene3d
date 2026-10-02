@@ -35,7 +35,10 @@ final class ProjectLoaderTest {
               },
               "runtime": {
                 "applicationExtension": "example.test-game",
-                "entryScene": "scenes/main.scene.json"
+                "mainScene": {
+                  "assetId": "92a63e56-bfd1-4907-a773-6c772e4f9945",
+                  "pathHint": "scenes/main.scene.json"
+                }
               },
               "extensions": [
                 {
@@ -105,7 +108,10 @@ final class ProjectLoaderTest {
                   },
                   "runtime": {
                     "applicationExtension": "example.test-game",
-                    "entryScene": "scenes/main.scene.json",
+                    "mainScene": {
+                      "assetId": "92a63e56-bfd1-4907-a773-6c772e4f9945",
+                      "pathHint": "scenes/main.scene.json"
+                    },
                     "projectSystems": "game/systems.json",
                     "inputMap": "config/input.json"
                   },
@@ -311,7 +317,10 @@ final class ProjectLoaderTest {
                   },
                   "runtime": {
                     "applicationExtension": "missing.extension",
-                    "entryScene": "../outside.scene.json"
+                    "mainScene": {
+                      "assetId": "92a63e56-bfd1-4907-a773-6c772e4f9945",
+                      "pathHint": "../outside.scene.json"
+                    }
                   },
                   "extensions": [
                     {"id": "Bad Extension", "requires": "latest"},
@@ -345,7 +354,7 @@ final class ProjectLoaderTest {
                         "project.field.duplicate",
                         "project.field.uri",
                         "project.engine.incompatible",
-                        "project.path.escape",
+                        "reference.asset",
                         "project.extension.id",
                         "project.extension.requirement",
                         "project.extension.duplicate",
@@ -361,7 +370,9 @@ final class ProjectLoaderTest {
     @Test
     void rejectsUnsafePaths() throws IOException {
         writeManifest(MINIMAL_MANIFEST
-                .replace("scenes/main.scene.json", "../outside.scene.json")
+                .replace(
+                        "\"applicationExtension\": \"example.test-game\",",
+                        "\"applicationExtension\": \"example.test-game\",\n    \"projectSystems\": \"../outside.json\",")
                 .replace("\"version\": \"1.2.3\"", "\"version\": \"1.2.3\", \"icon\": \"images\\\\icon.png\""));
 
         ProjectLoadResult result = loader().load(temporaryDirectory);
@@ -453,7 +464,10 @@ final class ProjectLoaderTest {
     /** Verifies complete runtime configuration. */
     private static void assertRuntime(GameProject project, Path canonicalRoot) {
         assertThat(project.runtime().applicationExtension()).isEqualTo("example.test-game");
-        assertThat(project.runtime().entryScene()).isEqualTo(canonicalRoot.resolve("scenes/main.scene.json"));
+        assertThat(project.runtime().mainScene()).get().satisfies(mainScene -> {
+            assertThat(mainScene.id().toString()).isEqualTo("92a63e56-bfd1-4907-a773-6c772e4f9945");
+            assertThat(mainScene.pathHint()).contains("scenes/main.scene.json");
+        });
         assertThat(project.runtime().projectSystems()).contains(canonicalRoot.resolve("game/systems.json"));
         assertThat(project.runtime().inputMap()).contains(canonicalRoot.resolve("config/input.json"));
         assertThat(project.launch().splash()).get().satisfies(splash -> {

@@ -25,11 +25,11 @@ import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -152,7 +152,7 @@ final class Spatial3dWorldCompositionTest {
     void reportsMalformedTransformProperty() throws IOException {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         Map<PropertyId, ProjectValue> properties = Map.of(Spatial3dDescriptors.positionProperty(), numbers(1.0F, 2.0F));
-        WorldDefinition definition = singleTransformWorld(properties);
+        SceneDefinition definition = singleTransformWorld(properties);
 
         WorldCompositionResult result = compose(definition, spatial);
 
@@ -186,21 +186,21 @@ final class Spatial3dWorldCompositionTest {
     }
 
     /** Writes and composes a world without host modules. */
-    private WorldCompositionResult compose(WorldDefinition definition) throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("spatial.world.json"), definition);
+    private WorldCompositionResult compose(SceneDefinition definition) throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("spatial.scene.json"), definition);
         return composeCatalog(definition, List.of());
     }
 
     /** Writes and composes a world with one spatial adapter. */
-    private WorldCompositionResult compose(WorldDefinition definition, Spatial3dWorldModule spatial)
+    private WorldCompositionResult compose(SceneDefinition definition, Spatial3dWorldModule spatial)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("spatial.world.json"), definition);
+        DefinitionWriter.write(temporaryDirectory.resolve("spatial.scene.json"), definition);
         WorldModuleBinding<Spatial3dWorldModule> binding = WorldModuleBinding.of(Spatial3dWorldModule.class, spatial);
         return composeCatalog(definition, List.of(binding));
     }
 
     /** Composes the written fixture through the public asset and runtime boundaries. */
-    private WorldCompositionResult composeCatalog(WorldDefinition definition, List<WorldModuleBinding<?>> modules) {
+    private WorldCompositionResult composeCatalog(SceneDefinition definition, List<WorldModuleBinding<?>> modules) {
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(Spatial3dDescriptors.extensionDescriptor()));
         return WorldComposer.compose(
@@ -213,7 +213,7 @@ final class Spatial3dWorldCompositionTest {
     }
 
     /** Creates one scaled parent and translated child. */
-    private static WorldDefinition hierarchicalWorld() {
+    private static SceneDefinition hierarchicalWorld() {
         ComponentDefinition childTransform =
                 transform(CHILD_TRANSFORM, Map.of(Spatial3dDescriptors.positionProperty(), numbers(0.0F, 2.0F, 0.0F)));
         LocalEntity child = new LocalEntity(CHILD_ID, "Child", true, List.of(childTransform), List.of());
@@ -223,14 +223,14 @@ final class Spatial3dWorldCompositionTest {
                         Spatial3dDescriptors.positionProperty(), numbers(10.0F, 0.0F, 0.0F),
                         Spatial3dDescriptors.scaleProperty(), numbers(2.0F, 2.0F, 2.0F)));
         LocalEntity root = new LocalEntity(ROOT_ID, "Root", true, List.of(rootTransform), List.of(child));
-        return new WorldDefinition(WORLD_ID, "Spatial hierarchy", List.of(root));
+        return new SceneDefinition(WORLD_ID, "Spatial hierarchy", List.of(root));
     }
 
     /** Creates one root transform with the supplied authored property overrides. */
-    private static WorldDefinition singleTransformWorld(Map<PropertyId, ProjectValue> properties) {
+    private static SceneDefinition singleTransformWorld(Map<PropertyId, ProjectValue> properties) {
         ComponentDefinition transform = transform(ROOT_TRANSFORM, properties);
         LocalEntity root = new LocalEntity(ROOT_ID, "Root", true, List.of(transform), List.of());
-        return new WorldDefinition(WORLD_ID, "Single transform", List.of(root));
+        return new SceneDefinition(WORLD_ID, "Single transform", List.of(root));
     }
 
     /** Creates one Transform3d component definition. */

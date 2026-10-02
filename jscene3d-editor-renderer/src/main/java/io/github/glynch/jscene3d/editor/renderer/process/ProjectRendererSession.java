@@ -16,10 +16,13 @@ import io.github.glynch.jscene3d.iosurface.macos.IOSurfaceBridge;
 import io.github.glynch.jscene3d.iosurface.macos.IOSurfaceDescriptor;
 import io.github.glynch.jscene3d.iosurface.macos.IOSurfaceRenderSurface;
 import io.github.glynch.jscene3d.platform.Window;
+import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.desktop.StandardProjectEnvironment;
 import io.github.glynch.jscene3d.project.runtime.HostedProject;
+import io.github.glynch.jscene3d.project.runtime.ProjectLaunchRequest;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeEnvironment;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeHost;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.render.Renderer;
 import java.time.Duration;
@@ -105,14 +108,15 @@ final class ProjectRendererSession implements RendererSession {
     static HostedProject loadProject(
             ProjectLaunch launch, ClassLoader classLoader, ProjectRuntimeEnvironment environment) {
         ProjectRuntimeHost host = new ProjectRuntimeHost(launch.engineVersion(), classLoader, environment);
-        HostedProject project = host.loadEntry(launch.projectRoot());
+        HostedProject project = host.load(
+                launch.projectRoot(), ProjectLaunchRequest.scene(AssetRef.<SceneDefinition>to(launch.sceneAssetId())));
         if (!project.project().identity().id().equals(launch.projectId())) {
             project.close();
             throw new IllegalStateException("Loaded project identity does not match the prepared launch");
         }
-        if (!project.world().definition().id().equals(launch.worldAssetId())) {
+        if (!project.world().definition().id().equals(launch.sceneAssetId())) {
             project.close();
-            throw new IllegalStateException("Loaded startup world does not match the prepared launch");
+            throw new IllegalStateException("Loaded Scene does not match the prepared launch");
         }
         return project;
     }

@@ -22,7 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Internal authoritative working copy shared by authored world and entity definitions.
+ * Internal authoritative working copy shared by authored Scene and entity definitions.
  *
  * <p>The current document, persisted semantic baseline, monotonic revision, and validated document-state history are
  * owned together. Dirty state is always derived by comparing current and persisted authored trees. Marking a state
@@ -449,8 +449,8 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
     /** Converts the retained document projection to the session's closed content model. */
     private static EditorRetainedDefinition.Content content(AuthoredDefinitionDocument document) {
         return switch (document.content()) {
-            case AuthoredDefinitionDocument.Content.World world ->
-                new EditorRetainedDefinition.Content.World(world.definition());
+            case AuthoredDefinitionDocument.Content.Scene world ->
+                new EditorRetainedDefinition.Content.Scene(world.definition());
             case AuthoredDefinitionDocument.Content.Entity entity ->
                 new EditorRetainedDefinition.Content.Entity(entity.definition());
         };

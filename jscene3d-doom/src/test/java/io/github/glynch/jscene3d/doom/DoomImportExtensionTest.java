@@ -44,8 +44,7 @@ final class DoomImportExtensionTest {
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "io.github.glynch.jscene3d.doom",
-                "entryScene": "main.scene.json"
+                "applicationExtension": "io.github.glynch.jscene3d.doom"
               },
               "extensions": [
                 {"id": "io.github.glynch.jscene3d.wad", "requires": "0.1.0-SNAPSHOT"},
@@ -85,7 +84,9 @@ final class DoomImportExtensionTest {
         projectDirectory = Files.createDirectory(temporaryDirectory.resolve("project"));
         Files.createDirectories(projectDirectory.resolve("assets"));
         Files.createDirectories(projectDirectory.resolve("imports"));
-        Files.writeString(projectDirectory.resolve("main.scene.json"), "{}", StandardCharsets.UTF_8);
+        Files.writeString(projectDirectory.resolve("main.scene.json"), """
+                {"assetId":"3bb93e80-90a8-4adb-becb-e49fb2312571","assetType":"scene-definition","formatVersion":1,"name":"Doom Import Test","connections":[],"roots":[]}
+                """, StandardCharsets.UTF_8);
         Files.writeString(
                 projectDirectory.resolve(ProjectLoader.MANIFEST_NAME), PROJECT_MANIFEST, StandardCharsets.UTF_8);
         Files.writeString(

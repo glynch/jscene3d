@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://jscene3d.org/schemas/world-definition-1.json",
-  "title": "JScene3D World Definition version 1",
+  "$id": "https://jscene3d.org/schemas/scene-definition-1.json",
+  "title": "JScene3D Scene Definition version 1",
   "type": "object",
   "additionalProperties": false,
   "required": ["assetId", "assetType", "formatVersion", "name", "connections", "roots"],
   "properties": {
     "$schema": {"type": "string", "format": "uri"},
     "assetId": {"type": "string", "format": "uuid"},
-    "assetType": {"const": "world-definition"},
+    "assetType": {"const": "scene-definition"},
     "formatVersion": {"const": 1},
     "name": {"type": "string", "minLength": 1},
     "connections": {

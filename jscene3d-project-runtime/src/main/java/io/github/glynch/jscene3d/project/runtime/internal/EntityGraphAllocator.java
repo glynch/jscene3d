@@ -39,8 +39,8 @@ final class EntityGraphAllocator {
 
     /** Allocates one complete initial world without repeating authored traversal. */
     AllocatedWorld allocate() {
-        if (plan.kind() != CompositionPlan.Kind.WORLD) {
-            throw new IllegalArgumentException("initial world allocation requires a world composition plan");
+        if (plan.kind() != CompositionPlan.Kind.SCENE_DEFINITION) {
+            throw new IllegalArgumentException("initial world allocation requires a Scene composition plan");
         }
         allocateEntities(null, true, false);
         resolveEndpointExports();

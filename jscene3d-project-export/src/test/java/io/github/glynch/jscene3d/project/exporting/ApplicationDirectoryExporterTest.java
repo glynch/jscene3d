@@ -44,7 +44,10 @@ final class ApplicationDirectoryExporterTest {
               },
               "runtime": {
                 "applicationExtension": "io.github.glynch.sample-game",
-                "entryScene": "worlds/start.world.json",
+                "mainScene": {
+                  "assetId": "1af6e97a-0401-4772-b476-29e2dcc8e77c",
+                  "pathHint": "worlds/start.scene.json"
+                },
                 "inputMap": "config/input-map.json"
               },
               "launch": {
@@ -163,7 +166,7 @@ final class ApplicationDirectoryExporterTest {
                         "project/resources/menu-background.resource.json",
                         "project/resources/runtime.bin",
                         "project/sample-game.j3d",
-                        "project/worlds/start.world.json");
+                        "project/worlds/start.scene.json");
     }
 
     /** Generates launchers containing no source-checkout paths or game-specific Java entry point. */
@@ -279,7 +282,7 @@ final class ApplicationDirectoryExporterTest {
     /** Writes the manifest and every category of file used to test export selection. */
     private void writeProjectFixture() throws IOException {
         write(projectRoot.resolve("sample-game.j3d"), PROJECT_DESCRIPTOR);
-        write(projectRoot.resolve("worlds/start.world.json"), definition("world-definition"));
+        write(projectRoot.resolve("worlds/start.scene.json"), definition("scene-definition"));
         write(projectRoot.resolve("entities/item.entity.json"), definition("entity-definition"));
         write(projectRoot.resolve("config/input-map.json"), "{}");
         write(projectRoot.resolve("branding/background.png"), "background");
@@ -298,7 +301,7 @@ final class ApplicationDirectoryExporterTest {
 
     /** Returns one discoverable definition header. */
     private static String definition(String type) {
-        String id = type.equals("world-definition")
+        String id = type.equals("scene-definition")
                 ? "1af6e97a-0401-4772-b476-29e2dcc8e77c"
                 : "88376f49-183d-4d1c-96bf-eaaddd50ed91";
         return """

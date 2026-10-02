@@ -1,7 +1,7 @@
 {
-  "$schema" : "https://jscene3d.org/schemas/world-definition-1.json",
+  "$schema" : "https://jscene3d.org/schemas/scene-definition-1.json",
   "assetId" : "592c525f-c8e1-4e9e-8546-12e44598527d",
-  "assetType" : "world-definition",
+  "assetType" : "scene-definition",
   "formatVersion" : 1,
   "name" : "Spawning example",
   "connections" : [ ],

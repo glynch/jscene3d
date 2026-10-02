@@ -35,10 +35,10 @@ import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.internal.ProjectIdentifiers;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -60,7 +60,7 @@ import org.jspecify.annotations.Nullable;
 public final class DefinitionDocumentReader {
     private static final int FORMAT_VERSION = 1;
     private static final String ENTITY_SCHEMA = "https://jscene3d.org/schemas/entity-definition-1.json";
-    private static final String WORLD_SCHEMA = "https://jscene3d.org/schemas/world-definition-1.json";
+    private static final String SCENE_SCHEMA = "https://jscene3d.org/schemas/scene-definition-1.json";
     private static final AssetId INVALID_ASSET_ID = new AssetId(new UUID(0, 0));
 
     private final Path projectRoot;
@@ -167,57 +167,57 @@ public final class DefinitionDocumentReader {
     }
 
     /**
-     * Reads one complete world-definition document matching catalog metadata.
+     * Reads one complete scene-definition document matching catalog metadata.
      *
      * @param projectRoot normalized project root
      * @param metadata catalog metadata
      * @return immutable definition and ordered diagnostics
      */
-    public static ReadResult<WorldDefinition> readWorld(Path projectRoot, AssetMetadata metadata) {
+    public static ReadResult<SceneDefinition> readScene(Path projectRoot, AssetMetadata metadata) {
         DefinitionDocumentReader reader = new DefinitionDocumentReader(
                 projectRoot, metadata.path().toUri(), metadata.id(), metadata.kind(), metadata.formatVersion());
         try (InputStream input = Files.newInputStream(metadata.path())) {
-            RawDefinitionDocuments.WorldDocument raw =
-                    ProjectJsonReader.strict().read(input, RawDefinitionDocuments.WorldDocument.class);
-            return reader.validateWorld(raw);
+            RawDefinitionDocuments.SceneDocument raw =
+                    ProjectJsonReader.strict().read(input, RawDefinitionDocuments.SceneDocument.class);
+            return reader.validateScene(raw);
         } catch (JsonProcessingException exception) {
             reader.diagnostics.error(
                     AssetDiagnosticCode.JSON_INVALID,
-                    "world definition is invalid JSON: " + exception.getOriginalMessage(),
+                    "Scene definition is invalid JSON: " + exception.getOriginalMessage(),
                     "");
         } catch (IOException exception) {
             reader.diagnostics.error(
                     AssetDiagnosticCode.FILE_READ_FAILED,
-                    "world definition cannot be read: " + exception.getMessage(),
+                    "Scene definition cannot be read: " + exception.getMessage(),
                     "");
         }
         return reader.failure();
     }
 
     /**
-     * Reads one complete authored world definition from caller-owned exact source bytes.
+     * Reads one complete authored Scene definition from caller-owned exact source bytes.
      *
      * @param projectRoot normalized project root
      * @param metadata trusted catalog metadata
      * @param input candidate document content, retained by the caller
      * @return immutable definition and ordered diagnostics
      */
-    public static ReadResult<WorldDefinition> readWorld(Path projectRoot, AssetMetadata metadata, InputStream input) {
+    public static ReadResult<SceneDefinition> readScene(Path projectRoot, AssetMetadata metadata, InputStream input) {
         DefinitionDocumentReader reader = new DefinitionDocumentReader(
                 projectRoot, metadata.path().toUri(), metadata.id(), metadata.kind(), metadata.formatVersion());
         try {
-            RawDefinitionDocuments.WorldDocument raw = ProjectJsonReader.strict()
-                    .read(Objects.requireNonNull(input, "input"), RawDefinitionDocuments.WorldDocument.class);
-            return reader.validateWorld(raw);
+            RawDefinitionDocuments.SceneDocument raw = ProjectJsonReader.strict()
+                    .read(Objects.requireNonNull(input, "input"), RawDefinitionDocuments.SceneDocument.class);
+            return reader.validateScene(raw);
         } catch (JsonProcessingException exception) {
             reader.diagnostics.error(
                     AssetDiagnosticCode.JSON_INVALID,
-                    "world definition is invalid JSON: " + exception.getOriginalMessage(),
+                    "Scene definition is invalid JSON: " + exception.getOriginalMessage(),
                     "");
         } catch (IOException exception) {
             reader.diagnostics.error(
                     AssetDiagnosticCode.FILE_READ_FAILED,
-                    "world definition cannot be read: " + exception.getMessage(),
+                    "Scene definition cannot be read: " + exception.getMessage(),
                     "");
         }
         return reader.failure();
@@ -253,14 +253,14 @@ public final class DefinitionDocumentReader {
         }
     }
 
-    /** Validates one world-definition document in source order. */
-    private ReadResult<WorldDefinition> validateWorld(RawDefinitionDocuments.@Nullable WorldDocument raw) {
+    /** Validates one scene-definition document in source order. */
+    private ReadResult<SceneDefinition> validateScene(RawDefinitionDocuments.@Nullable SceneDocument raw) {
         if (raw == null) {
             diagnostics.error(AssetDiagnosticCode.JSON_INVALID, "asset document must be a JSON object", "");
             return failure();
         }
         AssetId id = validateEnvelope(
-                raw.schema(), raw.assetId(), raw.assetType(), raw.formatVersion(), AssetKind.WORLD_DEFINITION);
+                raw.schema(), raw.assetId(), raw.assetType(), raw.formatVersion(), AssetKind.SCENE_DEFINITION);
         String name = requiredName(raw.name(), "/name");
         List<EntityEntry> roots = validateEntries(raw.roots(), "/roots");
         List<SignalConnection> connections = validateConnections(raw.connections(), "/connections");
@@ -268,7 +268,7 @@ public final class DefinitionDocumentReader {
             return failure();
         }
         try {
-            return success(new WorldDefinition(id, name, connections, roots));
+            return success(new SceneDefinition(id, name, connections, roots));
         } catch (IllegalArgumentException exception) {
             diagnostics.error(AssetDiagnosticCode.TARGET_INVALID, exception.toString(), "");
             return failure();
@@ -305,7 +305,7 @@ public final class DefinitionDocumentReader {
                     "formatVersion must be " + FORMAT_VERSION + ": " + formatVersion,
                     "/formatVersion");
         }
-        String expectedSchema = expectedKind == AssetKind.ENTITY_DEFINITION ? ENTITY_SCHEMA : WORLD_SCHEMA;
+        String expectedSchema = expectedKind == AssetKind.ENTITY_DEFINITION ? ENTITY_SCHEMA : SCENE_SCHEMA;
         if (schema != null && !expectedSchema.equals(schema)) {
             diagnostics.warning(
                     AssetDiagnosticCode.SCHEMA_URI_INVALID,

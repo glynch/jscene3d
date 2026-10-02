@@ -56,8 +56,8 @@ public record CompositionPlan(
 
     /** Root authored definition kind. */
     public enum Kind {
-        /** Root is a world definition. */
-        WORLD,
+        /** Root is a Scene definition. */
+        SCENE_DEFINITION,
         /** Root is a reusable entity definition. */
         ENTITY_DEFINITION
     }

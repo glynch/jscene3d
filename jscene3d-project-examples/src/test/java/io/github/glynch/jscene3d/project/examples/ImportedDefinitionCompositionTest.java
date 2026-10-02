@@ -28,8 +28,8 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -41,7 +41,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Proves that an authored world can compose a published imported entity definition. */
+/** Proves that an authored Scene can compose a published imported entity definition into a live World. */
 final class ImportedDefinitionCompositionTest {
     private static final AssetId WORLD_ID = AssetId.from("31764fc9-a3ad-40aa-9783-ebc154e11ae7");
     private static final AssetId DEFINITION_ID = AssetId.from("4e230064-13e5-4ad2-bba8-8fc7dbf4ab32");
@@ -61,11 +61,11 @@ final class ImportedDefinitionCompositionTest {
     /** Composes a runtime entity through import lookup, mixed-source validation, and placement expansion. */
     @Test
     void composesImportedDefinitionPlacement() throws IOException {
-        WorldDefinition authoredWorld = new WorldDefinition(
+        SceneDefinition authoredWorld = new SceneDefinition(
                 WORLD_ID,
                 "Imported world",
                 List.of(new EntityPlacement(PLACEMENT_ID, true, AssetRef.to(DEFINITION_ID), Map.of())));
-        DefinitionWriter.write(temporaryDirectory.resolve("imported.world.json"), authoredWorld);
+        DefinitionWriter.write(temporaryDirectory.resolve("imported.scene.json"), authoredWorld);
         AssetCatalog authored = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         EntityDefinition generated = new EntityDefinition(
                 DEFINITION_ID,

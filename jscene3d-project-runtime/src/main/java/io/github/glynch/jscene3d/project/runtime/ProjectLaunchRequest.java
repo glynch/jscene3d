@@ -4,8 +4,9 @@
  */
 package io.github.glynch.jscene3d.project.runtime;
 
+import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -17,11 +18,12 @@ public final class ProjectLaunchRequest {
             new ProjectLaunchRequest(Optional.empty(), Optional.empty(), Map.of());
 
     private final Optional<String> profile;
-    private final Optional<Path> scene;
+    private final Optional<AssetRef<SceneDefinition>> scene;
     private final Map<String, ProjectValue> parameters;
 
     /** Stores one validated launch request. */
-    private ProjectLaunchRequest(Optional<String> profile, Optional<Path> scene, Map<String, ProjectValue> parameters) {
+    private ProjectLaunchRequest(
+            Optional<String> profile, Optional<AssetRef<SceneDefinition>> scene, Map<String, ProjectValue> parameters) {
         this.profile = Objects.requireNonNull(profile, "profile");
         this.scene = Objects.requireNonNull(scene, "scene");
         this.parameters = immutableParameters(parameters);
@@ -37,20 +39,29 @@ public final class ProjectLaunchRequest {
     }
 
     /**
+     * Creates a request that runs one explicitly selected Scene independently of the Main Scene.
+     *
+     * @param scene stable selected-scene reference
+     * @return validated explicit Scene request
+     */
+    public static ProjectLaunchRequest scene(AssetRef<SceneDefinition> scene) {
+        return new ProjectLaunchRequest(
+                Optional.empty(), Optional.of(Objects.requireNonNull(scene, "scene")), Map.of());
+    }
+
+    /**
      * Creates a named playtest request for an explicitly selected scene.
      *
      * @param profile stable playtest profile name
-     * @param scene project-relative world-definition path
+     * @param scene stable selected-scene reference
      * @param parameters immutable application-defined parameters
      * @return validated playtest request
      */
-    public static ProjectLaunchRequest playtest(String profile, Path scene, Map<String, ProjectValue> parameters) {
+    public static ProjectLaunchRequest playtest(
+            String profile, AssetRef<SceneDefinition> scene, Map<String, ProjectValue> parameters) {
         String validProfile = requireNonBlank(profile, "profile");
-        Path validScene = Objects.requireNonNull(scene, "scene").normalize();
-        if (validScene.isAbsolute() || validScene.toString().isBlank() || validScene.startsWith("..")) {
-            throw new IllegalArgumentException("scene must be a project-relative path");
-        }
-        return new ProjectLaunchRequest(Optional.of(validProfile), Optional.of(validScene), parameters);
+        return new ProjectLaunchRequest(
+                Optional.of(validProfile), Optional.of(Objects.requireNonNull(scene, "scene")), parameters);
     }
 
     /** Returns the optional human-readable profile identity.
@@ -63,9 +74,9 @@ public final class ProjectLaunchRequest {
 
     /** Returns the optional scene overriding the manifest-selected scene.
      *
-     * @return project-relative selected scene when present
+     * @return stable selected-scene reference when present
      */
-    public Optional<Path> scene() {
+    public Optional<AssetRef<SceneDefinition>> scene() {
         return scene;
     }
 

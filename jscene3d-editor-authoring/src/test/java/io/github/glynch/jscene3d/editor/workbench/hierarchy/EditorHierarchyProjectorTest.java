@@ -17,7 +17,7 @@ import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,10 +44,10 @@ final class EditorHierarchyProjectorTest {
         AssetCatalog catalog = catalog(definition());
         List<ProjectDiagnostic> diagnostics = new ArrayList<>();
         EditorHierarchyProjector projector = projector(catalog, diagnostics);
-        WorldDefinition world = world();
+        SceneDefinition world = world();
 
         EditorHierarchyProjection projection =
-                projector.project(world, projectRoot.resolve("world.world.json").toUri(), true, true, Set.of(LOCAL_ID));
+                projector.project(world, projectRoot.resolve("world.scene.json").toUri(), true, true, Set.of(LOCAL_ID));
 
         assertThat(projection.context().definitionId()).isEqualTo(WORLD_ID);
         assertThat(projection.roots())
@@ -78,9 +78,9 @@ final class EditorHierarchyProjectorTest {
         EditorHierarchyProjector projector = projector(catalog, new ArrayList<>());
 
         EditorHierarchyProjection firstProjection = projector.project(
-                world(), projectRoot.resolve("world.world.json").toUri(), true, true, Set.of());
+                world(), projectRoot.resolve("world.scene.json").toUri(), true, true, Set.of());
         EditorHierarchyProjection secondProjection = projector.project(
-                world(), projectRoot.resolve("world.world.json").toUri(), true, true, Set.of());
+                world(), projectRoot.resolve("world.scene.json").toUri(), true, true, Set.of());
         HierarchyOccurrenceId first =
                 firstProjection.roots().get(1).children().getFirst().occurrence();
         HierarchyOccurrenceId second =
@@ -123,11 +123,11 @@ final class EditorHierarchyProjectorTest {
         EditorHierarchyProjector projector = projector(catalog, diagnostics);
 
         EditorHierarchyProjection projection = projector.project(
-                new WorldDefinition(
+                new SceneDefinition(
                         WORLD_ID,
                         "World",
                         List.of(new EntityPlacement(FIRST_PLACEMENT, true, AssetRef.to(DEFINITION_ID), Map.of()))),
-                projectRoot.resolve("world.world.json").toUri(),
+                projectRoot.resolve("world.scene.json").toUri(),
                 true,
                 true,
                 Set.of());
@@ -153,12 +153,12 @@ final class EditorHierarchyProjectorTest {
         return new EntityDefinition(DEFINITION_ID, "Reusable", root);
     }
 
-    private static WorldDefinition world() {
+    private static SceneDefinition world() {
         LocalEntity local = new LocalEntity(LOCAL_ID, "Local", true, List.of(), List.of());
         EntityPlacement first =
                 new EntityPlacement(FIRST_PLACEMENT, "First", true, AssetRef.to(DEFINITION_ID), Map.of());
         EntityPlacement second =
                 new EntityPlacement(SECOND_PLACEMENT, "Second", false, AssetRef.to(DEFINITION_ID), Map.of());
-        return new WorldDefinition(WORLD_ID, "World", List.of(local, first, second));
+        return new SceneDefinition(WORLD_ID, "World", List.of(local, first, second));
     }
 }

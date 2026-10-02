@@ -1,7 +1,7 @@
 {
-  "$schema" : "https://jscene3d.org/schemas/world-definition-1.json",
+  "$schema" : "https://jscene3d.org/schemas/scene-definition-1.json",
   "assetId" : "9b76c125-3c5f-4a38-8571-199b79b3d77e",
-  "assetType" : "world-definition",
+  "assetType" : "scene-definition",
   "formatVersion" : 1,
   "name" : "Spatial hierarchy",
   "connections" : [ ],

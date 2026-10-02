@@ -79,10 +79,13 @@ public record RawManifest(
     /** Nullable raw runtime configuration. */
     record RuntimeConfiguration(
             @Nullable String applicationExtension,
-            @Nullable String entryScene,
-            @Nullable String startupScene,
+            @Nullable AssetReference mainScene,
             @Nullable String projectSystems,
             @Nullable String inputMap) {}
+
+    /** Nullable raw stable asset reference. */
+    record AssetReference(
+            @Nullable String assetId, @Nullable String pathHint) {}
 
     /** Nullable raw launch presentation. */
     record LaunchConfiguration(@Nullable SplashConfiguration splash) {}

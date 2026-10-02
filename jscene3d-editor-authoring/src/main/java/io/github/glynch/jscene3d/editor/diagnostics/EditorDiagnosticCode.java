@@ -17,13 +17,7 @@ public enum EditorDiagnosticCode implements DiagnosticCode {
     /** Core and extension setting declarations contain conflicting keys. */
     SETTING_REGISTRY_INVALID("editor.setting.registry", "Project settings contain conflicting declarations"),
     /** Published imported content could not be opened. */
-    IMPORT_CONTENT_UNAVAILABLE("editor.import.content", "Published imported content could not be opened"),
-    /** The configured startup world is not an authored world definition. */
-    STARTUP_WORLD_MISSING("editor.startup-world.missing", "The configured startup world is not in the asset catalog"),
-    /** The startup world could not be realized as an editor-safe preview. */
-    PREVIEW_COMPOSITION_FAILED("editor.preview.composition", "The startup-world preview could not be composed"),
-    /** The startup world provides no camera through which the editor can render it. */
-    PREVIEW_CAMERA_MISSING("editor.preview.camera", "The startup-world preview has no enabled primary camera");
+    IMPORT_CONTENT_UNAVAILABLE("editor.import.content", "Published imported content could not be opened");
 
     private final String code;
     private final String message;

@@ -26,8 +26,8 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -113,7 +113,7 @@ final class WorldSchedulingTest {
     void runsPhysicsWorldModulesAtTheReservedPhase() throws IOException {
         List<String> events = new ArrayList<>();
         RecordingPhysicsModule physics = new RecordingPhysicsModule(events);
-        WorldDefinition definition = world(true, List.of(component(ALPHA_ID, ALPHA_TYPE)));
+        SceneDefinition definition = world(true, List.of(component(ALPHA_ID, ALPHA_TYPE)));
         List<ComponentTypeDescriptor> descriptors = List.of(descriptor(ALPHA_TYPE, ALL_PHASES));
         Map<ComponentType, ComponentFactory<?>> factories =
                 Map.of(ALPHA_TYPE, context -> new RecordingUpdates("alpha", events));
@@ -319,7 +319,7 @@ final class WorldSchedulingTest {
 
     /** Writes and composes one fixture world, requiring success. */
     private World compose(
-            WorldDefinition definition,
+            SceneDefinition definition,
             List<ComponentTypeDescriptor> descriptors,
             Map<ComponentType, ComponentFactory<?>> factories)
             throws IOException {
@@ -328,7 +328,7 @@ final class WorldSchedulingTest {
 
     /** Writes and composes one fixture world through the public composer. */
     private WorldCompositionResult composeResult(
-            WorldDefinition definition,
+            SceneDefinition definition,
             List<ComponentTypeDescriptor> descriptors,
             Map<ComponentType, ComponentFactory<?>> factories)
             throws IOException {
@@ -337,12 +337,12 @@ final class WorldSchedulingTest {
 
     /** Writes and composes one fixture world with explicit host modules. */
     private WorldCompositionResult composeResult(
-            WorldDefinition definition,
+            SceneDefinition definition,
             List<ComponentTypeDescriptor> descriptors,
             Map<ComponentType, ComponentFactory<?>> factories,
             List<WorldModuleBinding<?>> modules)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("schedule.world.json"), definition);
+        DefinitionWriter.write(temporaryDirectory.resolve("schedule.scene.json"), definition);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
                 EXTENSION_ID,
@@ -371,9 +371,9 @@ final class WorldSchedulingTest {
     }
 
     /** Creates one local root with configurable enablement and authored component order. */
-    private static WorldDefinition world(boolean enabled, List<ComponentDefinition> components) {
+    private static SceneDefinition world(boolean enabled, List<ComponentDefinition> components) {
         LocalEntity root = new LocalEntity(ROOT_ID, "Root", enabled, components, List.of());
-        return new WorldDefinition(WORLD_ID, "Schedule world", List.of(root));
+        return new SceneDefinition(WORLD_ID, "Schedule world", List.of(root));
     }
 
     /** Creates one authored component from an exact type. */

@@ -38,10 +38,8 @@ import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
 import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -61,8 +59,6 @@ public final class EditorProjectSession implements AutoCloseable {
     private final List<ProjectAsset> assets;
     private final Collection<ProjectDiagnostic> diagnostics;
     private final EditorHierarchyProjector hierarchyProjector;
-    private final AssetId startupWorldId;
-    private final Path startupWorldSource;
     private final AuthoringChangeSource<AuthoringSessionChange> changes = new AuthoringChangeSource<>();
     private final AuthoringChangeSource<EditorHierarchyProjection> hierarchyChanges = new AuthoringChangeSource<>();
     private final AuthoringChangeSource<AuthoringDefinitionChange> definitionChanges = new AuthoringChangeSource<>();
@@ -72,12 +68,12 @@ public final class EditorProjectSession implements AutoCloseable {
     private final List<AuthoringSubscription> workingCopySubscriptions = new ArrayList<>();
     private final Map<AssetId, RetainedState> retainedDefinitions = new LinkedHashMap<>();
 
-    private EditorHierarchyProjection hierarchy;
+    private Optional<EditorHierarchyProjection> activeHierarchy = Optional.empty();
     private long configurationRevision;
     private boolean closed;
 
     /**
-     * Stores validated project data and opens the authoritative startup-world working copy.
+     * Stores validated project data without implicitly opening any Scene.
      *
      * @param source loaded project inputs
      * @param assets validated authored assets
@@ -98,11 +94,6 @@ public final class EditorProjectSession implements AutoCloseable {
         this.assets = List.copyOf(assets);
         this.hierarchyProjector = Objects.requireNonNull(hierarchyProjector, "hierarchyProjector");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
-        startupWorldId = validSource.startupWorld().id();
-        startupWorldSource = validSource.startupWorldSource().toAbsolutePath().normalize();
-        AuthoredDefinitionDocument startupDocument = loadAuthoredDocument(startupWorldId);
-        openWorkingCopy(startupDocument);
-        hierarchy = projectHierarchy();
     }
 
     /** Returns the validated project descriptor.
@@ -178,26 +169,6 @@ public final class EditorProjectSession implements AutoCloseable {
         return assets;
     }
 
-    /** Returns the current startup-world content.
-     *
-     * @return current world definition
-     */
-    public WorldDefinition startupWorld() {
-        ensureOpen();
-        return ((EditorRetainedDefinition.Content.World)
-                        startupWorkingCopy().state().content())
-                .definition();
-    }
-
-    /** Returns the normalized authored startup-world source.
-     *
-     * @return authored world source
-     */
-    public Path startupWorldSource() {
-        ensureOpen();
-        return startupWorldSource;
-    }
-
     /**
      * Resolves and retains one structural definition by authoritative asset identity.
      *
@@ -212,13 +183,20 @@ public final class EditorProjectSession implements AutoCloseable {
         AssetId validId = Objects.requireNonNull(id, "id");
         RetainedState existing = retainedDefinitions.get(validId);
         if (existing != null) {
-            return new DefinitionRetentionResult(Optional.of(snapshot(existing)), List.of());
+            EditorRetainedDefinition retained = snapshot(existing);
+            activeHierarchy = Optional.of(retained.hierarchy());
+            hierarchyChanges.emit(retained.hierarchy());
+            return new DefinitionRetentionResult(Optional.of(retained), List.of());
         }
 
         Optional<AssetMetadata> authored = authoredAssets.find(validId);
         DefinitionRetentionResult result =
                 authored.isPresent() ? retainAuthored(authored.orElseThrow()) : retainGeneratedEntity(validId);
         diagnostics.addAll(result.diagnostics());
+        result.definition().ifPresent(definition -> {
+            activeHierarchy = Optional.of(definition.hierarchy());
+            hierarchyChanges.emit(definition.hierarchy());
+        });
         return result;
     }
 
@@ -373,13 +351,13 @@ public final class EditorProjectSession implements AutoCloseable {
                 .orElseGet(() -> retainedFailure(id, expectedRevision));
     }
 
-    /** Returns the hierarchy projection for the current startup world.
+    /** Returns the hierarchy projection for the explicitly opened active definition.
      *
-     * @return current definition context and hierarchy roots
+     * @return current definition context and hierarchy roots, when a definition is active
      */
-    public EditorHierarchyProjection hierarchy() {
+    public Optional<EditorHierarchyProjection> activeHierarchy() {
         ensureOpen();
-        return hierarchy;
+        return activeHierarchy;
     }
 
     /**
@@ -665,20 +643,18 @@ public final class EditorProjectSession implements AutoCloseable {
 
     /** Refreshes current projections and forwards one coherent working-copy notification. */
     private void workingCopyChanged(AuthoringDefinitionChange change) {
-        if (change.definition().equals(startupWorldId)) {
-            hierarchy = projectHierarchy();
-            hierarchyChanges.emit(hierarchy);
+        RetainedState retained = retainedDefinitions.get(change.definition());
+        if (retained != null
+                && activeHierarchy
+                        .map(EditorHierarchyProjection::context)
+                        .map(EditorHierarchyProjection.Context::definitionId)
+                        .filter(change.definition()::equals)
+                        .isPresent()) {
+            EditorHierarchyProjection refreshed = snapshot(retained).hierarchy();
+            activeHierarchy = Optional.of(refreshed);
+            hierarchyChanges.emit(refreshed);
         }
         definitionChanges.emit(change);
-    }
-
-    /** Projects the current startup-world working-copy state. */
-    private EditorHierarchyProjection projectHierarchy() {
-        AuthoredDefinitionWorkingCopy workingCopy = startupWorkingCopy();
-        EditorRetainedDefinition.Content.World world =
-                (EditorRetainedDefinition.Content.World) workingCopy.state().content();
-        return hierarchyProjector.project(
-                world.definition(), startupWorldSource.toUri(), true, true, workingCopy.modifiedEntityIds());
     }
 
     /** Loads one definition whose kind and filesystem source were established by the authored catalog. */
@@ -741,7 +717,7 @@ public final class EditorProjectSession implements AutoCloseable {
         }
         EditorHierarchyProjection projection =
                 switch (content) {
-                    case EditorRetainedDefinition.Content.World world ->
+                    case EditorRetainedDefinition.Content.Scene world ->
                         hierarchyProjector.project(
                                 world.definition(), state.source(), editable, editable, modifiedEntities);
                     case EditorRetainedDefinition.Content.Entity entity ->
@@ -773,8 +749,6 @@ public final class EditorProjectSession implements AutoCloseable {
         EditorHierarchyProjection currentHierarchy;
         if (retained != null) {
             currentHierarchy = snapshot(retained).hierarchy();
-        } else if (definition.equals(startupWorldId)) {
-            currentHierarchy = hierarchy;
         } else {
             return Optional.empty();
         }
@@ -798,7 +772,7 @@ public final class EditorProjectSession implements AutoCloseable {
     /** Returns the directly authored roots of one retained structural definition. */
     private static List<EntityEntry> scopeRoots(EditorRetainedDefinition.Content content) {
         return switch (content) {
-            case EditorRetainedDefinition.Content.World world ->
+            case EditorRetainedDefinition.Content.Scene world ->
                 world.definition().roots();
             case EditorRetainedDefinition.Content.Entity entity ->
                 List.of(entity.definition().root());
@@ -909,27 +883,7 @@ public final class EditorProjectSession implements AutoCloseable {
         return workingCopy;
     }
 
-    /** Loads the source-preserving authored startup document established by the project source. */
-    private AuthoredDefinitionDocument loadAuthoredDocument(AssetId id) {
-        AuthoredDefinitionDocument.LoadResult result =
-                AuthoredDefinitionDocument.load(authoredAssets, definitions, types, id);
-        diagnostics.addAll(result.diagnostics());
-        if (result.document().isEmpty()) {
-            throw new IllegalStateException("Authored startup definition could not be loaded: " + id);
-        }
-        return result.document().orElseThrow();
-    }
-
-    /** Returns the always-open startup-world working copy. */
-    private AuthoredDefinitionWorkingCopy startupWorkingCopy() {
-        AuthoredDefinitionWorkingCopy workingCopy = workingCopies.get(startupWorldId);
-        if (workingCopy == null) {
-            throw new IllegalStateException("Startup-world working copy is unavailable");
-        }
-        return workingCopy;
-    }
-
-    /** Returns an open authored working copy, including the eagerly opened startup world. */
+    /** Returns an explicitly opened authored working copy. */
     private Optional<AuthoredDefinitionWorkingCopy> authoredWorkingCopy(AssetId id) {
         return Optional.ofNullable(workingCopies.get(Objects.requireNonNull(id, "id")));
     }
@@ -1024,17 +978,13 @@ public final class EditorProjectSession implements AutoCloseable {
      * @param authoredAssets authored asset catalog
      * @param types registered project type catalog
      * @param definitions authored and published definition resolver
-     * @param startupWorld loaded startup-world definition
-     * @param startupWorldSource authored startup-world source path
      */
     public record Source(
             GameProject project,
             ProjectConfiguration configuration,
             AssetCatalog authoredAssets,
             RegisteredTypeCatalog types,
-            DefinitionResolver definitions,
-            WorldDefinition startupWorld,
-            Path startupWorldSource) {
+            DefinitionResolver definitions) {
         /** Validates the complete loaded source. */
         public Source {
             Objects.requireNonNull(project, "project");
@@ -1042,8 +992,6 @@ public final class EditorProjectSession implements AutoCloseable {
             Objects.requireNonNull(authoredAssets, "authoredAssets");
             Objects.requireNonNull(types, "types");
             Objects.requireNonNull(definitions, "definitions");
-            Objects.requireNonNull(startupWorld, "startupWorld");
-            Objects.requireNonNull(startupWorldSource, "startupWorldSource");
         }
     }
 

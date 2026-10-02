@@ -13,7 +13,7 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.net.URI;
 import java.util.Collection;
 
@@ -29,7 +29,7 @@ public final class WorldCompositionEngine {
      *
      * @param source world source used for runtime diagnostics
      * @param definitions authored and imported definition resolver
-     * @param definition validated root world definition
+     * @param definition validated root Scene definition
      * @param types validated component descriptor catalog
      * @param extensions trusted executable runtime extensions
      * @param modules host-supplied world-module bindings
@@ -39,7 +39,7 @@ public final class WorldCompositionEngine {
     public static World compose(
             URI source,
             DefinitionResolver definitions,
-            WorldDefinition definition,
+            SceneDefinition definition,
             RegisteredTypeCatalog types,
             Collection<ComponentRuntimeExtension> extensions,
             Collection<WorldModuleBinding<?>> modules,

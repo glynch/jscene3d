@@ -40,6 +40,7 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
@@ -47,7 +48,6 @@ import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -181,7 +181,7 @@ final class Physics3dWorldCompositionTest {
     void rejectsNonSiblingShapeMembership() throws IOException {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         Physics3dWorldModule physics = Physics3dAdapters.standard();
-        WorldDefinition invalid = invalidMembershipWorld();
+        SceneDefinition invalid = invalidMembershipWorld();
 
         WorldCompositionResult result =
                 compose(invalid, new ShapeResources(), spatial, physics, new ArrayList<>(), new ArrayList<>());
@@ -198,14 +198,14 @@ final class Physics3dWorldCompositionTest {
 
     /** Writes and composes one collision fixture through every supported project/runtime seam. */
     private WorldCompositionResult compose(
-            WorldDefinition definition,
+            SceneDefinition definition,
             RuntimeResourceProvider resources,
             Spatial3dWorldModule spatial,
             Physics3dWorldModule physics,
             List<CollisionOverlap3d> overlaps,
             List<String> phases)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("collision.world.json"), definition);
+        DefinitionWriter.write(temporaryDirectory.resolve("collision.scene.json"), definition);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(
                 Spatial3dDescriptors.extensionDescriptor(),
@@ -220,7 +220,7 @@ final class Physics3dWorldCompositionTest {
     }
 
     /** Creates the valid static-body, two-shape sensor, and signal receiver world. */
-    private static WorldDefinition validWorld() {
+    private static SceneDefinition validWorld() {
         LocalEntity staticEntity = new LocalEntity(
                 STATIC_ENTITY,
                 "Static target",
@@ -255,12 +255,12 @@ final class Physics3dWorldCompositionTest {
         List<SignalConnection> connections = List.of(
                 connection(Physics3dDescriptors.overlapEnteredSignal()),
                 connection(Physics3dDescriptors.overlapExitedSignal()));
-        return new WorldDefinition(
+        return new SceneDefinition(
                 WORLD_ID, "Collision acceptance", connections, List.of(staticEntity, sensorEntity, behaviorEntity));
     }
 
     /** Creates a world whose body illegally references a shape on another entity. */
-    private static WorldDefinition invalidMembershipWorld() {
+    private static SceneDefinition invalidMembershipWorld() {
         LocalEntity body = new LocalEntity(
                 STATIC_ENTITY,
                 "Body",
@@ -275,7 +275,7 @@ final class Physics3dWorldCompositionTest {
                 true,
                 List.of(shape(SENSOR_BOX, SENSOR_BOX_RESOURCE, Map.of())),
                 List.of());
-        return new WorldDefinition(WORLD_ID, "Invalid membership", List.of(body, shape));
+        return new SceneDefinition(WORLD_ID, "Invalid membership", List.of(body, shape));
     }
 
     /** Creates one signal connection from the sensor to the behavior receiver. */

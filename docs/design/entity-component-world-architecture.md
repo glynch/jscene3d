@@ -17,7 +17,7 @@ The model is built around several deliberate distinctions:
 
 - A renderer `Scene` is not a project `World`.
 - A renderer `Object3D` is not a live `Entity`.
-- `WorldDefinition` and `EntityDefinition` are immutable authored data;
+- `SceneDefinition` and `EntityDefinition` are immutable authored data;
   `World` and `Entity` are live runtime state.
 - The entity hierarchy owns identity, lifetime, and structural ownership.
 - Components compose behavior instead of creating an inheritance hierarchy of
@@ -86,13 +86,12 @@ descriptor exists. `ProjectLoader` validates the selected descriptor into a
 descriptor path.
 
 `GameProject` contains project identity and attribution, engine compatibility,
-runtime entry points, extension requirements, source assets, import-definition
-paths, export presets, and launch presentation. Its
-`RuntimeConfiguration` selects the application extension, gameplay entry
-world, optional startup world, optional project systems, and optional input
-map. The field names `entryScene` and `startupScene` remain in that API, but
-the referenced assets used by the current runtime host are `WorldDefinition`
-documents.
+runtime configuration, extension requirements, source assets,
+import-definition paths, export presets, and launch presentation. Its
+`RuntimeConfiguration` selects the application extension, optional Main Scene,
+optional project systems, and optional input map. The Main Scene is an
+`AssetRef<SceneDefinition>`: stable asset identity is authoritative and its
+path hint is non-authoritative metadata.
 
 Loading a `GameProject` is structural and safe. It does not load runtime
 extensions, execute importers, compose a world, or initialize rendering,
@@ -100,17 +99,17 @@ physics, or audio.
 
 ### Definition assets
 
-`AssetCatalog` recursively discovers authored `*.world.json` and
+`AssetCatalog` recursively discovers authored `*.scene.json` and
 `*.entity.json` documents in deterministic project-relative path order. Nested
 project roots are boundaries. Each definition has a project-wide `AssetId`,
 and complete content remains unloaded until requested through a
 `DefinitionResolver`.
 
-A `WorldDefinition` contains:
+A `SceneDefinition` contains:
 
 - its stable `AssetId` and display name;
 - root `EntityEntry` values in authored order; and
-- signal-to-action connections within the world definition.
+- signal-to-action connections within the Scene definition.
 
 An `EntityDefinition` contains:
 
@@ -260,7 +259,7 @@ ComponentRuntimeExtension
 `WorldComposer` is the single composition boundary. It receives:
 
 - a `DefinitionResolver` for authored and generated definitions;
-- the selected `WorldDefinition` reference or a validated in-memory revision;
+- the selected `SceneDefinition` reference or a validated in-memory revision;
 - a `RegisteredTypeCatalog`;
 - trusted `ComponentRuntimeExtension` implementations;
 - host-supplied `WorldModuleBinding` values; and
@@ -301,7 +300,7 @@ host calls `World.activate()`.
 
 `World` is the runtime ownership root for one composed definition. It exposes:
 
-- the source `WorldDefinition`;
+- the source `SceneDefinition`;
 - deterministic roots and lookup by `RuntimeEntityId`;
 - exact-interface world-module lookup;
 - inactive definition preparation for later spawning;
@@ -527,10 +526,11 @@ are generic despite that document's source formats.
 8. invokes `prepare` only on the manifest-selected
    `ApplicationRuntimeExtension`, if it implements that optional entry point.
 
-The standard load selects the optional startup world before the gameplay entry
-world. `loadEntry` selects the gameplay entry world. A `ProjectLaunchRequest`
-can instead select a project-relative world and portable application-defined
-parameters, including a named playtest request.
+The standard load resolves the optional Main Scene by stable `AssetId`. A
+`ProjectLaunchRequest` can instead select an explicit Scene by `AssetId` and
+provide portable application-defined parameters, including a named playtest
+request. An explicit Scene request neither requires nor modifies the Main
+Scene.
 
 Success returns a `HostedProject` containing the validated `GameProject`, the
 authored asset catalog, the launch request, and an owned inactive `World`.

@@ -37,9 +37,9 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationC
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentProperties;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -233,8 +233,8 @@ final class WorldSpawningTest {
             throws IOException {
         Files.createDirectories(directory);
         EntityDefinition projectile = projectileDefinition();
-        WorldDefinition definition = worldDefinition();
-        DefinitionWriter.write(directory.resolve("spawn.world.json"), definition);
+        SceneDefinition definition = worldDefinition();
+        DefinitionWriter.write(directory.resolve("spawn.scene.json"), definition);
         DefinitionWriter.write(directory.resolve("projectile.entity.json"), projectile);
         AssetCatalog assets = AssetCatalog.scan(directory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(new ExtensionDescriptor(
@@ -262,12 +262,12 @@ final class WorldSpawningTest {
         return new SpawnFixture(world, world.roots().getFirst(), emitter);
     }
 
-    /** Creates the emitter-only startup world. */
-    private static WorldDefinition worldDefinition() {
+    /** Creates the emitter-only initial live World. */
+    private static SceneDefinition worldDefinition() {
         ComponentDefinition emitter =
                 new ComponentDefinition(EMITTER_COMPONENT, EMITTER_TYPE.id(), EMITTER_TYPE.version(), Map.of());
         LocalEntity root = new LocalEntity(EMITTER_ID, "Emitter", true, List.of(emitter), List.of());
-        return new WorldDefinition(WORLD_ID, "Spawn world", List.of(root));
+        return new SceneDefinition(WORLD_ID, "Spawn world", List.of(root));
     }
 
     /** Creates one reusable projectile definition with a non-component child. */

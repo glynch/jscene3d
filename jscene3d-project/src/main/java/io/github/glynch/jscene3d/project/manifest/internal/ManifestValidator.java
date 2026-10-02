@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.project.manifest.internal;
 import static io.github.glynch.jscene3d.project.internal.ProjectHashes.isSha256;
 import static io.github.glynch.jscene3d.project.internal.ProjectIdentifiers.isProjectId;
 
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.internal.DiagnosticCollector;
 import io.github.glynch.jscene3d.project.internal.FieldDiagnosticCodes;
@@ -17,6 +19,7 @@ import io.github.glynch.jscene3d.project.internal.SemanticVersionRequirement;
 import io.github.glynch.jscene3d.project.internal.ValidationContext;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.manifest.ProjectDiagnosticCode;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -253,7 +256,7 @@ public final class ManifestValidator {
     private GameProject.RuntimeConfiguration validateRuntime(RawManifest.@Nullable RuntimeConfiguration raw) {
         if (raw == null) {
             diagnostics.error(ProjectDiagnosticCode.FIELD_REQUIRED, "runtime is required", "/runtime");
-            raw = new RawManifest.RuntimeConfiguration(null, null, null, null, null);
+            raw = new RawManifest.RuntimeConfiguration(null, null, null, null);
         }
         String extension = fields.requiredText(raw.applicationExtension(), "/runtime/applicationExtension");
         if (!extension.isEmpty() && !isProjectId(extension)) {
@@ -262,14 +265,30 @@ public final class ManifestValidator {
                     "runtime.applicationExtension must be a lowercase reverse-domain identifier",
                     "/runtime/applicationExtension");
         }
-        Optional<Path> entryScene = paths.resolveRequired(raw.entryScene(), "/runtime/entryScene", true);
-        Optional<Path> startupScene = paths.resolveOptional(raw.startupScene(), "/runtime/startupScene", true);
+        Optional<AssetRef<SceneDefinition>> mainScene = validateMainScene(raw.mainScene());
         Optional<Path> projectSystems = paths.resolveOptional(raw.projectSystems(), "/runtime/projectSystems", true);
         Optional<Path> inputMap = paths.resolveOptional(raw.inputMap(), "/runtime/inputMap", true);
         String safeExtension = isProjectId(extension) ? extension : "invalid.extension";
-        Path safeEntryScene = entryScene.orElse(root.resolve("invalid.scene.json"));
-        return new GameProject.RuntimeConfiguration(
-                safeExtension, safeEntryScene, startupScene, projectSystems, inputMap);
+        return new GameProject.RuntimeConfiguration(safeExtension, mainScene, projectSystems, inputMap);
+    }
+
+    /** Validates the optional stable Main Scene reference without resolving it. */
+    private Optional<AssetRef<SceneDefinition>> validateMainScene(RawManifest.@Nullable AssetReference raw) {
+        if (raw == null) {
+            return Optional.empty();
+        }
+        String serializedId = fields.requiredText(raw.assetId(), "/runtime/mainScene/assetId");
+        Optional<String> pathHint = fields.optionalText(raw.pathHint(), "/runtime/mainScene/pathHint");
+        try {
+            AssetId id = AssetId.from(serializedId);
+            return Optional.of(pathHint.isPresent() ? AssetRef.to(id, pathHint.orElseThrow()) : AssetRef.to(id));
+        } catch (IllegalArgumentException failure) {
+            diagnostics.error(
+                    ProjectDiagnosticCode.REFERENCE_ASSET_INVALID,
+                    "runtime.mainScene must contain a valid asset reference",
+                    "/runtime/mainScene");
+            return Optional.empty();
+        }
     }
 
     /** Validates optional application launch presentation. */

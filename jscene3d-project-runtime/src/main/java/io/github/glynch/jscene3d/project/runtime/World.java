@@ -7,15 +7,15 @@ package io.github.glynch.jscene3d.project.runtime;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Runtime ownership and composition root for one authored world.
+ * Runtime ownership and composition root instantiated from one authored Scene.
  *
  * <p>Composition returns an inactive world: its complete graph and component objects exist, but no lifecycle callback
  * has run. {@link #activate()} transactionally creates and activates declared component lifecycles. This interface is
@@ -27,9 +27,9 @@ public interface World extends AutoCloseable {
     /**
      * Returns the validated authored definition used for composition.
      *
-     * @return world definition
+     * @return authored Scene definition
      */
-    WorldDefinition definition();
+    SceneDefinition definition();
 
     /**
      * Returns root entities in deterministic authored order.

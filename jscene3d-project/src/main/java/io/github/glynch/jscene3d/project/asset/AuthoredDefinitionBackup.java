@@ -159,7 +159,7 @@ public final class AuthoredDefinitionBackup {
     /**
      * Returns the authored structural kind.
      *
-     * @return world or entity definition kind
+     * @return Scene or entity definition kind
      */
     public AssetKind kind() {
         return kind;

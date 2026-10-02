@@ -70,6 +70,12 @@ public enum ProjectDiagnosticCode implements DiagnosticCode {
     RUNTIME_EXTENSION_INVALID("project.runtime.extension", "The runtime extension identifier is invalid"),
     /** The application extension is undeclared. */
     RUNTIME_EXTENSION_MISSING("project.runtime.extension.missing", "The runtime extension is not declared"),
+    /** Run Project was requested without a configured Main Scene. */
+    MAIN_SCENE_MISSING("project.runtime.main-scene.missing", "The project does not configure a Main Scene"),
+    /** A selected Scene asset cannot be resolved. */
+    SCENE_REFERENCE_MISSING("project.runtime.scene.missing", "The selected Scene asset cannot be resolved"),
+    /** A selected asset is not a SceneDefinition. */
+    SCENE_REFERENCE_KIND("project.runtime.scene.kind", "The selected asset is not a SceneDefinition"),
     /** The manifest schema is unsupported. */
     SCHEMA_UNSUPPORTED("project.schema.unsupported", "The project schema version is unsupported"),
     /** The manifest schema URI is invalid. */

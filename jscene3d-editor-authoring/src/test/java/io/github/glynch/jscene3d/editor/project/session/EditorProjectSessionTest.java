@@ -35,7 +35,6 @@ import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -65,6 +64,44 @@ final class EditorProjectSessionTest {
     @TempDir
     private Path projectRoot;
 
+    /** Opens an authoring session without implicitly activating the configured main Scene. */
+    @Test
+    void opensWithoutAnActiveScene() throws Exception {
+        try (EditorProjectSession session = session()) {
+            assertThat(session.activeHierarchy()).isEmpty();
+            assertThat(session.retainedDefinitionIds()).isEmpty();
+        }
+    }
+
+    /** Opens a valid authoring session for a project containing no Scenes and no Main Scene. */
+    @Test
+    void opensProjectWithNoScenesAndNoMainScene() throws Exception {
+        writeDescriptorWithoutMainScene();
+        writeExtension();
+
+        try (EditorProjectSession session = loadSession()) {
+            assertThat(session.project().runtime().mainScene()).isEmpty();
+            assertThat(session.authoredAssets().assets()).isEmpty();
+            assertThat(session.activeHierarchy()).isEmpty();
+        }
+    }
+
+    /** Does not infer a Main Scene when authored Scenes exist without one configured. */
+    @Test
+    void opensProjectWithSceneButNoMainScene() throws Exception {
+        writeDescriptorWithoutMainScene();
+        writeExtension();
+        writeWorld();
+
+        try (EditorProjectSession session = loadSession()) {
+            assertThat(session.project().runtime().mainScene()).isEmpty();
+            assertThat(session.authoredAssets().assets())
+                    .singleElement()
+                    .returns(AssetKind.SCENE_DEFINITION, metadata -> metadata.kind());
+            assertThat(session.activeHierarchy()).isEmpty();
+        }
+    }
+
     /** Retains one reusable authoritative working copy for each authored structural definition. */
     @Test
     void retainsEditableWorldAndEntityWorkingCopies() throws Exception {
@@ -74,7 +111,7 @@ final class EditorProjectSessionTest {
             AuthoredDefinitionWorkingCopy worldCopy =
                     session.retainedAuthoredWorkingCopy(WORLD_ID).orElseThrow();
 
-            assertAuthoredInitialState(world, AssetKind.WORLD_DEFINITION);
+            assertAuthoredInitialState(world, AssetKind.SCENE_DEFINITION);
             assertAuthoredInitialState(entity, AssetKind.ENTITY_DEFINITION);
             assertThat(entity.hierarchy().roots()).singleElement().returns(true, EditorHierarchyNode::isEditable);
             assertThat(session.definitionState(WORLD_ID)).get().returns(false, AuthoringDefinitionState::dirty);
@@ -359,8 +396,8 @@ final class EditorProjectSessionTest {
             set(session, WORLD_ID, worldProperty(session, SPEED), number("2"), 0L);
 
             AuthoringPersistenceResult result = session.revertDefinition(WORLD_ID, 1L);
-            InspectorProjection inspection =
-                    session.inspect(session.hierarchy().roots().getFirst().inspectorTarget(), 2L);
+            InspectorProjection inspection = session.inspect(
+                    session.activeHierarchy().orElseThrow().roots().getFirst().inspectorTarget(), 2L);
 
             assertPersistenceOutcome(result, AuthoringPersistenceResult.Outcome.REVERTED, 2L, false, false, false);
             assertThat(property(inspection, SPEED).state().authoredValue())
@@ -384,8 +421,8 @@ final class EditorProjectSessionTest {
             Files.writeString(worldSource(), external, StandardCharsets.UTF_8);
 
             AuthoringPersistenceResult result = session.revertDefinition(WORLD_ID, 1L);
-            InspectorProjection inspection =
-                    session.inspect(session.hierarchy().roots().getFirst().inspectorTarget(), 2L);
+            InspectorProjection inspection = session.inspect(
+                    session.activeHierarchy().orElseThrow().roots().getFirst().inspectorTarget(), 2L);
             AuthoredDefinitionDocument current =
                     session.retainedAuthoredDocument(WORLD_ID).orElseThrow();
 
@@ -486,8 +523,8 @@ final class EditorProjectSessionTest {
             retain(restored, WORLD_ID);
             List<AuthoringDefinitionChange> changes = definitionChanges(restored);
             AuthoringRestoreResult recovery = restored.restoreDefinition(WORLD_ID, 0L, backup);
-            InspectorProjection recovered =
-                    restored.inspect(restored.hierarchy().roots().getFirst().inspectorTarget(), 1L);
+            InspectorProjection recovered = restored.inspect(
+                    restored.activeHierarchy().orElseThrow().roots().getFirst().inspectorTarget(), 1L);
 
             assertRestoreOutcome(recovery, AuthoringRestoreResult.Outcome.RESTORED, 1L, true, false, false);
             assertThat(property(recovered, SPEED).state().authoredValue())
@@ -555,6 +592,7 @@ final class EditorProjectSessionTest {
         byte[] backup;
         byte[] source;
         try (EditorProjectSession original = session()) {
+            retain(original, WORLD_ID);
             source = Files.readAllBytes(worldSource());
             AuthoringBackupResult captured = original.backupDefinition(WORLD_ID, 0L);
             backup = captured.backup().orElseThrow().encode();
@@ -580,6 +618,7 @@ final class EditorProjectSessionTest {
     void restoreRejectsExternalSourceChangeAtomically() throws Exception {
         byte[] backup;
         try (EditorProjectSession original = session()) {
+            retain(original, WORLD_ID);
             set(original, WORLD_ID, worldProperty(original, SPEED), number("2"), 0L);
             backup = original.backupDefinition(WORLD_ID, 1L)
                     .backup()
@@ -597,8 +636,8 @@ final class EditorProjectSessionTest {
                     restored.retainedAuthoredDocument(WORLD_ID).orElseThrow();
 
             AuthoringRestoreResult result = restored.restoreDefinition(WORLD_ID, 0L, backup);
-            InspectorProjection inspection =
-                    restored.inspect(restored.hierarchy().roots().getFirst().inspectorTarget(), 0L);
+            InspectorProjection inspection = restored.inspect(
+                    restored.activeHierarchy().orElseThrow().roots().getFirst().inspectorTarget(), 0L);
 
             assertRestoreOutcome(result, AuthoringRestoreResult.Outcome.SOURCE_CHANGED, 0L, false, false, false);
             assertThat(restored.retainedAuthoredDocument(WORLD_ID)).containsSame(before);
@@ -639,11 +678,11 @@ final class EditorProjectSessionTest {
                                     1L,
                                     replaceBackup(valid, WORLD_ID.toString(), ENTITY_DEFINITION_ID.toString())),
                             session.restoreDefinition(
-                                    WORLD_ID, 1L, replaceBackup(valid, "world-definition", "entity-definition")),
+                                    WORLD_ID, 1L, replaceBackup(valid, "scene-definition", "entity-definition")),
                             session.restoreDefinition(
                                     WORLD_ID,
                                     1L,
-                                    replaceBackup(valid, "worlds/main.world.json", "worlds/other.world.json")),
+                                    replaceBackup(valid, "worlds/main.scene.json", "worlds/other.scene.json")),
                             session.restoreDefinition(
                                     WORLD_ID, 1L, replaceBackup(valid, "\"speed\" : 2", "\"speed\" : \"fast\"")),
                             session.restoreDefinition(WORLD_ID, 2L, valid))
@@ -679,6 +718,7 @@ final class EditorProjectSessionTest {
     void rejectsGeneratedDefinitionOperationsAsNonEditable() throws Exception {
         URI source = URI.create("jscene3d-import:/models/generated.entity.json");
         try (EditorProjectSession session = sessionWithGeneratedDefinition(source)) {
+            retain(session, WORLD_ID);
             byte[] authoredBackup = session.backupDefinition(WORLD_ID, 0L)
                     .backup()
                     .orElseThrow()
@@ -787,6 +827,7 @@ final class EditorProjectSessionTest {
     void rejectsUnknownDefinitionIdentity() throws Exception {
         try (EditorProjectSession session = session()) {
             DefinitionRetentionResult result = session.retainDefinition(GENERATED_DEFINITION_ID);
+            retain(session, WORLD_ID);
             byte[] backup = session.backupDefinition(WORLD_ID, 0L)
                     .backup()
                     .orElseThrow()
@@ -794,7 +835,7 @@ final class EditorProjectSessionTest {
 
             assertThat(result.definition()).isEmpty();
             assertThat(result.diagnostics()).isNotEmpty();
-            assertThat(session.retainedDefinitionIds()).isEmpty();
+            assertThat(session.retainedDefinitionIds()).containsExactly(WORLD_ID);
             assertThat(session.backupDefinition(GENERATED_DEFINITION_ID, 0L).outcome())
                     .isEqualTo(AuthoringBackupResult.Outcome.INVALID_TARGET);
             assertThat(session.restoreDefinition(GENERATED_DEFINITION_ID, 0L, backup)
@@ -808,7 +849,7 @@ final class EditorProjectSessionTest {
         return session.retainDefinition(id).definition().orElseThrow();
     }
 
-    /** Asserts the common initial contract for authored world and entity definitions. */
+    /** Asserts the common initial contract for authored Scene and entity definitions. */
     private static void assertAuthoredInitialState(EditorRetainedDefinition retained, AssetKind kind) {
         assertThat(retained)
                 .returns(kind, EditorRetainedDefinition::kind)
@@ -824,11 +865,14 @@ final class EditorProjectSessionTest {
         return changes;
     }
 
-    /** Creates the current startup-world component-property target. */
+    /** Creates the current active-Scene component-property target. */
     private static InspectorMutationTarget.ComponentProperty worldProperty(
             EditorProjectSession session, PropertyId property) {
         return new InspectorMutationTarget.ComponentProperty(
-                session.hierarchy().roots().getFirst().occurrence(), WORLD_ENTITY_ID, WORLD_COMPONENT_ID, property);
+                session.activeHierarchy().orElseThrow().roots().getFirst().occurrence(),
+                WORLD_ENTITY_ID,
+                WORLD_COMPONENT_ID,
+                property);
     }
 
     /** Creates one component-property target in a retained authored entity definition. */
@@ -993,10 +1037,7 @@ final class EditorProjectSessionTest {
         ProjectConfiguration configuration = base.configuration();
         AssetCatalog authored = base.authoredAssets();
         RegisteredTypeCatalog types = base.types();
-        WorldDefinition world = base.startupWorld();
-        Path worldSource = base.startupWorldSource();
-        return new EditorProjectSession.Source(
-                project, configuration, authored, types, definitions, world, worldSource);
+        return new EditorProjectSession.Source(project, configuration, authored, types, definitions);
     }
 
     private void writeProject() throws IOException {
@@ -1013,7 +1054,20 @@ final class EditorProjectSessionTest {
                   "schemaVersion":1,
                   "identity":{"id":"example.session-test","name":"Session Test","version":"1.0.0"},
                   "engine":{"requires":">=0.1.0-SNAPSHOT <0.2.0"},
-                  "runtime":{"applicationExtension":"example.session-test","entryScene":"worlds/main.world.json"},
+                  "runtime":{"applicationExtension":"example.session-test","mainScene":{"assetId":"3b406aba-26fb-4681-9abe-7a952c321f9a","pathHint":"worlds/main.scene.json"}},
+                  "extensions":[{"id":"example.session-test","requires":">=1.0.0 <2.0.0"}]
+                }
+                """);
+    }
+
+    private void writeDescriptorWithoutMainScene() throws IOException {
+        write("authoring-session.j3d", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/project-1.json",
+                  "schemaVersion":1,
+                  "identity":{"id":"example.session-test","name":"Session Test","version":"1.0.0"},
+                  "engine":{"requires":">=0.1.0-SNAPSHOT <0.2.0"},
+                  "runtime":{"applicationExtension":"example.session-test"},
                   "extensions":[{"id":"example.session-test","requires":">=1.0.0 <2.0.0"}]
                 }
                 """);
@@ -1043,11 +1097,11 @@ final class EditorProjectSessionTest {
     }
 
     private void writeWorld() throws IOException {
-        write("worlds/main.world.json", """
+        write("worlds/main.scene.json", """
                 {
-                  "$schema":"https://jscene3d.org/schemas/world-definition-1.json",
+                  "$schema":"https://jscene3d.org/schemas/scene-definition-1.json",
                   "assetId":"3b406aba-26fb-4681-9abe-7a952c321f9a",
-                  "assetType":"world-definition",
+                  "assetType":"scene-definition",
                   "formatVersion":1,
                   "name":"Opening World",
                   "connections":[],
@@ -1102,7 +1156,7 @@ final class EditorProjectSessionTest {
     }
 
     private Path worldSource() {
-        return projectRoot.resolve("worlds/main.world.json");
+        return projectRoot.resolve("worlds/main.scene.json");
     }
 
     private Path entitySource() {

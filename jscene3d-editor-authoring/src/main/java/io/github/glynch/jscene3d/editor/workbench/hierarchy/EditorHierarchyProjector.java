@@ -18,7 +18,7 @@ import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.entity.EntityPlacement;
 import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.net.URI;
 import java.util.Collection;
 import java.util.HashSet;
@@ -44,9 +44,9 @@ public final class EditorHierarchyProjector {
     }
 
     /**
-     * Projects the latest authored world.
+     * Projects the latest authored Scene.
      *
-     * @param world world definition
+     * @param scene Scene definition
      * @param source logical definition source
      * @param definitionEditable whether the definition has authored editability
      * @param entriesEditable whether local entries have an authoritative writable working copy
@@ -54,22 +54,22 @@ public final class EditorHierarchyProjector {
      * @return immutable definition context and actual ordered roots
      */
     public EditorHierarchyProjection project(
-            WorldDefinition world,
+            SceneDefinition scene,
             URI source,
             boolean definitionEditable,
             boolean entriesEditable,
             Set<EntityId> modifiedEntityIds) {
-        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(scene, "scene");
         URI validSource = requireAbsolute(source);
         ProjectionState state = new ProjectionState(Set.copyOf(modifiedEntityIds));
-        HierarchyOccurrenceId root = new HierarchyOccurrenceId(world.id(), List.of());
-        List<EditorHierarchyNode> roots = world.roots().stream()
+        HierarchyOccurrenceId root = new HierarchyOccurrenceId(scene.id(), List.of());
+        List<EditorHierarchyNode> roots = scene.roots().stream()
                 .map(entry -> projectEntry(entry, validSource, new HashSet<>(), false, entriesEditable, root, state))
                 .toList();
         EditorHierarchyProjection.Context definition = new EditorHierarchyProjection.Context(
-                world.id(),
-                AssetKind.WORLD_DEFINITION,
-                AuthoringText.literal(world.name()),
+                scene.id(),
+                AssetKind.SCENE_DEFINITION,
+                AuthoringText.literal(scene.name()),
                 validSource,
                 definitionEditable);
         return new EditorHierarchyProjection(definition, roots);

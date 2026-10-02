@@ -45,9 +45,9 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceBin
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentReferenceResolver;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -57,10 +57,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 
-/** Loads an authored world and transactionally composes two independent definition placements. */
+/** Loads an authored Scene and transactionally composes a live World with two definition placements. */
 public final class WorldCompositionExample {
     private static final String EXTENSION_ID = "io.github.glynch.jscene3d.world-example";
-    private static final AssetId WORLD_ID = AssetId.from("0fbb5faf-b309-4684-a24c-8dd2295bb483");
+    private static final AssetId SCENE_ID = AssetId.from("0fbb5faf-b309-4684-a24c-8dd2295bb483");
     private static final ComponentId LABEL_LINK_COMPONENT = ComponentId.from("34d922c8-dd18-4d4c-8fd4-2a0daaa1cd08");
     private static final ComponentType LABEL_TYPE = ComponentType.of(EXTENSION_ID + "/label", 1);
     private static final ComponentType LABEL_LINK_TYPE = ComponentType.of(EXTENSION_ID + "/label-link", 1);
@@ -81,11 +81,11 @@ public final class WorldCompositionExample {
     /**
      * Composes the example world in the supplied asset directory.
      *
-     * @param arguments one world asset-directory path
+     * @param arguments one Scene asset-directory path
      */
     public static void main(String[] arguments) {
         if (arguments.length != 1) {
-            throw new IllegalArgumentException("expected one world asset-directory path");
+            throw new IllegalArgumentException("expected one Scene asset-directory path");
         }
         Path assetDirectory = Path.of(arguments[0]).toAbsolutePath().normalize();
         AssetCatalog assets = AssetCatalog.scan(assetDirectory).catalog().orElseThrow();
@@ -94,7 +94,7 @@ public final class WorldCompositionExample {
         ExampleResourceProvider resources = new ExampleResourceProvider();
         WorldCompositionResult result = WorldComposer.compose(
                 assets,
-                AssetRef.<WorldDefinition>to(WORLD_ID),
+                AssetRef.<SceneDefinition>to(SCENE_ID),
                 types,
                 List.of(new LabelRuntimeExtension()),
                 List.of(WorldModuleBinding.of(PresentationModule.class, presentation)),

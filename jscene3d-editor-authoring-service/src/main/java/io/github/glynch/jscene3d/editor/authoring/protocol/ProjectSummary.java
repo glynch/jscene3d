@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.authoring.protocol;
 
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Deliberately small wire projection of an opened authoring project.
@@ -14,7 +15,7 @@ import java.util.Objects;
  * @param version authored project version
  * @param root canonical project root
  * @param descriptor actual descriptor path loaded by Java
- * @param startupWorld startup-world identity and name
+ * @param mainScene optional Main Scene identity and name
  * @param assetCounts coarse authored and projected asset counts
  */
 public record ProjectSummary(
@@ -23,7 +24,7 @@ public record ProjectSummary(
         String version,
         String root,
         String descriptor,
-        WorldSummary startupWorld,
+        @Nullable SceneSummary mainScene,
         AssetCounts assetCounts) {
     /** Validates one successful project summary. */
     public ProjectSummary {
@@ -32,19 +33,18 @@ public record ProjectSummary(
         Objects.requireNonNull(version, "version");
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(descriptor, "descriptor");
-        Objects.requireNonNull(startupWorld, "startupWorld");
         Objects.requireNonNull(assetCounts, "assetCounts");
     }
 
     /**
-     * Startup-world identity exposed by the first authoring milestone.
+     * Optional Main Scene identity configured for Run Project.
      *
-     * @param id stable startup-world asset identity
-     * @param name author-facing startup-world name
+     * @param id stable Scene asset identity
+     * @param name author-facing Scene name
      */
-    public record WorldSummary(String id, String name) {
-        /** Validates the startup-world summary. */
-        public WorldSummary {
+    public record SceneSummary(String id, String name) {
+        /** Validates the Main Scene summary. */
+        public SceneSummary {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(name, "name");
         }

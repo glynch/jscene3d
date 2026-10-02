@@ -32,7 +32,6 @@ module io.github.glynch.jscene3d.project {
     exports io.github.glynch.jscene3d.project.standard.spatial3d;
     exports io.github.glynch.jscene3d.project.value;
     exports io.github.glynch.jscene3d.project.validation;
-    exports io.github.glynch.jscene3d.project.world;
 
     opens io.github.glynch.jscene3d.project.asset.internal to
             com.fasterxml.jackson.databind;
@@ -49,7 +48,5 @@ module io.github.glynch.jscene3d.project {
     opens io.github.glynch.jscene3d.project.validation to
             io.github.glynch.jscene3d.i18n;
     opens io.github.glynch.jscene3d.project.resource.internal to
-            com.fasterxml.jackson.databind;
-    opens io.github.glynch.jscene3d.project.scene.internal to
             com.fasterxml.jackson.databind;
 }

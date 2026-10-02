@@ -50,7 +50,7 @@ final class EditorInspectorProjectorTest {
     private static final ComponentId COMPONENT_ID = ComponentId.from("3e940be7-e58d-4f3a-8b5e-e61c99c00904");
     private static final ComponentId UNKNOWN_COMPONENT_ID = ComponentId.from("f4d181e0-b05a-4e6f-96fa-56db4774de70");
     private static final ComponentType COMPONENT_TYPE = ComponentType.of("example.inspector/mover", 1);
-    private static final Path SOURCE = Path.of("/project/worlds/map01.world.json");
+    private static final Path SOURCE = Path.of("/project/worlds/map01.scene.json");
 
     /** Retains typed authored/default values, provenance, required state, and structured constraints. */
     @Test

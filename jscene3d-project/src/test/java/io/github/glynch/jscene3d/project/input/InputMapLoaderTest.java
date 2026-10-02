@@ -139,7 +139,6 @@ class InputMapLoaderTest {
     /** Creates the minimum validated project needed by the input-map loader. */
     private GameProject createProject() throws IOException {
         Files.createDirectories(temporaryDirectory.resolve("application"));
-        Files.writeString(temporaryDirectory.resolve("application/main.scene.json"), "{}");
         Files.createDirectories(temporaryDirectory.resolve("schema"));
         Files.writeString(temporaryDirectory.resolve("schema/input-map-1.schema.json"), "{}");
         Files.writeString(temporaryDirectory.resolve("jscene3d.json"), """
@@ -149,7 +148,6 @@ class InputMapLoaderTest {
                   "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
                   "runtime": {
                     "applicationExtension": "example.input",
-                    "entryScene": "application/main.scene.json",
                     "inputMap": "application/input-map.json"
                   },
                   "extensions": [

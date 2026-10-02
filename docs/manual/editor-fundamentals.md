@@ -27,8 +27,8 @@ does not reproduce project rules in TypeScript.
 ## Main editor surfaces
 
 - **JScene3D Project** summarizes the open project, including its identity,
-  descriptor and root paths, startup world, and authored and projected asset
-  counts.
+  descriptor and root paths, optional Main Scene, and authored and projected
+  asset counts.
 - **Hierarchy** shows the entities and placements in the active definition.
   Selecting an occurrence establishes the current authoring selection.
 - **Inspector** appears in the Secondary Side Bar and projects the selected
@@ -38,7 +38,7 @@ does not reproduce project rules in TypeScript.
   by Java. Diagnostics retain their source file, severity, code, message, and,
   where available, JSON location. The **JScene3D** Output channel records
   service and workflow details rather than authoring problems.
-- A **JScene3D Authored Definition** editor opens `*.world.json` and
+- A **JScene3D Authored Definition** editor opens `*.scene.json` and
   `*.entity.json` files. Its tab anchors the definition's document lifecycle
   and coordinates the Hierarchy and Inspector. The editor body is currently a
   concise definition summary, not a general JSON editor or graphical canvas.
@@ -53,7 +53,7 @@ An editor project session loads the information needed to understand a project:
 
 - project metadata and settings from the `.j3d` descriptor;
 - inert extension descriptors describing registered types and components;
-- authored world and entity definitions;
+- authored Scene and entity definitions;
 - import definitions and already-published generated content.
 
 It does not load runtime extensions, execute arbitrary game implementation

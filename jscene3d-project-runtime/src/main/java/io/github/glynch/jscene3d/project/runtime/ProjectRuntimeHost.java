@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.project.asset.AssetCatalogLoadResult;
 import io.github.glynch.jscene3d.project.asset.AssetKind;
 import io.github.glynch.jscene3d.project.asset.AssetMetadata;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoadResult;
 import io.github.glynch.jscene3d.project.extension.ExtensionCatalogLoader;
 import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
@@ -17,14 +18,16 @@ import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import io.github.glynch.jscene3d.project.input.InputMapLoadResult;
 import io.github.glynch.jscene3d.project.input.InputMapLoader;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.manifest.ProjectDiagnosticCode;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoadResult;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
 import io.github.glynch.jscene3d.project.runtime.extension.ApplicationRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
@@ -55,7 +58,7 @@ public final class ProjectRuntimeHost implements ProjectHost {
     }
 
     /**
-     * Loads the manifest-selected startup world while reporting synchronous milestones.
+     * Loads the manifest-selected Main Scene while reporting synchronous milestones.
      *
      * @param projectRoot project directory containing one current or legacy project descriptor
      * @param progress load-progress receiver
@@ -89,85 +92,24 @@ public final class ProjectRuntimeHost implements ProjectHost {
         ProjectLaunchRequest validRequest = Objects.requireNonNull(request, "request");
         validProgress.report(ProjectLoadProgressReporter.Phase.MANIFEST);
         GameProject project = loadProject(projectRoot);
-        Path startupScene = validRequest
+        AssetRef<SceneDefinition> scene = validRequest
                 .scene()
-                .map(scene -> resolveRequestedScene(project, scene))
-                .orElseGet(() -> project.runtime()
-                        .startupScene()
-                        .orElse(project.runtime().entryScene()));
-        return load(project, startupScene, validRequest, validProgress);
+                .or(() -> project.runtime().mainScene())
+                .orElseThrow(() -> missingMainScene(project));
+        return load(project, scene, validRequest, validProgress);
     }
 
-    /**
-     * Loads the manifest-selected gameplay entry world rather than an optional startup world.
-     *
-     * @param projectRoot project directory containing one current or legacy project descriptor
-     * @return composed inactive gameplay project
-     */
-    public HostedProject loadEntry(Path projectRoot) {
-        return loadEntry(projectRoot, ProjectLaunchRequest.standard(), ignored -> {});
-    }
-
-    /**
-     * Loads the manifest-selected gameplay world while reporting synchronous milestones.
-     *
-     * @param projectRoot project directory containing one current or legacy project descriptor
-     * @param progress load-progress receiver
-     * @return composed inactive gameplay project
-     */
-    public HostedProject loadEntry(Path projectRoot, ProjectLoadProgressReporter progress) {
-        return loadEntry(projectRoot, ProjectLaunchRequest.standard(), progress);
-    }
-
-    /**
-     * Loads gameplay using an optional explicit scene and launch parameters.
-     *
-     * @param projectRoot project directory containing one current or legacy project descriptor
-     * @param request scene selection and project-defined parameters
-     * @return composed inactive gameplay project
-     */
-    public HostedProject loadEntry(Path projectRoot, ProjectLaunchRequest request) {
-        return loadEntry(projectRoot, request, ignored -> {});
-    }
-
-    /**
-     * Loads gameplay using an optional explicit scene while reporting synchronous milestones.
-     *
-     * @param projectRoot project directory containing one current or legacy project descriptor
-     * @param request scene selection and project-defined parameters
-     * @param progress load-progress receiver
-     * @return composed inactive gameplay project
-     */
-    public HostedProject loadEntry(
-            Path projectRoot, ProjectLaunchRequest request, ProjectLoadProgressReporter progress) {
-        ProjectLoadProgressReporter validProgress = Objects.requireNonNull(progress, "progress");
-        ProjectLaunchRequest validRequest = Objects.requireNonNull(request, "request");
-        validProgress.report(ProjectLoadProgressReporter.Phase.MANIFEST);
-        GameProject project = loadProject(projectRoot);
-        Path entryScene = validRequest
-                .scene()
-                .map(scene -> resolveRequestedScene(project, scene))
-                .orElse(project.runtime().entryScene());
-        return load(project, entryScene, validRequest, validProgress);
-    }
-
-    /** Resolves a validated request path against the loaded project boundary. */
-    private static Path resolveRequestedScene(GameProject project, Path requestedScene) {
-        Path selected = project.root().resolve(requestedScene).normalize();
-        if (!selected.startsWith(project.root())) {
-            throw new ProjectHostException("requested scene escapes the project: " + requestedScene);
-        }
-        return selected;
-    }
-
-    /** Composes one validated authored world while retaining the loaded project configuration. */
+    /** Composes one validated authored Scene while retaining the loaded project configuration. */
     private HostedProject load(
-            GameProject project, Path worldPath, ProjectLaunchRequest request, ProjectLoadProgressReporter progress) {
+            GameProject project,
+            AssetRef<SceneDefinition> scene,
+            ProjectLaunchRequest request,
+            ProjectLoadProgressReporter progress) {
         progress.report(ProjectLoadProgressReporter.Phase.EXTENSIONS);
         RegisteredTypeCatalog types = loadTypes(project);
         progress.report(ProjectLoadProgressReporter.Phase.ASSETS);
         AssetCatalog assets = loadAssets(project);
-        AssetMetadata startup = startupAsset(worldPath, assets);
+        requireSceneAsset(project, scene, assets, request.scene().isEmpty());
         progress.report(ProjectLoadProgressReporter.Phase.INPUT);
         Optional<InputMapDefinition> inputMap = loadInputMap(project);
         List<ComponentRuntimeExtension> extensions = runtimeExtensions();
@@ -176,16 +118,11 @@ public final class ProjectRuntimeHost implements ProjectHost {
         progress.report(ProjectLoadProgressReporter.Phase.MODULES);
         List<WorldModuleBinding<?>> modules = List.copyOf(environment.createWorldModules(inputMap));
         progress.report(ProjectLoadProgressReporter.Phase.WORLD);
-        WorldCompositionResult composition = WorldComposer.compose(
-                content.definitions(),
-                AssetRef.<WorldDefinition>to(startup.id()),
-                types,
-                extensions,
-                modules,
-                content.resources());
+        WorldCompositionResult composition =
+                WorldComposer.compose(content.definitions(), scene, types, extensions, modules, content.resources());
         if (!composition.isComposed()) {
             ProjectHostException failure =
-                    new ProjectHostException("startup world composition failed", composition.diagnostics());
+                    new ProjectHostException("Scene composition failed", composition.diagnostics());
             closeModules(modules, failure);
             throw failure;
         }
@@ -246,17 +183,39 @@ public final class ProjectRuntimeHost implements ProjectHost {
                 .orElseThrow(() -> new ProjectHostException("asset catalog loading failed", result.diagnostics()));
     }
 
-    /** Resolves one selected authored path to a world-definition identity. */
-    private static AssetMetadata startupAsset(Path worldPath, AssetCatalog assets) {
-        AssetMetadata startup = assets.assets().stream()
-                .filter(asset -> asset.path().equals(worldPath))
-                .findFirst()
-                .orElseThrow(
-                        () -> new ProjectHostException("startup world is absent from the asset catalog: " + worldPath));
-        if (startup.kind() != AssetKind.WORLD_DEFINITION) {
-            throw new ProjectHostException("startup asset is not a world definition: " + startup.path());
+    /** Requires one selected asset identity to resolve to a SceneDefinition. */
+    private static void requireSceneAsset(
+            GameProject project, AssetRef<SceneDefinition> reference, AssetCatalog assets, boolean mainScene) {
+        AssetMetadata selected = assets.find(reference.id())
+                .orElseThrow(() -> sceneFailure(
+                        project,
+                        ProjectDiagnosticCode.SCENE_REFERENCE_MISSING,
+                        mainScene ? "/runtime/mainScene" : "",
+                        "selected Scene is absent from the asset catalog: " + reference.id()));
+        if (selected.kind() != AssetKind.SCENE_DEFINITION) {
+            throw sceneFailure(
+                    project,
+                    ProjectDiagnosticCode.SCENE_REFERENCE_KIND,
+                    mainScene ? "/runtime/mainScene" : "",
+                    "selected asset is not a SceneDefinition: " + selected.path());
         }
-        return startup;
+    }
+
+    /** Creates the authoritative failure for Run Project without a Main Scene. */
+    private static ProjectHostException missingMainScene(GameProject project) {
+        return sceneFailure(
+                project,
+                ProjectDiagnosticCode.MAIN_SCENE_MISSING,
+                "/runtime/mainScene",
+                "Run Project requires a configured Main Scene");
+    }
+
+    /** Creates one structured selected-Scene failure. */
+    private static ProjectHostException sceneFailure(
+            GameProject project, ProjectDiagnosticCode code, String location, String message) {
+        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                ProjectDiagnostic.Severity.ERROR, code, project.descriptor().toUri(), location, Map.of());
+        return new ProjectHostException(message, List.of(diagnostic));
     }
 
     /** Discovers application providers and combines them with host-owned built-ins. */

@@ -17,6 +17,7 @@ import io.github.glynch.jscene3d.project.input.InputMapDefinition;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.runtime.HostedProject;
 import io.github.glynch.jscene3d.project.runtime.ProjectContent;
+import io.github.glynch.jscene3d.project.runtime.ProjectHostException;
 import io.github.glynch.jscene3d.project.runtime.ProjectRuntimeEnvironment;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
@@ -35,7 +36,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 final class ProjectRendererSessionTest {
     private static final String PROJECT_ID = "io.github.glynch.renderer-test";
-    private static final String WORLD_ID = "2f26576c-570d-4338-bc30-52bc41def3a5";
+    private static final String SCENE_ID = "2f26576c-570d-4338-bc30-52bc41def3a5";
     private static final String PROJECT_MANIFEST = """
             {
               "$schema": "https://jscene3d.org/schemas/project-1.json",
@@ -51,8 +52,10 @@ final class ProjectRendererSessionTest {
               },
               "runtime": {
                 "applicationExtension": "io.github.glynch.renderer-test",
-                "entryScene": "worlds/main.world.json",
-                "startupScene": "worlds/intro.world.json"
+                "mainScene": {
+                  "assetId": "ee595fcf-3e5b-453a-9f02-6160d85e98a9",
+                  "pathHint": "worlds/intro.scene.json"
+                }
               },
               "extensions": [
                 {
@@ -62,24 +65,24 @@ final class ProjectRendererSessionTest {
               ]
             }
             """;
-    private static final String OPTIONAL_STARTUP_WORLD_DEFINITION = """
+    private static final String CONFIGURED_MAIN_SCENE_DEFINITION = """
             {
-              "$schema": "https://jscene3d.org/schemas/world-definition-1.json",
+              "$schema": "https://jscene3d.org/schemas/scene-definition-1.json",
               "assetId": "ee595fcf-3e5b-453a-9f02-6160d85e98a9",
-              "assetType": "world-definition",
+              "assetType": "scene-definition",
               "formatVersion": 1,
-              "name": "Optional Startup World",
+              "name": "Configured Main Scene",
               "connections": [],
               "roots": []
             }
             """;
-    private static final String WORLD_DEFINITION = """
+    private static final String SCENE_DEFINITION = """
             {
-              "$schema": "https://jscene3d.org/schemas/world-definition-1.json",
+              "$schema": "https://jscene3d.org/schemas/scene-definition-1.json",
               "assetId": "2f26576c-570d-4338-bc30-52bc41def3a5",
-              "assetType": "world-definition",
+              "assetType": "scene-definition",
               "formatVersion": 1,
-              "name": "Renderer Test World",
+              "name": "Renderer Test Scene",
               "connections": [],
               "roots": []
             }
@@ -101,18 +104,18 @@ final class ProjectRendererSessionTest {
     private Path temporaryDirectory;
 
     @Test
-    void loadsPreparedEntryWorldWhenManifestHasDifferentOptionalStartupScene() throws IOException {
+    void loadsExplicitSceneInsteadOfTheDifferentConfiguredMainScene() throws IOException {
         Path projectRoot = writeProject();
         Path publishedContent = temporaryDirectory.resolve("published");
         ProjectLaunch launch =
-                new ProjectLaunch(projectRoot, publishedContent, "0.1.0-SNAPSHOT", PROJECT_ID, AssetId.from(WORLD_ID));
+                new ProjectLaunch(projectRoot, publishedContent, "0.1.0-SNAPSHOT", PROJECT_ID, AssetId.from(SCENE_ID));
 
         try (URLClassLoader runtimeLoader = runtimeClassLoader()) {
             HostedProject project = ProjectRendererSession.loadProject(
                     launch, runtimeLoader, new TestProjectEnvironment(publishedContent));
 
             assertThat(project.project().identity().id()).isEqualTo(PROJECT_ID);
-            assertThat(project.world().definition().id()).isEqualTo(AssetId.from(WORLD_ID));
+            assertThat(project.world().definition().id()).isEqualTo(AssetId.from(SCENE_ID));
             assertThat(project.world().isActive()).isFalse();
 
             project.world().activate();
@@ -129,8 +132,8 @@ final class ProjectRendererSessionTest {
         Path projectRoot = writeProject();
         Path publishedContent = temporaryDirectory.resolve("published");
         ProjectLaunch projectMismatch = new ProjectLaunch(
-                projectRoot, publishedContent, "0.1.0-SNAPSHOT", "example.other-project", AssetId.from(WORLD_ID));
-        ProjectLaunch worldMismatch = new ProjectLaunch(
+                projectRoot, publishedContent, "0.1.0-SNAPSHOT", "example.other-project", AssetId.from(SCENE_ID));
+        ProjectLaunch sceneMismatch = new ProjectLaunch(
                 projectRoot,
                 publishedContent,
                 "0.1.0-SNAPSHOT",
@@ -143,9 +146,9 @@ final class ProjectRendererSessionTest {
                     .hasMessageContaining("project identity");
         }
         try (URLClassLoader runtimeLoader = runtimeClassLoader()) {
-            assertThatThrownBy(() -> ProjectRendererSession.loadProject(worldMismatch, runtimeLoader, environment))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("startup world");
+            assertThatThrownBy(() -> ProjectRendererSession.loadProject(sceneMismatch, runtimeLoader, environment))
+                    .isInstanceOf(ProjectHostException.class)
+                    .hasMessageContaining("selected Scene is absent");
         }
     }
 
@@ -153,10 +156,10 @@ final class ProjectRendererSessionTest {
         Path projectRoot = temporaryDirectory.resolve("project");
         Files.createDirectories(projectRoot.resolve("worlds"));
         Files.writeString(projectRoot.resolve("renderer-test.j3d"), PROJECT_MANIFEST, StandardCharsets.UTF_8);
-        Files.writeString(projectRoot.resolve("worlds/main.world.json"), WORLD_DEFINITION, StandardCharsets.UTF_8);
+        Files.writeString(projectRoot.resolve("worlds/main.scene.json"), SCENE_DEFINITION, StandardCharsets.UTF_8);
         Files.writeString(
-                projectRoot.resolve("worlds/intro.world.json"),
-                OPTIONAL_STARTUP_WORLD_DEFINITION,
+                projectRoot.resolve("worlds/intro.scene.json"),
+                CONFIGURED_MAIN_SCENE_DEFINITION,
                 StandardCharsets.UTF_8);
         return projectRoot;
     }

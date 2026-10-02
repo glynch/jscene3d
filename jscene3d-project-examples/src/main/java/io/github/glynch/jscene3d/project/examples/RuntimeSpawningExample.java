@@ -33,9 +33,9 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegis
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentLifecycleCallbacks;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentUpdateCallbacks;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -49,7 +49,7 @@ import java.util.logging.Logger;
 /** Prepares one reusable projectile definition and spawns independent instances at safe boundaries. */
 public final class RuntimeSpawningExample {
     private static final String EXTENSION_ID = "io.github.glynch.jscene3d.spawning-example";
-    private static final AssetId WORLD_ID = AssetId.from("592c525f-c8e1-4e9e-8546-12e44598527d");
+    private static final AssetId SCENE_ID = AssetId.from("592c525f-c8e1-4e9e-8546-12e44598527d");
     private static final AssetId PROJECTILE_ID = AssetId.from("b78d0f03-2cdb-4142-8d41-14245cfc7453");
     private static final ComponentId EMITTER_ID = ComponentId.from("676966fc-549a-4174-a2dc-df420268808f");
     private static final ComponentId PROJECTILE_COMPONENT = ComponentId.from("6810ad02-0002-421a-8fd0-b856876795e8");
@@ -79,7 +79,7 @@ public final class RuntimeSpawningExample {
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(descriptor()));
         World world = WorldComposer.compose(
                         assets,
-                        AssetRef.<WorldDefinition>to(WORLD_ID),
+                        AssetRef.<SceneDefinition>to(SCENE_ID),
                         types,
                         List.of(new SpawningRuntimeExtension()),
                         List.of(),

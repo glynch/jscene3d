@@ -29,8 +29,7 @@ final class ImportLoaderTest {
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "example.import-test",
-                "entryScene": "main.scene.json"
+                "applicationExtension": "example.import-test"
               },
               "extensions": [
                 {"id": "example.import-test", "requires": "1.0.0"}

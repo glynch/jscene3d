@@ -18,6 +18,8 @@ import static io.github.glynch.jscene3d.project.internal.ProjectPaths.immutableN
 import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireNormalizedAbsolute;
 import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireOptionalNormalizedAbsolute;
 
+import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -419,8 +421,7 @@ public final class GameProject {
     /** Runtime entry points used by preview, play, and export workflows. */
     public static final class RuntimeConfiguration {
         private final String applicationExtension;
-        private final Path entryScene;
-        private final Optional<Path> startupScene;
+        private final Optional<AssetRef<SceneDefinition>> mainScene;
         private final Optional<Path> projectSystems;
         private final Optional<Path> inputMap;
 
@@ -428,20 +429,17 @@ public final class GameProject {
          * Creates validated runtime configuration.
          *
          * @param applicationExtension extension that creates project-specific runtime objects
-         * @param entryScene normalized absolute gameplay entry-scene path
-         * @param startupScene optional normalized absolute scene shown before gameplay
+         * @param mainScene optional first scene instantiated by Run Project
          * @param projectSystems optional normalized absolute project-systems path
          * @param inputMap optional normalized absolute input-map path
          */
         public RuntimeConfiguration(
                 String applicationExtension,
-                Path entryScene,
-                Optional<Path> startupScene,
+                Optional<AssetRef<SceneDefinition>> mainScene,
                 Optional<Path> projectSystems,
                 Optional<Path> inputMap) {
             this.applicationExtension = requireProjectId(applicationExtension, "applicationExtension");
-            this.entryScene = requireNormalizedAbsolute(entryScene, "entryScene");
-            this.startupScene = requireOptionalNormalizedAbsolute(startupScene, "startupScene");
+            this.mainScene = Objects.requireNonNull(mainScene, "mainScene");
             this.projectSystems = requireOptionalNormalizedAbsolute(projectSystems, "projectSystems");
             this.inputMap = requireOptionalNormalizedAbsolute(inputMap, "inputMap");
         }
@@ -456,21 +454,12 @@ public final class GameProject {
         }
 
         /**
-         * Returns the gameplay entry scene.
+         * Returns the optional first scene instantiated by Run Project.
          *
-         * @return normalized absolute entry-scene path
+         * @return stable main-scene reference when configured
          */
-        public Path entryScene() {
-            return entryScene;
-        }
-
-        /**
-         * Returns the optional scene shown before gameplay begins.
-         *
-         * @return normalized absolute startup-scene path when configured
-         */
-        public Optional<Path> startupScene() {
-            return startupScene;
+        public Optional<AssetRef<SceneDefinition>> mainScene() {
+            return mainScene;
         }
 
         /**
@@ -498,21 +487,20 @@ public final class GameProject {
             }
             return other instanceof RuntimeConfiguration configuration
                     && applicationExtension.equals(configuration.applicationExtension)
-                    && entryScene.equals(configuration.entryScene)
-                    && startupScene.equals(configuration.startupScene)
+                    && mainScene.equals(configuration.mainScene)
                     && projectSystems.equals(configuration.projectSystems)
                     && inputMap.equals(configuration.inputMap);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(applicationExtension, entryScene, startupScene, projectSystems, inputMap);
+            return Objects.hash(applicationExtension, mainScene, projectSystems, inputMap);
         }
 
         @Override
         public String toString() {
-            return "RuntimeConfiguration[applicationExtension=" + applicationExtension + ", entryScene=" + entryScene
-                    + ", startupScene=" + startupScene + ", projectSystems=" + projectSystems + ", inputMap="
+            return "RuntimeConfiguration[applicationExtension=" + applicationExtension + ", mainScene=" + mainScene
+                    + ", projectSystems=" + projectSystems + ", inputMap="
                     + inputMap + ']';
         }
     }

@@ -34,13 +34,13 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBind
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -50,7 +50,7 @@ import java.util.logging.Logger;
 /** Composes authored collision objects and reports precise sensor-shape overlap transitions. */
 public final class Collision3dCompositionExample {
     private static final String EXTENSION_ID = "io.github.glynch.jscene3d.collision-example";
-    private static final AssetId WORLD_ID = AssetId.from("89c78715-7849-41fe-a999-d316c2de4c0d");
+    private static final AssetId SCENE_ID = AssetId.from("89c78715-7849-41fe-a999-d316c2de4c0d");
     private static final ComponentId TARGET_TRANSFORM = ComponentId.from("fa52798f-6a4c-4e2d-8d6a-fbab834c6eb7");
     private static final ComponentId RECORDER_COMPONENT = ComponentId.from("22ddd9bb-18ac-4725-94ce-cddf4f4ff8c9");
     private static final ComponentType RECORDER_TYPE = ComponentType.of(EXTENSION_ID + "/overlap-recorder", 1);
@@ -66,11 +66,11 @@ public final class Collision3dCompositionExample {
     /**
      * Composes and steps the collision world in the supplied asset directory.
      *
-     * @param arguments one world asset-directory path
+     * @param arguments one Scene asset-directory path
      */
     public static void main(String[] arguments) {
         if (arguments.length != 1) {
-            throw new IllegalArgumentException("expected one world asset-directory path");
+            throw new IllegalArgumentException("expected one Scene asset-directory path");
         }
         Path assetDirectory = Path.of(arguments[0]).toAbsolutePath().normalize();
         AssetCatalog assets = AssetCatalog.scan(assetDirectory).catalog().orElseThrow();
@@ -120,7 +120,7 @@ public final class Collision3dCompositionExample {
                 WorldModuleBinding.of(Spatial3dWorldModule.class, spatial),
                 WorldModuleBinding.of(Physics3dWorldModule.class, physics));
         return WorldComposer.compose(
-                assets, AssetRef.<WorldDefinition>to(WORLD_ID), types, extensions, modules, resources);
+                assets, AssetRef.<SceneDefinition>to(SCENE_ID), types, extensions, modules, resources);
     }
 
     /** Releases host-created modules when composition cannot transfer ownership to a world. */

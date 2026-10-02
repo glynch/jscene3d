@@ -11,7 +11,6 @@ import io.github.glynch.jscene3d.project.extension.ExtensionDiagnosticCode;
 import io.github.glynch.jscene3d.project.imports.ImportDefinitionDiagnosticCode;
 import io.github.glynch.jscene3d.project.manifest.ProjectDiagnosticCode;
 import io.github.glynch.jscene3d.project.resource.ResourceDiagnosticCode;
-import io.github.glynch.jscene3d.project.scene.SceneDiagnosticCode;
 import java.util.Arrays;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -23,7 +22,6 @@ final class DiagnosticCodeCatalogTest {
     void validatesProjectDiagnosticCatalog() {
         DiagnosticCode[] codes = Stream.of(
                         ProjectDiagnosticCode.values(),
-                        SceneDiagnosticCode.values(),
                         ResourceDiagnosticCode.values(),
                         ExtensionDiagnosticCode.values(),
                         ImportDefinitionDiagnosticCode.values())

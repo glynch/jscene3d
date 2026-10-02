@@ -30,10 +30,10 @@ import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -189,7 +189,7 @@ final class Spatial3dPresentationCompositionTest {
     @Test
     void rejectsMultiplePrimaryCameras() throws IOException {
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
-        WorldDefinition definition = new WorldDefinition(
+        SceneDefinition definition = new SceneDefinition(
                 WORLD_ID, "Ambiguous cameras", List.of(cameraEntity("First", true), cameraEntity("Second", true)));
 
         WorldCompositionResult result = compose(definition, spatial, noResources());
@@ -218,9 +218,9 @@ final class Spatial3dPresentationCompositionTest {
 
     /** Writes and composes a definition using the real catalog and runtime extension seams. */
     private WorldCompositionResult compose(
-            WorldDefinition definition, Spatial3dWorldModule spatial, RuntimeResourceProvider resources)
+            SceneDefinition definition, Spatial3dWorldModule spatial, RuntimeResourceProvider resources)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("presentation.world.json"), definition);
+        DefinitionWriter.write(temporaryDirectory.resolve("presentation.scene.json"), definition);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(Spatial3dDescriptors.extensionDescriptor()));
         return WorldComposer.compose(
@@ -233,7 +233,7 @@ final class Spatial3dPresentationCompositionTest {
     }
 
     /** Creates the camera, sun, and visible mesh acceptance world. */
-    private static WorldDefinition presentationWorld() {
+    private static SceneDefinition presentationWorld() {
         LocalEntity camera = cameraEntity("Camera", true);
         LocalEntity light = entity(
                 "Sun",
@@ -264,12 +264,12 @@ final class Spatial3dPresentationCompositionTest {
                                 Spatial3dDescriptors.sizeProperty(), numbers(2.0F, 3.0F),
                                 Spatial3dDescriptors.anchorProperty(), numbers(0.5F, 0.0F),
                                 Spatial3dDescriptors.alignmentProperty(), new ProjectValue.TextValue("cylindrical"))));
-        return new WorldDefinition(WORLD_ID, "3D presentation", List.of(camera, light, mesh, billboard));
+        return new SceneDefinition(WORLD_ID, "3D presentation", List.of(camera, light, mesh, billboard));
     }
 
     /** Creates a world containing exactly one camera. */
-    private static WorldDefinition singleCameraWorld(boolean primary) {
-        return new WorldDefinition(WORLD_ID, "Camera", List.of(cameraEntity("Camera", primary)));
+    private static SceneDefinition singleCameraWorld(boolean primary) {
+        return new SceneDefinition(WORLD_ID, "Camera", List.of(cameraEntity("Camera", primary)));
     }
 
     /** Creates one camera entity with explicit projection and selection state. */

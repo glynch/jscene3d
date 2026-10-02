@@ -32,7 +32,7 @@ final class RendererConfigurationTest {
             "--published-content-root=/projects/example/.jscene3d/published",
             "--engine-version=0.1.0-SNAPSHOT",
             "--project-id=example.project",
-            "--world-asset-id=e890c4c3-fb32-49d8-88b8-4e04e7a29656",
+            "--scene-asset-id=e890c4c3-fb32-49d8-88b8-4e04e7a29656",
             "org.example.Editor",
             "1280",
             "720"
@@ -68,7 +68,7 @@ final class RendererConfigurationTest {
                     "--published-content-root=/published",
                     "--engine-version=0.1.0-SNAPSHOT",
                     "--project-id=example.project",
-                    "--world-asset-id=not-an-asset-id",
+                    "--scene-asset-id=not-an-asset-id",
                     "org.example.Editor",
                     "640",
                     "480"

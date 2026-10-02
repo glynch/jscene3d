@@ -11,8 +11,8 @@ import java.util.Optional;
 public enum AssetKind {
     /** Reusable single-root entity hierarchy. */
     ENTITY_DEFINITION("entity-definition", ".entity.json"),
-    /** Authored world containing local entities and reusable-definition placements. */
-    WORLD_DEFINITION("world-definition", ".world.json");
+    /** Authored Scene containing local entities and reusable-definition placements. */
+    SCENE_DEFINITION("scene-definition", ".scene.json");
 
     private final String serializedName;
     private final String fileSuffix;

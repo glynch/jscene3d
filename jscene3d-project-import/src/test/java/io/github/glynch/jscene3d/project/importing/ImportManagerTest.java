@@ -46,8 +46,7 @@ final class ImportManagerTest {
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "io.github.glynch.import-test",
-                "entryScene": "main.scene.json"
+                "applicationExtension": "io.github.glynch.import-test"
               },
               "extensions": [
                 {"id": "io.github.glynch.import-test", "requires": "1.0.0"}
@@ -89,7 +88,9 @@ final class ImportManagerTest {
         cacheDirectory = Files.createDirectory(temporaryDirectory.resolve("cache"));
         write("assets/source.txt", "source-v1");
         write("assets/dependency.txt", "dependency-v1");
-        write("main.scene.json", "{}");
+        write("main.scene.json", """
+                {"assetId":"26b1665f-819b-49b4-b67d-c479dbc497e5","assetType":"scene-definition","formatVersion":1,"name":"Import Test","connections":[],"roots":[]}
+                """);
         write("imports/source.import.json", IMPORT_DEFINITION);
         write(ProjectLoader.MANIFEST_NAME, PROJECT_MANIFEST);
         project = new ProjectLoader("0.1.0-SNAPSHOT")

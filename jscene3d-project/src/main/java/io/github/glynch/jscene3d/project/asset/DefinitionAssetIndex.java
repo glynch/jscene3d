@@ -6,7 +6,7 @@ package io.github.glynch.jscene3d.project.asset;
 
 import io.github.glynch.jscene3d.project.asset.internal.DefinitionDocumentReader;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.file.Path;
@@ -150,17 +150,17 @@ final class DefinitionAssetIndex {
                     new ByteArrayInputStream(Arrays.copyOf(generatedContent, generatedContent.length)));
         }
 
-        /** Reads and structurally validates this authored source as a world definition. */
-        DefinitionDocumentReader.ReadResult<WorldDefinition> readWorld(Path projectRoot) {
+        /** Reads and structurally validates this authored source as a Scene definition. */
+        DefinitionDocumentReader.ReadResult<SceneDefinition> readScene(Path projectRoot) {
             if (content != null) {
                 byte[] sourceContent = content;
-                return DefinitionDocumentReader.readWorld(
+                return DefinitionDocumentReader.readScene(
                         projectRoot,
-                        Objects.requireNonNull(metadata, "authored world metadata"),
+                        Objects.requireNonNull(metadata, "authored Scene metadata"),
                         new ByteArrayInputStream(Arrays.copyOf(sourceContent, sourceContent.length)));
             }
-            return DefinitionDocumentReader.readWorld(
-                    projectRoot, Objects.requireNonNull(metadata, "authored world metadata"));
+            return DefinitionDocumentReader.readScene(
+                    projectRoot, Objects.requireNonNull(metadata, "authored Scene metadata"));
         }
     }
 

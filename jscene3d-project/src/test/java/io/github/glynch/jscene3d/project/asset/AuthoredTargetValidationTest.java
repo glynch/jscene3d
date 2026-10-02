@@ -21,9 +21,9 @@ import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -93,11 +93,11 @@ final class AuthoredTargetValidationTest {
         ComponentDefinition probe = new ComponentDefinition(
                 PROBE, PROBE_TYPE.id(), PROBE_TYPE.version(), Map.of(TARGET, componentTarget(PLACEMENT)));
         LocalEntity localProbe = new LocalEntity(LOCAL_PROBE, true, List.of(probe), List.of());
-        WorldDefinition world = new WorldDefinition(WORLD_ID, "Invalid seam", List.of(placement, localProbe));
-        DefinitionWriter.write(temporaryDirectory.resolve("target.world.json"), world);
+        SceneDefinition world = new SceneDefinition(WORLD_ID, "Invalid seam", List.of(placement, localProbe));
+        DefinitionWriter.write(temporaryDirectory.resolve("target.scene.json"), world);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
 
-        DefinitionLoadResult<WorldDefinition> result = assets.loadWorld(AssetRef.to(WORLD_ID), types());
+        DefinitionLoadResult<SceneDefinition> result = assets.loadScene(AssetRef.to(WORLD_ID), types());
 
         assertThat(result.definition()).isEmpty();
         assertThat(result.diagnostics())

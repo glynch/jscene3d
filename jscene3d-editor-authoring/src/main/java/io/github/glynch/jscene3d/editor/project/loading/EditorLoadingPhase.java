@@ -24,10 +24,6 @@ public enum EditorLoadingPhase {
     LOADING_PUBLISHED_CONTENT("loading-published-content", "Loading published project content", 0.62),
     /** Validates the assets exposed to the editor. */
     VALIDATING_ASSETS("validating-assets", "Validating project assets", 0.74),
-    /** Loads the world configured as the project's startup world. */
-    LOADING_STARTUP_WORLD("loading-startup-world", "Loading the startup world", 0.84),
-    /** Projects the startup world into the editor hierarchy. */
-    BUILDING_HIERARCHY("building-hierarchy", "Building the editor hierarchy", 0.90),
     /** Composes the scene preview and presents its first frame. */
     PREPARING_PREVIEW("preparing-preview", "Composing and presenting the first preview frame", 0.96),
     /** Marks project opening as complete. */

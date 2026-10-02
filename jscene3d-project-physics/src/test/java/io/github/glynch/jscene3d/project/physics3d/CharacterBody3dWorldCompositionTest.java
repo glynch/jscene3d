@@ -24,6 +24,7 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
@@ -31,7 +32,6 @@ import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -73,7 +73,7 @@ final class CharacterBody3dWorldCompositionTest {
     /** Teleports a composed character before activation and preserves that pose when physics starts. */
     @Test
     void teleportsCharacterBeforeWorldActivation() throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("character.world.json"), worldDefinition());
+        DefinitionWriter.write(temporaryDirectory.resolve("character.scene.json"), worldDefinition());
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         World world = WorldComposer.compose(
                         assets,
@@ -119,7 +119,7 @@ final class CharacterBody3dWorldCompositionTest {
     /** Grounds a capsule, slides it along a wall, and publishes the resolved pose to its entity transform. */
     @Test
     void movesCharacterAgainstComposedStaticCollision() throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("character.world.json"), worldDefinition());
+        DefinitionWriter.write(temporaryDirectory.resolve("character.scene.json"), worldDefinition());
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
         Physics3dWorldModule physics = Physics3dAdapters.standard();
@@ -186,7 +186,7 @@ final class CharacterBody3dWorldCompositionTest {
     }
 
     /** Creates the floor, wall, and independently shaped character fixture. */
-    private static WorldDefinition worldDefinition() {
+    private static SceneDefinition worldDefinition() {
         LocalEntity floor = collisionEntity(
                 new CollisionEntityIds(FLOOR_ENTITY, FLOOR_TRANSFORM, FLOOR_SHAPE, FLOOR_BODY),
                 "Floor",
@@ -205,7 +205,7 @@ final class CharacterBody3dWorldCompositionTest {
                 Physics3dDescriptors.characterBodyType(),
                 CHARACTER_RESOURCE,
                 new Vector3f(0.0F, 1.001F, 0.0F));
-        return new WorldDefinition(WORLD_ID, "Character acceptance", List.of(floor, wall, character));
+        return new SceneDefinition(WORLD_ID, "Character acceptance", List.of(floor, wall, character));
     }
 
     /** Creates one spatial collision entity with stable explicit shape membership. */

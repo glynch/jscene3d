@@ -37,7 +37,7 @@ public final class RawDefinitionDocuments {
             @Nullable List<@Nullable Connection> connections,
             @Nullable Entry root) {}
 
-    /** Complete world-definition document.
+    /** Complete scene-definition document.
      *
      * @param schema optional schema URI
      * @param assetId nullable stable asset identity
@@ -47,7 +47,7 @@ public final class RawDefinitionDocuments {
      * @param connections nullable internal connections
      * @param roots nullable root entries
      */
-    public record WorldDocument(
+    public record SceneDocument(
             @JsonProperty("$schema") @Nullable String schema,
             @Nullable String assetId,
             @Nullable String assetType,

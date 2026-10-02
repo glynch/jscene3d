@@ -43,7 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Exercises source-preserving authored world and entity documents. */
+/** Exercises source-preserving authored Scene and entity documents. */
 final class AuthoredDefinitionDocumentTest {
     private static final AssetId WORLD_ID = AssetId.from("4b067393-2ee9-4345-babc-ea1614fb95c8");
     private static final AssetId ENTITY_DEFINITION_ID = AssetId.from("15a64477-b57f-3ae3-bf65-33cd6baab7b6");
@@ -57,9 +57,9 @@ final class AuthoredDefinitionDocumentTest {
     private static final String EXACT_NUMBER = "1234567890.123456789012345678901234567890";
     private static final String WORLD_SOURCE = """
             {
-              "$schema": "https://jscene3d.org/schemas/world-definition-1.json",
+              "$schema": "https://jscene3d.org/schemas/scene-definition-1.json",
               "assetId": "4b067393-2ee9-4345-babc-ea1614fb95c8",
-              "assetType": "world-definition",
+              "assetType": "scene-definition",
               "formatVersion": 1,
               "name": "Preserved World",
               "connections": [],
@@ -157,7 +157,7 @@ final class AuthoredDefinitionDocumentTest {
     /** Creates representative authored sources and their safe descriptor catalog. */
     @BeforeEach
     void setUp() throws IOException {
-        worldSource = projectRoot.resolve("worlds/map01.world.json");
+        worldSource = projectRoot.resolve("worlds/map01.scene.json");
         entitySource = projectRoot.resolve("entities/player.entity.json");
         Files.createDirectories(worldSource.getParent());
         Files.createDirectories(entitySource.getParent());
@@ -173,7 +173,7 @@ final class AuthoredDefinitionDocumentTest {
         AuthoredDefinitionDocument world = load(WORLD_ID);
         AuthoredDefinitionDocument entity = load(ENTITY_DEFINITION_ID);
 
-        assertThat(world.content()).isInstanceOf(AuthoredDefinitionDocument.Content.World.class);
+        assertThat(world.content()).isInstanceOf(AuthoredDefinitionDocument.Content.Scene.class);
         assertThat(entity.content()).isInstanceOf(AuthoredDefinitionDocument.Content.Entity.class);
         assertThat(world.source()).isEqualTo(worldSource.toRealPath());
         assertThat(entity.source()).isEqualTo(entitySource.toRealPath());
@@ -197,8 +197,8 @@ final class AuthoredDefinitionDocumentTest {
         assertThat(decoded.encode()).isEqualTo(encoded);
         assertThat(decoded)
                 .returns(WORLD_ID, AuthoredDefinitionBackup::definition)
-                .returns(AssetKind.WORLD_DEFINITION, AuthoredDefinitionBackup::kind)
-                .returns("worlds/map01.world.json", AuthoredDefinitionBackup::source)
+                .returns(AssetKind.SCENE_DEFINITION, AuthoredDefinitionBackup::kind)
+                .returns("worlds/map01.scene.json", AuthoredDefinitionBackup::source)
                 .returns(persisted.sourceFingerprint().hexadecimal(), AuthoredDefinitionBackup::persistedSourceSha256);
         assertThat(restored.sourceFingerprint()).isEqualTo(persisted.sourceFingerprint());
         assertThat(restoredProperties.path("optional-text").textValue()).isEqualTo("recovered");
@@ -272,9 +272,9 @@ final class AuthoredDefinitionDocumentTest {
         AuthoredDefinitionBackup wrongDefinition = tampered(
                 original, "\"assetId\" : \"" + WORLD_ID + "\"", "\"assetId\" : \"" + ENTITY_DEFINITION_ID + "\"");
         AuthoredDefinitionBackup wrongKind =
-                tampered(original, "\"kind\" : \"world-definition\"", "\"kind\" : \"entity-definition\"");
+                tampered(original, "\"kind\" : \"scene-definition\"", "\"kind\" : \"entity-definition\"");
         AuthoredDefinitionBackup wrongSource = tampered(
-                original, "\"source\" : \"worlds/map01.world.json\"", "\"source\" : \"worlds/other.world.json\"");
+                original, "\"source\" : \"worlds/map01.scene.json\"", "\"source\" : \"worlds/other.scene.json\"");
         AuthoredDefinitionBackup wrongFingerprint =
                 tampered(original, original.persistedSourceSha256(), "0".repeat(64));
 
@@ -637,7 +637,7 @@ final class AuthoredDefinitionDocumentTest {
     void rejectsDefinitionKindMismatch() throws IOException {
         Files.writeString(
                 worldSource,
-                WORLD_SOURCE.replace("\"world-definition\"", "\"entity-definition\""),
+                WORLD_SOURCE.replace("\"scene-definition\"", "\"entity-definition\""),
                 StandardCharsets.UTF_8);
 
         AuthoredDefinitionDocument.LoadResult result = AuthoredDefinitionDocument.load(assets, assets, types, WORLD_ID);

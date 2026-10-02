@@ -23,7 +23,7 @@ record RendererConfiguration(
     private static final String PUBLISHED_CONTENT_OPTION = "--published-content-root=";
     private static final String ENGINE_VERSION_OPTION = "--engine-version=";
     private static final String PROJECT_ID_OPTION = "--project-id=";
-    private static final String WORLD_ASSET_ID_OPTION = "--world-asset-id=";
+    private static final String SCENE_ASSET_ID_OPTION = "--scene-asset-id=";
 
     static RendererConfiguration from(String[] arguments) {
         if (arguments.length < 3) {
@@ -40,7 +40,7 @@ record RendererConfiguration(
                     && !putOption(options, argument, PUBLISHED_CONTENT_OPTION)
                     && !putOption(options, argument, ENGINE_VERSION_OPTION)
                     && !putOption(options, argument, PROJECT_ID_OPTION)
-                    && !putOption(options, argument, WORLD_ASSET_ID_OPTION)) {
+                    && !putOption(options, argument, SCENE_ASSET_ID_OPTION)) {
                 throw usageFailure();
             }
         }
@@ -67,7 +67,7 @@ record RendererConfiguration(
                 absolutePath(options, PUBLISHED_CONTENT_OPTION),
                 option(options, ENGINE_VERSION_OPTION),
                 option(options, PROJECT_ID_OPTION),
-                AssetId.from(option(options, WORLD_ASSET_ID_OPTION))));
+                AssetId.from(option(options, SCENE_ASSET_ID_OPTION))));
     }
 
     private static boolean putOption(Map<String, String> options, String argument, String prefix) {
@@ -132,5 +132,5 @@ record RendererConfiguration(
             Path publishedContentRoot,
             String engineVersion,
             String projectId,
-            AssetId worldAssetId) {}
+            AssetId sceneAssetId) {}
 }

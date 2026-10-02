@@ -67,7 +67,7 @@ final class ProtocolDtoValidationTest {
                 "/projects/example/.jscene3d/published",
                 "0.1.0-SNAPSHOT",
                 "2f26576c-570d-4338-bc30-52bc41def3a5",
-                "Opening World",
+                "Opening Scene",
                 List.of("/runtime/example.jar"));
         assertThatThrownBy(() -> new ViewportLaunchSpecification(
                         0L,
@@ -77,7 +77,7 @@ final class ProtocolDtoValidationTest {
                         "/projects/example/.jscene3d/published",
                         "0.1.0-SNAPSHOT",
                         "world",
-                        "Opening World",
+                        "Opening Scene",
                         noRuntimeArtifacts))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("positive");
@@ -89,7 +89,7 @@ final class ProtocolDtoValidationTest {
                         "/projects/example/.jscene3d/published",
                         "0.1.0-SNAPSHOT",
                         "world",
-                        "Opening World",
+                        "Opening Scene",
                         blankRuntimeArtifact))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("runtimeArtifacts");
@@ -422,7 +422,7 @@ final class ProtocolDtoValidationTest {
                 "1.0.0",
                 "/project",
                 "/project/project.j3d",
-                new ProjectSummary.WorldSummary("world", "World"),
+                new ProjectSummary.SceneSummary("world", "World"),
                 new ProjectSummary.AssetCounts(0, 0));
     }
 }

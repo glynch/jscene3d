@@ -25,8 +25,8 @@ import io.github.glynch.jscene3d.project.entity.PropertyTarget;
 import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,19 +44,19 @@ public final class CompositionPlanner {
     }
 
     /**
-     * Plans one validated in-memory world definition without reloading its root.
+     * Plans one validated in-memory Scene definition without reloading its root.
      *
      * @param source absolute logical source of the supplied root
-     * @param root validated in-memory world definition
+     * @param root validated in-memory Scene definition
      * @param resolver resolver for referenced authored or generated entity definitions
      * @param types validated inert component descriptor catalog
      * @return complete plan or ordered structured diagnostics
      */
     public static CompositionPlanResult plan(
-            URI source, WorldDefinition root, DefinitionResolver resolver, RegisteredTypeCatalog types) {
+            URI source, SceneDefinition root, DefinitionResolver resolver, RegisteredTypeCatalog types) {
         Objects.requireNonNull(root, "root");
         Planner planner = Planner.loading(source, root.id(), resolver, types);
-        return planner.execute(() -> planner.planWorld(root));
+        return planner.execute(() -> planner.planScene(root));
     }
 
     /**
@@ -206,8 +206,8 @@ public final class CompositionPlanner {
             }
         }
 
-        /** Plans world roots and their scoped connections. */
-        private CompositionPlan planWorld(WorldDefinition root) {
+        /** Plans Scene roots and their scoped connections. */
+        private CompositionPlan planScene(SceneDefinition root) {
             CompositionOccurrenceId anchor = new CompositionOccurrenceId(root.id(), List.of());
             CompositionScope scope = new CompositionScope(root.id(), anchor);
             List<EntityEntry> roots = root.roots();
@@ -215,7 +215,7 @@ public final class CompositionPlanner {
                 planEntry(scope, roots.get(index), anchor, Optional.empty(), true, "/roots/" + index);
             }
             planConnections(scope, root.connections(), "/connections");
-            return complete(CompositionPlan.Kind.WORLD);
+            return complete(CompositionPlan.Kind.SCENE_DEFINITION);
         }
 
         /** Plans one reusable definition with caller-supplied root arguments. */

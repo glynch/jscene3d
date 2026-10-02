@@ -45,7 +45,7 @@ final class ApplicationImageExporterTest {
         Files.write(projectRoot.resolve("branding/sample-game.icns"), new byte[] {0, 1, 2, 3});
         Files.writeString(projectRoot.resolve("jscene3d.json"), manifest(), UTF_8);
         Files.createDirectories(projectRoot.resolve("worlds"));
-        Files.writeString(projectRoot.resolve("worlds/start.world.json"), worldDefinition(), UTF_8);
+        Files.writeString(projectRoot.resolve("worlds/start.scene.json"), worldDefinition(), UTF_8);
         applicationDirectory = temporaryDirectory.resolve("application-directory");
         outputDirectory = temporaryDirectory.resolve("native-output");
         ApplicationDirectoryRequest request = ApplicationDirectoryRequest.builder()
@@ -96,7 +96,7 @@ final class ApplicationImageExporterTest {
                         "jscene3d-project-desktop.jar",
                         "project/branding/sample-game.icns",
                         "project/jscene3d.json",
-                        "project/worlds/start.world.json",
+                        "project/worlds/start.scene.json",
                         "sample-game.jar");
         assertThat(ApplicationImageMetadata.read(image.root().resolve("Contents/app")))
                 .isEqualTo(new ApplicationImageMetadata("Sample Game", "1.0.0"));
@@ -207,7 +207,10 @@ final class ApplicationImageExporterTest {
                   },
                   "runtime": {
                     "applicationExtension": "io.github.glynch.sample-game",
-                    "entryScene": "worlds/start.world.json"
+                    "mainScene": {
+                      "assetId": "1af6e97a-0401-4772-b476-29e2dcc8e77c",
+                      "pathHint": "worlds/start.scene.json"
+                    }
                   },
                   "extensions": [
                     {
@@ -224,12 +227,12 @@ final class ApplicationImageExporterTest {
         return manifest().replace(",\n    \"icon\": \"branding/sample-game.icns\"", "");
     }
 
-    /** Returns one discoverable world-definition header. */
+    /** Returns one discoverable scene-definition header. */
     private static String worldDefinition() {
         return """
                 {
                   "assetId": "1af6e97a-0401-4772-b476-29e2dcc8e77c",
-                  "assetType": "world-definition",
+                  "assetType": "scene-definition",
                   "formatVersion": 1
                 }
                 """;

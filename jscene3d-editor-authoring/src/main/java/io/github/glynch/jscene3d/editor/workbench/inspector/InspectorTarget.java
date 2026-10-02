@@ -50,8 +50,8 @@ public record InspectorTarget(Kind kind, URI source, String identity, Optional<H
 
     /** Semantic target kinds independent of any editor view. */
     public enum Kind {
-        /** Opened world root. */
-        WORLD,
+        /** Opened Scene root. */
+        SCENE,
         /** Locally authored entity. */
         LOCAL_ENTITY,
         /** Read-only entity realized beneath a placement. */

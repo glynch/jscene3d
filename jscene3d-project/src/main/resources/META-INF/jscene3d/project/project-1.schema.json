@@ -182,16 +182,13 @@
     "runtime": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["applicationExtension", "entryScene"],
+      "required": ["applicationExtension"],
       "properties": {
         "applicationExtension": {
           "type": "string"
         },
-        "entryScene": {
-          "type": "string"
-        },
-        "startupScene": {
-          "type": "string"
+        "mainScene": {
+          "$ref": "#/$defs/assetReference"
         },
         "projectSystems": {
           "type": "string"
@@ -199,6 +196,15 @@
         "inputMap": {
           "type": "string"
         }
+      }
+    },
+    "assetReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId"],
+      "properties": {
+        "assetId": {"type": "string", "format": "uuid"},
+        "pathHint": {"type": "string", "minLength": 1}
       }
     },
     "launch": {

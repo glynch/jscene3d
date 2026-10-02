@@ -17,7 +17,7 @@ The distinction between these pairs is fundamental:
 | `Scene` | `World` |
 | `Object3D` | `Entity` with a `Transform3d` component |
 | `Mesh` | Rendering component attached to an entity |
-| Direct Java construction | `WorldDefinition` and `EntityDefinition` assets |
+| Direct Java construction | `SceneDefinition` and `EntityDefinition` assets |
 | Renderer frame loop | World lifecycle, fixed simulation, and frame updates |
 
 A `Scene` is the root of the objects needed to draw an image. A `World` owns
@@ -32,8 +32,8 @@ but a `World` is not a `Scene`, and an `Entity` is not an `Object3D`.
 The principal stages are:
 
 1. The project-named `.j3d` descriptor identifies the project, engine
-   compatibility, entry and optional startup worlds, input map, extensions,
-   source assets, imports, and launch presentation.
+   compatibility, optional Main Scene, input map, extensions, source assets,
+   imports, and launch presentation.
 2. `ProjectLoader` locates and validates that descriptor as a `GameProject`
    without loading executable extensions or running import providers.
 3. Extension descriptors provide safe type and component metadata. The asset
@@ -42,7 +42,7 @@ The principal stages are:
    previously published imports.
 4. `ProjectRuntimeHost` discovers trusted runtime extensions, creates
    host-selected world modules, and asks `WorldComposer` to compose the chosen
-   `WorldDefinition`.
+   `SceneDefinition`.
 5. Successful composition returns a `HostedProject` containing project
    metadata, its asset catalog, the launch request, and an inactive `World`.
 6. The manifest-selected application runtime extension may prepare that
@@ -71,7 +71,7 @@ property of every entity.
 
 ## Definitions are authored; worlds are live
 
-`WorldDefinition` and `EntityDefinition` are immutable authored data. `World`
+`SceneDefinition` and `EntityDefinition` are immutable authored data. `World`
 and `Entity` are live runtime state.
 
 An `EntityDefinition` is a reusable, single-root entity hierarchy with an
@@ -79,7 +79,7 @@ optional exported contract and internal signal/action connections. Placing the
 same definition several times creates independent live entities that share
 authored intent rather than mutable runtime state.
 
-A `WorldDefinition` has a stable identity, display name, internal connections,
+A `SceneDefinition` has a stable identity, display name, internal connections,
 and any number of root entries. A root entry may be a locally authored entity
 or a placement of an `EntityDefinition`.
 
@@ -161,7 +161,7 @@ other title-specific component class.
 A `ProjectLaunchRequest` selects the world and portable parameters for one
 runtime load. A standard request lets the descriptor choose the startup or
 entry world. A playtest request records a named profile, a project-relative
-world-definition path, and application-defined parameters.
+scene-definition path, and application-defined parameters.
 
 A `PlaytestProfile` is a reusable local-development preset loaded from
 `playtest/profiles.json`; it is not exported project state. The desktop launcher

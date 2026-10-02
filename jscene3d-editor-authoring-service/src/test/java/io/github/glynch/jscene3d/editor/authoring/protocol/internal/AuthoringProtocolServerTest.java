@@ -52,11 +52,11 @@ final class AuthoringProtocolServerTest {
     /** Negotiates the supported protocol and advertises only implemented authoring capabilities. */
     @Test
     void initializesAuthoringConnection() throws IOException {
-        JsonNode response = response(initialize(1, 0));
+        JsonNode response = response(initialize(2, 0));
 
         assertThat(response.path("id").asInt()).isEqualTo(1);
         assertThat(response.path("connectionGeneration").asText()).isEqualTo("connection-test");
-        assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
+        assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
         assertThat(response.at("/result/protocolVersion/minor").asInt()).isZero();
         assertThat(response.at("/result/processKind").asText()).isEqualTo("authoring");
         assertThat(response.at("/result/serviceVersion").asText()).isEqualTo("1.2.0-test");
@@ -85,30 +85,30 @@ final class AuthoringProtocolServerTest {
     /** Rejects an incompatible major without initializing the connection. */
     @Test
     void rejectsIncompatibleMajorVersion() throws IOException {
-        JsonNode response = response(initialize(2, 0));
+        JsonNode response = response(initialize(3, 0));
 
         assertThat(response.at("/error/code").asInt()).isEqualTo(-32001);
-        assertThat(response.at("/error/data/requested/major").asInt()).isEqualTo(2);
-        assertThat(response.at("/error/data/supported/major").asInt()).isEqualTo(1);
+        assertThat(response.at("/error/data/requested/major").asInt()).isEqualTo(3);
+        assertThat(response.at("/error/data/supported/major").asInt()).isEqualTo(2);
         assertThat(server.isInitialized()).isFalse();
     }
 
     /** Negotiates the implemented minor when the client supports a newer compatible minor. */
     @Test
     void negotiatesCompatibleMinorVersion() throws IOException {
-        JsonNode response = response(initialize(1, 7));
+        JsonNode response = response(initialize(2, 7));
 
-        assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(5);
+        assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isZero();
         assertThat(server.isInitialized()).isTrue();
     }
 
     /** Rejects a second initialization without replacing negotiated connection state. */
     @Test
     void rejectsRepeatedInitialization() throws IOException {
-        response(initialize(1, 0));
+        response(initialize(2, 0));
 
-        JsonNode repeated = response(initialize(1, 0));
+        JsonNode repeated = response(initialize(2, 0));
 
         assertThat(repeated.at("/error/code").asInt()).isEqualTo(-32003);
         assertThat(server.isInitialized()).isTrue();
@@ -121,7 +121,7 @@ final class AuthoringProtocolServerTest {
 
         assertThat(response.at("/error/code").asInt()).isEqualTo(-32002);
 
-        response(initialize(1, 0));
+        response(initialize(2, 0));
         JsonNode closed = response(request(2, "project/close", "{}"));
 
         assertThat(closed.at("/result/closed").asBoolean()).isFalse();
@@ -161,7 +161,7 @@ final class AuthoringProtocolServerTest {
     void reportsInvalidParams() throws IOException {
         JsonNode missingInitialize = response("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}");
         JsonNode scalarInitialize = response(request(2, "initialize", "true"));
-        response(initialize(1, 0));
+        response(initialize(2, 0));
         JsonNode missingOpen = response("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"project/open\"}");
         JsonNode invalidOpen = response(request(4, "project/open", "{\"path\":\"   \"}"));
         JsonNode invalidReplace =
@@ -177,11 +177,11 @@ final class AuthoringProtocolServerTest {
     /** Rejects absent, blank, and malformed client language tags without retaining a locale. */
     @Test
     void rejectsInvalidClientLanguage() throws IOException {
-        JsonNode missing = response(request(1, "initialize", "{\"protocolVersion\":{\"major\":1,\"minor\":0}}"));
+        JsonNode missing = response(request(1, "initialize", "{\"protocolVersion\":{\"major\":2,\"minor\":0}}"));
         JsonNode blank = response(
-                request(2, "initialize", "{\"protocolVersion\":{\"major\":1,\"minor\":0},\"clientLanguage\":\" \"}"));
+                request(2, "initialize", "{\"protocolVersion\":{\"major\":2,\"minor\":0},\"clientLanguage\":\" \"}"));
         JsonNode malformed = response(request(
-                3, "initialize", "{\"protocolVersion\":{\"major\":1,\"minor\":0},\"clientLanguage\":\"en_US\"}"));
+                3, "initialize", "{\"protocolVersion\":{\"major\":2,\"minor\":0},\"clientLanguage\":\"en_US\"}"));
 
         assertThat(missing.at("/error/code").asInt()).isEqualTo(-32602);
         assertThat(blank.at("/error/code").asInt()).isEqualTo(-32602);
@@ -195,7 +195,7 @@ final class AuthoringProtocolServerTest {
         Path first = temporaryDirectory.resolve("first");
         Path invalid = temporaryDirectory.resolve("invalid");
         AuthoringTestProject.write(first, "first.j3d");
-        response(initialize(1, 0));
+        response(initialize(2, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + first + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
 
@@ -217,48 +217,48 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesDefinitionOpen() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(1, 1));
+        response(initialize(2, 1));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
 
         JsonNode response = response(request(
                 3,
                 "definition/open",
-                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.SCENE_ASSET_ID
                         + "\"}"));
 
         assertThat(response.at("/result/opened").asBoolean()).isTrue();
         assertThat(response.at("/result/projectGeneration").asLong()).isEqualTo(generation);
         assertThat(response.at("/result/definition/context/assetId").asText())
-                .isEqualTo(AuthoringTestProject.WORLD_ASSET_ID);
-        assertThat(response.at("/result/definition/context/kind").asText()).isEqualTo("world-definition");
+                .isEqualTo(AuthoringTestProject.SCENE_ASSET_ID);
+        assertThat(response.at("/result/definition/context/kind").asText()).isEqualTo("scene-definition");
         assertThat(response.at("/result/definition/context/origin").asText()).isEqualTo("authored");
         assertThat(response.at("/result/definition/roots/0/occurrence/entityPath/0")
                         .asText())
                 .isEqualTo(AuthoringTestProject.ENTITY_ID);
         assertThat(response.at("/result/definition/roots/0/target/source").asText())
-                .endsWith("worlds/main.world.json");
+                .endsWith("worlds/main.scene.json");
     }
 
-    /** Dispatches an authoritative startup-world launch without exposing Java implementation objects. */
+    /** Dispatches an authoritative Main Scene launch without exposing Java implementation objects. */
     @Test
     void dispatchesViewportLaunchPreparation() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(1, 5));
+        response(initialize(2, 5));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
 
         JsonNode prepared = response(request(
                 3,
                 "viewport/prepareLaunch",
-                "{\"expectedProjectGeneration\":" + generation + ",\"worldAssetId\":\""
-                        + AuthoringTestProject.WORLD_ASSET_ID + "\"}"));
+                "{\"expectedProjectGeneration\":" + generation + ",\"sceneAssetId\":\""
+                        + AuthoringTestProject.SCENE_ASSET_ID + "\"}"));
 
         assertThat(prepared.at("/result/prepared").asBoolean()).isTrue();
         assertThat(prepared.at("/result/launch/projectGeneration").asLong()).isEqualTo(generation);
         assertThat(prepared.at("/result/launch/projectId").asText()).isEqualTo("example.authoring-test");
-        assertThat(prepared.at("/result/launch/worldAssetId").asText()).isEqualTo(AuthoringTestProject.WORLD_ASSET_ID);
-        assertThat(prepared.at("/result/launch/worldName").asText()).isEqualTo("Opening World");
+        assertThat(prepared.at("/result/launch/sceneAssetId").asText()).isEqualTo(AuthoringTestProject.SCENE_ASSET_ID);
+        assertThat(prepared.at("/result/launch/sceneName").asText()).isEqualTo("Opening Scene");
         assertThat(prepared.at("/result/launch/runtimeArtifacts").isArray()).isTrue();
     }
 
@@ -266,13 +266,13 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesInspectorRead() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(1, 2));
+        response(initialize(2, 2));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
         JsonNode definition = response(request(
                 3,
                 "definition/open",
-                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.SCENE_ASSET_ID
                         + "\"}"));
         long revision = definition.at("/result/definition/revision").asLong();
         JsonNode target = definition.at("/result/definition/roots/0/target");
@@ -296,17 +296,17 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesAuthoredDefinitionLifecycle() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(1, 3));
+        response(initialize(2, 3));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
         JsonNode definition = response(request(
                 3,
                 "definition/open",
-                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.SCENE_ASSET_ID
                         + "\"}"));
         JsonNode occurrence = definition.at("/result/definition/roots/0/occurrence");
         String identity = "\"expectedProjectGeneration\":" + generation + ",\"assetId\":\""
-                + AuthoringTestProject.WORLD_ASSET_ID + "\",\"expectedDefinitionRevision\":";
+                + AuthoringTestProject.SCENE_ASSET_ID + "\",\"expectedDefinitionRevision\":";
         String target = "{\"kind\":\"entity-enabled\",\"occurrence\":" + occurrence + ",\"entityId\":\""
                 + AuthoringTestProject.ENTITY_ID + "\"}";
 
@@ -363,13 +363,13 @@ final class AuthoringProtocolServerTest {
     @Test
     void reportsMalformedNumericMutationWithoutTerminatingConnection() throws IOException {
         AuthoringTestProject.writeScalarPropertyProject(temporaryDirectory);
-        response(initialize(1, 3));
+        response(initialize(2, 3));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
         JsonNode definition = response(request(
                 3,
                 "definition/open",
-                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.WORLD_ASSET_ID
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.SCENE_ASSET_ID
                         + "\"}"));
         JsonNode occurrence = definition.at("/result/definition/roots/0/occurrence");
         String target = "{\"kind\":\"component-property\",\"occurrence\":" + occurrence
@@ -380,7 +380,7 @@ final class AuthoringProtocolServerTest {
                 4,
                 "definition/mutate",
                 "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\""
-                        + AuthoringTestProject.WORLD_ASSET_ID
+                        + AuthoringTestProject.SCENE_ASSET_ID
                         + "\",\"expectedDefinitionRevision\":0,\"operation\":\"set\",\"target\":" + target
                         + ",\"value\":{\"kind\":\"number\",\"literal\":\"not-a-number\"}}"));
         JsonNode closed = response(request(5, "project/close", "{}"));
@@ -396,7 +396,7 @@ final class AuthoringProtocolServerTest {
     /** Ignores unknown optional initialization fields as required for additive evolution. */
     @Test
     void ignoresUnknownInitializationFields() throws IOException {
-        String params = "{\"protocolVersion\":{\"major\":1,\"minor\":0,\"patch\":4},"
+        String params = "{\"protocolVersion\":{\"major\":2,\"minor\":0,\"patch\":4},"
                 + "\"clientLanguage\":\"en\",\"clientName\":\"test\"}";
 
         JsonNode response = response(request(1, "initialize", params));
@@ -408,7 +408,7 @@ final class AuthoringProtocolServerTest {
     /** Reports unknown methods only after initialization has established the connection. */
     @Test
     void reportsUnknownMethod() throws IOException {
-        response(initialize(1, 0));
+        response(initialize(2, 0));
 
         JsonNode response = response(request(2, "project/unknown", "{}"));
 
@@ -419,7 +419,7 @@ final class AuthoringProtocolServerTest {
     /** Converts an unexpected closed-service failure into the defined internal error response. */
     @Test
     void reportsUnexpectedServiceFailure() throws IOException {
-        response(initialize(1, 0));
+        response(initialize(2, 0));
         service.close();
 
         JsonNode response = response(request(2, "project/close", "{}"));
@@ -469,7 +469,7 @@ final class AuthoringProtocolServerTest {
         assertThat(response).isEmpty();
         assertThat(server.isInitialized()).isFalse();
 
-        response(initialize(1, 0));
+        response(initialize(2, 0));
         JsonNode closed = response(request(2, "project/close", "{}"));
 
         assertThat(closed.at("/result/closed").asBoolean()).isFalse();

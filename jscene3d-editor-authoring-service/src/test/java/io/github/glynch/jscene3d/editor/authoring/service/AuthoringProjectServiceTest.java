@@ -81,17 +81,18 @@ final class AuthoringProjectServiceTest {
                                 .toString(),
                         project -> project.descriptor())
                 .satisfies(project -> {
-                    assertThat(project.startupWorld().id()).isEqualTo("e890c4c3-fb32-49d8-88b8-4e04e7a29656");
-                    assertThat(project.startupWorld().name()).isEqualTo("Opening World");
+                    ProjectSummary.SceneSummary mainScene = Objects.requireNonNull(project.mainScene());
+                    assertThat(mainScene.id()).isEqualTo("e890c4c3-fb32-49d8-88b8-4e04e7a29656");
+                    assertThat(mainScene.name()).isEqualTo("Opening Scene");
                     assertThat(project.assetCounts().authored()).isEqualTo(1);
                     assertThat(project.assetCounts().projected()).isEqualTo(1);
                 });
         assertThat(service.activeSession()).isPresent();
     }
 
-    /** Prepares only the generation-scoped startup world with renderer-only runtime inputs. */
+    /** Prepares only the generation-scoped Main Scene with renderer-only runtime inputs. */
     @Test
-    void preparesAuthoritativeStartupWorldViewportLaunch() throws IOException {
+    void preparesAuthoritativeMainSceneViewportLaunch() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
         Path runtimeArtifact = temporaryDirectory.resolve("runtime/application.jar");
         AuthoringProjectService viewportService = new AuthoringProjectService(
@@ -102,7 +103,7 @@ final class AuthoringProjectServiceTest {
             viewportService.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
 
             ViewportLaunchResult result = viewportService.prepareViewportLaunch(
-                    new ViewportLaunchParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+                    new ViewportLaunchParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
             ViewportLaunchSpecification launch = Objects.requireNonNull(result.launch());
 
             assertThat(result.prepared()).isTrue();
@@ -112,8 +113,8 @@ final class AuthoringProjectServiceTest {
                     .returns("example.authoring-test", ViewportLaunchSpecification::projectId)
                     .returns("Small Authoring Project", ViewportLaunchSpecification::projectName)
                     .returns("0.1.0-SNAPSHOT", ViewportLaunchSpecification::engineVersion)
-                    .returns(AuthoringTestProject.WORLD_ASSET_ID, ViewportLaunchSpecification::worldAssetId)
-                    .returns("Opening World", ViewportLaunchSpecification::worldName);
+                    .returns(AuthoringTestProject.SCENE_ASSET_ID, ViewportLaunchSpecification::sceneAssetId)
+                    .returns("Opening Scene", ViewportLaunchSpecification::sceneName);
             assertThat(launch.projectRoot())
                     .isEqualTo(temporaryDirectory.toRealPath().toString());
             assertThat(launch.runtimeArtifacts())
@@ -122,24 +123,24 @@ final class AuthoringProjectServiceTest {
         }
     }
 
-    /** Rejects absent projects, stale generations, malformed IDs, and non-startup worlds. */
+    /** Rejects absent projects, stale generations, malformed IDs, and non-Main Scenes. */
     @Test
     void rejectsUnavailableViewportLaunchIdentity() throws IOException {
         ViewportLaunchResult absent =
-                service.prepareViewportLaunch(new ViewportLaunchParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+                service.prepareViewportLaunch(new ViewportLaunchParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
         service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
 
         ViewportLaunchResult stale =
-                service.prepareViewportLaunch(new ViewportLaunchParams(2L, AuthoringTestProject.WORLD_ASSET_ID));
+                service.prepareViewportLaunch(new ViewportLaunchParams(2L, AuthoringTestProject.SCENE_ASSET_ID));
         ViewportLaunchResult malformed = service.prepareViewportLaunch(new ViewportLaunchParams(1L, "not-an-id"));
         ViewportLaunchResult different =
                 service.prepareViewportLaunch(new ViewportLaunchParams(1L, AuthoringTestProject.DEFINITION_ASSET_ID));
 
         assertThat(absent.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_NOT_OPEN);
         assertThat(stale.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_GENERATION_CONFLICT);
-        assertThat(malformed.failureCode()).isEqualTo(AuthoringProjectService.VIEWPORT_WORLD_UNAVAILABLE);
-        assertThat(different.failureCode()).isEqualTo(AuthoringProjectService.VIEWPORT_WORLD_UNAVAILABLE);
+        assertThat(malformed.failureCode()).isEqualTo(AuthoringProjectService.VIEWPORT_SCENE_UNAVAILABLE);
+        assertThat(different.failureCode()).isEqualTo(AuthoringProjectService.VIEWPORT_SCENE_UNAVAILABLE);
     }
 
     /** Opens generic world and entity definitions only for the expected active project generation. */
@@ -150,16 +151,16 @@ final class AuthoringProjectServiceTest {
         service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
 
         DefinitionOpenResult world =
-                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
         DefinitionOpenResult entity =
                 service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.DEFINITION_ASSET_ID));
         DefinitionOpenResult stale =
-                service.openDefinition(new DefinitionOpenParams(2L, AuthoringTestProject.WORLD_ASSET_ID));
+                service.openDefinition(new DefinitionOpenParams(2L, AuthoringTestProject.SCENE_ASSET_ID));
 
         assertThat(world.opened()).isTrue();
         var worldSnapshot = Objects.requireNonNull(world.definition());
         assertThat(worldSnapshot.context())
-                .returns("world-definition", context -> context.kind())
+                .returns("scene-definition", context -> context.kind())
                 .returns("authored", context -> context.origin())
                 .returns(true, context -> context.editable());
         assertThat(worldSnapshot.roots()).hasSize(1);
@@ -184,7 +185,7 @@ final class AuthoringProjectServiceTest {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
         service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
         DefinitionOpenResult definition =
-                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
         DefinitionSnapshot retained = Objects.requireNonNull(definition.definition());
         DefinitionSnapshot.SemanticTarget target = retained.roots().getFirst().target();
 
@@ -226,7 +227,7 @@ final class AuthoringProjectServiceTest {
         AuthoringTestProject.writeEulerRotationProject(temporaryDirectory);
         service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
         DefinitionOpenResult definition =
-                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
         DefinitionSnapshot retained = Objects.requireNonNull(definition.definition());
 
         InspectorReadResult read = service.readInspector(
@@ -256,7 +257,7 @@ final class AuthoringProjectServiceTest {
         AuthoringTestProject.writeScalarPropertyProject(temporaryDirectory);
         service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
         DefinitionSnapshot definition = Objects.requireNonNull(
-                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.WORLD_ASSET_ID))
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID))
                         .definition());
         InspectorSnapshot inspector = Objects.requireNonNull(service.readInspector(
                         new InspectorReadParams(
@@ -309,7 +310,7 @@ final class AuthoringProjectServiceTest {
                 .satisfies(result -> assertThat(result.diagnostics())
                         .singleElement()
                         .returns("property.kind", diagnostic -> diagnostic.code()));
-        String source = Files.readString(temporaryDirectory.resolve("worlds/main.world.json"));
+        String source = Files.readString(temporaryDirectory.resolve("worlds/main.scene.json"));
         assertThat(source).contains("\"precision\":1.25", "\"title\":\"Player\"");
 
         InspectorSnapshot refreshed = Objects.requireNonNull(service.readInspector(
@@ -436,7 +437,7 @@ final class AuthoringProjectServiceTest {
         ProjectOpenResult opened = service.openProject(new ProjectOpenParams(active.toString()));
         EditorProjectSession retained = service.activeSession().orElseThrow();
         InspectorMutationTarget.EntityEnabled target = enabledTarget(retained);
-        AssetId world = AssetId.from(AuthoringTestProject.WORLD_ASSET_ID);
+        AssetId world = AssetId.from(AuthoringTestProject.SCENE_ASSET_ID);
         retained.mutate(world, target, new AuthoringMutation.Set(new ProjectValue.BooleanValue(false)), 0L);
         retained.mutate(world, target, new AuthoringMutation.Set(new ProjectValue.BooleanValue(true)), 1L);
         retained.undo(world, 2L);
@@ -453,11 +454,17 @@ final class AuthoringProjectServiceTest {
         assertThat(service.activeSession()).containsSame(retained);
         assertThat(retained.definitionState(world)).get().returns(revision, state -> state.revision());
         assertThat(retained.isDirty()).isTrue();
-        assertThat(retained.startupWorld().roots().getFirst().isEnabled()).isFalse();
+        assertThat(retained.activeHierarchy())
+                .get()
+                .satisfies(hierarchy ->
+                        assertThat(hierarchy.roots().getFirst().isEnabled()).isFalse());
         assertThat(retained.definitionState(world)).get().returns(true, state -> state.canUndo());
         assertThat(retained.definitionState(world)).get().returns(true, state -> state.canRedo());
         retained.redo(world, revision);
-        assertThat(retained.startupWorld().roots().getFirst().isEnabled()).isTrue();
+        assertThat(retained.activeHierarchy())
+                .get()
+                .satisfies(hierarchy ->
+                        assertThat(hierarchy.roots().getFirst().isEnabled()).isTrue());
         assertThat(service.closeProject().invalidatedProjectGeneration()).isEqualTo(1L);
     }
 
@@ -472,7 +479,7 @@ final class AuthoringProjectServiceTest {
         EditorProjectSession replaced = service.activeSession().orElseThrow();
         InspectorMutationTarget.EntityEnabled target = enabledTarget(replaced);
         replaced.mutate(
-                AssetId.from(AuthoringTestProject.WORLD_ASSET_ID),
+                AssetId.from(AuthoringTestProject.SCENE_ASSET_ID),
                 target,
                 new AuthoringMutation.Set(new ProjectValue.BooleanValue(false)),
                 0L);
@@ -597,7 +604,12 @@ final class AuthoringProjectServiceTest {
 
     /** Creates an enabled-state mutation target for the fixture's local entity. */
     private static InspectorMutationTarget.EntityEnabled enabledTarget(EditorProjectSession session) {
-        EditorHierarchyNode entity = session.hierarchy().roots().getFirst();
+        EditorHierarchyNode entity = session.retainDefinition(AssetId.from(AuthoringTestProject.SCENE_ASSET_ID))
+                .definition()
+                .orElseThrow()
+                .hierarchy()
+                .roots()
+                .getFirst();
         return new InspectorMutationTarget.EntityEnabled(
                 entity.occurrence(), EntityId.from(AuthoringTestProject.ENTITY_ID));
     }
@@ -614,7 +626,7 @@ final class AuthoringProjectServiceTest {
         return service.mutateDefinition(
                 new DefinitionMutationParams(
                         1L,
-                        AuthoringTestProject.WORLD_ASSET_ID,
+                        AuthoringTestProject.SCENE_ASSET_ID,
                         revision,
                         "set",
                         new DefinitionMutationParams.MutationTarget(

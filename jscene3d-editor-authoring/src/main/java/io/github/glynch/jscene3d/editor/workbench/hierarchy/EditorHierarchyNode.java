@@ -64,7 +64,7 @@ public record EditorHierarchyNode(
     }
 
     /**
-     * Returns the opened world or referenced definition identity when applicable.
+     * Returns the opened Scene or referenced definition identity when applicable.
      *
      * @return optional definition identity
      */
@@ -91,7 +91,7 @@ public record EditorHierarchyNode(
     }
 
     /**
-     * Returns whether this occurrence supports authoring mutations in the containing world.
+     * Returns whether this occurrence supports authoring mutations in the containing Scene.
      *
      * @return whether the occurrence is editable
      */
@@ -101,8 +101,8 @@ public record EditorHierarchyNode(
 
     /** Semantic hierarchy entry kinds. */
     public enum Kind {
-        /** Opened world definition. */
-        WORLD,
+        /** Opened Scene definition. */
+        SCENE,
         /** Locally authored entity. */
         LOCAL_ENTITY,
         /** Reusable entity-definition placement. */
@@ -117,7 +117,7 @@ public record EditorHierarchyNode(
      * @param occurrence occurrence-safe hierarchy identity
      * @param kind semantic hierarchy kind
      * @param entityId local entity or placement identity when applicable
-     * @param definitionId world or referenced definition identity when applicable
+     * @param definitionId Scene or referenced definition identity when applicable
      */
     public record Identity(
             HierarchyOccurrenceId occurrence, Kind kind, Optional<EntityId> entityId, Optional<AssetId> definitionId) {

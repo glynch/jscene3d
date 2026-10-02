@@ -154,7 +154,7 @@ published entity definitions and resources
         ↓ read-only project content loading
 DefinitionResolver and RuntimeResourceProvider
         ↓
-WorldDefinition / EntityDefinition / runtime resources
+SceneDefinition / EntityDefinition / runtime resources
 ```
 
 `PublishedProjectContent` combines the authored asset catalog with generated

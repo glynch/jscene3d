@@ -26,9 +26,9 @@ import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.RegisteredType;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.ProjectLoader;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -63,15 +63,15 @@ final class AssetCatalogTest {
     @Test
     void resolvesStableReferenceAfterDefinitionMoves() throws IOException {
         EntityDefinition beacon = beaconDefinition();
-        WorldDefinition garden = gardenWorld("entities/beacon.entity.json");
+        SceneDefinition garden = gardenWorld("entities/beacon.entity.json");
         Path originalPath = temporaryDirectory.resolve("entities/beacon.entity.json");
         Path movedPath = temporaryDirectory.resolve("archive/beacon.entity.json");
         DefinitionWriter.write(originalPath, beacon);
-        DefinitionWriter.write(temporaryDirectory.resolve("worlds/garden.world.json"), garden);
+        DefinitionWriter.write(temporaryDirectory.resolve("worlds/garden.scene.json"), garden);
 
         AssetCatalog initial = scanValidCatalog();
         assertThat(initial.assets()).extracting(AssetMetadata::id).containsExactly(BEACON_ASSET, GARDEN_ASSET);
-        assertThat(initial.loadWorld(AssetRef.to(GARDEN_ASSET)).definition()).contains(garden);
+        assertThat(initial.loadScene(AssetRef.to(GARDEN_ASSET)).definition()).contains(garden);
 
         Files.createDirectories(movedPath.getParent());
         Files.move(originalPath, movedPath);
@@ -81,7 +81,7 @@ final class AssetCatalogTest {
                 .get()
                 .extracting(AssetMetadata::path)
                 .isEqualTo(movedPath.toRealPath());
-        assertThat(moved.loadWorld(AssetRef.to(GARDEN_ASSET)).definition()).contains(garden);
+        assertThat(moved.loadScene(AssetRef.to(GARDEN_ASSET)).definition()).contains(garden);
     }
 
     /** Produces byte-stable JSON that loads back into equal immutable definitions. */
@@ -134,14 +134,14 @@ final class AssetCatalogTest {
                 .contains("\"assetType\" : \"entity-definition\"")
                 .endsWith("\n!");
         assertThat(worldOutput.toString(StandardCharsets.UTF_8))
-                .contains("\"assetType\" : \"world-definition\"")
+                .contains("\"assetType\" : \"scene-definition\"")
                 .endsWith("\n!");
     }
 
-    /** Resolves a generated definition placed by an authored world through one mixed-source graph. */
+    /** Resolves a generated definition placed by an authored Scene through one mixed-source graph. */
     @Test
     void resolvesGeneratedDefinitionFromAuthoredWorld() throws IOException {
-        WorldDefinition world = new WorldDefinition(
+        SceneDefinition world = new SceneDefinition(
                 GARDEN_ASSET,
                 "Generated world",
                 List.of(new EntityPlacement(BEACON_PLACEMENT, true, AssetRef.to(BEACON_ASSET), Map.of())));
@@ -149,7 +149,7 @@ final class AssetCatalogTest {
                 BEACON_ASSET,
                 "Generated entity",
                 new LocalEntity(BEACON_ROOT, "Generated root", true, List.of(), List.of()));
-        DefinitionWriter.write(temporaryDirectory.resolve("garden.world.json"), world);
+        DefinitionWriter.write(temporaryDirectory.resolve("garden.scene.json"), world);
         AssetCatalog authored = scanValidCatalog();
         ByteArrayOutputStream generated = new ByteArrayOutputStream();
         DefinitionWriter.write(generated, generatedDefinition);
@@ -160,8 +160,8 @@ final class AssetCatalogTest {
                         new ByteArrayInputStream(generated.toByteArray()))
                 .build();
 
-        DefinitionLoadResult<WorldDefinition> result =
-                definitions.loadWorld(AssetRef.to(GARDEN_ASSET), RegisteredTypeCatalog.of(List.of()));
+        DefinitionLoadResult<SceneDefinition> result =
+                definitions.loadScene(AssetRef.to(GARDEN_ASSET), RegisteredTypeCatalog.of(List.of()));
 
         assertThat(result.definition()).contains(world);
         assertThat(result.diagnostics()).isEmpty();
@@ -217,10 +217,10 @@ final class AssetCatalogTest {
                 """);
         write("wrong.entity.json", """
                 {"assetId":"6ce65e51-122a-4018-ae90-23a154e35c9a",
-                 "assetType":"world-definition","formatVersion":1}
+                 "assetType":"scene-definition","formatVersion":1}
                 """);
-        write("broken.world.json", "{");
-        write("null.world.json", "null");
+        write("broken.scene.json", "{");
+        write("null.scene.json", "null");
 
         AssetCatalogLoadResult result = AssetCatalog.scan(temporaryDirectory);
 
@@ -287,13 +287,13 @@ final class AssetCatalogTest {
     /** Diagnoses unresolved and wrong-kind typed references without consulting their path hints. */
     @Test
     void rejectsMissingAndWrongKindReferences() throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("garden.world.json"), gardenWorld("ignored.entity.json"));
+        DefinitionWriter.write(temporaryDirectory.resolve("garden.scene.json"), gardenWorld("ignored.entity.json"));
         AssetCatalog catalog = scanValidCatalog();
 
         DefinitionLoadResult<EntityDefinition> wrongKind =
                 catalog.loadEntity(AssetRef.to(GARDEN_ASSET, "somewhere/else.entity.json"));
         DefinitionLoadResult<EntityDefinition> missing = catalog.loadEntity(AssetRef.to(MISSING_ASSET));
-        DefinitionLoadResult<WorldDefinition> invalidWorld = catalog.loadWorld(AssetRef.to(GARDEN_ASSET));
+        DefinitionLoadResult<SceneDefinition> invalidWorld = catalog.loadScene(AssetRef.to(GARDEN_ASSET));
 
         assertThat(wrongKind.diagnostics())
                 .singleElement()
@@ -347,11 +347,11 @@ final class AssetCatalogTest {
                         AssetRef.to(BEACON_ASSET),
                         Map.of(property("speed"), new ProjectValue.TextValue("fast"))));
         DefinitionWriter.write(
-                temporaryDirectory.resolve("garden.world.json"),
-                new WorldDefinition(GARDEN_ASSET, "Garden", placements));
+                temporaryDirectory.resolve("garden.scene.json"),
+                new SceneDefinition(GARDEN_ASSET, "Garden", placements));
         AssetCatalog catalog = scanValidCatalog();
 
-        DefinitionLoadResult<WorldDefinition> result = catalog.loadWorld(AssetRef.to(GARDEN_ASSET));
+        DefinitionLoadResult<SceneDefinition> result = catalog.loadScene(AssetRef.to(GARDEN_ASSET));
 
         assertThat(result.definition()).isEmpty();
         assertThat(result.diagnostics())
@@ -401,11 +401,11 @@ final class AssetCatalogTest {
                 new SignalConnection(emitted, EndpointTarget.placement(BEACON_PLACEMENT, new EndpointId("accept"))),
                 new SignalConnection(emitted, EndpointTarget.placement(BEACON_PLACEMENT, new EndpointId("missing"))));
         DefinitionWriter.write(
-                temporaryDirectory.resolve("garden.world.json"),
-                new WorldDefinition(GARDEN_ASSET, "Garden", connections, List.of(placement)));
+                temporaryDirectory.resolve("garden.scene.json"),
+                new SceneDefinition(GARDEN_ASSET, "Garden", connections, List.of(placement)));
         AssetCatalog catalog = scanValidCatalog();
 
-        DefinitionLoadResult<WorldDefinition> result = catalog.loadWorld(AssetRef.to(GARDEN_ASSET));
+        DefinitionLoadResult<SceneDefinition> result = catalog.loadScene(AssetRef.to(GARDEN_ASSET));
 
         assertThat(result.definition()).isEmpty();
         assertThat(result.diagnostics())
@@ -525,7 +525,7 @@ final class AssetCatalogTest {
     @Test
     void bundlesDefinitionSchemas() throws IOException {
         assertSchema("entity-definition-1.schema.json", "Entity Definition", "entity-definition");
-        assertSchema("world-definition-1.schema.json", "World Definition", "world-definition");
+        assertSchema("scene-definition-1.schema.json", "Scene Definition", "scene-definition");
     }
 
     /** Creates one entity definition containing representative portable property values. */
@@ -578,14 +578,14 @@ final class AssetCatalogTest {
     }
 
     /** Creates one world placing the reusable beacon through a deliberately replaceable path hint. */
-    private static WorldDefinition gardenWorld(String pathHint) {
+    private static SceneDefinition gardenWorld(String pathHint) {
         EntityPlacement placement = new EntityPlacement(
                 BEACON_PLACEMENT,
                 "Beacon A",
                 true,
                 AssetRef.to(BEACON_ASSET, pathHint),
                 Map.of(property("color"), new ProjectValue.TextValue("green")));
-        return new WorldDefinition(GARDEN_ASSET, "Garden", List.of(placement));
+        return new SceneDefinition(GARDEN_ASSET, "Garden", List.of(placement));
     }
 
     /** Creates one definition whose local root places another definition. */

@@ -5,6 +5,8 @@
 package io.github.glynch.jscene3d.project.playtest;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueDecoder;
@@ -59,7 +61,9 @@ public final class PlaytestProfileLoader {
 
     /** Decodes one selected profile after document-level validation. */
     private static PlaytestProfile decode(String name, JsonNode raw) {
-        String scene = requireText(raw.path("scene").textValue(), "scene");
+        JsonNode scene = requiredObject(raw.get("scene"), "scene");
+        String assetId = requireText(scene.path("assetId").textValue(), "scene.assetId");
+        String pathHint = scene.path("pathHint").textValue();
         JsonNode rawParameters = raw.get("parameters");
         Map<String, ProjectValue> parameters = new LinkedHashMap<>();
         if (rawParameters != null) {
@@ -68,7 +72,13 @@ public final class PlaytestProfileLoader {
                     .forEach(entry -> parameters.put(
                             entry.getKey(), ProjectValueDecoder.plain().decode(entry.getValue(), "/parameters")));
         }
-        return new PlaytestProfile(name, Path.of(scene), parameters);
+        try {
+            AssetId id = AssetId.from(assetId);
+            return new PlaytestProfile(
+                    name, pathHint == null ? AssetRef.to(id) : AssetRef.to(id, pathHint), parameters);
+        } catch (IllegalArgumentException failure) {
+            throw new PlaytestProfileException("scene must contain a valid asset reference", failure);
+        }
     }
 
     /** Verifies the only supported document version. */

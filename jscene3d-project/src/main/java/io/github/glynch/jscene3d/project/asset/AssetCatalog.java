@@ -8,7 +8,7 @@ import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireNor
 
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -42,7 +42,7 @@ public final class AssetCatalog implements DefinitionResolver {
     /**
      * Scans supported authored definition files below one project root.
      *
-     * <p>Discovery is recursive and deterministic. Only {@code .entity.json} and {@code .world.json} files are
+     * <p>Discovery is recursive and deterministic. Only {@code .entity.json} and {@code .scene.json} files are
      * considered. A nested directory containing a current or legacy project descriptor is a separate project and its
      * subtree is not scanned. Complete definitions remain unloaded until requested through the resulting catalog.
      *
@@ -108,26 +108,26 @@ public final class AssetCatalog implements DefinitionResolver {
     }
 
     /**
-     * Resolves, loads, and validates one world definition and its transitive definition references.
+     * Resolves, loads, and validates one Scene definition and its transitive definition references.
      *
-     * @param reference typed world-definition reference
+     * @param reference typed scene-definition reference
      * @return loaded definition or ordered structured diagnostics
      */
-    public DefinitionLoadResult<WorldDefinition> loadWorld(AssetRef<WorldDefinition> reference) {
-        return DefinitionGraphLoader.loadWorld(
+    public DefinitionLoadResult<SceneDefinition> loadScene(AssetRef<SceneDefinition> reference) {
+        return DefinitionGraphLoader.loadScene(
                 DefinitionAssetIndex.builder(this).build(), Objects.requireNonNull(reference, "reference"));
     }
 
     /**
-     * Resolves and validates a world through both its asset graph and component descriptors.
+     * Resolves and validates a Scene through both its asset graph and component descriptors.
      *
-     * @param reference typed world-definition reference
+     * @param reference typed scene-definition reference
      * @param types resolved safe extension metadata
-     * @return loaded world or ordered structural and component diagnostics
+     * @return loaded Scene or ordered structural and component diagnostics
      */
-    public DefinitionLoadResult<WorldDefinition> loadWorld(
-            AssetRef<WorldDefinition> reference, RegisteredTypeCatalog types) {
-        return DefinitionGraphLoader.loadWorld(
+    public DefinitionLoadResult<SceneDefinition> loadScene(
+            AssetRef<SceneDefinition> reference, RegisteredTypeCatalog types) {
+        return DefinitionGraphLoader.loadScene(
                 DefinitionAssetIndex.builder(this).build(),
                 Objects.requireNonNull(reference, "reference"),
                 Objects.requireNonNull(types, "types"));
@@ -145,13 +145,13 @@ public final class AssetCatalog implements DefinitionResolver {
     }
 
     @Override
-    public DefinitionLoadResult<WorldDefinition> loadAuthoredWorld(
+    public DefinitionLoadResult<SceneDefinition> loadAuthoredScene(
             AssetMetadata metadata, byte[] content, RegisteredTypeCatalog types) {
         AssetMetadata validMetadata = Objects.requireNonNull(metadata, "metadata");
         DefinitionAssetIndex definitions = DefinitionAssetIndex.builder(this)
                 .overrideAuthored(validMetadata, Objects.requireNonNull(content, "content"))
                 .build();
-        return DefinitionGraphLoader.loadWorld(
+        return DefinitionGraphLoader.loadScene(
                 definitions, AssetRef.to(validMetadata.id()), Objects.requireNonNull(types, "types"));
     }
 }

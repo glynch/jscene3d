@@ -36,9 +36,9 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -88,7 +88,7 @@ final class WorldComposerTest {
     @Test
     void composesCompleteIndependentPlacementGraphs() throws IOException {
         EntityDefinition reusable = reusableDefinition();
-        WorldDefinition definition = worldDefinition(reusable);
+        SceneDefinition definition = worldDefinition(reusable);
         RecordingFactory factory = new RecordingFactory();
 
         WorldCompositionResult result = compose(definition, reusable, descriptor(), factory);
@@ -112,12 +112,12 @@ final class WorldComposerTest {
     /** Uses the supplied working-copy revision instead of reloading the root world from its resolver. */
     @Test
     void composesAnInMemoryWorldRevision() throws IOException {
-        WorldDefinition saved = worldWithComponent();
-        Path source = temporaryDirectory.resolve("world.world.json");
+        SceneDefinition saved = worldWithComponent();
+        Path source = temporaryDirectory.resolve("world.scene.json");
         DefinitionWriter.write(source, saved);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         LocalEntity editedRoot = new LocalEntity(LOCAL_ROOT, "Value", true, List.of(component("2")), List.of());
-        WorldDefinition edited = new WorldDefinition(WORLD_ASSET, "Value world", List.of(editedRoot));
+        SceneDefinition edited = new SceneDefinition(WORLD_ASSET, "Value world", List.of(editedRoot));
 
         WorldCompositionResult result = WorldComposer.compose(
                 source.toUri(),
@@ -142,7 +142,7 @@ final class WorldComposerTest {
     @Test
     void resolvesPlacementArgumentsWithinEachInstance() throws IOException {
         EntityDefinition reusable = reusableDefinition();
-        WorldDefinition definition = worldDefinition(reusable);
+        SceneDefinition definition = worldDefinition(reusable);
         RecordingFactory factory = new RecordingFactory();
         World world =
                 compose(definition, reusable, descriptor(), factory).world().orElseThrow();
@@ -174,7 +174,7 @@ final class WorldComposerTest {
     void computesInitialEffectiveEnabledState() throws IOException {
         LocalEntity child = new LocalEntity(DEFINITION_CHILD, true, List.of(), List.of());
         LocalEntity root = new LocalEntity(LOCAL_ROOT, false, List.of(), List.of(child));
-        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Disabled world", List.of(root));
+        SceneDefinition definition = new SceneDefinition(WORLD_ASSET, "Disabled world", List.of(root));
 
         World world = compose(definition, descriptor(), new RecordingFactory())
                 .world()
@@ -195,7 +195,7 @@ final class WorldComposerTest {
     void resolvesDescriptorDeclaredCapabilityOnExactEntity() throws IOException {
         LocalEntity child = new LocalEntity(DEFINITION_CHILD, true, List.of(), List.of());
         LocalEntity root = new LocalEntity(LOCAL_ROOT, true, List.of(component("1")), List.of(child));
-        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Capability world", List.of(root));
+        SceneDefinition definition = new SceneDefinition(WORLD_ASSET, "Capability world", List.of(root));
         World world = compose(definition, capableDescriptor(ComponentMultiplicity.SINGLE), new RecordingFactory())
                 .world()
                 .orElseThrow();
@@ -222,7 +222,7 @@ final class WorldComposerTest {
                         component("81411df2-a65c-449b-9611-1ec68dc5a722", "1"),
                         component("0d6d3e6e-a2ab-49c5-9b04-bcb261341f39", "2")),
                 List.of());
-        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Ambiguous capability world", List.of(root));
+        SceneDefinition definition = new SceneDefinition(WORLD_ASSET, "Ambiguous capability world", List.of(root));
         World world = compose(definition, capableDescriptor(ComponentMultiplicity.MULTIPLE), new RecordingFactory())
                 .world()
                 .orElseThrow();
@@ -265,7 +265,7 @@ final class WorldComposerTest {
                         component("81411df2-a65c-449b-9611-1ec68dc5a722", "1"),
                         component("0d6d3e6e-a2ab-49c5-9b04-bcb261341f39", "2")),
                 List.of());
-        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Close world", List.of(root));
+        SceneDefinition definition = new SceneDefinition(WORLD_ASSET, "Close world", List.of(root));
         ComponentTypeDescriptor multiple = descriptor(ComponentMultiplicity.MULTIPLE);
         World world = compose(definition, multiple, factory).world().orElseThrow();
 
@@ -296,7 +296,7 @@ final class WorldComposerTest {
                         component("0d6d3e6e-a2ab-49c5-9b04-bcb261341f39", "2"),
                         component("b07ad64a-fd9f-482f-8000-ac644975bd45", "99")),
                 List.of());
-        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Failing world", List.of(root));
+        SceneDefinition definition = new SceneDefinition(WORLD_ASSET, "Failing world", List.of(root));
 
         WorldCompositionResult result = compose(definition, descriptor(ComponentMultiplicity.MULTIPLE), factory);
 
@@ -312,7 +312,7 @@ final class WorldComposerTest {
     /** Reports duplicate executable providers as structured diagnostics rather than publishing a world. */
     @Test
     void rejectsDuplicateRuntimeExtensions() throws IOException {
-        WorldDefinition definition = emptyWorld();
+        SceneDefinition definition = emptyWorld();
         ComponentRuntimeExtension provider = extension(new RecordingFactory());
 
         WorldCompositionResult result = compose(definition, descriptor(), List.of(provider, provider), NO_RESOURCES);
@@ -327,7 +327,7 @@ final class WorldComposerTest {
     /** Converts provider registration failures into terminal structured diagnostics. */
     @Test
     void reportsRuntimeExtensionRegistrationFailure() throws IOException {
-        WorldDefinition definition = emptyWorld();
+        SceneDefinition definition = emptyWorld();
         ComponentRuntimeExtension provider = new ComponentRuntimeExtension() {
             @Override
             public String id() {
@@ -360,7 +360,7 @@ final class WorldComposerTest {
                         component("81411df2-a65c-449b-9611-1ec68dc5a722", "1"),
                         component("0d6d3e6e-a2ab-49c5-9b04-bcb261341f39", "2")),
                 List.of());
-        WorldDefinition definition = new WorldDefinition(WORLD_ASSET, "Shared state", List.of(root));
+        SceneDefinition definition = new SceneDefinition(WORLD_ASSET, "Shared state", List.of(root));
 
         WorldCompositionResult result =
                 compose(definition, descriptor(ComponentMultiplicity.MULTIPLE), context -> shared);
@@ -742,25 +742,25 @@ final class WorldComposerTest {
 
     /** Writes a world with no reusable definitions and composes it through the catalog. */
     private WorldCompositionResult compose(
-            WorldDefinition world, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory) throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
+            SceneDefinition world, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory) throws IOException {
+        DefinitionWriter.write(temporaryDirectory.resolve("world.scene.json"), world);
         return composeCatalog(world, descriptor, factory);
     }
 
     /** Writes one world and composes it with explicitly supplied runtime collaborators. */
     private WorldCompositionResult compose(
-            WorldDefinition world,
+            SceneDefinition world,
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
             RuntimeResourceProvider resources)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
+        DefinitionWriter.write(temporaryDirectory.resolve("world.scene.json"), world);
         return composeCatalog(world, descriptor, extensions, resources);
     }
 
     /** Writes one world and composes it with explicit host world modules. */
     private WorldCompositionResult composeWithModules(
-            WorldDefinition world,
+            SceneDefinition world,
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
             List<WorldModuleBinding<?>> modules)
@@ -770,37 +770,37 @@ final class WorldComposerTest {
 
     /** Writes one world and composes it with explicit host modules and runtime resources. */
     private WorldCompositionResult composeWithModules(
-            WorldDefinition world,
+            SceneDefinition world,
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
             List<WorldModuleBinding<?>> modules,
             RuntimeResourceProvider resources)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
+        DefinitionWriter.write(temporaryDirectory.resolve("world.scene.json"), world);
         return composeCatalog(world, descriptor, extensions, modules, resources);
     }
 
     /** Writes the fixture assets and composes through the supported catalog interface. */
     private WorldCompositionResult compose(
-            WorldDefinition world,
+            SceneDefinition world,
             EntityDefinition reusable,
             ComponentTypeDescriptor descriptor,
             ComponentFactory<?> factory)
             throws IOException {
-        DefinitionWriter.write(temporaryDirectory.resolve("world.world.json"), world);
+        DefinitionWriter.write(temporaryDirectory.resolve("world.scene.json"), world);
         DefinitionWriter.write(temporaryDirectory.resolve("reusable.entity.json"), reusable);
         return composeCatalog(world, descriptor, factory);
     }
 
     /** Scans written fixtures and invokes the public world composer. */
     private WorldCompositionResult composeCatalog(
-            WorldDefinition world, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory) {
+            SceneDefinition world, ComponentTypeDescriptor descriptor, ComponentFactory<?> factory) {
         return composeCatalog(world, descriptor, List.of(extension(factory)), NO_RESOURCES);
     }
 
     /** Scans written fixtures and invokes the public world composer with explicit runtime collaborators. */
     private WorldCompositionResult composeCatalog(
-            WorldDefinition world,
+            SceneDefinition world,
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
             RuntimeResourceProvider resources) {
@@ -809,7 +809,7 @@ final class WorldComposerTest {
 
     /** Scans fixtures and invokes the public world composer with explicit world modules. */
     private WorldCompositionResult composeCatalog(
-            WorldDefinition world,
+            SceneDefinition world,
             ComponentTypeDescriptor descriptor,
             List<ComponentRuntimeExtension> extensions,
             List<WorldModuleBinding<?>> modules,
@@ -846,12 +846,12 @@ final class WorldComposerTest {
     }
 
     /** Creates two independent roots whose components have distinct identity and property values. */
-    private static WorldDefinition twoRootWorld() {
+    private static SceneDefinition twoRootWorld() {
         LocalEntity first = new LocalEntity(
                 LOCAL_ROOT, true, List.of(component("81411df2-a65c-449b-9611-1ec68dc5a722", "1")), List.of());
         LocalEntity second = new LocalEntity(
                 DEFINITION_ROOT, true, List.of(component("0d6d3e6e-a2ab-49c5-9b04-bcb261341f39", "2")), List.of());
-        return new WorldDefinition(WORLD_ASSET, "Two roots", List.of(first, second));
+        return new SceneDefinition(WORLD_ASSET, "Two roots", List.of(first, second));
     }
 
     /** Creates a provider whose one shared string lease records acquisition and release. */
@@ -885,25 +885,25 @@ final class WorldComposerTest {
     }
 
     /** Creates a world with one local root and two placements of the same definition. */
-    private static WorldDefinition worldDefinition(EntityDefinition reusable) {
+    private static SceneDefinition worldDefinition(EntityDefinition reusable) {
         LocalEntity local = new LocalEntity(LOCAL_ROOT, "Garden", true, List.of(component("10")), List.of());
         EntityPlacement first = new EntityPlacement(
                 FIRST_PLACEMENT, "First beacon", true, AssetRef.to(reusable.id()), Map.of(VALUE, number("2")));
         EntityPlacement second =
                 new EntityPlacement(SECOND_PLACEMENT, true, AssetRef.to(reusable.id()), Map.of(VALUE, number("3")));
-        return new WorldDefinition(WORLD_ASSET, "Garden", List.of(local, first, second));
+        return new SceneDefinition(WORLD_ASSET, "Garden", List.of(local, first, second));
     }
 
     /** Creates a component-free world suitable for registration and resource boundary tests. */
-    private static WorldDefinition emptyWorld() {
+    private static SceneDefinition emptyWorld() {
         LocalEntity root = new LocalEntity(LOCAL_ROOT, "Empty", true, List.of(), List.of());
-        return new WorldDefinition(WORLD_ASSET, "Empty world", List.of(root));
+        return new SceneDefinition(WORLD_ASSET, "Empty world", List.of(root));
     }
 
     /** Creates one root containing the fixture value component. */
-    private static WorldDefinition worldWithComponent() {
+    private static SceneDefinition worldWithComponent() {
         LocalEntity root = new LocalEntity(LOCAL_ROOT, "Value", true, List.of(component("1")), List.of());
-        return new WorldDefinition(WORLD_ASSET, "Value world", List.of(root));
+        return new SceneDefinition(WORLD_ASSET, "Value world", List.of(root));
     }
 
     /** Creates a single-instance value component descriptor. */

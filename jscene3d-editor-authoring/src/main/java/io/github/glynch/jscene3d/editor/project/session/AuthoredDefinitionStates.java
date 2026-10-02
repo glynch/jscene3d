@@ -78,7 +78,7 @@ final class AuthoredDefinitionStates {
     /** Returns direct authored roots for either structural definition kind. */
     private static List<EntityEntry> roots(AuthoredDefinitionDocument.Content content) {
         return switch (content) {
-            case AuthoredDefinitionDocument.Content.World world ->
+            case AuthoredDefinitionDocument.Content.Scene world ->
                 world.definition().roots();
             case AuthoredDefinitionDocument.Content.Entity entity ->
                 List.of(entity.definition().root());

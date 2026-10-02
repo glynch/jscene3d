@@ -20,8 +20,8 @@ import io.github.glynch.jscene3d.project.runtime.RuntimeEntityId;
 import io.github.glynch.jscene3d.project.runtime.SpawnTarget;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldModule;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -122,7 +122,7 @@ final class WorldFrameDriverTest {
         }
 
         @Override
-        public WorldDefinition definition() {
+        public SceneDefinition definition() {
             throw new UnsupportedOperationException("not required by this fixture");
         }
 

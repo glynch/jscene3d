@@ -12,7 +12,7 @@ import java.util.Objects;
 
 /** Stable identity of one expanded entity occurrence.
  *
- * @param rootDefinition root world or reusable-definition asset
+ * @param rootDefinition root Scene or reusable-definition asset
  * @param entityPath ordered local-entity and placement identities from the root
  */
 public record CompositionOccurrenceId(AssetId rootDefinition, List<EntityId> entityPath) {

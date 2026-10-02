@@ -17,9 +17,9 @@ import io.github.glynch.jscene3d.project.internal.AtomicProjectFileWriter;
 import io.github.glynch.jscene3d.project.internal.Preconditions;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonReader;
 import io.github.glynch.jscene3d.project.internal.ProjectJsonTreeWriter;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.internal.ProjectValueJsonWriter;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,7 +31,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * One source-preserving authored world or entity definition.
+ * One source-preserving authored Scene or entity definition.
  *
  * <p>The trusted source, validated JSON tree, immutable domain projection, and persisted-source SHA-256 baseline are
  * established together and cannot drift independently. Candidate property patches deep-copy the accepted tree and
@@ -78,7 +78,7 @@ public final class AuthoredDefinitionDocument {
      * @param assets authoritative authored asset catalog
      * @param definitions authoritative mixed-source definition resolver
      * @param types resolved safe component metadata
-     * @param id authored world or entity identity
+     * @param id authored Scene or entity identity
      * @return retained document or ordered structured diagnostics
      */
     public static LoadResult load(
@@ -152,7 +152,7 @@ public final class AuthoredDefinitionDocument {
     /**
      * Returns the authored structural definition kind.
      *
-     * @return world or entity definition kind
+     * @return Scene or entity definition kind
      */
     public AssetKind kind() {
         return metadata.kind();
@@ -172,7 +172,7 @@ public final class AuthoredDefinitionDocument {
     /**
      * Returns the immutable domain projection of the same accepted state as the retained tree.
      *
-     * @return authored world or entity content
+     * @return authored Scene or entity content
      */
     public Content content() {
         return content;
@@ -428,7 +428,7 @@ public final class AuthoredDefinitionDocument {
             byte[] candidateBytes) {
         return switch (metadata.kind()) {
             case ENTITY_DEFINITION -> definitions.loadAuthoredEntity(metadata, candidateBytes, types);
-            case WORLD_DEFINITION -> definitions.loadAuthoredWorld(metadata, candidateBytes, types);
+            case SCENE_DEFINITION -> definitions.loadAuthoredScene(metadata, candidateBytes, types);
         };
     }
 
@@ -436,20 +436,20 @@ public final class AuthoredDefinitionDocument {
     private static Content content(AssetKind kind, Object definition) {
         return switch (kind) {
             case ENTITY_DEFINITION -> new Content.Entity((EntityDefinition) definition);
-            case WORLD_DEFINITION -> new Content.World((WorldDefinition) definition);
+            case SCENE_DEFINITION -> new Content.Scene((SceneDefinition) definition);
         };
     }
 
     /** Locates the properties object of one local entity component without traversing placements. */
     private Optional<ObjectNode> properties(ObjectNode candidate, ComponentPropertyTarget target) {
-        return kind() == AssetKind.WORLD_DEFINITION
+        return kind() == AssetKind.SCENE_DEFINITION
                 ? propertiesInEntries(candidate.get("roots"), target)
                 : propertiesInEntry(candidate.get("root"), target);
     }
 
     /** Finds one source-local entity or placement by stable identity. */
     private Optional<ObjectNode> entry(ObjectNode candidate, EntityId target) {
-        return kind() == AssetKind.WORLD_DEFINITION
+        return kind() == AssetKind.SCENE_DEFINITION
                 ? entryInEntries(candidate.get("roots"), target)
                 : entryInEntry(candidate.get("root"), target);
     }
@@ -782,7 +782,7 @@ public final class AuthoredDefinitionDocument {
     }
 
     /** Closed immutable domain projection retained beside the accepted source tree. */
-    public sealed interface Content permits Content.World, Content.Entity {
+    public sealed interface Content permits Content.Scene, Content.Entity {
         /**
          * Returns the authoritative asset identity.
          *
@@ -793,17 +793,17 @@ public final class AuthoredDefinitionDocument {
         /**
          * Returns the structural definition kind.
          *
-         * @return world or entity kind
+         * @return Scene or entity kind
          */
         AssetKind kind();
 
-        /** Authored world domain projection.
+        /** Authored Scene domain projection.
          *
-         * @param definition validated immutable world
+         * @param definition validated immutable Scene
          */
-        record World(WorldDefinition definition) implements Content {
-            /** Validates world content. */
-            public World {
+        record Scene(SceneDefinition definition) implements Content {
+            /** Validates Scene content. */
+            public Scene {
                 Objects.requireNonNull(definition, "definition");
             }
 
@@ -814,7 +814,7 @@ public final class AuthoredDefinitionDocument {
 
             @Override
             public AssetKind kind() {
-                return AssetKind.WORLD_DEFINITION;
+                return AssetKind.SCENE_DEFINITION;
             }
         }
 

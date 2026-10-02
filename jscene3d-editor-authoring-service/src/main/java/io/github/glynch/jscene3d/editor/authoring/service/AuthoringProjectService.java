@@ -47,6 +47,10 @@ import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorValue;
 import io.github.glynch.jscene3d.i18n.MessageSource;
 import io.github.glynch.jscene3d.i18n.resourcebundle.ResourceBundleMessageSource;
 import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.asset.AssetKind;
+import io.github.glynch.jscene3d.project.asset.AssetMetadata;
+import io.github.glynch.jscene3d.project.asset.AssetRef;
+import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
@@ -56,10 +60,10 @@ import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyNumericBound;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.file.Path;
@@ -83,8 +87,8 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Stable rejection when replacement no longer targets the active project generation. */
     public static final String PROJECT_GENERATION_CONFLICT = "authoring.project.generationConflict";
 
-    /** Stable failure when a requested viewport world is unavailable in the active project. */
-    public static final String VIEWPORT_WORLD_UNAVAILABLE = "authoring.viewport.worldUnavailable";
+    /** Stable failure when a requested viewport Scene is unavailable in the active project. */
+    public static final String VIEWPORT_SCENE_UNAVAILABLE = "authoring.viewport.sceneUnavailable";
 
     /** Stable failure when a requested structural definition cannot be resolved. */
     public static final String DEFINITION_UNAVAILABLE = "authoring.definition.unavailable";
@@ -269,12 +273,12 @@ public final class AuthoringProjectService implements AutoCloseable {
     }
 
     /**
-     * Prepares a renderer launch for an authoritative world in the active project.
+     * Prepares a renderer launch for an authoritative Scene in the active project.
      *
-     * <p>The first product viewport renders the startup world. Requiring the caller to echo its Java-issued
+     * <p>The first product viewport renders the Main Scene. Requiring the caller to echo its Java-issued
      * {@link AssetId} prevents display labels or paths from becoming identity at the editor boundary.
      *
-     * @param params expected generation and world identity
+     * @param params expected generation and Scene identity
      * @return generation-scoped launch specification or stable rejection
      */
     public ViewportLaunchResult prepareViewportLaunch(ViewportLaunchParams params) {
@@ -284,7 +288,7 @@ public final class AuthoringProjectService implements AutoCloseable {
     /**
      * Prepares a renderer launch using the initialized client locale for diagnostics.
      *
-     * @param params expected generation and world identity
+     * @param params expected generation and Scene identity
      * @param locale locale used to render launch diagnostics
      * @return generation-scoped launch specification or stable rejection
      */
@@ -300,16 +304,23 @@ public final class AuthoringProjectService implements AutoCloseable {
             return viewportFailure(PROJECT_GENERATION_CONFLICT);
         }
 
-        AssetId requestedWorld;
+        AssetId requestedScene;
         try {
-            requestedWorld = AssetId.from(validParams.worldAssetId());
+            requestedScene = AssetId.from(validParams.sceneAssetId());
         } catch (IllegalArgumentException exception) {
-            return viewportFailure(VIEWPORT_WORLD_UNAVAILABLE);
+            return viewportFailure(VIEWPORT_SCENE_UNAVAILABLE);
         }
-        WorldDefinition startupWorld = session.startupWorld();
-        if (!startupWorld.id().equals(requestedWorld)) {
-            return viewportFailure(VIEWPORT_WORLD_UNAVAILABLE);
+        Optional<AssetMetadata> metadata = session.authoredAssets().find(requestedScene);
+        if (metadata.isEmpty() || metadata.orElseThrow().kind() != AssetKind.SCENE_DEFINITION) {
+            return viewportFailure(VIEWPORT_SCENE_UNAVAILABLE);
         }
+        DefinitionLoadResult<SceneDefinition> loaded =
+                session.definitions().loadScene(AssetRef.to(requestedScene), session.types());
+        if (loaded.definition().isEmpty()) {
+            return new ViewportLaunchResult(
+                    false, null, diagnostics(loaded.diagnostics(), locale), VIEWPORT_SCENE_UNAVAILABLE);
+        }
+        SceneDefinition scene = loaded.definition().orElseThrow();
 
         GameProject project = session.project();
         Path publishedContentRoot = EditorProjectLoader.resolvePublishedContentRoot(project.root());
@@ -320,8 +331,8 @@ public final class AuthoringProjectService implements AutoCloseable {
                 project.root().toString(),
                 publishedContentRoot.toString(),
                 engineVersion,
-                startupWorld.id().toString(),
-                startupWorld.name(),
+                scene.id().toString(),
+                scene.name(),
                 runtimeArtifacts.stream().map(Path::toString).toList());
         return new ViewportLaunchResult(true, launch, diagnostics(session.diagnostics(), locale), null);
     }
@@ -561,14 +572,20 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Maps the retained domain session to the deliberately narrow first-milestone summary. */
     private static ProjectSummary summary(EditorProjectSession session) {
         GameProject project = session.project();
-        WorldDefinition world = session.startupWorld();
+        ProjectSummary.SceneSummary mainScene = project.runtime()
+                .mainScene()
+                .flatMap(reference -> session.definitions()
+                        .loadScene(reference, session.types())
+                        .definition())
+                .map(scene -> new ProjectSummary.SceneSummary(scene.id().toString(), scene.name()))
+                .orElse(null);
         return new ProjectSummary(
                 project.identity().id(),
                 project.identity().name(),
                 project.identity().version(),
                 project.root().toString(),
                 project.descriptor().toString(),
-                new ProjectSummary.WorldSummary(world.id().toString(), world.name()),
+                mainScene,
                 new ProjectSummary.AssetCounts(
                         session.authoredAssets().assets().size(),
                         session.assets().size()));
@@ -646,7 +663,7 @@ public final class AuthoringProjectService implements AutoCloseable {
     private static InspectorTarget inspectorTarget(DefinitionSnapshot.SemanticTarget target) {
         InspectorTarget.Kind kind =
                 switch (target.kind()) {
-                    case "world" -> InspectorTarget.Kind.WORLD;
+                    case "scene" -> InspectorTarget.Kind.SCENE;
                     case "local-entity" -> InspectorTarget.Kind.LOCAL_ENTITY;
                     case "generated-entity" -> InspectorTarget.Kind.GENERATED_ENTITY;
                     case "placement" -> InspectorTarget.Kind.PLACEMENT;
@@ -1027,7 +1044,7 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Serializes hierarchy kinds independently of Java enum spelling. */
     private static String serialized(EditorHierarchyNode.Kind kind) {
         return switch (kind) {
-            case WORLD -> "world";
+            case SCENE -> "scene";
             case LOCAL_ENTITY -> "local-entity";
             case PLACEMENT -> "placement";
             case GENERATED_ENTITY -> "generated-entity";
@@ -1037,7 +1054,7 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Serializes Inspector target kinds independently of Java enum spelling. */
     private static String serialized(InspectorTarget.Kind kind) {
         return switch (kind) {
-            case WORLD -> "world";
+            case SCENE -> "scene";
             case LOCAL_ENTITY -> "local-entity";
             case GENERATED_ENTITY -> "generated-entity";
             case PLACEMENT -> "placement";

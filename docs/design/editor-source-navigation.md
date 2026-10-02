@@ -42,7 +42,7 @@ selection foundations, not a claim that the user-facing action already exists.
 
 An implementation-source association belongs with the safe component and
 extension metadata that identifies the behavior. It must not be written into an
-authored world or entity as an implementation class name. Keeping the
+authored Scene or entity as an implementation class name. Keeping the
 association outside project content preserves the descriptor/runtime boundary
 and allows the authoring service to resolve navigation without loading arbitrary
 game runtime implementations.

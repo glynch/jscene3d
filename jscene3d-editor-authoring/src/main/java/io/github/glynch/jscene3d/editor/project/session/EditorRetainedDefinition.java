@@ -8,7 +8,7 @@ import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProje
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetKind;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.net.URI;
 import java.util.Objects;
 
@@ -63,7 +63,7 @@ public record EditorRetainedDefinition(
     }
 
     /** Closed structural-definition content retained by the session. */
-    public sealed interface Content permits Content.World, Content.Entity {
+    public sealed interface Content permits Content.Scene, Content.Entity {
         /**
          * Returns the authoritative asset identity.
          *
@@ -74,17 +74,17 @@ public record EditorRetainedDefinition(
         /**
          * Returns the structural definition kind.
          *
-         * @return world or entity definition kind
+         * @return Scene or entity definition kind
          */
         AssetKind kind();
 
-        /** Current immutable world content or the startup-world working-copy snapshot.
+        /** Current immutable Scene content or its working-copy snapshot.
          *
-         * @param definition current world definition
+         * @param definition current Scene definition
          */
-        record World(WorldDefinition definition) implements Content {
-            /** Validates world content. */
-            public World {
+        record Scene(SceneDefinition definition) implements Content {
+            /** Validates Scene content. */
+            public Scene {
                 Objects.requireNonNull(definition, "definition");
             }
 
@@ -95,7 +95,7 @@ public record EditorRetainedDefinition(
 
             @Override
             public AssetKind kind() {
-                return AssetKind.WORLD_DEFINITION;
+                return AssetKind.SCENE_DEFINITION;
             }
         }
 

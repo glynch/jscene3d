@@ -7,7 +7,10 @@ package io.github.glynch.jscene3d.project.desktop;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.runtime.ProjectLaunchRequest;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,8 +18,10 @@ import org.junit.jupiter.api.Test;
 final class DesktopProjectRunnerTest {
     @Test
     void marksNamedPlaytestWindow() {
-        ProjectLaunchRequest request =
-                ProjectLaunchRequest.playtest("moving-floor-34", Path.of("worlds/map01.world.json"), Map.of());
+        ProjectLaunchRequest request = ProjectLaunchRequest.playtest(
+                "moving-floor-34",
+                AssetRef.<SceneDefinition>to(AssetId.from("2f26576c-570d-4338-bc30-52bc41def3a5")),
+                Map.of());
 
         assertThat(DesktopProjectRunner.windowTitle("Doomed Corridors", request))
                 .isEqualTo("Doomed Corridors [PLAYTEST: moving-floor-34]");

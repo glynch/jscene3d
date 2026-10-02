@@ -6,13 +6,13 @@ package io.github.glynch.jscene3d.game.application;
 
 import java.util.Arrays;
 
-/** Host-owned application transitions which authored worlds may request. */
+/** Host-owned application transitions which live Worlds may request. */
 public enum ApplicationCommand {
-    /** Replaces the current gameplay world with the project's startup world while retaining gameplay for resume. */
+    /** Requests a host-selected menu while retaining gameplay for resume where supported. */
     SHOW_MENU("show-menu"),
-    /** Replaces terminal gameplay with the project's startup world and discards the gameplay session. */
+    /** Requests a host-selected menu and discards the gameplay session where supported. */
     RETURN_TO_MENU("return-to-menu"),
-    /** Replaces any retained gameplay with a fresh instance of the manifest entry world. */
+    /** Replaces any retained gameplay with a fresh instance of the selected launch Scene. */
     NEW_GAME("new-game"),
     /** Returns to the retained gameplay world when one exists. */
     RESUME("resume"),

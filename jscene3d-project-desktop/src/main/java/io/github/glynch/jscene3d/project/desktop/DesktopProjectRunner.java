@@ -61,7 +61,7 @@ public final class DesktopProjectRunner {
                 new StandardProjectEnvironment(publishedImports, applicationState::createControl));
     }
 
-    /** Runs the manifest-selected startup world until its window requests closure.
+    /** Runs the manifest-selected Main Scene until its window requests closure.
      *
      * @param projectRoot project directory containing one current or legacy project descriptor
      */
@@ -311,14 +311,12 @@ public final class DesktopProjectRunner {
             this.launchRequest = Objects.requireNonNull(launchRequest, "launchRequest");
         }
 
-        /** Loads and activates the manifest-selected startup world. */
+        /** Loads and activates the configured Main Scene or explicit Scene request. */
         private void start(ProjectLoadProgressReporter progress) {
             application.setResumeAvailable(false);
             HostedProject loaded = host.load(projectRoot, launchRequest, progress);
-            boolean startupMenu = !launchRequest.isPlaytest()
-                    && loaded.project().runtime().startupScene().isPresent();
-            DesktopSessionLifecycle<RunningWorld> started = new DesktopSessionLifecycle<>(startupMenu);
-            started.start(new RunningWorld(loaded, !startupMenu));
+            DesktopSessionLifecycle<RunningWorld> started = new DesktopSessionLifecycle<>(false);
+            started.start(new RunningWorld(loaded, true));
             lifecycle = started;
         }
 
@@ -345,7 +343,7 @@ public final class DesktopProjectRunner {
             boolean continueRunning = active.apply(
                     command,
                     () -> new RunningWorld(host.load(projectRoot), false),
-                    () -> new RunningWorld(host.loadEntry(projectRoot, launchRequest, progress), true));
+                    () -> new RunningWorld(host.load(projectRoot, launchRequest, progress), true));
             application.setResumeAvailable(active.canResume());
             return continueRunning;
         }

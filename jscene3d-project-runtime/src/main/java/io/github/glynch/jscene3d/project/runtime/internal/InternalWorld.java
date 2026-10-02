@@ -24,9 +24,9 @@ import io.github.glynch.jscene3d.project.runtime.SpawnOperation;
 import io.github.glynch.jscene3d.project.runtime.SpawnTarget;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldModule;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -43,7 +43,7 @@ import org.jspecify.annotations.Nullable;
 
 /** Composition-time world implementation which owns all constructed component values. */
 final class InternalWorld implements World {
-    private final WorldDefinition definition;
+    private final SceneDefinition definition;
     private final WorldCompositionServices services;
     private final WorldModules modules;
     private final WorldResources resources;
@@ -61,7 +61,7 @@ final class InternalWorld implements World {
     private boolean committingMutation;
 
     /** Creates an empty world shell visible to factories while its complete graph is constructed. */
-    InternalWorld(WorldDefinition definition, WorldCompositionServices services) {
+    InternalWorld(SceneDefinition definition, WorldCompositionServices services) {
         this.definition = Objects.requireNonNull(definition, "definition");
         this.services = Objects.requireNonNull(services, "services");
         modules = services.modules();
@@ -70,7 +70,7 @@ final class InternalWorld implements World {
     }
 
     @Override
-    public WorldDefinition definition() {
+    public SceneDefinition definition() {
         return definition;
     }
 

@@ -1,6 +1,6 @@
 # Application runtime
 
-JScene3D's runtime facilities connect authored worlds to fixed-step simulation,
+JScene3D's runtime facilities instantiate authored Scenes as live Worlds and connect them to fixed-step simulation,
 input, physics, audio, native desktop hosting, and export. The detailed entity
 and component model is covered in
 [Project and game fundamentals](project-fundamentals.md) and the

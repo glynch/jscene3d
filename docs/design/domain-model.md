@@ -69,8 +69,6 @@ A Project may contain any number of SceneDefinitions.
 
 A SceneDefinition has persistent asset identity independent of its display name and physical location.
 
-`SceneDefinition` is the intended replacement for the current authored `WorldDefinition` concept.
-
 The existing older `project.scene.SceneDefinition` typed-node/controller model is a separate obsolete model and is not the `SceneDefinition` described by this document.
 
 ## World
@@ -141,15 +139,11 @@ instantiate
 World
 ```
 
-`mainScene` replaces the current `startupScene`/`startupWorld` terminology.
-
 The Main Scene is a normal SceneDefinition. Its special role is only that it provides the initial Scene content for application startup.
 
 The `mainScene` relationship should use the SceneDefinition's stable asset identity rather than its filesystem path.
 
 Moving or renaming the SceneDefinition therefore does not change which Scene is the Main Scene.
-
-The current `entryScene` concept is not part of the domain model and should be removed.
 
 ## Entity
 
@@ -769,7 +763,7 @@ The Asset itself remains authoritative for its `AssetId`.
 
 First-class authored Assets may be discovered independently of fixed directory names.
 
-The current JScene3D model recursively discovers authored WorldDefinitions and EntityDefinitions within the Project boundary.
+The current JScene3D model recursively discovers authored SceneDefinitions and EntityDefinitions within the Project boundary.
 
 The future SceneDefinition model should retain this property.
 
@@ -1227,17 +1221,17 @@ Domain concepts should therefore not be constrained unnecessarily by incidental 
 
 ## Scene Serialization
 
-The current authored Scene concept is serialized as `WorldDefinition`.
+The current authored Scene concept is serialized as `SceneDefinition`.
 
 The future terminology refactor will replace this with Scene terminology.
 
 This affects persisted concepts including the current:
 
 ```text
-*.world.json
-"assetType": "world-definition"
-world-definition schema
-WORLD_DEFINITION asset kind
+*.scene.json
+"assetType": "scene-definition"
+scene-definition schema
+SCENE_DEFINITION asset kind
 ```
 
 The intended future terminology is conceptually:
@@ -1257,9 +1251,9 @@ Existing stable `AssetId` values should be preserved through this terminology mi
 
 JScene3D currently contains an older `project.scene.SceneDefinition` model based on an earlier typed-node/controller architecture.
 
-That model predates the current hierarchical Entity/Component `WorldDefinition` architecture and is not part of the domain model defined here.
+That model predates the current hierarchical Entity/Component `SceneDefinition` architecture and is not part of the domain model defined here.
 
-It should be retired before the current `WorldDefinition` assumes the `SceneDefinition` name.
+It should be retired before the current `SceneDefinition` assumes the `SceneDefinition` name.
 
 This avoids retaining two unrelated concepts with the same domain terminology.
 
@@ -1293,16 +1287,6 @@ The Project's runtime entry point is:
 mainScene
 ```
 
-The terms:
-
-```text
-startupWorld
-startupScene
-entryScene
-```
-
-should not remain part of the final domain terminology for that role.
-
 ## Open Domain Decisions
 
 The following domain questions remain intentionally unresolved:
@@ -1316,7 +1300,7 @@ The following domain questions remain intentionally unresolved:
 - the precise semantics of placement overrides and parameters
 - nested EntityDefinition/placement semantics
 - duplication rules for EntityIds, ComponentIds, and internal references
-- the final compatibility strategy for `WorldDefinition` to `SceneDefinition`
+- the final compatibility strategy for `SceneDefinition` to `SceneDefinition`
 - whether generated SceneDefinitions should be supported
 - whether additional currently path-based project relationships should become identity-based
 

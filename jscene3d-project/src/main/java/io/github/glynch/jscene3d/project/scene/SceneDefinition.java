@@ -4,69 +4,84 @@
  */
 package io.github.glynch.jscene3d.project.scene;
 
-import static io.github.glynch.jscene3d.project.internal.Preconditions.requireLocalId;
-import static io.github.glynch.jscene3d.project.internal.ProjectPaths.requireNormalizedAbsolute;
+import static io.github.glynch.jscene3d.project.entity.internal.EntityTreeChecks.copyConnections;
+import static io.github.glynch.jscene3d.project.entity.internal.EntityTreeChecks.copyRoots;
+import static io.github.glynch.jscene3d.project.internal.Preconditions.requireNonBlank;
 
-import java.nio.file.Path;
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.entity.EntityEntry;
+import io.github.glynch.jscene3d.project.entity.SignalConnection;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable, validated scene definition ready for later runtime instantiation. */
+/** Immutable authored definition of one Scene and its root entity entries. */
 public final class SceneDefinition {
-    private final Path source;
-    private final String id;
-    private final SceneNodeDefinition root;
-    private final List<SceneConnection> connections;
+    private final AssetId id;
+    private final String name;
+    private final List<SignalConnection> connections;
+    private final List<EntityEntry> roots;
 
     /**
-     * Creates a validated scene definition.
+     * Creates a Scene definition.
      *
-     * @param source normalized absolute source path
-     * @param id stable scene identifier
-     * @param root root scene node
-     * @param connections signal-to-action connections
+     * @param id stable asset identity
+     * @param name editor display name
+     * @param roots local entities and reusable-definition placements
      */
-    public SceneDefinition(Path source, String id, SceneNodeDefinition root, List<SceneConnection> connections) {
-        this.source = requireNormalizedAbsolute(source, "source");
-        this.id = requireLocalId(id, "id");
-        this.root = Objects.requireNonNull(root, "root");
-        this.connections = List.copyOf(connections);
+    public SceneDefinition(AssetId id, String name, List<? extends EntityEntry> roots) {
+        this(id, name, List.of(), roots);
     }
 
     /**
-     * Returns the normalized absolute source path.
+     * Creates a Scene definition with internal signal/action connections.
      *
-     * @return scene source path
+     * @param id stable asset identity
+     * @param name editor display name
+     * @param connections internal signal/action connections
+     * @param roots local entities and reusable-definition placements
      */
-    public Path source() {
-        return source;
+    public SceneDefinition(
+            AssetId id, String name, List<SignalConnection> connections, List<? extends EntityEntry> roots) {
+        this.id = Objects.requireNonNull(id, "id");
+        this.name = requireNonBlank(name, "name");
+        this.roots = copyRoots(roots, "roots");
+        this.connections = copyConnections(this.roots, connections, "connections");
     }
 
     /**
-     * Returns the stable scene identifier.
+     * Returns the stable asset identity.
      *
-     * @return scene identifier
+     * @return asset identity
      */
-    public String id() {
+    public AssetId id() {
         return id;
     }
 
     /**
-     * Returns the root scene node.
+     * Returns the editor display name.
      *
-     * @return root node
+     * @return display name
      */
-    public SceneNodeDefinition root() {
-        return root;
+    public String name() {
+        return name;
     }
 
     /**
-     * Returns signal-to-action connections in declaration order.
+     * Returns internal signal/action connections in declaration order.
      *
-     * @return immutable ordered connections
+     * @return immutable connections
      */
-    public List<SceneConnection> connections() {
+    public List<SignalConnection> connections() {
         return connections;
+    }
+
+    /**
+     * Returns root entity entries in declaration order.
+     *
+     * @return immutable root entries
+     */
+    public List<EntityEntry> roots() {
+        return roots;
     }
 
     @Override
@@ -75,20 +90,20 @@ public final class SceneDefinition {
             return true;
         }
         return other instanceof SceneDefinition definition
-                && source.equals(definition.source)
                 && id.equals(definition.id)
-                && root.equals(definition.root)
-                && connections.equals(definition.connections);
+                && name.equals(definition.name)
+                && connections.equals(definition.connections)
+                && roots.equals(definition.roots);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, id, root, connections);
+        return Objects.hash(id, name, connections, roots);
     }
 
     @Override
     public String toString() {
-        return "SceneDefinition[source=" + source + ", id=" + id + ", root=" + root + ", connections=" + connections
+        return "SceneDefinition[id=" + id + ", name=" + name + ", connections=" + connections + ", roots=" + roots
                 + ']';
     }
 }

@@ -29,9 +29,9 @@ import io.github.glynch.jscene3d.project.extension.ExtensionDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -78,10 +78,10 @@ final class CompositionPlannerTest {
         DefinitionWriter.write(temporaryDirectory.resolve("outer.entity.json"), outer);
         DefinitionResolver resolver =
                 AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
-        WorldDefinition world = worldDefinition();
+        SceneDefinition world = worldDefinition();
 
         CompositionPlanResult result = CompositionPlanner.plan(
-                temporaryDirectory.resolve("working.world.json").toUri(), world, resolver, types());
+                temporaryDirectory.resolve("working.scene.json").toUri(), world, resolver, types());
 
         assertThat(result.diagnostics()).isEmpty();
         CompositionPlan plan = result.plan().orElseThrow();
@@ -125,17 +125,17 @@ final class CompositionPlannerTest {
     /** Uses the caller-owned in-memory root rather than reloading the saved world revision. */
     @Test
     void treatsTheInMemoryRootAsAuthoritative() throws IOException {
-        WorldDefinition saved = new WorldDefinition(
+        SceneDefinition saved = new SceneDefinition(
                 WORLD_ID, "Saved", List.of(new LocalEntity(FIRST_PLACEMENT, "Saved root", true, List.of(), List.of())));
-        DefinitionWriter.write(temporaryDirectory.resolve("saved.world.json"), saved);
+        DefinitionWriter.write(temporaryDirectory.resolve("saved.scene.json"), saved);
         AssetCatalog catalog = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
-        WorldDefinition edited = new WorldDefinition(
+        SceneDefinition edited = new SceneDefinition(
                 WORLD_ID,
                 "Edited",
                 List.of(new LocalEntity(SECOND_PLACEMENT, "Unsaved root", true, List.of(), List.of())));
 
         CompositionPlan plan = CompositionPlanner.plan(
-                        temporaryDirectory.resolve("saved.world.json").toUri(), edited, catalog, types())
+                        temporaryDirectory.resolve("saved.scene.json").toUri(), edited, catalog, types())
                 .plan()
                 .orElseThrow();
 
@@ -148,7 +148,7 @@ final class CompositionPlannerTest {
     /** Resolves already-published generated definitions through the same safe planner. */
     @Test
     void plansGeneratedDefinitionsThroughTheResolver() throws IOException {
-        WorldDefinition world = new WorldDefinition(
+        SceneDefinition world = new SceneDefinition(
                 WORLD_ID,
                 "Generated",
                 List.of(new EntityPlacement(
@@ -158,7 +158,7 @@ final class CompositionPlannerTest {
                         Map.of(
                                 VALUE, number(4),
                                 RESOURCE, reference(FIRST_RESOURCE)))));
-        DefinitionWriter.write(temporaryDirectory.resolve("generated.world.json"), world);
+        DefinitionWriter.write(temporaryDirectory.resolve("generated.scene.json"), world);
         AssetCatalog authored = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         ByteArrayOutputStream generated = new ByteArrayOutputStream();
         DefinitionWriter.write(generated, innerDefinition());
@@ -168,13 +168,13 @@ final class CompositionPlannerTest {
                 .build();
 
         CompositionPlan plan = CompositionPlanner.plan(
-                        temporaryDirectory.resolve("generated.world.json").toUri(), world, resolver, types())
+                        temporaryDirectory.resolve("generated.scene.json").toUri(), world, resolver, types())
                 .plan()
                 .orElseThrow();
 
         assertThat(plan.definitionSources()).containsEntry(INNER_ID, generatedSource);
         assertThat(plan.entities().getFirst().authoredSource())
-                .isEqualTo(temporaryDirectory.resolve("generated.world.json").toUri());
+                .isEqualTo(temporaryDirectory.resolve("generated.scene.json").toUri());
         assertThat(plan.components().getFirst().authoredSource()).isEqualTo(generatedSource);
     }
 
@@ -223,8 +223,8 @@ final class CompositionPlannerTest {
     }
 
     /** Creates a world with two independently configured instances of one nested reusable definition. */
-    private static WorldDefinition worldDefinition() {
-        return new WorldDefinition(
+    private static SceneDefinition worldDefinition() {
+        return new SceneDefinition(
                 WORLD_ID,
                 "World working copy",
                 List.of(

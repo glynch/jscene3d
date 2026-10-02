@@ -26,7 +26,10 @@ final class PlaytestProfileLoaderTest {
                   "schemaVersion": 1,
                   "profiles": {
                     "moving-floor-34": {
-                      "scene": "worlds/map01.world.json",
+                      "scene": {
+                        "assetId": "92a63e56-bfd1-4907-a773-6c772e4f9945",
+                        "pathHint": "worlds/map01.scene.json"
+                      },
                       "parameters": {
                         "example.invulnerable": true,
                         "example.spawn": [43, 0.875, 21.5]
@@ -39,7 +42,8 @@ final class PlaytestProfileLoaderTest {
         PlaytestProfile profile = new PlaytestProfileLoader().load(temporaryDirectory, "moving-floor-34");
 
         assertThat(profile.name()).isEqualTo("moving-floor-34");
-        assertThat(profile.scene()).isEqualTo(Path.of("worlds/map01.world.json"));
+        assertThat(profile.scene().id().toString()).isEqualTo("92a63e56-bfd1-4907-a773-6c772e4f9945");
+        assertThat(profile.scene().pathHint()).contains("worlds/map01.scene.json");
         assertThat(profile.parameters().get("example.invulnerable")).isEqualTo(new ProjectValue.BooleanValue(true));
         assertThat(profile.parameters().get("example.spawn")).isInstanceOf(ProjectValue.ArrayValue.class);
     }

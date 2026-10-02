@@ -9,7 +9,7 @@ import java.util.Objects;
 
 /** Runtime-free identity of one distinct expansion of an authored definition.
  *
- * @param definition expanded world or reusable-definition asset
+ * @param definition expanded Scene or reusable-definition asset
  * @param anchor occurrence anchoring this distinct definition instance
  */
 public record CompositionScope(AssetId definition, CompositionOccurrenceId anchor) {

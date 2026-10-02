@@ -29,7 +29,7 @@ These low-level modules remain usable without the project model. The manual's
 - `jscene3d-i18n` defines toolkit-independent localized-message lookup, with a
   Java resource-bundle implementation.
 - `jscene3d-project` owns versioned project manifests and settings, assets,
-  import definitions, entity and world definitions, safe extension metadata,
+  import definitions, entity and Scene definitions, safe extension metadata,
   built-in descriptor metadata, validation, stable identities, and diagnostics.
 - `jscene3d-project-3d` supplies authorable spatial and presentation descriptors,
   their runtime components and resource codecs, and the world-scoped adapter

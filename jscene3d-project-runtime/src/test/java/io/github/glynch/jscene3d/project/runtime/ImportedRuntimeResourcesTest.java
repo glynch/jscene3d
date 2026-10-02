@@ -57,7 +57,7 @@ final class ImportedRuntimeResourcesTest {
               "schemaVersion": 1,
               "identity": {"id": "example.runtime-resource", "name": "Resources", "version": "1.0.0"},
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
-              "runtime": {"applicationExtension": "example.runtime-resource", "entryScene": "main.world.json"},
+              "runtime": {"applicationExtension": "example.runtime-resource"},
               "extensions": [{"id": "example.runtime-resource", "requires": "1.0.0"}],
               "assets": [
                 {"id": "resource-doc", "type": "example.runtime-resource/source", "path": "assets/resource.json"},

@@ -32,8 +32,8 @@ import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBind
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpoints;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactoryRegistry;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentRuntimeExtension;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -289,20 +289,20 @@ final class WorldEndpointBindingTest {
 
     /** Writes and composes one definition and world through the supported public seam. */
     private WorldCompositionResult compose(
-            EntityDefinition definition, WorldDefinition world, ComponentRuntimeExtension extension)
+            EntityDefinition definition, SceneDefinition world, ComponentRuntimeExtension extension)
             throws IOException {
         return compose(List.of(definition), world, extension);
     }
 
     /** Writes all reusable definitions before composing one world. */
     private WorldCompositionResult compose(
-            List<EntityDefinition> definitions, WorldDefinition world, ComponentRuntimeExtension extension)
+            List<EntityDefinition> definitions, SceneDefinition world, ComponentRuntimeExtension extension)
             throws IOException {
         for (int index = 0; index < definitions.size(); index++) {
             DefinitionWriter.write(
                     temporaryDirectory.resolve("endpoints-" + index + ".entity.json"), definitions.get(index));
         }
-        DefinitionWriter.write(temporaryDirectory.resolve("endpoints.world.json"), world);
+        DefinitionWriter.write(temporaryDirectory.resolve("endpoints.scene.json"), world);
         AssetCatalog assets = AssetCatalog.scan(temporaryDirectory).catalog().orElseThrow();
         RegisteredTypeCatalog types = RegisteredTypeCatalog.of(List.of(descriptor()));
         return WorldComposer.compose(assets, AssetRef.to(WORLD_ID), types, List.of(extension), List.of(), NO_RESOURCES);
@@ -360,16 +360,16 @@ final class WorldEndpointBindingTest {
     }
 
     /** Creates two placements and the supplied world-level connections. */
-    private static WorldDefinition placedWorld(List<SignalConnection> connections) {
+    private static SceneDefinition placedWorld(List<SignalConnection> connections) {
         return placedWorld(DEFINITION_ID, connections);
     }
 
     /** Creates two placements of the selected definition and the supplied world-level connections. */
-    private static WorldDefinition placedWorld(AssetId definition, List<SignalConnection> connections) {
+    private static SceneDefinition placedWorld(AssetId definition, List<SignalConnection> connections) {
         EntityPlacement first = new EntityPlacement(FIRST_PLACEMENT, "First", true, AssetRef.to(definition), Map.of());
         EntityPlacement second =
                 new EntityPlacement(SECOND_PLACEMENT, "Second", true, AssetRef.to(definition), Map.of());
-        return new WorldDefinition(WORLD_ID, "Endpoint world", connections, List.of(first, second));
+        return new SceneDefinition(WORLD_ID, "Endpoint world", connections, List.of(first, second));
     }
 
     /** Creates the safe endpoint descriptors used by every fixture. */

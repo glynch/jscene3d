@@ -35,6 +35,7 @@ import io.github.glynch.jscene3d.project.runtime.PublishedRuntimeResources;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.AuthoredEulerRotation3d;
 import io.github.glynch.jscene3d.project.spatial3d.Material3dResource;
 import io.github.glynch.jscene3d.project.spatial3d.Mesh3dResource;
@@ -45,7 +46,6 @@ import io.github.glynch.jscene3d.project.spatial3d.Spatial3dRuntimeExtension;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -71,8 +71,7 @@ final class GltfProjectImportTest {
               },
               "engine": {"requires": ">=0.1.0-SNAPSHOT <0.2.0"},
               "runtime": {
-                "applicationExtension": "io.github.glynch.jscene3d.gltf",
-                "entryScene": "main.world.json"
+                "applicationExtension": "io.github.glynch.jscene3d.gltf"
               },
               "extensions": [
                 {"id": "io.github.glynch.jscene3d.gltf", "requires": "0.1.0-SNAPSHOT"}
@@ -154,8 +153,8 @@ final class GltfProjectImportTest {
                 .assetId()
                 .orElseThrow();
         DefinitionWriter.write(
-                temporaryDirectory.resolve("main.world.json"),
-                new WorldDefinition(
+                temporaryDirectory.resolve("main.scene.json"),
+                new SceneDefinition(
                         WORLD_ID,
                         "Imported model",
                         List.of(new EntityPlacement(PLACEMENT_ID, true, AssetRef.to(generatedId), Map.of()))));

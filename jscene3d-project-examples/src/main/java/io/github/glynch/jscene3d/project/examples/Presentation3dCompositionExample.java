@@ -22,6 +22,7 @@ import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.WorldComposer;
 import io.github.glynch.jscene3d.project.runtime.WorldCompositionResult;
 import io.github.glynch.jscene3d.project.runtime.WorldModuleBinding;
+import io.github.glynch.jscene3d.project.scene.SceneDefinition;
 import io.github.glynch.jscene3d.project.spatial3d.Material3dResource;
 import io.github.glynch.jscene3d.project.spatial3d.Mesh3dResource;
 import io.github.glynch.jscene3d.project.spatial3d.Spatial3dAdapters;
@@ -30,14 +31,13 @@ import io.github.glynch.jscene3d.project.spatial3d.Spatial3dWorldModule;
 import io.github.glynch.jscene3d.project.spatial3d.Transform3d;
 import io.github.glynch.jscene3d.project.spatial3d.descriptor.Spatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
-import io.github.glynch.jscene3d.project.world.WorldDefinition;
 import java.nio.file.Path;
 import java.util.List;
 import org.joml.Quaternionf;
 
 /** Renders a descriptor-authored camera, directional light, and immutable-resource cube. */
 public final class Presentation3dCompositionExample {
-    private static final AssetId WORLD_ID = AssetId.from("91d7de40-0364-4d1e-b357-8f255cf46d56");
+    private static final AssetId SCENE_ID = AssetId.from("91d7de40-0364-4d1e-b357-8f255cf46d56");
     private static final ComponentId CUBE_TRANSFORM = ComponentId.from("ef97052c-8dbb-4cb7-b3f2-bce92385f4af");
     private static final ResourceReference MESH_REFERENCE = ResourceReference.asset("example-cube-mesh");
     private static final ResourceReference MATERIAL_REFERENCE = ResourceReference.asset("example-blue-material");
@@ -50,11 +50,11 @@ public final class Presentation3dCompositionExample {
     /**
      * Opens the authored presentation world supplied as the sole argument.
      *
-     * @param arguments one world asset-directory path
+     * @param arguments one Scene asset-directory path
      */
     public static void main(String[] arguments) {
         if (arguments.length != 1) {
-            throw new IllegalArgumentException("expected one world asset-directory path");
+            throw new IllegalArgumentException("expected one Scene asset-directory path");
         }
         Path assetDirectory = Path.of(arguments[0]).toAbsolutePath().normalize();
         ExampleLauncher.launch(
@@ -69,7 +69,7 @@ public final class Presentation3dCompositionExample {
         ExampleResources resources = new ExampleResources();
         WorldCompositionResult result = WorldComposer.compose(
                 assets,
-                AssetRef.<WorldDefinition>to(WORLD_ID),
+                AssetRef.<SceneDefinition>to(SCENE_ID),
                 types,
                 List.of(new Spatial3dRuntimeExtension()),
                 List.of(WorldModuleBinding.of(Spatial3dWorldModule.class, spatial)),

@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Immutable entity authored locally within a world or reusable entity definition. */
+/** Immutable entity authored locally within a Scene or reusable entity definition. */
 public final class LocalEntity implements EntityEntry {
     private final EntityId id;
     private final Optional<String> name;

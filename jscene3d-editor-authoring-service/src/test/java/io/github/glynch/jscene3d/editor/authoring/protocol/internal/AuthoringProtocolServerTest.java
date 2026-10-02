@@ -52,12 +52,12 @@ final class AuthoringProtocolServerTest {
     /** Negotiates the supported protocol and advertises only implemented authoring capabilities. */
     @Test
     void initializesAuthoringConnection() throws IOException {
-        JsonNode response = response(initialize(2, 0));
+        JsonNode response = response(initialize(2, 1));
 
         assertThat(response.path("id").asInt()).isEqualTo(1);
         assertThat(response.path("connectionGeneration").asText()).isEqualTo("connection-test");
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isZero();
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(1);
         assertThat(response.at("/result/processKind").asText()).isEqualTo("authoring");
         assertThat(response.at("/result/serviceVersion").asText()).isEqualTo("1.2.0-test");
         assertThat(response.at("/result/engineVersion").asText()).isEqualTo("0.1.0-SNAPSHOT");
@@ -99,7 +99,7 @@ final class AuthoringProtocolServerTest {
         JsonNode response = response(initialize(2, 7));
 
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isZero();
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(1);
         assertThat(server.isInitialized()).isTrue();
     }
 
@@ -172,6 +172,28 @@ final class AuthoringProtocolServerTest {
         assertThat(missingOpen.at("/error/code").asInt()).isEqualTo(-32602);
         assertThat(invalidOpen.at("/error/code").asInt()).isEqualTo(-32602);
         assertThat(invalidReplace.at("/error/code").asInt()).isEqualTo(-32602);
+    }
+
+    /** Serializes Java-classified semantic groups and stable Main Scene identity on project open. */
+    @Test
+    void serializesSemanticProjectCatalog() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        AuthoringTestProject.writeEntityDefinition(temporaryDirectory);
+        response(initialize(2, 1));
+
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
+
+        assertThat(opened.at("/result/project/catalog/scenes/0/id").asText())
+                .isEqualTo(AuthoringTestProject.SCENE_ASSET_ID);
+        assertThat(opened.at("/result/project/catalog/scenes/0/mainScene").asBoolean())
+                .isTrue();
+        assertThat(opened.at("/result/project/catalog/scenes/0/source").asText())
+                .endsWith("/worlds/main.scene.json");
+        assertThat(opened.at("/result/project/catalog/entityDefinitions/0/id").asText())
+                .isEqualTo(AuthoringTestProject.DEFINITION_ASSET_ID);
+        assertThat(opened.at("/result/project/catalog/entityDefinitions/0/mainScene")
+                        .asBoolean())
+                .isFalse();
     }
 
     /** Rejects absent, blank, and malformed client language tags without retaining a locale. */

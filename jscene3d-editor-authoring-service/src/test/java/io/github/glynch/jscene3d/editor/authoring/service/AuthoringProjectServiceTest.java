@@ -86,8 +86,67 @@ final class AuthoringProjectServiceTest {
                     assertThat(mainScene.name()).isEqualTo("Opening Scene");
                     assertThat(project.assetCounts().authored()).isEqualTo(1);
                     assertThat(project.assetCounts().projected()).isEqualTo(1);
+                    assertThat(project.catalog().scenes())
+                            .singleElement()
+                            .returns(AuthoringTestProject.SCENE_ASSET_ID, ProjectSummary.CatalogEntry::id)
+                            .returns("Opening Scene", ProjectSummary.CatalogEntry::name)
+                            .returns("authored", ProjectSummary.CatalogEntry::origin)
+                            .returns(true, ProjectSummary.CatalogEntry::editable)
+                            .returns(true, ProjectSummary.CatalogEntry::mainScene)
+                            .satisfies(entry -> assertThat(entry.source()).endsWith("/worlds/main.scene.json"));
+                    assertThat(project.catalog().entityDefinitions()).isEmpty();
                 });
         assertThat(service.activeSession()).isPresent();
+    }
+
+    /** Groups definitions semantically and retains Main Scene identity after physical relocation. */
+    @Test
+    void catalogsDefinitionsIndependentlyOfPhysicalDirectoryLayout() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        AuthoringTestProject.writeEntityDefinition(temporaryDirectory);
+        Path relocatedScene = temporaryDirectory.resolve("unconventional/content/opening.scene.json");
+        Path relocatedEntity = temporaryDirectory.resolve("misc/catalog/player.entity.json");
+        Files.createDirectories(relocatedScene.getParent());
+        Files.createDirectories(relocatedEntity.getParent());
+        Files.move(temporaryDirectory.resolve("worlds/main.scene.json"), relocatedScene);
+        Files.move(temporaryDirectory.resolve("entities/reusable.entity.json"), relocatedEntity);
+
+        ProjectSummary summary =
+                Objects.requireNonNull(service.openProject(new ProjectOpenParams(temporaryDirectory.toString()))
+                        .project());
+
+        assertThat(summary.catalog().scenes())
+                .singleElement()
+                .returns(AuthoringTestProject.SCENE_ASSET_ID, ProjectSummary.CatalogEntry::id)
+                .returns(true, ProjectSummary.CatalogEntry::mainScene)
+                .satisfies(entry -> assertThat(entry.source()).endsWith("/unconventional/content/opening.scene.json"));
+        assertThat(summary.catalog().entityDefinitions())
+                .singleElement()
+                .returns(AuthoringTestProject.DEFINITION_ASSET_ID, ProjectSummary.CatalogEntry::id)
+                .returns(false, ProjectSummary.CatalogEntry::mainScene)
+                .satisfies(entry -> assertThat(entry.source()).endsWith("/misc/catalog/player.entity.json"));
+    }
+
+    /** Opens a valid Project with no Scenes, no Main Scene, and no Entity definitions. */
+    @Test
+    void returnsEmptySemanticGroupsForProjectWithoutDefinitions() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        Files.delete(temporaryDirectory.resolve("worlds/main.scene.json"));
+        Path descriptor = temporaryDirectory.resolve(AuthoringTestProject.DESCRIPTOR);
+        String source = Files.readString(descriptor);
+        Files.writeString(
+                descriptor,
+                source.replace(
+                        "\"runtime\":{\"applicationExtension\":\"example.authoring-test\",\"mainScene\":{\"assetId\":\"e890c4c3-fb32-49d8-88b8-4e04e7a29656\",\"pathHint\":\"worlds/main.scene.json\"}}",
+                        "\"runtime\":{\"applicationExtension\":\"example.authoring-test\"}"));
+
+        ProjectOpenResult result = service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        ProjectSummary summary = Objects.requireNonNull(result.project());
+
+        assertThat(result.opened()).isTrue();
+        assertThat(summary.mainScene()).isNull();
+        assertThat(summary.catalog().scenes()).isEmpty();
+        assertThat(summary.catalog().entityDefinitions()).isEmpty();
     }
 
     /** Prepares only the generation-scoped Main Scene with renderer-only runtime inputs. */

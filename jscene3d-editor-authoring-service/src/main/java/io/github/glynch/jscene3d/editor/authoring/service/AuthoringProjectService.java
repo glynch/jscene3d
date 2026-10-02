@@ -26,6 +26,7 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchSpecification;
 import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
+import io.github.glynch.jscene3d.editor.project.asset.ProjectAsset;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringBackupResult;
@@ -74,6 +75,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /** Owns zero or one retained authoring project session for a persistent service process. */
@@ -588,7 +590,43 @@ public final class AuthoringProjectService implements AutoCloseable {
                 mainScene,
                 new ProjectSummary.AssetCounts(
                         session.authoredAssets().assets().size(),
-                        session.assets().size()));
+                        session.assets().size()),
+                catalog(session, mainScene));
+    }
+
+    /** Projects only Java-classified structural definitions into the semantic Project catalog. */
+    private static ProjectSummary.ProjectCatalog catalog(
+            EditorProjectSession session, ProjectSummary.@Nullable SceneSummary mainScene) {
+        Map<String, ProjectAsset> projections = session.assets().stream()
+                .filter(asset -> asset.kind() == ProjectAsset.Kind.SCENE_DEFINITION
+                        || asset.kind() == ProjectAsset.Kind.ENTITY_DEFINITION)
+                .collect(Collectors.toUnmodifiableMap(ProjectAsset::identity, asset -> asset));
+        List<ProjectSummary.CatalogEntry> scenes = session.authoredAssets().assets().stream()
+                .filter(asset -> asset.kind() == AssetKind.SCENE_DEFINITION)
+                .map(asset -> catalogEntry(
+                        asset,
+                        projections,
+                        mainScene != null && mainScene.id().equals(asset.id().toString())))
+                .toList();
+        List<ProjectSummary.CatalogEntry> entityDefinitions = session.authoredAssets().assets().stream()
+                .filter(asset -> asset.kind() == AssetKind.ENTITY_DEFINITION)
+                .map(asset -> catalogEntry(asset, projections, false))
+                .toList();
+        return new ProjectSummary.ProjectCatalog(scenes, entityDefinitions);
+    }
+
+    /** Maps one AssetCatalog-derived authored definition without inferring semantics from its path. */
+    private static ProjectSummary.CatalogEntry catalogEntry(
+            AssetMetadata metadata, Map<String, ProjectAsset> projections, boolean mainScene) {
+        ProjectAsset projection =
+                Objects.requireNonNull(projections.get(metadata.id().toString()), "definition projection");
+        return new ProjectSummary.CatalogEntry(
+                metadata.id().toString(),
+                projection.label(),
+                metadata.path().toUri().toString(),
+                "authored",
+                true,
+                mainScene);
     }
 
     /** Maps one domain diagnostic without adding serialization concerns to the domain type. */

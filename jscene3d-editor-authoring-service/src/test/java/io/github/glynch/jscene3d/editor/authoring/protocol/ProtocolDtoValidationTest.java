@@ -155,6 +155,41 @@ final class ProtocolDtoValidationTest {
                 .hasMessageContaining("non-negative");
     }
 
+    /** Enforces the semantic catalog vocabulary and group-specific Main Scene invariant. */
+    @Test
+    void validatesSemanticProjectCatalog() {
+        ProjectSummary.CatalogEntry authored =
+                new ProjectSummary.CatalogEntry("scene", "Scene", "file:///project/scene.json", "authored", true, true);
+        ProjectSummary.CatalogEntry entity = new ProjectSummary.CatalogEntry(
+                "entity", "Entity", "file:///project/entity.json", "authored", true, false);
+        List<ProjectSummary.CatalogEntry> noEntries = List.of();
+        List<ProjectSummary.CatalogEntry> authoredEntities = List.of(authored);
+        ProjectSummary.SceneSummary otherScene = new ProjectSummary.SceneSummary("other", "Other");
+        ProjectSummary.AssetCounts assetCounts = new ProjectSummary.AssetCounts(1, 1);
+        ProjectSummary.ProjectCatalog catalog = new ProjectSummary.ProjectCatalog(List.of(authored), noEntries);
+
+        assertThat(new ProjectSummary.ProjectCatalog(List.of(authored), List.of(entity)).scenes())
+                .containsExactly(authored);
+        assertThatThrownBy(() -> new ProjectSummary.CatalogEntry(
+                        "generated", "Generated", "published:generated", "generated", true, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot be editable");
+        assertThatThrownBy(() -> new ProjectSummary.ProjectCatalog(noEntries, authoredEntities))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot be the Main Scene");
+        assertThatThrownBy(() -> new ProjectSummary(
+                        "project",
+                        "Project",
+                        "1.0.0",
+                        "/project",
+                        "/project/project.j3d",
+                        otherScene,
+                        assetCounts,
+                        catalog))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("stable configured identity");
+    }
+
     /** Carries the explicit positive orderly-shutdown acknowledgement. */
     @Test
     void representsAcceptedShutdown() {
@@ -423,6 +458,10 @@ final class ProtocolDtoValidationTest {
                 "/project",
                 "/project/project.j3d",
                 new ProjectSummary.SceneSummary("world", "World"),
-                new ProjectSummary.AssetCounts(0, 0));
+                new ProjectSummary.AssetCounts(1, 1),
+                new ProjectSummary.ProjectCatalog(
+                        List.of(new ProjectSummary.CatalogEntry(
+                                "world", "World", "file:///project/world.scene.json", "authored", true, true)),
+                        List.of()));
     }
 }

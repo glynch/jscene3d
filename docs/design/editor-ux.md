@@ -944,9 +944,19 @@ For example, a color property should be presented as a color rather than requiri
 
 ## Property Validation
 
-Invalid authored values should be communicated at the property or Component level where possible.
+Component properties are validated according to their declared metadata and domain rules.
 
-Validation should identify the affected property without requiring the developer to inspect raw JSON or terminal output.
+Validation may identify:
+
+- missing required values
+- invalid numeric ranges
+- invalid enum values
+- unresolved references
+- incompatible reference targets
+- invalid collection contents
+- other property-specific constraints
+
+Problems should be presented close to the affected property where practical.
 
 The Inspector may provide:
 
@@ -954,9 +964,9 @@ The Inspector may provide:
 - warning/error decoration
 - tooltips or details
 
-Java remains authoritative for domain validation.
+Invalid authored state should not be silently corrected or replaced with defaults.
 
-The frontend should not independently invent validation rules for Component types.
+Java remains authoritative for domain validation. The frontend presents validation results rather than independently implementing Component-specific domain rules.
 
 ## Reference Properties
 
@@ -1555,24 +1565,6 @@ Project
 ```
 
 Problems should be associated with the most specific semantic object available.
-
-## Property Validation
-
-Component properties are validated according to their declared metadata and domain rules.
-
-Validation may identify:
-
-- missing required values
-- invalid numeric ranges
-- invalid enum values
-- unresolved references
-- incompatible reference targets
-- invalid collection contents
-- other property-specific constraints
-
-Problems should be presented close to the affected property where practical.
-
-Invalid state should not be silently replaced with defaults.
 
 ## Component Validation
 

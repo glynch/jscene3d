@@ -67,6 +67,7 @@ final class AuthoringProtocolServerTest {
                         "project/open",
                         "project/replace",
                         "project/close",
+                        "viewport/prepareLaunch",
                         "definition/open",
                         "definition/mutate",
                         "definition/undo",
@@ -98,7 +99,7 @@ final class AuthoringProtocolServerTest {
         JsonNode response = response(initialize(1, 7));
 
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(4);
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(5);
         assertThat(server.isInitialized()).isTrue();
     }
 
@@ -237,6 +238,28 @@ final class AuthoringProtocolServerTest {
                 .isEqualTo(AuthoringTestProject.ENTITY_ID);
         assertThat(response.at("/result/definition/roots/0/target/source").asText())
                 .endsWith("worlds/main.world.json");
+    }
+
+    /** Dispatches an authoritative startup-world launch without exposing Java implementation objects. */
+    @Test
+    void dispatchesViewportLaunchPreparation() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        response(initialize(1, 5));
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
+        long generation = opened.at("/result/projectGeneration").asLong();
+
+        JsonNode prepared = response(request(
+                3,
+                "viewport/prepareLaunch",
+                "{\"expectedProjectGeneration\":" + generation + ",\"worldAssetId\":\""
+                        + AuthoringTestProject.WORLD_ASSET_ID + "\"}"));
+
+        assertThat(prepared.at("/result/prepared").asBoolean()).isTrue();
+        assertThat(prepared.at("/result/launch/projectGeneration").asLong()).isEqualTo(generation);
+        assertThat(prepared.at("/result/launch/projectId").asText()).isEqualTo("example.authoring-test");
+        assertThat(prepared.at("/result/launch/worldAssetId").asText()).isEqualTo(AuthoringTestProject.WORLD_ASSET_ID);
+        assertThat(prepared.at("/result/launch/worldName").asText()).isEqualTo("Opening World");
+        assertThat(prepared.at("/result/launch/runtimeArtifacts").isArray()).isTrue();
     }
 
     /** Dispatches one complete Inspector snapshot using the Java-issued hierarchy target. */

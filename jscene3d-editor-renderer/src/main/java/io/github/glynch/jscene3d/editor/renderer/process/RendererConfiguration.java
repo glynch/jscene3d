@@ -5,26 +5,47 @@
 package io.github.glynch.jscene3d.editor.renderer.process;
 
 import io.github.glynch.jscene3d.editor.renderer.protocol.RendererProtocolVersion;
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 
 /** Validated process arguments supplied by the Electron structured-launch boundary. */
 record RendererConfiguration(
-        String electronBundleId, int initialWidth, int initialHeight, RendererProtocolVersion protocolVersion) {
+        String electronBundleId,
+        int initialWidth,
+        int initialHeight,
+        RendererProtocolVersion protocolVersion,
+        Optional<ProjectLaunch> projectLaunch) {
     private static final String VERSION_OPTION = "--protocol-version=";
+    private static final String PROJECT_ROOT_OPTION = "--project-root=";
+    private static final String PUBLISHED_CONTENT_OPTION = "--published-content-root=";
+    private static final String ENGINE_VERSION_OPTION = "--engine-version=";
+    private static final String PROJECT_ID_OPTION = "--project-id=";
+    private static final String WORLD_ASSET_ID_OPTION = "--world-asset-id=";
 
     static RendererConfiguration from(String[] arguments) {
-        int offset;
-        RendererProtocolVersion version;
-        if (arguments.length == 3) {
-            offset = 0;
-            version = RendererProtocolVersion.CURRENT;
-        } else if (arguments.length == 4 && arguments[0].startsWith(VERSION_OPTION)) {
-            offset = 1;
-            version = parseVersion(arguments[0].substring(VERSION_OPTION.length()));
-        } else {
-            throw new IllegalArgumentException(
-                    "Expected [--protocol-version=<major>.<minor>] Electron bundle ID, width and height");
+        if (arguments.length < 3) {
+            throw usageFailure();
+        }
+        int processArgumentCount = arguments.length - 3;
+        Map<String, String> options = new LinkedHashMap<>();
+        RendererProtocolVersion version = RendererProtocolVersion.CURRENT;
+        for (int index = 0; index < processArgumentCount; index++) {
+            String argument = arguments[index];
+            if (argument.startsWith(VERSION_OPTION)) {
+                version = parseVersion(argument.substring(VERSION_OPTION.length()));
+            } else if (!putOption(options, argument, PROJECT_ROOT_OPTION)
+                    && !putOption(options, argument, PUBLISHED_CONTENT_OPTION)
+                    && !putOption(options, argument, ENGINE_VERSION_OPTION)
+                    && !putOption(options, argument, PROJECT_ID_OPTION)
+                    && !putOption(options, argument, WORLD_ASSET_ID_OPTION)) {
+                throw usageFailure();
+            }
         }
 
+        int offset = processArgumentCount;
         String bundleId = arguments[offset].strip();
         if (bundleId.isEmpty()) {
             throw new IllegalArgumentException("Electron bundle ID must not be blank");
@@ -34,7 +55,51 @@ record RendererConfiguration(
         if (!version.equals(RendererProtocolVersion.CURRENT)) {
             throw new IllegalArgumentException("Unsupported renderer protocol version: " + version);
         }
-        return new RendererConfiguration(bundleId, width, height, version);
+        return new RendererConfiguration(bundleId, width, height, version, projectLaunch(options));
+    }
+
+    private static Optional<ProjectLaunch> projectLaunch(Map<String, String> options) {
+        if (options.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new ProjectLaunch(
+                absolutePath(options, PROJECT_ROOT_OPTION),
+                absolutePath(options, PUBLISHED_CONTENT_OPTION),
+                option(options, ENGINE_VERSION_OPTION),
+                option(options, PROJECT_ID_OPTION),
+                AssetId.from(option(options, WORLD_ASSET_ID_OPTION))));
+    }
+
+    private static boolean putOption(Map<String, String> options, String argument, String prefix) {
+        if (!argument.startsWith(prefix)) {
+            return false;
+        }
+        String value = argument.substring(prefix.length());
+        if (value.isBlank() || options.put(prefix, value) != null) {
+            throw new IllegalArgumentException("Renderer option must occur once with a non-blank value: " + prefix);
+        }
+        return true;
+    }
+
+    private static String option(Map<String, String> options, String name) {
+        String value = options.get(name);
+        if (value == null) {
+            throw new IllegalArgumentException("Project renderer option is required: " + name);
+        }
+        return value;
+    }
+
+    private static Path absolutePath(Map<String, String> options, String name) {
+        Path path = Path.of(option(options, name));
+        if (!path.isAbsolute()) {
+            throw new IllegalArgumentException("Project renderer path must be absolute: " + name);
+        }
+        return path.normalize();
+    }
+
+    private static IllegalArgumentException usageFailure() {
+        return new IllegalArgumentException(
+                "Expected renderer options followed by Electron bundle ID, width and height");
     }
 
     private static RendererProtocolVersion parseVersion(String value) {
@@ -60,4 +125,12 @@ record RendererConfiguration(
             throw new IllegalArgumentException("Initial surface " + name + " must be an integer", exception);
         }
     }
+
+    /** Java-owned semantic project launch retained independently of Electron surface identity. */
+    record ProjectLaunch(
+            Path projectRoot,
+            Path publishedContentRoot,
+            String engineVersion,
+            String projectId,
+            AssetId worldAssetId) {}
 }

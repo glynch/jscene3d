@@ -46,6 +46,59 @@ final class ProtocolDtoValidationTest {
                 .hasMessageContaining("blank");
     }
 
+    /** Enforces generation, identity, and mutually exclusive result shapes for viewport launches. */
+    @Test
+    void validatesViewportLaunchDtos() {
+        List<String> noRuntimeArtifacts = List.of();
+        List<String> blankRuntimeArtifact = List.of(" ");
+        List<ProjectDiagnosticDto> noDiagnostics = List.of();
+        assertThatThrownBy(() -> new ViewportLaunchParams(0L, "world"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> new ViewportLaunchParams(1L, " \t"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+
+        ViewportLaunchSpecification launch = new ViewportLaunchSpecification(
+                7L,
+                "example.project",
+                "Example",
+                "/projects/example",
+                "/projects/example/.jscene3d/published",
+                "0.1.0-SNAPSHOT",
+                "2f26576c-570d-4338-bc30-52bc41def3a5",
+                "Opening World",
+                List.of("/runtime/example.jar"));
+        assertThatThrownBy(() -> new ViewportLaunchSpecification(
+                        0L,
+                        "example.project",
+                        "Example",
+                        "/projects/example",
+                        "/projects/example/.jscene3d/published",
+                        "0.1.0-SNAPSHOT",
+                        "world",
+                        "Opening World",
+                        noRuntimeArtifacts))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> new ViewportLaunchSpecification(
+                        7L,
+                        "example.project",
+                        "Example",
+                        "/projects/example",
+                        "/projects/example/.jscene3d/published",
+                        "0.1.0-SNAPSHOT",
+                        "world",
+                        "Opening World",
+                        blankRuntimeArtifact))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runtimeArtifacts");
+        assertThatThrownBy(() -> new ViewportLaunchResult(true, null, noDiagnostics, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ViewportLaunchResult(false, launch, noDiagnostics, "rejected"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     /** Rejects non-positive generations and blank definition asset identities. */
     @Test
     void rejectsInvalidDefinitionOpenParams() {

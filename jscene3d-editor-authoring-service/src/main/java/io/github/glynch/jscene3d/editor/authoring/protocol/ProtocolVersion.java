@@ -12,7 +12,7 @@ package io.github.glynch.jscene3d.editor.authoring.protocol;
  */
 public record ProtocolVersion(int major, int minor) {
     /** Current protocol version implemented by this service. */
-    public static final ProtocolVersion CURRENT = new ProtocolVersion(1, 4);
+    public static final ProtocolVersion CURRENT = new ProtocolVersion(1, 5);
 
     /** Validates non-negative version components. */
     public ProtocolVersion {

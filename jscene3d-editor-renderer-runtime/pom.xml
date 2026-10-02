@@ -87,6 +87,16 @@
                                 </artifactItem>
                                 <artifactItem>
                                     <groupId>org.lwjgl</groupId>
+                                    <artifactId>lwjgl-openal</artifactId>
+                                    <version>${lwjgl.version}</version>
+                                    <classifier>natives-macos-arm64</classifier>
+                                    <type>jar</type>
+                                    <fileMappers>
+                                        <fileMapper implementation="org.codehaus.plexus.components.io.filemappers.FlattenFileMapper" />
+                                    </fileMappers>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.lwjgl</groupId>
                                     <artifactId>lwjgl-stb</artifactId>
                                     <version>${lwjgl.version}</version>
                                     <classifier>natives-macos-arm64</classifier>

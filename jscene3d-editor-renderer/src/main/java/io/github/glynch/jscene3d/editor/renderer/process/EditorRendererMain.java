@@ -42,9 +42,12 @@ public final class EditorRendererMain {
             throw failure;
         }
 
-        ValidationRendererSession rendererSession;
+        RendererSession rendererSession;
         try {
-            rendererSession = ValidationRendererSession.create(configuration);
+            rendererSession = configuration
+                    .projectLaunch()
+                    .<RendererSession>map(launch -> ProjectRendererSession.create(configuration, launch))
+                    .orElseGet(() -> ValidationRendererSession.create(configuration));
         } catch (RuntimeException | LinkageError failure) {
             output.println(RendererProtocol.EVENT_PROTOCOL_VERSION + " " + configuration.protocolVersion());
             output.println(RendererProtocol.EVENT_ERROR + " RUNTIME_FAILURE startup");
@@ -52,7 +55,7 @@ public final class EditorRendererMain {
             throw failure;
         }
 
-        try (ValidationRendererSession session = rendererSession;
+        try (RendererSession session = rendererSession;
                 BufferedReader input = new BufferedReader(
                         new InputStreamReader(new FileInputStream(FileDescriptor.in), StandardCharsets.UTF_8))) {
             RendererProtocolServer server =

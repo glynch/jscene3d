@@ -12,12 +12,15 @@ import java.util.Objects;
 /** Immutable process configuration parsed from authoring-service command-line arguments. */
 final class AuthoringServiceConfiguration {
     private static final String EXTENSION_METADATA_PREFIX = "--extension-metadata=";
+    private static final String RUNTIME_ARTIFACT_PREFIX = "--runtime-artifact=";
 
     private final List<Path> installedExtensionMetadata;
+    private final List<Path> runtimeArtifacts;
 
     /** Stores an ordered snapshot of installed descriptor-only extension artifacts. */
-    private AuthoringServiceConfiguration(List<Path> installedExtensionMetadata) {
+    private AuthoringServiceConfiguration(List<Path> installedExtensionMetadata, List<Path> runtimeArtifacts) {
         this.installedExtensionMetadata = List.copyOf(installedExtensionMetadata);
+        this.runtimeArtifacts = List.copyOf(runtimeArtifacts);
     }
 
     /**
@@ -29,23 +32,36 @@ final class AuthoringServiceConfiguration {
     static AuthoringServiceConfiguration from(String[] arguments) {
         Objects.requireNonNull(arguments, "arguments");
         List<Path> installedExtensionMetadata = new ArrayList<>();
+        List<Path> runtimeArtifacts = new ArrayList<>();
         for (String argument : arguments) {
             String candidate = Objects.requireNonNull(argument, "argument");
-            if (!candidate.startsWith(EXTENSION_METADATA_PREFIX)) {
+            if (candidate.startsWith(EXTENSION_METADATA_PREFIX)) {
+                installedExtensionMetadata.add(
+                        argumentPath(candidate, EXTENSION_METADATA_PREFIX, "extension metadata"));
+            } else if (candidate.startsWith(RUNTIME_ARTIFACT_PREFIX)) {
+                runtimeArtifacts.add(argumentPath(candidate, RUNTIME_ARTIFACT_PREFIX, "runtime artifact"));
+            } else {
                 throw new IllegalArgumentException("Unsupported authoring service argument: " + candidate);
             }
-            String configuredPath = candidate.substring(EXTENSION_METADATA_PREFIX.length());
-            if (configuredPath.isBlank()) {
-                throw new IllegalArgumentException("Authoring service extension metadata path must not be blank");
-            }
-            installedExtensionMetadata.add(
-                    Path.of(configuredPath).toAbsolutePath().normalize());
         }
-        return new AuthoringServiceConfiguration(installedExtensionMetadata);
+        return new AuthoringServiceConfiguration(installedExtensionMetadata, runtimeArtifacts);
     }
 
     /** Returns installed descriptor-only extension artifacts in configured order. */
     List<Path> installedExtensionMetadata() {
         return installedExtensionMetadata;
+    }
+
+    /** Returns renderer-only runtime artifacts in configured order. */
+    List<Path> runtimeArtifacts() {
+        return runtimeArtifacts;
+    }
+
+    private static Path argumentPath(String argument, String prefix, String description) {
+        String configuredPath = argument.substring(prefix.length());
+        if (configuredPath.isBlank()) {
+            throw new IllegalArgumentException("Authoring service " + description + " path must not be blank");
+        }
+        return Path.of(configuredPath).toAbsolutePath().normalize();
     }
 }

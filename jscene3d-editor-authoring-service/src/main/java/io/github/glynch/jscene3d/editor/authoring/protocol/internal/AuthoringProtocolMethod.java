@@ -19,6 +19,8 @@ enum AuthoringProtocolMethod {
     PROJECT_REPLACE("project/replace"),
     /** Closes the retained project without terminating the service. */
     PROJECT_CLOSE("project/close"),
+    /** Prepares an isolated renderer launch for one authoritative project world. */
+    VIEWPORT_PREPARE_LAUNCH("viewport/prepareLaunch"),
     /** Resolves and retains a structural definition with its complete hierarchy snapshot. */
     DEFINITION_OPEN("definition/open"),
     /** Applies one exact SET or REMOVE mutation. */

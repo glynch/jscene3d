@@ -32,7 +32,8 @@ public final class AuthoringServiceMain {
                 build.engineVersion(),
                 AuthoringServiceMain.class.getClassLoader(),
                 configuration.installedExtensionMetadata());
-        AuthoringProjectService service = new AuthoringProjectService(loader);
+        AuthoringProjectService service =
+                new AuthoringProjectService(loader, build.engineVersion(), configuration.runtimeArtifacts());
         AuthoringProtocolServer server = new AuthoringProtocolServer(
                 service,
                 build.serviceVersion(),

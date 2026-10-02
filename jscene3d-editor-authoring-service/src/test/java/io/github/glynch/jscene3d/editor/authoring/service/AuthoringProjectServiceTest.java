@@ -21,6 +21,9 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchSpecification;
 import io.github.glynch.jscene3d.editor.authoring.testing.AuthoringTestProject;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringMutation;
@@ -84,6 +87,59 @@ final class AuthoringProjectServiceTest {
                     assertThat(project.assetCounts().projected()).isEqualTo(1);
                 });
         assertThat(service.activeSession()).isPresent();
+    }
+
+    /** Prepares only the generation-scoped startup world with renderer-only runtime inputs. */
+    @Test
+    void preparesAuthoritativeStartupWorldViewportLaunch() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        Path runtimeArtifact = temporaryDirectory.resolve("runtime/application.jar");
+        AuthoringProjectService viewportService = new AuthoringProjectService(
+                new EditorProjectLoader("0.1.0-SNAPSHOT", AuthoringProjectServiceTest.class.getClassLoader()),
+                "0.1.0-SNAPSHOT",
+                List.of(runtimeArtifact));
+        try (viewportService) {
+            viewportService.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+
+            ViewportLaunchResult result = viewportService.prepareViewportLaunch(
+                    new ViewportLaunchParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+            ViewportLaunchSpecification launch = Objects.requireNonNull(result.launch());
+
+            assertThat(result.prepared()).isTrue();
+            assertThat(result.failureCode()).isNull();
+            assertThat(launch)
+                    .returns(1L, ViewportLaunchSpecification::projectGeneration)
+                    .returns("example.authoring-test", ViewportLaunchSpecification::projectId)
+                    .returns("Small Authoring Project", ViewportLaunchSpecification::projectName)
+                    .returns("0.1.0-SNAPSHOT", ViewportLaunchSpecification::engineVersion)
+                    .returns(AuthoringTestProject.WORLD_ASSET_ID, ViewportLaunchSpecification::worldAssetId)
+                    .returns("Opening World", ViewportLaunchSpecification::worldName);
+            assertThat(launch.projectRoot())
+                    .isEqualTo(temporaryDirectory.toRealPath().toString());
+            assertThat(launch.runtimeArtifacts())
+                    .containsExactly(
+                            runtimeArtifact.toAbsolutePath().normalize().toString());
+        }
+    }
+
+    /** Rejects absent projects, stale generations, malformed IDs, and non-startup worlds. */
+    @Test
+    void rejectsUnavailableViewportLaunchIdentity() throws IOException {
+        ViewportLaunchResult absent =
+                service.prepareViewportLaunch(new ViewportLaunchParams(1L, AuthoringTestProject.WORLD_ASSET_ID));
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+
+        ViewportLaunchResult stale =
+                service.prepareViewportLaunch(new ViewportLaunchParams(2L, AuthoringTestProject.WORLD_ASSET_ID));
+        ViewportLaunchResult malformed = service.prepareViewportLaunch(new ViewportLaunchParams(1L, "not-an-id"));
+        ViewportLaunchResult different =
+                service.prepareViewportLaunch(new ViewportLaunchParams(1L, AuthoringTestProject.DEFINITION_ASSET_ID));
+
+        assertThat(absent.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_NOT_OPEN);
+        assertThat(stale.failureCode()).isEqualTo(AuthoringProjectService.PROJECT_GENERATION_CONFLICT);
+        assertThat(malformed.failureCode()).isEqualTo(AuthoringProjectService.VIEWPORT_WORLD_UNAVAILABLE);
+        assertThat(different.failureCode()).isEqualTo(AuthoringProjectService.VIEWPORT_WORLD_UNAVAILABLE);
     }
 
     /** Opens generic world and entity definitions only for the expected active project generation. */

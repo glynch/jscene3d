@@ -31,6 +31,24 @@ final class AuthoringServiceConfigurationTest {
         assertThatThrownBy(() -> configuredMetadata.add(third)).isInstanceOf(UnsupportedOperationException.class);
     }
 
+    /** Keeps executable project runtime artifacts separate from safe authoring metadata. */
+    @Test
+    void parsesRendererRuntimeArtifactsInArgumentOrder() {
+        Path first = Path.of("runtime", "first.jar");
+        Path second = Path.of("runtime", "second.jar");
+
+        AuthoringServiceConfiguration configuration = AuthoringServiceConfiguration.from(new String[] {
+            "--runtime-artifact=" + first, "--extension-metadata=metadata", "--runtime-artifact=" + second
+        });
+
+        assertThat(configuration.runtimeArtifacts())
+                .containsExactly(
+                        first.toAbsolutePath().normalize(),
+                        second.toAbsolutePath().normalize());
+        assertThat(configuration.installedExtensionMetadata())
+                .containsExactly(Path.of("metadata").toAbsolutePath().normalize());
+    }
+
     /** Accepts the supported empty configuration. */
     @Test
     void acceptsNoInstalledExtensionMetadata() {
@@ -45,6 +63,7 @@ final class AuthoringServiceConfigurationTest {
         String[] nullArgument = {null};
         String[] unsupportedArgument = {"--unsupported=value"};
         String[] blankMetadataPath = {"--extension-metadata= \t"};
+        String[] blankRuntimeArtifact = {"--runtime-artifact= \t"};
 
         assertThatThrownBy(() -> AuthoringServiceConfiguration.from(nullArgument))
                 .isInstanceOf(NullPointerException.class)
@@ -53,6 +72,9 @@ final class AuthoringServiceConfigurationTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unsupported authoring service argument");
         assertThatThrownBy(() -> AuthoringServiceConfiguration.from(blankMetadataPath))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not be blank");
+        assertThatThrownBy(() -> AuthoringServiceConfiguration.from(blankRuntimeArtifact))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must not be blank");
     }

@@ -32,12 +32,14 @@ final class RuntimeArchiveIT {
             "org.joml",
             "org.lwjgl",
             "org.lwjgl.glfw",
+            "org.lwjgl.openal",
             "org.lwjgl.opengl",
             "org.lwjgl.stb");
     private static final Set<String> REQUIRED_NATIVE_LIBRARIES = Set.of(
             "native/libiosurface_bridge.dylib",
             "native/liblwjgl.dylib",
             "native/libglfw.dylib",
+            "native/libopenal.dylib",
             "native/liblwjgl_opengl.dylib",
             "native/liblwjgl_stb.dylib");
 

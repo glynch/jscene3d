@@ -22,6 +22,9 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchSpecification;
 import io.github.glynch.jscene3d.editor.presentation.AuthoringText;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
@@ -80,6 +83,9 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Stable rejection when replacement no longer targets the active project generation. */
     public static final String PROJECT_GENERATION_CONFLICT = "authoring.project.generationConflict";
 
+    /** Stable failure when a requested viewport world is unavailable in the active project. */
+    public static final String VIEWPORT_WORLD_UNAVAILABLE = "authoring.viewport.worldUnavailable";
+
     /** Stable failure when a requested structural definition cannot be resolved. */
     public static final String DEFINITION_UNAVAILABLE = "authoring.definition.unavailable";
 
@@ -94,6 +100,8 @@ public final class AuthoringProjectService implements AutoCloseable {
 
     private final EditorProjectLoader loader;
     private final ProjectDiagnosticMessageResolver diagnosticMessages;
+    private final String engineVersion;
+    private final List<Path> runtimeArtifacts;
 
     private @Nullable EditorProjectSession activeSession;
     private long nextProjectGeneration = 1;
@@ -106,12 +114,38 @@ public final class AuthoringProjectService implements AutoCloseable {
      * @param loader headless authoring project loader
      */
     public AuthoringProjectService(EditorProjectLoader loader) {
-        this(loader, new ProjectDiagnosticMessageResolver());
+        this(loader, "0.1.0-SNAPSHOT", List.of(), new ProjectDiagnosticMessageResolver());
+    }
+
+    /**
+     * Creates a service with the running engine version and renderer-only runtime artifacts.
+     *
+     * @param loader headless authoring project loader
+     * @param engineVersion running JScene3D engine version
+     * @param runtimeArtifacts artifacts available only to isolated renderer processes
+     */
+    public AuthoringProjectService(EditorProjectLoader loader, String engineVersion, List<Path> runtimeArtifacts) {
+        this(loader, engineVersion, runtimeArtifacts, new ProjectDiagnosticMessageResolver());
     }
 
     /** Creates a service with an explicit diagnostic presentation resolver. */
     AuthoringProjectService(EditorProjectLoader loader, ProjectDiagnosticMessageResolver diagnosticMessages) {
+        this(loader, "0.1.0-SNAPSHOT", List.of(), diagnosticMessages);
+    }
+
+    /** Creates a service with explicit launch and diagnostic collaborators. */
+    AuthoringProjectService(
+            EditorProjectLoader loader,
+            String engineVersion,
+            List<Path> runtimeArtifacts,
+            ProjectDiagnosticMessageResolver diagnosticMessages) {
         this.loader = Objects.requireNonNull(loader, "loader");
+        this.engineVersion = requireNonBlank(engineVersion, "engineVersion");
+        this.runtimeArtifacts = runtimeArtifacts.stream()
+                .map(path -> Objects.requireNonNull(path, "runtimeArtifact")
+                        .toAbsolutePath()
+                        .normalize())
+                .toList();
         this.diagnosticMessages = Objects.requireNonNull(diagnosticMessages, "diagnosticMessages");
     }
 
@@ -232,6 +266,64 @@ public final class AuthoringProjectService implements AutoCloseable {
         activeProjectGeneration = 0;
         session.close();
         return new ProjectCloseResult(true, invalidatedGeneration);
+    }
+
+    /**
+     * Prepares a renderer launch for an authoritative world in the active project.
+     *
+     * <p>The first product viewport renders the startup world. Requiring the caller to echo its Java-issued
+     * {@link AssetId} prevents display labels or paths from becoming identity at the editor boundary.
+     *
+     * @param params expected generation and world identity
+     * @return generation-scoped launch specification or stable rejection
+     */
+    public ViewportLaunchResult prepareViewportLaunch(ViewportLaunchParams params) {
+        return prepareViewportLaunch(params, Locale.ENGLISH);
+    }
+
+    /**
+     * Prepares a renderer launch using the initialized client locale for diagnostics.
+     *
+     * @param params expected generation and world identity
+     * @param locale locale used to render launch diagnostics
+     * @return generation-scoped launch specification or stable rejection
+     */
+    public synchronized ViewportLaunchResult prepareViewportLaunch(ViewportLaunchParams params, Locale locale) {
+        ensureOpen();
+        ViewportLaunchParams validParams = Objects.requireNonNull(params, "params");
+        Objects.requireNonNull(locale, "locale");
+        EditorProjectSession session = activeSession;
+        if (session == null) {
+            return viewportFailure(PROJECT_NOT_OPEN);
+        }
+        if (activeProjectGeneration != validParams.expectedProjectGeneration()) {
+            return viewportFailure(PROJECT_GENERATION_CONFLICT);
+        }
+
+        AssetId requestedWorld;
+        try {
+            requestedWorld = AssetId.from(validParams.worldAssetId());
+        } catch (IllegalArgumentException exception) {
+            return viewportFailure(VIEWPORT_WORLD_UNAVAILABLE);
+        }
+        WorldDefinition startupWorld = session.startupWorld();
+        if (!startupWorld.id().equals(requestedWorld)) {
+            return viewportFailure(VIEWPORT_WORLD_UNAVAILABLE);
+        }
+
+        GameProject project = session.project();
+        Path publishedContentRoot = EditorProjectLoader.resolvePublishedContentRoot(project.root());
+        ViewportLaunchSpecification launch = new ViewportLaunchSpecification(
+                activeProjectGeneration,
+                project.identity().id(),
+                project.identity().name(),
+                project.root().toString(),
+                publishedContentRoot.toString(),
+                engineVersion,
+                startupWorld.id().toString(),
+                startupWorld.name(),
+                runtimeArtifacts.stream().map(Path::toString).toList());
+        return new ViewportLaunchResult(true, launch, diagnostics(session.diagnostics(), locale), null);
     }
 
     /**
@@ -966,6 +1058,19 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Creates an operation-level Inspector rejection without leaking a stale generation. */
     private static InspectorReadResult inspectorFailure(String failureCode) {
         return new InspectorReadResult(false, null, null, List.of(), failureCode);
+    }
+
+    /** Creates an operation-level viewport rejection without leaking stale launch inputs. */
+    private static ViewportLaunchResult viewportFailure(String failureCode) {
+        return new ViewportLaunchResult(false, null, List.of(), failureCode);
+    }
+
+    private static String requireNonBlank(String value, String name) {
+        String validValue = Objects.requireNonNull(value, name);
+        if (validValue.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+        return validValue;
     }
 
     /** Rejects operations after process-scoped ownership has ended. */

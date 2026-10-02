@@ -8,7 +8,6 @@ import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
-import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.World;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentEndpointBinder;
@@ -30,14 +29,13 @@ final class RuntimeComponentConstructor {
     }
 
     /** Constructs every planned component and completes the world, rolling back on any failure. */
-    static World construct(AllocatedWorld allocation, RegisteredTypeCatalog catalog, FactoryBindings factories) {
+    static World construct(AllocatedWorld allocation, FactoryBindings factories) {
         List<Object> created = new ArrayList<>();
         try {
             List<WorldComponentEntry> entries = construct(
                     allocation.world(),
                     allocation.components(),
                     allocation.connections(),
-                    catalog,
                     factories,
                     ComponentCreationContext.ResourceAccess.ACQUIRE,
                     created);
@@ -50,15 +48,13 @@ final class RuntimeComponentConstructor {
     }
 
     /** Constructs one detached prepared instance without publishing or invoking lifecycle callbacks. */
-    static List<WorldComponentEntry> construct(
-            AllocatedInstance allocation, RegisteredTypeCatalog catalog, FactoryBindings factories) {
+    static List<WorldComponentEntry> construct(AllocatedInstance allocation, FactoryBindings factories) {
         List<Object> created = new ArrayList<>();
         try {
             List<WorldComponentEntry> entries = construct(
                     allocation.world(),
                     allocation.components(),
                     allocation.connections(),
-                    catalog,
                     factories,
                     ComponentCreationContext.ResourceAccess.PREPARED_ONLY,
                     created);
@@ -75,7 +71,6 @@ final class RuntimeComponentConstructor {
             InternalWorld world,
             List<ComponentPlan> plans,
             List<RuntimeConnectionPlan> connections,
-            RegisteredTypeCatalog catalog,
             FactoryBindings factories,
             ComponentCreationContext.ResourceAccess resourceAccess,
             List<Object> created) {
@@ -83,9 +78,9 @@ final class RuntimeComponentConstructor {
         List<ComponentBindingEntry> bindings = new ArrayList<>();
         List<ComponentEndpointBindingEntry> endpointBindings = new ArrayList<>();
         for (ComponentPlan plan : plans) {
-            ComponentTypeDescriptor descriptor = descriptor(plan, catalog);
+            ComponentTypeDescriptor descriptor = plan.descriptor();
             EffectiveComponentProperties properties =
-                    EffectiveComponentProperties.merge(descriptor, plan.definition(), plan.overrides(), plan.scope());
+                    EffectiveComponentProperties.from(plan.properties(), plan.scopes());
             Object value = create(plan, world, descriptor, properties, factories, resourceAccess);
             world.claimComponent(value, plan.location());
             created.add(value);
@@ -96,7 +91,9 @@ final class RuntimeComponentConstructor {
             boolean bindsEndpoints = declaresEndpoints(descriptor);
             requireEndpointSupport(plan, bindsEndpoints, value);
             plan.owner().addComponent(plan.definition().id(), descriptor, value);
-            plan.scope().bindComponent(plan.authoredEntity(), plan.definition().id(), value);
+            plan.scopes()
+                    .require(plan.composition().scope())
+                    .bindComponent(plan.authoredEntity(), plan.definition().id(), value);
             if (bindsReferences && value instanceof ComponentReferenceBinder binder) {
                 bindings.add(new ComponentBindingEntry(plan, binder, properties));
             }
@@ -145,17 +142,6 @@ final class RuntimeComponentConstructor {
         } finally {
             context.expire();
         }
-    }
-
-    /** Returns the descriptor which catalog-aware validation already established for one plan. */
-    private static ComponentTypeDescriptor descriptor(ComponentPlan plan, RegisteredTypeCatalog catalog) {
-        ComponentDefinition definition = plan.definition();
-        ComponentType type = new ComponentType(definition.type(), definition.typeVersion());
-        return catalog.findComponent(type)
-                .orElseThrow(() -> new RuntimeCompositionException(
-                        RuntimeDiagnosticCode.TYPE_MISSING,
-                        "component descriptor is absent after validation: " + type,
-                        plan.location()));
     }
 
     /** Requires a callback implementation whenever safe metadata declares lifecycle participation. */

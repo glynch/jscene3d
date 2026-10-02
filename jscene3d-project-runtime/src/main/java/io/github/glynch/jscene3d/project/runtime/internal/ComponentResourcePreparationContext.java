@@ -6,9 +6,12 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentPreparationContext;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentProperties;
+import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
+import java.util.Map;
 import java.util.Objects;
 
 /** One-use component preparation context backed by a world resource transaction. */
@@ -24,13 +27,12 @@ final class ComponentResourcePreparationContext implements ComponentPreparationC
     ComponentResourcePreparationContext(
             ComponentDefinition definition,
             ComponentTypeDescriptor descriptor,
-            EffectiveComponentProperties properties,
+            Map<PropertyId, ProjectValue> properties,
             WorldResources.Preparation resources,
             String location) {
         this.definition = Objects.requireNonNull(definition, "definition");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
-        this.properties = new ComponentProperties(
-                Objects.requireNonNull(properties, "properties").values());
+        this.properties = new ComponentProperties(Objects.requireNonNull(properties, "properties"));
         this.resources = Objects.requireNonNull(resources, "resources");
         this.location = Objects.requireNonNull(location, "location");
     }

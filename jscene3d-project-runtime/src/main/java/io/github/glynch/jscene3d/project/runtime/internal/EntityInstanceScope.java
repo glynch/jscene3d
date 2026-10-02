@@ -4,7 +4,6 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
-import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EndpointTarget;
@@ -14,30 +13,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Distinct live expansion of one world or reusable entity-definition asset. */
+/** Live lookup indexes for one safe planned definition-occurrence scope. */
 final class EntityInstanceScope {
-    private final AssetId asset;
-    private final InstanceOverrides overrides;
     private final Map<EntityId, InternalEntity> entities = new LinkedHashMap<>();
     private final Map<ComponentTarget, Object> components = new LinkedHashMap<>();
     private final Map<EndpointTarget, RuntimeEndpointAddress> exportedSignals = new LinkedHashMap<>();
     private final Map<EndpointTarget, RuntimeEndpointAddress> exportedActions = new LinkedHashMap<>();
-
-    /** Creates one empty instance-local identity table. */
-    EntityInstanceScope(AssetId asset, InstanceOverrides overrides) {
-        this.asset = Objects.requireNonNull(asset, "asset");
-        this.overrides = Objects.requireNonNull(overrides, "overrides");
-    }
-
-    /** Returns the asset expanded by this scope. */
-    AssetId asset() {
-        return asset;
-    }
-
-    /** Returns contract overrides resolved specifically for this scope. */
-    InstanceOverrides overrides() {
-        return overrides;
-    }
 
     /** Binds one stable local identity to its live entity within only this scope. */
     void bind(EntityId id, InternalEntity entity) {

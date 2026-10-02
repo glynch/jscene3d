@@ -6,6 +6,7 @@ package io.github.glynch.jscene3d.project.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -179,6 +180,22 @@ final class WorldSpawningTest {
         assertThat(fixture.owner().children()).isEmpty();
         assertThat(fixture.world().isActive()).isTrue();
         fixture.world().close();
+    }
+
+    /** Reports resolver diagnostics when preparation cannot load the requested reusable definition. */
+    @Test
+    void rejectsMissingDefinitionDuringPreparation() throws IOException {
+        List<String> events = new ArrayList<>();
+        SpawnFixture fixture = compose(events, resourceProvider(events));
+        AssetRef<EntityDefinition> missing = AssetRef.to(AssetId.from("1915e4bd-f201-477b-937a-26f6792acf65"));
+        World world = fixture.world();
+
+        EntityPreparationException failure =
+                assertThrows(EntityPreparationException.class, () -> world.prepare(missing));
+
+        assertThat(failure.diagnostics()).isNotEmpty();
+
+        world.close();
     }
 
     /** Restricts preparation to inactive worlds and prepared handles to their owning world. */

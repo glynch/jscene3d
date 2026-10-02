@@ -7,7 +7,7 @@ package io.github.glynch.jscene3d.project.runtime.internal;
 import io.github.glynch.jscene3d.project.component.ComponentDefinition;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
-import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.composition.CompositionComponent;
 import io.github.glynch.jscene3d.project.runtime.RuntimeDiagnosticCode;
 import io.github.glynch.jscene3d.project.runtime.extension.ComponentFactory;
 import java.util.List;
@@ -20,15 +20,11 @@ final class RuntimeComponentPreparer {
     }
 
     /** Prepares every component plan and rolls back resources after any failure. */
-    static void prepare(
-            List<ComponentPreparationPlan> plans,
-            RegisteredTypeCatalog catalog,
-            FactoryBindings factories,
-            WorldResources resources) {
+    static void prepare(List<CompositionComponent> plans, FactoryBindings factories, WorldResources resources) {
         WorldResources.Preparation preparation = resources.beginPreparation();
         try {
-            for (ComponentPreparationPlan plan : plans) {
-                prepare(plan, catalog, factories, preparation);
+            for (CompositionComponent plan : plans) {
+                prepare(plan, factories, preparation);
             }
             preparation.commit();
         } catch (RuntimeException failure) {
@@ -39,22 +35,13 @@ final class RuntimeComponentPreparer {
 
     /** Invokes one exact component factory's bounded preparation hook. */
     private static void prepare(
-            ComponentPreparationPlan plan,
-            RegisteredTypeCatalog catalog,
-            FactoryBindings factories,
-            WorldResources.Preparation resources) {
+            CompositionComponent plan, FactoryBindings factories, WorldResources.Preparation resources) {
         ComponentDefinition definition = plan.definition();
         ComponentType type = new ComponentType(definition.type(), definition.typeVersion());
-        ComponentTypeDescriptor descriptor = catalog.findComponent(type)
-                .orElseThrow(() -> new RuntimeCompositionException(
-                        RuntimeDiagnosticCode.TYPE_MISSING,
-                        "component descriptor is absent after validation: " + type,
-                        plan.location()));
-        EffectiveComponentProperties properties =
-                EffectiveComponentProperties.merge(descriptor, definition, plan.overrides(), plan.scope());
+        ComponentTypeDescriptor descriptor = plan.descriptor();
         ComponentFactory<?> factory = factories.requireComponent(type, plan.location());
-        ComponentResourcePreparationContext context =
-                new ComponentResourcePreparationContext(definition, descriptor, properties, resources, plan.location());
+        ComponentResourcePreparationContext context = new ComponentResourcePreparationContext(
+                definition, descriptor, plan.values(), resources, plan.location());
         try {
             factory.prepare(context);
         } catch (RuntimeDiagnosticsException | RuntimeCompositionException exception) {

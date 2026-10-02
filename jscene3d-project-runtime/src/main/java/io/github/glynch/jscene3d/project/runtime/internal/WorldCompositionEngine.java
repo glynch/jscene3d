@@ -5,6 +5,9 @@
 package io.github.glynch.jscene3d.project.runtime.internal;
 
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
+import io.github.glynch.jscene3d.project.composition.CompositionPlan;
+import io.github.glynch.jscene3d.project.composition.CompositionPlanResult;
+import io.github.glynch.jscene3d.project.composition.CompositionPlanner;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.runtime.RuntimeResourceProvider;
 import io.github.glynch.jscene3d.project.runtime.World;
@@ -41,12 +44,15 @@ public final class WorldCompositionEngine {
             Collection<ComponentRuntimeExtension> extensions,
             Collection<WorldModuleBinding<?>> modules,
             RuntimeResourceProvider resources) {
+        CompositionPlanResult planning = CompositionPlanner.plan(source, definition, definitions, types);
+        CompositionPlan plan =
+                planning.plan().orElseThrow(() -> new RuntimeDiagnosticsException(planning.diagnostics()));
         FactoryBindings factories = WorldRuntimeExtensions.register(source, types, extensions);
         WorldModules worldModules = new WorldModules(modules);
         WorldCompositionServices services =
                 new WorldCompositionServices(source, definitions, types, factories, worldModules, resources);
         InternalWorld world = new InternalWorld(definition, services);
-        AllocatedWorld allocation = new EntityGraphAllocator(world).allocate();
-        return RuntimeComponentConstructor.construct(allocation, types, factories);
+        AllocatedWorld allocation = new EntityGraphAllocator(world, plan).allocate();
+        return RuntimeComponentConstructor.construct(allocation, factories);
     }
 }

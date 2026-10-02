@@ -8,6 +8,10 @@ import io.github.glynch.jscene3d.diagnostic.DiagnosticCode;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.composition.CompositionDiagnosticCode;
+import io.github.glynch.jscene3d.project.composition.CompositionPlan;
+import io.github.glynch.jscene3d.project.composition.CompositionPlanResult;
+import io.github.glynch.jscene3d.project.composition.CompositionPlanner;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
@@ -96,15 +100,21 @@ final class InternalWorld implements World {
         requirePreparationOpen();
         AssetRef<EntityDefinition> validReference = Objects.requireNonNull(reference, "reference");
         Map<PropertyId, ProjectValue> validBindings = immutableValues(resourceBindings, "resourceBindings");
+        var loaded = services.definitions().loadEntity(validReference, services.types());
+        if (!loaded.isValid()) {
+            throw new EntityPreparationException(loaded.diagnostics());
+        }
+        CompositionPlanResult planning = CompositionPlanner.prepare(
+                loaded.source(),
+                loaded.definition().orElseThrow(),
+                services.definitions(),
+                services.types(),
+                validBindings);
+        CompositionPlan plan = planning.plan()
+                .orElseThrow(() -> new EntityPreparationException(runtimePlanningDiagnostics(planning.diagnostics())));
         try {
-            DefinitionPreparationPlanner.PreparedGraph graph = new DefinitionPreparationPlanner(
-                            services.definitions(), services.types())
-                    .plan(validReference, validBindings);
-            RuntimeComponentPreparer.prepare(graph.components(), services.types(), services.factories(), resources);
-            return new InternalPreparedEntityDefinition(
-                    this, validReference, graph.definition(), graph.definitions(), validBindings, graph.source());
-        } catch (RuntimeDiagnosticsException failure) {
-            throw new EntityPreparationException(failure.diagnostics());
+            RuntimeComponentPreparer.prepare(plan.components(), services.factories(), resources);
+            return new InternalPreparedEntityDefinition(this, validReference, plan, validBindings, loaded.source());
         } catch (RuntimeCompositionException failure) {
             String detail =
                     Objects.toString(failure.getMessage(), failure.code().defaultMessage());
@@ -419,9 +429,17 @@ final class InternalWorld implements World {
         @Nullable AllocatedInstance allocation = null;
         @Nullable List<WorldComponentEntry> entries = null;
         try {
-            allocation = new EntityGraphAllocator(this)
-                    .allocateSpawn(operation.prepared(), operation.owner(), operation.parameters());
-            entries = RuntimeComponentConstructor.construct(allocation, services.types(), services.factories());
+            CompositionPlanResult planning = CompositionPlanner.instantiate(
+                    operation.prepared().plan(),
+                    services.types(),
+                    operation.parameters(),
+                    operation.prepared().resourceBindings());
+            if (!planning.isPlanned()) {
+                operation.fail(runtimePlanningDiagnostics(planning.diagnostics()));
+                return;
+            }
+            allocation = new EntityGraphAllocator(this, planning.plan().orElseThrow()).allocateSpawn(operation.owner());
+            entries = RuntimeComponentConstructor.construct(allocation, services.factories());
             publishSpawn(allocation);
             schedule.addComponents(entries);
             lifecycle.add(entries);
@@ -443,6 +461,19 @@ final class InternalWorld implements World {
                     failureDetail("spawn transaction failed", failure),
                     "")));
         }
+    }
+
+    /** Preserves established runtime-facing spawn diagnostics while accepting safe planning diagnostics. */
+    private static List<ProjectDiagnostic> runtimePlanningDiagnostics(List<ProjectDiagnostic> diagnostics) {
+        return diagnostics.stream()
+                .map(value -> value.code() == CompositionDiagnosticCode.ARGUMENT_INVALID
+                        ? diagnostic(
+                                value.source(),
+                                RuntimeDiagnosticCode.SPAWN_ARGUMENT_INVALID,
+                                value.details().getOrDefault("technicalDetail", value.message()),
+                                value.location())
+                        : value)
+                .toList();
     }
 
     /** Publishes one completely constructed hierarchy into world lookup and ownership traversal. */

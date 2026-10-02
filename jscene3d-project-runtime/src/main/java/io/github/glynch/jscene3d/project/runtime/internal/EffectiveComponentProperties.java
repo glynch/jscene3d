@@ -4,10 +4,8 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
-import io.github.glynch.jscene3d.project.component.ComponentDefinition;
-import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
 import io.github.glynch.jscene3d.project.component.PropertyId;
-import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
+import io.github.glynch.jscene3d.project.composition.CompositionValue;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -27,28 +25,12 @@ final class EffectiveComponentProperties {
         values = Collections.unmodifiableMap(projected);
     }
 
-    /** Merges defaults, authored values, and contract overrides in descriptor declaration order. */
-    static EffectiveComponentProperties merge(
-            ComponentTypeDescriptor descriptor,
-            ComponentDefinition definition,
-            Map<PropertyId, ScopedProjectValue> overrides,
-            EntityInstanceScope localScope) {
+    /** Adapts already effective safe values to their live runtime scope indexes. */
+    static EffectiveComponentProperties from(
+            Map<PropertyId, CompositionValue> planned, RuntimeCompositionScopes scopes) {
         Map<PropertyId, ScopedProjectValue> result = new LinkedHashMap<>();
-        for (Map.Entry<PropertyId, PropertyDescriptor> property :
-                descriptor.properties().entrySet()) {
-            PropertyId id = property.getKey();
-            if (overrides.containsKey(id)) {
-                result.put(id, Objects.requireNonNull(overrides.get(id), "override"));
-            } else if (definition.properties().containsKey(id)) {
-                ProjectValue value =
-                        Objects.requireNonNull(definition.properties().get(id), "authored property");
-                result.put(id, new ScopedProjectValue(value, localScope));
-            } else {
-                property.getValue()
-                        .defaultValue()
-                        .ifPresent(value -> result.put(id, new ScopedProjectValue(value, localScope)));
-            }
-        }
+        planned.forEach((property, value) ->
+                result.put(property, new ScopedProjectValue(value.value(), scopes.require(value.authoredScope()))));
         return new EffectiveComponentProperties(result);
     }
 

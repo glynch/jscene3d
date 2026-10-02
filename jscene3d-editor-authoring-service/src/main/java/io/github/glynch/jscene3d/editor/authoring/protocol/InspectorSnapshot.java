@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.authoring.protocol;
 
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionSnapshot.Occurrence;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -332,8 +333,7 @@ public record InspectorSnapshot(
             String entityId,
             String label,
             String resolution,
-            DefinitionSnapshot.@Nullable Occurrence occurrence)
-            implements Value {
+            @Nullable Occurrence occurrence) implements Value {
         /** Validates entity-target presentation. */
         public EntityTargetValue {
             requireKind(kind, "entity-target");
@@ -362,7 +362,7 @@ public record InspectorSnapshot(
             String componentLabel,
             @Nullable ComponentTypeDto componentType,
             String resolution,
-            DefinitionSnapshot.@Nullable Occurrence occurrence)
+            @Nullable Occurrence occurrence)
             implements Value {
         /** Validates component-target presentation. */
         public ComponentTargetValue {

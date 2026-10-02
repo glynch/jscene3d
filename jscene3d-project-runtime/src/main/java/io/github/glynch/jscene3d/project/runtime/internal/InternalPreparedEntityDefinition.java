@@ -4,9 +4,9 @@
  */
 package io.github.glynch.jscene3d.project.runtime.internal;
 
-import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.composition.CompositionPlan;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.runtime.PreparedEntityDefinition;
 import io.github.glynch.jscene3d.project.runtime.World;
@@ -19,8 +19,7 @@ import java.util.Objects;
 public final class InternalPreparedEntityDefinition implements PreparedEntityDefinition {
     private final InternalWorld world;
     private final AssetRef<EntityDefinition> reference;
-    private final EntityDefinition definition;
-    private final Map<AssetId, EntityDefinition> definitions;
+    private final CompositionPlan plan;
     private final Map<PropertyId, ProjectValue> resourceBindings;
     private final URI source;
 
@@ -28,14 +27,12 @@ public final class InternalPreparedEntityDefinition implements PreparedEntityDef
     InternalPreparedEntityDefinition(
             InternalWorld world,
             AssetRef<EntityDefinition> reference,
-            EntityDefinition definition,
-            Map<AssetId, EntityDefinition> definitions,
+            CompositionPlan plan,
             Map<PropertyId, ProjectValue> resourceBindings,
             URI source) {
         this.world = Objects.requireNonNull(world, "world");
         this.reference = Objects.requireNonNull(reference, "reference");
-        this.definition = Objects.requireNonNull(definition, "definition");
-        this.definitions = Map.copyOf(definitions);
+        this.plan = Objects.requireNonNull(plan, "plan");
         this.resourceBindings = Map.copyOf(resourceBindings);
         this.source = Objects.requireNonNull(source, "source");
     }
@@ -50,14 +47,9 @@ public final class InternalPreparedEntityDefinition implements PreparedEntityDef
         return world;
     }
 
-    /** Returns the validated root definition. */
-    EntityDefinition definition() {
-        return definition;
-    }
-
-    /** Returns every definition in the validated transitive structural graph. */
-    Map<AssetId, EntityDefinition> definitions() {
-        return definitions;
+    /** Returns the immutable prepared definition graph and effective fixed bindings. */
+    CompositionPlan plan() {
+        return plan;
     }
 
     /** Returns fixed public resource bindings supplied during preparation. */

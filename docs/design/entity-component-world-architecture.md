@@ -266,18 +266,26 @@ ComponentRuntimeExtension
 - host-supplied `WorldModuleBinding` values; and
 - a host-owned `RuntimeResourceProvider`.
 
+After graph validation, the runtime-free composition planner in
+`jscene3d-project` expands authored and generated definitions into an immutable
+`CompositionPlan`. The plan assigns stable occurrence identities, preserves
+authored scopes and provenance, and establishes effective Component properties,
+Resource references, and scoped connections. It contains no live runtime,
+renderer, or executable extension objects. Runtime composition consumes this
+plan rather than independently interpreting the definition graph.
+
 Composition performs these operations as one transaction:
 
 1. Load and validate the root world and transitive entity-definition graph.
-2. Expand local entries and definition placements into distinct instance
-   scopes.
-3. Allocate the complete entity graph before invoking a component factory.
-4. Resolve exact descriptors and factories and merge authored values over
-   descriptor defaults and contract overrides.
+2. Safely plan local entries, definition placements, effective properties, and
+   scoped connections without loading runtime implementations.
+3. Allocate the complete live entity graph from the plan before invoking a
+   component factory.
+4. Resolve the planned exact descriptors to trusted runtime factories.
 5. Construct every runtime component.
 6. Bind authored entity and component references after all factories finish.
 7. Bind every descriptor-declared signal and action implementation.
-8. Resolve authored connections to exact live endpoint addresses.
+8. Resolve planned authored connections to exact live endpoint addresses.
 9. Publish a complete inactive `World` only if every step succeeds.
 
 Failure returns ordered `ProjectDiagnostic` values and releases constructed

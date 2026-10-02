@@ -6,6 +6,10 @@
   ],
   "config": {
     // Prose, links, and wide capability tables intentionally exceed a fixed source width.
-    "MD013": false
+    "MD013": false,
+    // Allow repeated headings such as "Acceptance Criteria" under different user stories.
+    "MD024": {
+      "siblings_only": true
+    }
   }
 }

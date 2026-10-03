@@ -1,0 +1,18 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/resource-1.json",
+  "schemaVersion" : 1,
+  "type" : "io.github.glynch.jscene3d.spatial3d/standard-material-resource",
+  "typeVersion" : 1,
+  "properties" : {
+    "color" : [ 0.6938719, 0.18447499, 0.001821162 ],
+    "metalness" : 0.0,
+    "roughness" : 0.75,
+    "emissive" : [ 0.0, 0.0, 0.0 ],
+    "emissive-intensity" : 1.0,
+    "opacity" : 1.0,
+    "alpha-mode" : "opaque",
+    "alpha-cutoff" : 0.5,
+    "side" : "front",
+    "vertex-colors" : false
+  }
+}

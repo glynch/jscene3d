@@ -1,0 +1,79 @@
+{
+  "$schema": "https://jscene3d.org/schemas/scene-definition-1.json",
+  "assetId": "05931084-bd10-4f1c-b4d6-4182be5c1a2c",
+  "assetType": "scene-definition",
+  "formatVersion": 1,
+  "name": "Main",
+  "connections": [],
+  "roots": [
+    {
+      "entryType": "local",
+      "entityId": "6cd59d4f-6dbd-4617-86e7-c77ffd7e96c2",
+      "name": "Cube",
+      "enabled": true,
+      "components": [
+        {
+          "componentId": "b3987df5-031a-44cf-ab62-3905e0cb48c6",
+          "type": "io.github.glynch.jscene3d.spatial3d/transform-3d",
+          "typeVersion": 1,
+          "properties": {
+            "position": [-1.5, 0, 0]
+          }
+        },
+        {
+          "componentId": "24342518-9227-4e19-9238-902480837932",
+          "type": "io.github.glynch.jscene3d.spatial3d/mesh-renderer-3d",
+          "typeVersion": 1,
+          "properties": {
+            "mesh": {
+              "$ref": "asset:sandbox-box-mesh"
+            },
+            "material": {
+              "$ref": "asset:sandbox-cube-material"
+            },
+            "visible": true
+          }
+        }
+      ],
+      "children": []
+    },
+    {
+      "entryType": "placement",
+      "entityId": "803ae1f4-ad80-46b6-a0bf-64b729ef1bd6",
+      "name": "Crate",
+      "enabled": true,
+      "definition": {
+        "assetId": "fd16cb58-68f1-4996-b267-a0b7a266fea6",
+        "pathHint": "entities/crate.entity.json"
+      },
+      "arguments": {}
+    },
+    {
+      "entryType": "local",
+      "entityId": "10f18801-91f4-4adb-9744-fee7c1539d08",
+      "name": "Directional Light",
+      "enabled": true,
+      "components": [
+        {
+          "componentId": "13cd1533-0b45-4fff-af45-94cb1097eaba",
+          "type": "io.github.glynch.jscene3d.spatial3d/transform-3d",
+          "typeVersion": 1,
+          "properties": {
+            "position": [4, 6, 5]
+          }
+        },
+        {
+          "componentId": "f4a06707-3ba5-41cc-a523-75bfa483b239",
+          "type": "io.github.glynch.jscene3d.spatial3d/directional-light-3d",
+          "typeVersion": 1,
+          "properties": {
+            "color": [1, 0.95, 0.85],
+            "intensity": 2.5,
+            "target": [0, 0, 0]
+          }
+        }
+      ],
+      "children": []
+    }
+  ]
+}

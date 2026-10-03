@@ -1,0 +1,48 @@
+{
+  "$schema": "https://jscene3d.org/schemas/entity-definition-1.json",
+  "assetId": "fd16cb58-68f1-4996-b267-a0b7a266fea6",
+  "assetType": "entity-definition",
+  "formatVersion": 1,
+  "name": "Crate",
+  "contract": {
+    "parameters": [],
+    "signals": [],
+    "actions": [],
+    "capabilities": [],
+    "attachments": [],
+    "resourceBindings": []
+  },
+  "connections": [],
+  "root": {
+    "entryType": "local",
+    "entityId": "cdf10e48-44e9-4590-ba9a-b57d3300c60f",
+    "name": "Crate",
+    "enabled": true,
+    "components": [
+      {
+        "componentId": "24687815-3208-4d23-a959-fd1ebb9e2732",
+        "type": "io.github.glynch.jscene3d.spatial3d/transform-3d",
+        "typeVersion": 1,
+        "properties": {
+          "position": [1.5, 0, 0],
+          "scale": [1, 1.25, 1]
+        }
+      },
+      {
+        "componentId": "05a60e40-f317-4a07-a5c4-4ec0cc277e71",
+        "type": "io.github.glynch.jscene3d.spatial3d/mesh-renderer-3d",
+        "typeVersion": 1,
+        "properties": {
+          "mesh": {
+            "$ref": "asset:sandbox-box-mesh"
+          },
+          "material": {
+            "$ref": "asset:sandbox-crate-material"
+          },
+          "visible": true
+        }
+      }
+    ],
+    "children": []
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://jscene3d.org/schemas/project-1.json",
+  "schemaVersion": 1,
+  "identity": {
+    "id": "io.github.glynch.jscene3d.editor-sandbox",
+    "name": "JScene3D Editor Sandbox",
+    "version": "0.1.0-SNAPSHOT",
+    "description": "Small deterministic Project for manual JScene3D Editor development."
+  },
+  "engine": {
+    "requires": ">=0.1.0-SNAPSHOT <0.2.0",
+    "authoredWith": "0.1.0-SNAPSHOT"
+  },
+  "runtime": {
+    "applicationExtension": "io.github.glynch.jscene3d.editor-sandbox",
+    "mainScene": {
+      "assetId": "05931084-bd10-4f1c-b4d6-4182be5c1a2c",
+      "pathHint": "scenes/main.scene.json"
+    }
+  },
+  "extensions": [
+    {
+      "id": "io.github.glynch.jscene3d.editor-sandbox",
+      "requires": ">=1.0.0 <2.0.0"
+    }
+  ],
+  "assets": [
+    {
+      "id": "sandbox-box-mesh",
+      "type": "io.github.glynch.jscene3d.spatial3d/mesh-resource",
+      "path": "resources/box.mesh.resource.json"
+    },
+    {
+      "id": "sandbox-box-mesh-payload",
+      "type": "io.github.glynch.jscene3d.spatial3d/mesh-payload",
+      "path": "resources/box.mesh"
+    },
+    {
+      "id": "sandbox-sphere-mesh",
+      "type": "io.github.glynch.jscene3d.spatial3d/mesh-resource",
+      "path": "resources/sphere.mesh.resource.json"
+    },
+    {
+      "id": "sandbox-sphere-mesh-payload",
+      "type": "io.github.glynch.jscene3d.spatial3d/mesh-payload",
+      "path": "resources/sphere.mesh"
+    },
+    {
+      "id": "sandbox-cube-material",
+      "type": "io.github.glynch.jscene3d.spatial3d/standard-material-resource",
+      "path": "resources/cube.material.resource.json"
+    },
+    {
+      "id": "sandbox-crate-material",
+      "type": "io.github.glynch.jscene3d.spatial3d/standard-material-resource",
+      "path": "resources/crate.material.resource.json"
+    },
+    {
+      "id": "sandbox-sphere-material",
+      "type": "io.github.glynch.jscene3d.spatial3d/standard-material-resource",
+      "path": "resources/sphere.material.resource.json"
+    }
+  ]
+}

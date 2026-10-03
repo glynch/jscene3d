@@ -104,10 +104,18 @@ final class SceneViewRendererSession implements AutoCloseable {
         return SceneViewRealizationResult.success(Status.APPLIED, replacement.revision());
     }
 
-    void render(Renderer renderer, float aspectRatio) {
+    void render(Renderer renderer, int viewportWidth, int viewportHeight) {
         requireOpen();
-        camera.setAspectRatio(aspectRatio);
+        updateViewportSize(viewportWidth, viewportHeight);
         Objects.requireNonNull(renderer, "renderer").render(scene, camera);
+    }
+
+    void updateViewportSize(int viewportWidth, int viewportHeight) {
+        requireOpen();
+        if (viewportWidth <= 0 || viewportHeight <= 0) {
+            throw new IllegalArgumentException("viewport dimensions must be positive");
+        }
+        camera.setAspectRatio((float) viewportWidth / viewportHeight);
     }
 
     Scene scene() {

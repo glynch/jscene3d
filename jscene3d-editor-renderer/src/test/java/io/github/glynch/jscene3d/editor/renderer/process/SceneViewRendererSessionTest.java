@@ -76,6 +76,17 @@ final class SceneViewRendererSessionTest {
     }
 
     @Test
+    void updatesEditorCameraAspectFromTheCurrentPhysicalViewport() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.updateViewportSize(1_920, 1_080);
+            assertThat(session.camera().aspectRatio()).isCloseTo(16.0f / 9.0f, offset(0.000_001f));
+
+            session.updateViewportSize(900, 1_600);
+            assertThat(session.camera().aspectRatio()).isCloseTo(9.0f / 16.0f, offset(0.000_001f));
+        }
+    }
+
+    @Test
     void realizesHierarchyTransformsAndDistinctRepeatedOccurrences() {
         TrackingResolver resolver = new TrackingResolver();
         try (SceneViewRendererSession session = new SceneViewRendererSession(resolver)) {

@@ -104,7 +104,7 @@ final class SceneViewProcessSession implements RendererSession {
     public void renderFrame() {
         requireOpen();
         if (sceneView.revision().isPresent()) {
-            sceneView.render(renderer, (float) width / height);
+            sceneView.render(renderer, width, height);
         } else {
             renderer.clear();
         }

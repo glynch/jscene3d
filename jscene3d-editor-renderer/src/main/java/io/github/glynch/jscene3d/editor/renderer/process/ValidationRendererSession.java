@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.renderer.process;
 import static org.lwjgl.opengl.GL11.glFlush;
 
 import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
 import io.github.glynch.jscene3d.iosurface.macos.IOSurfaceBridge;
@@ -106,6 +107,12 @@ final class ValidationRendererSession implements RendererSession {
         requireOpen();
         mesh.rotateY(horizontal * DRAG_SENSITIVITY);
         mesh.rotateX(vertical * DRAG_SENSITIVITY);
+    }
+
+    @Override
+    public void replaceSceneViewSnapshot(SceneViewSnapshot snapshot) {
+        requireOpen();
+        throw new IllegalStateException("Validation view does not accept Scene View snapshots");
     }
 
     @Override

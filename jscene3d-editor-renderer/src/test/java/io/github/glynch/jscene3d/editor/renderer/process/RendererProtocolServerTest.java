@@ -9,12 +9,16 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.glynch.jscene3d.editor.renderer.protocol.RendererProtocolVersion;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /** Tests lifecycle and failure behavior at the renderer protocol boundary. */
@@ -26,7 +30,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.0",
+                        "PROTOCOL_VERSION 1.1",
                         "RENDERER_READY",
                         "FRAME_READY",
                         "SURFACE_READY 800 600",
@@ -45,7 +49,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.0",
+                        "PROTOCOL_VERSION 1.1",
                         "RENDERER_READY",
                         "PAUSED",
                         "ERROR INVALID_STATE frame-paused",
@@ -61,7 +65,7 @@ final class RendererProtocolServerTest {
     void preservesStageOneQuitWithoutWritingAProductShutdownAcknowledgement() throws IOException {
         ProtocolResult result = run(new FakeRendererSession(), "QUIT\n");
 
-        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY");
+        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY");
     }
 
     @Test
@@ -70,13 +74,31 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.0",
+                        "PROTOCOL_VERSION 1.1",
                         "RENDERER_READY",
                         "ERROR MALFORMED_REQUEST command",
                         "ERROR UNKNOWN_COMMAND command",
                         "FRAME_READY",
                         "SHUTDOWN_READY");
         assertThat(result.diagnostics()).contains("Rejected command");
+    }
+
+    @Test
+    void replacesACompleteSafeSceneViewSnapshot() throws IOException {
+        FakeRendererSession session = new FakeRendererSession();
+        String json =
+                "{\"sceneAssetId\":\"e890c4c3-fb32-49d8-88b8-4e04e7a29656\"," + "\"revision\":3,\"occurrences\":[]}";
+        String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+
+        ProtocolResult result = run(session, "SCENE_SNAPSHOT " + encoded + "\nSHUTDOWN\n");
+
+        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY", "SHUTDOWN_READY");
+        assertThat(session.snapshot)
+                .isNotNull()
+                .returns(3L, SceneViewSnapshot::revision)
+                .returns(
+                        "e890c4c3-fb32-49d8-88b8-4e04e7a29656",
+                        value -> value.scene().toString());
     }
 
     @Test
@@ -94,7 +116,7 @@ final class RendererProtocolServerTest {
                 .isThrownBy(() -> server.run(new BufferedReader(new StringReader("FRAME 9\n"))))
                 .withMessage("frame failed");
         assertThat(output.toString().lines())
-                .containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
+                .containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
     }
 
     @Test
@@ -112,7 +134,7 @@ final class RendererProtocolServerTest {
                 .isThrownBy(() -> server.run(new BufferedReader(new StringReader("FRAME 9\n"))))
                 .withMessage("native frame failed");
         assertThat(output.toString().lines())
-                .containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
+                .containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
     }
 
     private static ProtocolResult run(FakeRendererSession session, String input) throws IOException {
@@ -136,6 +158,7 @@ final class RendererProtocolServerTest {
         private boolean failFrames;
         private boolean failNativeFrames;
         private boolean closed;
+        private @Nullable SceneViewSnapshot snapshot;
 
         @Override
         public void renderFrame() {
@@ -157,6 +180,11 @@ final class RendererProtocolServerTest {
         @Override
         public void applyValidationDrag(float horizontal, float vertical) {
             dragRequests++;
+        }
+
+        @Override
+        public void replaceSceneViewSnapshot(SceneViewSnapshot snapshot) {
+            this.snapshot = snapshot;
         }
 
         @Override

@@ -12,7 +12,7 @@ package io.github.glynch.jscene3d.editor.renderer.protocol;
  */
 public record RendererProtocolVersion(int major, int minor) {
     /** Current product protocol version. */
-    public static final RendererProtocolVersion CURRENT = new RendererProtocolVersion(1, 0);
+    public static final RendererProtocolVersion CURRENT = new RendererProtocolVersion(1, 1);
 
     /** Validates a non-negative protocol version. */
     public RendererProtocolVersion {

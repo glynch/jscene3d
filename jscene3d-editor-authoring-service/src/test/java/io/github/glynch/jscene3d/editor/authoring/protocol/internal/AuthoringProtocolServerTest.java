@@ -52,12 +52,12 @@ final class AuthoringProtocolServerTest {
     /** Negotiates the supported protocol and advertises only implemented authoring capabilities. */
     @Test
     void initializesAuthoringConnection() throws IOException {
-        JsonNode response = response(initialize(2, 1));
+        JsonNode response = response(initialize(2, 2));
 
         assertThat(response.path("id").asInt()).isEqualTo(1);
         assertThat(response.path("connectionGeneration").asText()).isEqualTo("connection-test");
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(1);
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(2);
         assertThat(response.at("/result/processKind").asText()).isEqualTo("authoring");
         assertThat(response.at("/result/serviceVersion").asText()).isEqualTo("1.2.0-test");
         assertThat(response.at("/result/engineVersion").asText()).isEqualTo("0.1.0-SNAPSHOT");
@@ -68,6 +68,7 @@ final class AuthoringProtocolServerTest {
                         "project/replace",
                         "project/close",
                         "viewport/prepareLaunch",
+                        "sceneView/read",
                         "definition/open",
                         "definition/mutate",
                         "definition/undo",
@@ -99,7 +100,7 @@ final class AuthoringProtocolServerTest {
         JsonNode response = response(initialize(2, 7));
 
         assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(1);
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(2);
         assertThat(server.isInitialized()).isTrue();
     }
 
@@ -282,6 +283,35 @@ final class AuthoringProtocolServerTest {
         assertThat(prepared.at("/result/launch/sceneAssetId").asText()).isEqualTo(AuthoringTestProject.SCENE_ASSET_ID);
         assertThat(prepared.at("/result/launch/sceneName").asText()).isEqualTo("Opening Scene");
         assertThat(prepared.at("/result/launch/runtimeArtifacts").isArray()).isTrue();
+    }
+
+    /** Dispatches a runtime-free revision-scoped Scene View snapshot without title implementation artifacts. */
+    @Test
+    void dispatchesSafeSceneViewRead() throws IOException {
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        response(initialize(2, 2));
+        JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
+        long generation = opened.at("/result/projectGeneration").asLong();
+        response(request(
+                3,
+                "definition/open",
+                "{\"expectedProjectGeneration\":" + generation + ",\"assetId\":\"" + AuthoringTestProject.SCENE_ASSET_ID
+                        + "\"}"));
+
+        JsonNode projected = response(request(
+                4,
+                "sceneView/read",
+                "{\"expectedProjectGeneration\":" + generation + ",\"sceneAssetId\":\""
+                        + AuthoringTestProject.SCENE_ASSET_ID + "\",\"expectedDefinitionRevision\":0}"));
+
+        assertThat(projected.at("/result/accepted").asBoolean()).isTrue();
+        assertThat(projected.at("/result/outcome").asText()).isEqualTo("projected");
+        assertThat(projected.at("/result/snapshot/sceneAssetId").asText())
+                .isEqualTo(AuthoringTestProject.SCENE_ASSET_ID);
+        assertThat(projected.at("/result/snapshot/revision").asLong()).isZero();
+        assertThat(projected.at("/result/launch/projectId").asText()).isEqualTo("example.authoring-test");
+        assertThat(projected.at("/result/launch/runtimeArtifacts").isMissingNode())
+                .isTrue();
     }
 
     /** Dispatches one complete Inspector snapshot using the Java-issued hierarchy target. */

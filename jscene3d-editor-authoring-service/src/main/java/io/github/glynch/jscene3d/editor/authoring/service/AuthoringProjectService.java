@@ -22,6 +22,9 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
+import io.github.glynch.jscene3d.editor.authoring.protocol.SceneViewReadParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.SceneViewReadResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.SceneViewSnapshotDto;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchSpecification;
@@ -46,6 +49,7 @@ import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorSection;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorValue;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewProjectionResult;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import io.github.glynch.jscene3d.i18n.MessageSource;
 import io.github.glynch.jscene3d.i18n.resourcebundle.ResourceBundleMessageSource;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -56,6 +60,7 @@ import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.component.ComponentId;
 import io.github.glynch.jscene3d.project.component.ComponentType;
 import io.github.glynch.jscene3d.project.component.PropertyId;
+import io.github.glynch.jscene3d.project.composition.CompositionOccurrenceId;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.entity.ComponentTarget;
 import io.github.glynch.jscene3d.project.entity.EntityId;
@@ -542,8 +547,7 @@ public final class AuthoringProjectService implements AutoCloseable {
      * Requests the current editor-safe Scene View projection within an active project generation.
      *
      * <p>The returned inner result remains tied to the requested Scene asset and its current working-copy revision.
-     * This Java service seam deliberately adds no protocol method; a future transport maps it through the existing
-     * connection-generation envelope.
+     * The protocol transport adds the connection-generation envelope around this project-scoped result.
      *
      * @param expectedProjectGeneration active project generation observed by the caller
      * @param scene retained Scene asset identity
@@ -563,6 +567,59 @@ public final class AuthoringProjectService implements AutoCloseable {
         }
         SceneViewProjectionResult projection = session.projectSceneView(validScene, expectedDefinitionRevision);
         return new SceneViewServiceResult(true, activeProjectGeneration, projection, null);
+    }
+
+    /**
+     * Reads one complete safe Scene View projection and its product-owned renderer launch context.
+     *
+     * <p>The response contains only data projected by the headless authoring model. In particular, it contains no
+     * title runtime artifact list and grants no authority to execute project implementation code.
+     *
+     * @param params active project identity, Scene identity, and expected working-copy revision
+     * @param locale initialized client display locale
+     * @return exact projection outcome and safe renderer inputs
+     */
+    public synchronized SceneViewReadResult readSceneView(SceneViewReadParams params, Locale locale) {
+        ensureOpen();
+        SceneViewReadParams validParams = Objects.requireNonNull(params, "params");
+        Locale validLocale = Objects.requireNonNull(locale, "locale");
+        EditorProjectSession session = activeSession;
+        if (session == null) {
+            return sceneViewReadFailure(validParams, PROJECT_NOT_OPEN);
+        }
+        if (activeProjectGeneration != validParams.expectedProjectGeneration()) {
+            return sceneViewReadFailure(validParams, PROJECT_GENERATION_CONFLICT);
+        }
+
+        AssetId scene;
+        try {
+            scene = AssetId.from(validParams.sceneAssetId());
+        } catch (IllegalArgumentException exception) {
+            return unavailableSceneView(validParams);
+        }
+        SceneViewProjectionResult projection =
+                session.projectSceneView(scene, validParams.expectedDefinitionRevision());
+        SceneViewSnapshotDto snapshot = projection
+                .snapshot()
+                .map(AuthoringProjectService::sceneViewSnapshot)
+                .orElse(null);
+        SceneViewReadResult.LaunchSpecification launch = projection
+                .snapshot()
+                .map(ignored -> sceneViewLaunch(session, scene))
+                .orElse(null);
+        return new SceneViewReadResult(
+                true,
+                activeProjectGeneration,
+                validParams.sceneAssetId(),
+                validParams.expectedDefinitionRevision(),
+                serialized(projection.outcome()),
+                projection.currentRevision().isPresent()
+                        ? projection.currentRevision().orElseThrow()
+                        : null,
+                snapshot,
+                launch,
+                diagnostics(projection.diagnostics(), validLocale),
+                null);
     }
 
     /**
@@ -673,6 +730,124 @@ public final class AuthoringProjectService implements AutoCloseable {
         return diagnostics.stream()
                 .map(diagnostic -> diagnostic(diagnostic, locale))
                 .toList();
+    }
+
+    /** Builds the fixed safe-renderer launch context without exposing runtime implementation artifacts. */
+    private SceneViewReadResult.LaunchSpecification sceneViewLaunch(EditorProjectSession session, AssetId scene) {
+        GameProject project = session.project();
+        Path publishedContentRoot = EditorProjectLoader.resolvePublishedContentRoot(project.root());
+        String sceneName = session.assets().stream()
+                .filter(asset -> scene.toString().equals(asset.identity()))
+                .map(ProjectAsset::label)
+                .findFirst()
+                .orElse(scene.toString());
+        return new SceneViewReadResult.LaunchSpecification(
+                project.identity().id(),
+                project.identity().name(),
+                project.root().toString(),
+                publishedContentRoot.toString(),
+                engineVersion,
+                sceneName);
+    }
+
+    /** Maps a runtime-free domain snapshot to the explicit protocol representation. */
+    private static SceneViewSnapshotDto sceneViewSnapshot(SceneViewSnapshot snapshot) {
+        return new SceneViewSnapshotDto(
+                snapshot.scene().toString(),
+                snapshot.revision(),
+                snapshot.occurrences().stream()
+                        .map(AuthoringProjectService::sceneViewOccurrence)
+                        .toList());
+    }
+
+    /** Maps one expanded visual occurrence. */
+    private static SceneViewSnapshotDto.VisualOccurrence sceneViewOccurrence(
+            SceneViewSnapshot.VisualOccurrence occurrence) {
+        return new SceneViewSnapshotDto.VisualOccurrence(
+                sceneViewOccurrenceId(occurrence.occurrence()),
+                occurrence
+                        .parent()
+                        .map(AuthoringProjectService::sceneViewOccurrenceId)
+                        .orElse(null),
+                occurrence.authoredAsset().toString(),
+                occurrence.authoredSource().toString(),
+                occurrence.authoredEntity().toString(),
+                occurrence.name().orElse(null),
+                occurrence.enabled(),
+                occurrence
+                        .transform()
+                        .map(AuthoringProjectService::sceneViewTransform)
+                        .orElse(null),
+                occurrence.meshes().stream()
+                        .map(AuthoringProjectService::sceneViewMesh)
+                        .toList(),
+                occurrence
+                        .directionalLight()
+                        .map(AuthoringProjectService::sceneViewDirectionalLight)
+                        .orElse(null));
+    }
+
+    /** Maps one stable expanded occurrence identity. */
+    private static SceneViewSnapshotDto.Occurrence sceneViewOccurrenceId(CompositionOccurrenceId occurrence) {
+        return new SceneViewSnapshotDto.Occurrence(
+                occurrence.rootDefinition().toString(),
+                occurrence.entityPath().stream().map(Object::toString).toList());
+    }
+
+    /** Maps one stable visual-component identity. */
+    private static SceneViewSnapshotDto.ComponentIdentity sceneViewComponentIdentity(
+            SceneViewSnapshot.ComponentIdentity identity) {
+        return new SceneViewSnapshotDto.ComponentIdentity(
+                sceneViewOccurrenceId(identity.occurrence()),
+                new SceneViewSnapshotDto.Scope(
+                        identity.scope().definition().toString(),
+                        sceneViewOccurrenceId(identity.scope().anchor())),
+                identity.authoredEntity().toString(),
+                identity.component().toString());
+    }
+
+    /** Maps an exact decimal vector without binary floating-point conversion. */
+    private static SceneViewSnapshotDto.Vector3 sceneViewVector(SceneViewSnapshot.Vector3 vector) {
+        return new SceneViewSnapshotDto.Vector3(
+                vector.x().toPlainString(),
+                vector.y().toPlainString(),
+                vector.z().toPlainString());
+    }
+
+    /** Maps one built-in transform projection. */
+    private static SceneViewSnapshotDto.Transform3d sceneViewTransform(SceneViewSnapshot.Transform3d transform) {
+        return new SceneViewSnapshotDto.Transform3d(
+                sceneViewComponentIdentity(transform.identity()),
+                sceneViewVector(transform.position()),
+                sceneViewVector(transform.orientationDegrees()),
+                sceneViewVector(transform.scale()));
+    }
+
+    /** Maps one unrealized renderer-resource reference. */
+    private static SceneViewSnapshotDto.ResourceReference sceneViewResource(ResourceReference reference) {
+        return new SceneViewSnapshotDto.ResourceReference(
+                serialized(reference.kind()),
+                reference.locator(),
+                reference.projectPath().map(Path::toString).orElse(null));
+    }
+
+    /** Maps one built-in mesh projection. */
+    private static SceneViewSnapshotDto.MeshRenderer3d sceneViewMesh(SceneViewSnapshot.MeshRenderer3d mesh) {
+        return new SceneViewSnapshotDto.MeshRenderer3d(
+                sceneViewComponentIdentity(mesh.identity()),
+                sceneViewResource(mesh.mesh()),
+                sceneViewResource(mesh.material()),
+                mesh.visible());
+    }
+
+    /** Maps one built-in directional-light projection. */
+    private static SceneViewSnapshotDto.DirectionalLight3d sceneViewDirectionalLight(
+            SceneViewSnapshot.DirectionalLight3d light) {
+        return new SceneViewSnapshotDto.DirectionalLight3d(
+                sceneViewComponentIdentity(light.identity()),
+                sceneViewVector(light.color()),
+                light.intensity().toPlainString(),
+                sceneViewVector(light.target()));
     }
 
     /** Maps one retained domain definition to its explicit versioned wire snapshot. */
@@ -1146,6 +1321,36 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Creates a project-ownership rejection without leaking a stale generation. */
     private static SceneViewServiceResult sceneViewFailure(String failureCode) {
         return new SceneViewServiceResult(false, null, null, failureCode);
+    }
+
+    /** Creates a protocol-level Scene View ownership rejection without leaking a stale generation. */
+    private static SceneViewReadResult sceneViewReadFailure(SceneViewReadParams params, String failureCode) {
+        return new SceneViewReadResult(
+                false,
+                null,
+                params.sceneAssetId(),
+                params.expectedDefinitionRevision(),
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                failureCode);
+    }
+
+    /** Creates an accepted unavailable outcome for a malformed or unknown Scene identity. */
+    private SceneViewReadResult unavailableSceneView(SceneViewReadParams params) {
+        return new SceneViewReadResult(
+                true,
+                activeProjectGeneration,
+                params.sceneAssetId(),
+                params.expectedDefinitionRevision(),
+                "scene-unavailable",
+                null,
+                null,
+                null,
+                List.of(),
+                null);
     }
 
     /** Creates an operation-level viewport rejection without leaking stale launch inputs. */

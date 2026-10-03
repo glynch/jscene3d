@@ -4,6 +4,7 @@
  */
 /** Product renderer process for native JScene3D Editor viewports. */
 module io.github.glynch.jscene3d.editor.renderer {
+    requires com.fasterxml.jackson.databind;
     requires io.github.glynch.jscene3d.core;
     requires io.github.glynch.jscene3d.editor.authoring;
     requires io.github.glynch.jscene3d.iosurface.macos;

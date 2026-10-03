@@ -15,6 +15,7 @@ final class RendererCommandTest {
     void parsesStageOneAndLifecycleCommands() throws RendererProtocolException {
         assertThat(RendererCommand.parse("FRAME 42")).isEqualTo(new RendererCommand.Frame("42"));
         assertThat(RendererCommand.parse("DRAG 1.5 -2")).isEqualTo(new RendererCommand.Drag(1.5f, -2.0f));
+        assertThat(RendererCommand.parse("SCENE_SNAPSHOT e30")).isEqualTo(new RendererCommand.SceneSnapshot("e30"));
         assertThat(RendererCommand.parse("RECEIVE_SURFACE")).isInstanceOf(RendererCommand.ReceiveSurface.class);
         assertThat(RendererCommand.parse("PAUSE")).isInstanceOf(RendererCommand.Pause.class);
         assertThat(RendererCommand.parse("RESUME")).isInstanceOf(RendererCommand.Resume.class);

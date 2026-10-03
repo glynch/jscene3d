@@ -44,10 +44,15 @@ public final class EditorRendererMain {
 
         RendererSession rendererSession;
         try {
-            rendererSession = configuration
-                    .projectLaunch()
-                    .<RendererSession>map(launch -> ProjectRendererSession.create(configuration, launch))
-                    .orElseGet(() -> ValidationRendererSession.create(configuration));
+            if (configuration.sceneViewLaunch().isPresent()) {
+                rendererSession = SceneViewProcessSession.create(
+                        configuration, configuration.sceneViewLaunch().orElseThrow());
+            } else if (configuration.projectLaunch().isPresent()) {
+                rendererSession = ProjectRendererSession.create(
+                        configuration, configuration.projectLaunch().orElseThrow());
+            } else {
+                rendererSession = ValidationRendererSession.create(configuration);
+            }
         } catch (RuntimeException | LinkageError failure) {
             output.println(RendererProtocol.EVENT_PROTOCOL_VERSION + " " + configuration.protocolVersion());
             output.println(RendererProtocol.EVENT_ERROR + " RUNTIME_FAILURE startup");

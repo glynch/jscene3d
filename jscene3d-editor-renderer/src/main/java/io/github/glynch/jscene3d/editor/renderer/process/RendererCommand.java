@@ -21,6 +21,7 @@ sealed interface RendererCommand {
             case RendererProtocol.COMMAND_SHUTDOWN -> noArguments(parts, new Shutdown());
             case RendererProtocol.COMMAND_QUIT -> noArguments(parts, new Quit());
             case RendererProtocol.COMMAND_DRAG -> parseDrag(parts);
+            case RendererProtocol.COMMAND_SCENE_SNAPSHOT -> parseSceneSnapshot(parts);
             default -> throw RendererProtocolException.unknown("Unknown renderer command: " + parts[0]);
         };
     }
@@ -48,6 +49,13 @@ sealed interface RendererCommand {
         }
     }
 
+    private static SceneSnapshot parseSceneSnapshot(String[] parts) throws RendererProtocolException {
+        if (parts.length != 2 || parts[1].isEmpty()) {
+            throw RendererProtocolException.malformed("SCENE_SNAPSHOT requires one encoded snapshot");
+        }
+        return new SceneSnapshot(parts[1]);
+    }
+
     private static <T extends RendererCommand> T noArguments(String[] parts, T command)
             throws RendererProtocolException {
         if (parts.length != 1) {
@@ -59,6 +67,8 @@ sealed interface RendererCommand {
     record Frame(String requestToken) implements RendererCommand {}
 
     record Drag(float horizontal, float vertical) implements RendererCommand {}
+
+    record SceneSnapshot(String encodedSnapshot) implements RendererCommand {}
 
     record ReceiveSurface() implements RendererCommand {}
 

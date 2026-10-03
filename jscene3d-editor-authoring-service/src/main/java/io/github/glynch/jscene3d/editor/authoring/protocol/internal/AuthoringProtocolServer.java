@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProtocolVersion;
+import io.github.glynch.jscene3d.editor.authoring.protocol.SceneViewReadParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ShutdownResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.framing.ContentLengthMessageReader;
@@ -213,6 +214,8 @@ public final class AuthoringProtocolServer {
                         id,
                         service.prepareViewportLaunch(
                                 readParams(request, ViewportLaunchParams.class), initializedLocale()));
+            case SCENE_VIEW_READ ->
+                success(id, service.readSceneView(readParams(request, SceneViewReadParams.class), initializedLocale()));
             case DEFINITION_OPEN ->
                 success(
                         id,

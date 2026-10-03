@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.renderer.process;
 import static org.lwjgl.opengl.GL11.glFlush;
 
 import io.github.glynch.jscene3d.editor.renderer.process.RendererConfiguration.ProjectLaunch;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import io.github.glynch.jscene3d.game.WorldFrameDriver;
 import io.github.glynch.jscene3d.game.input.ActionSnapshot;
 import io.github.glynch.jscene3d.game.input.InputWorldModule;
@@ -153,6 +154,12 @@ final class ProjectRendererSession implements RendererSession {
     @Override
     public void applyValidationDrag(float horizontal, float vertical) {
         requireOpen();
+    }
+
+    @Override
+    public void replaceSceneViewSnapshot(SceneViewSnapshot snapshot) {
+        requireOpen();
+        throw new IllegalStateException("Game View does not accept Scene View snapshots");
     }
 
     @Override

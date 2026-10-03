@@ -21,6 +21,9 @@ import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectOpenResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectReplaceResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ProjectSummary;
+import io.github.glynch.jscene3d.editor.authoring.protocol.SceneViewReadParams;
+import io.github.glynch.jscene3d.editor.authoring.protocol.SceneViewReadResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.SceneViewSnapshotDto;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.ViewportLaunchSpecification;
@@ -112,6 +115,8 @@ final class AuthoringProjectServiceTest {
         SceneViewServiceResult unretained = service.projectSceneView(1L, scene, 0L);
         service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
         SceneViewServiceResult projected = service.projectSceneView(1L, scene, 0L);
+        SceneViewReadResult wireProjection = service.readSceneView(
+                new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 0L), Locale.ENGLISH);
 
         assertThat(unopened)
                 .returns(false, SceneViewServiceResult::accepted)
@@ -137,6 +142,116 @@ final class AuthoringProjectServiceTest {
                     assertThat(result.currentRevision()).hasValue(0L);
                     assertThat(result.snapshot()).get().returns(scene, snapshot -> snapshot.scene());
                 });
+        assertThat(wireProjection)
+                .returns(true, SceneViewReadResult::accepted)
+                .returns("projected", SceneViewReadResult::outcome)
+                .returns(0L, SceneViewReadResult::currentRevision)
+                .satisfies(result -> {
+                    assertThat(result.snapshot()).isNotNull();
+                    assertThat(result.launch())
+                            .isNotNull()
+                            .returns("example.authoring-test", SceneViewReadResult.LaunchSpecification::projectId)
+                            .returns("Opening Scene", SceneViewReadResult.LaunchSpecification::sceneName);
+                });
+    }
+
+    /** Returns exact protocol outcomes for absent, stale, malformed, and stale-revision Scene View requests. */
+    @Test
+    void rejectsInvalidSceneViewProtocolIdentity() throws IOException {
+        SceneViewReadResult unopened = service.readSceneView(
+                new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 0L), Locale.ENGLISH);
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+
+        SceneViewReadResult wrongGeneration = service.readSceneView(
+                new SceneViewReadParams(2L, AuthoringTestProject.SCENE_ASSET_ID, 0L), Locale.ENGLISH);
+        SceneViewReadResult malformed =
+                service.readSceneView(new SceneViewReadParams(1L, "not-an-id", 0L), Locale.ENGLISH);
+        service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
+        SceneViewReadResult staleRevision = service.readSceneView(
+                new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 1L), Locale.ENGLISH);
+
+        assertThat(unopened)
+                .returns(false, SceneViewReadResult::accepted)
+                .returns(AuthoringProjectService.PROJECT_NOT_OPEN, SceneViewReadResult::failureCode);
+        assertThat(wrongGeneration)
+                .returns(false, SceneViewReadResult::accepted)
+                .returns(AuthoringProjectService.PROJECT_GENERATION_CONFLICT, SceneViewReadResult::failureCode);
+        assertThat(malformed)
+                .returns(true, SceneViewReadResult::accepted)
+                .returns("scene-unavailable", SceneViewReadResult::outcome)
+                .returns(null, SceneViewReadResult::snapshot)
+                .returns(null, SceneViewReadResult::launch);
+        assertThat(staleRevision)
+                .returns(true, SceneViewReadResult::accepted)
+                .returns("stale-revision", SceneViewReadResult::outcome)
+                .returns(0L, SceneViewReadResult::currentRevision)
+                .returns(null, SceneViewReadResult::snapshot)
+                .returns(null, SceneViewReadResult::launch);
+    }
+
+    /** Serializes every supported built-in Scene View projection without runtime implementation inputs. */
+    @Test
+    void serializesCompleteSceneViewProjection() throws IOException {
+        AuthoringTestProject.writeSceneViewProject(temporaryDirectory);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        DefinitionOpenResult opened =
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
+
+        SceneViewReadResult result = service.readSceneView(
+                new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 0L), Locale.ENGLISH);
+        SceneViewSnapshotDto snapshot = Objects.requireNonNull(result.snapshot());
+
+        assertThat(opened.opened()).withFailMessage(opened::toString).isTrue();
+        assertThat(result)
+                .returns(true, SceneViewReadResult::accepted)
+                .returns("projected", SceneViewReadResult::outcome)
+                .returns(0L, SceneViewReadResult::currentRevision);
+        assertThat(snapshot.occurrences()).hasSize(2);
+        assertRootSceneViewProjection(snapshot.occurrences().getFirst());
+        assertChildSceneViewProjection(snapshot.occurrences().get(1));
+        assertThat(result.launch())
+                .isNotNull()
+                .returns("example.authoring-test", SceneViewReadResult.LaunchSpecification::projectId)
+                .returns("Opening Scene", SceneViewReadResult.LaunchSpecification::sceneName);
+    }
+
+    /** Verifies the root transform, mesh resources, and stable component scope. */
+    private static void assertRootSceneViewProjection(SceneViewSnapshotDto.VisualOccurrence root) {
+        assertThat(root.parent()).isNull();
+        assertThat(root.name()).isEqualTo("Visual Root");
+        assertThat(root.transform()).isNotNull().satisfies(transform -> {
+            assertThat(transform.position().x()).isEqualTo("1.25");
+            assertThat(transform.orientationDegrees().z()).isEqualTo("30");
+            assertThat(transform.scale().y()).isEqualTo("3");
+            assertThat(transform.identity().scope().definitionAssetId()).isEqualTo(AuthoringTestProject.SCENE_ASSET_ID);
+        });
+        assertThat(root.meshes()).singleElement().satisfies(mesh -> {
+            assertThat(mesh.visible()).isTrue();
+            assertThat(mesh.mesh())
+                    .returns("asset", SceneViewSnapshotDto.ResourceReference::kind)
+                    .returns("test-mesh", SceneViewSnapshotDto.ResourceReference::locator)
+                    .returns(null, SceneViewSnapshotDto.ResourceReference::projectPath);
+            assertThat(mesh.material())
+                    .returns("asset", SceneViewSnapshotDto.ResourceReference::kind)
+                    .returns("test-material", SceneViewSnapshotDto.ResourceReference::locator)
+                    .returns(null, SceneViewSnapshotDto.ResourceReference::projectPath);
+        });
+        assertThat(root.directionalLight()).isNull();
+    }
+
+    /** Verifies parent identity, disabled state, and exact directional-light values. */
+    private static void assertChildSceneViewProjection(SceneViewSnapshotDto.VisualOccurrence child) {
+        assertThat(child.parent()).isNotNull();
+        assertThat(child.name()).isNull();
+        assertThat(child.enabled()).isFalse();
+        assertThat(child.transform()).isNotNull();
+        assertThat(child.meshes()).isEmpty();
+        assertThat(child.directionalLight()).isNotNull().satisfies(light -> {
+            assertThat(light.color().y()).isEqualTo("0.5");
+            assertThat(light.intensity()).isEqualTo("3.5");
+            assertThat(light.target().z()).isEqualTo("9");
+        });
     }
 
     /** Groups definitions semantically and retains Main Scene identity after physical relocation. */

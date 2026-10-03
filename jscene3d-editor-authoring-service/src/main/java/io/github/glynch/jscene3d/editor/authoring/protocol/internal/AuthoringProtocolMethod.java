@@ -21,6 +21,8 @@ enum AuthoringProtocolMethod {
     PROJECT_CLOSE("project/close"),
     /** Prepares an isolated renderer launch for one authoritative project world. */
     VIEWPORT_PREPARE_LAUNCH("viewport/prepareLaunch"),
+    /** Reads one immutable editor-safe Scene View projection. */
+    SCENE_VIEW_READ("sceneView/read"),
     /** Resolves and retains a structural definition with its complete hierarchy snapshot. */
     DEFINITION_OPEN("definition/open"),
     /** Applies one exact SET or REMOVE mutation. */

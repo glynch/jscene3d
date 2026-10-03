@@ -22,7 +22,12 @@ final class RendererConfigurationTest {
 
         assertThat(configuration)
                 .isEqualTo(new RendererConfiguration(
-                        "org.example.Editor", 640, 480, RendererProtocolVersion.CURRENT, Optional.empty()));
+                        "org.example.Editor",
+                        640,
+                        480,
+                        RendererProtocolVersion.CURRENT,
+                        Optional.empty(),
+                        Optional.empty()));
     }
 
     @Test
@@ -40,6 +45,30 @@ final class RendererConfigurationTest {
 
         assertThat(configuration.projectLaunch())
                 .contains(new RendererConfiguration.ProjectLaunch(
+                        Path.of("/projects/example"),
+                        Path.of("/projects/example/.jscene3d/published"),
+                        "0.1.0-SNAPSHOT",
+                        "example.project",
+                        AssetId.from("e890c4c3-fb32-49d8-88b8-4e04e7a29656")));
+    }
+
+    @Test
+    void distinguishesRuntimeFreeSceneViewLaunch() {
+        RendererConfiguration configuration = RendererConfiguration.from(new String[] {
+            "--scene-view",
+            "--project-root=/projects/example",
+            "--published-content-root=/projects/example/.jscene3d/published",
+            "--engine-version=0.1.0-SNAPSHOT",
+            "--project-id=example.project",
+            "--scene-asset-id=e890c4c3-fb32-49d8-88b8-4e04e7a29656",
+            "org.example.Editor",
+            "1280",
+            "720"
+        });
+
+        assertThat(configuration.projectLaunch()).isEmpty();
+        assertThat(configuration.sceneViewLaunch())
+                .contains(new RendererConfiguration.SceneViewLaunch(
                         Path.of("/projects/example"),
                         Path.of("/projects/example/.jscene3d/published"),
                         "0.1.0-SNAPSHOT",
@@ -78,7 +107,7 @@ final class RendererConfigurationTest {
     @Test
     void acceptsExplicitCurrentProtocolVersion() {
         RendererConfiguration configuration = RendererConfiguration.from(
-                new String[] {"--protocol-version=1.0", "org.example.Editor", "1920", "1080"});
+                new String[] {"--protocol-version=1.1", "org.example.Editor", "1920", "1080"});
 
         assertThat(configuration.protocolVersion()).isEqualTo(RendererProtocolVersion.CURRENT);
     }

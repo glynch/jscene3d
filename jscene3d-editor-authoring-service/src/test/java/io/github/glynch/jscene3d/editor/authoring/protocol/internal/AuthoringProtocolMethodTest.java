@@ -33,6 +33,7 @@ final class AuthoringProtocolMethodTest {
                         "project/replace",
                         "project/close",
                         "viewport/prepareLaunch",
+                        "sceneView/read",
                         "definition/open",
                         "definition/mutate",
                         "definition/undo",

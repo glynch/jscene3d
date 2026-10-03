@@ -231,6 +231,67 @@ public final class AuthoringTestProject {
                 """);
     }
 
+    /** Writes a Scene containing every built-in visual projection supported by the safe Scene View. */
+    public static void writeSceneViewProject(Path root) throws IOException {
+        write(root, DESCRIPTOR);
+        writeFile(root, "worlds/main.scene.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/scene-definition-1.json",
+                  "assetId":"e890c4c3-fb32-49d8-88b8-4e04e7a29656",
+                  "assetType":"scene-definition",
+                  "formatVersion":1,
+                  "name":"Opening Scene",
+                  "connections":[],
+                  "roots":[{
+                    "entryType":"local",
+                    "entityId":"0b295328-b5a3-4f41-9f34-e9b4abc430a7",
+                    "name":"Visual Root",
+                    "enabled":true,
+                    "components":[{
+                      "componentId":"11111111-1111-4111-8111-111111111111",
+                      "type":"io.github.glynch.jscene3d.spatial3d/transform-3d",
+                      "typeVersion":1,
+                      "properties":{
+                        "position":[1.25,2,3],
+                        "orientation":[10,20,30],
+                        "scale":[2,3,4]
+                      }
+                    },{
+                      "componentId":"22222222-2222-4222-8222-222222222222",
+                      "type":"io.github.glynch.jscene3d.spatial3d/mesh-renderer-3d",
+                      "typeVersion":1,
+                      "properties":{
+                        "mesh":{"$ref":"asset:test-mesh"},
+                        "material":{"$ref":"asset:test-material"},
+                        "visible":true
+                      }
+                    }],
+                    "children":[{
+                      "entryType":"local",
+                      "entityId":"33333333-3333-4333-8333-333333333333",
+                      "enabled":false,
+                      "components":[{
+                        "componentId":"55555555-5555-4555-8555-555555555555",
+                        "type":"io.github.glynch.jscene3d.spatial3d/transform-3d",
+                        "typeVersion":1,
+                        "properties":{}
+                      },{
+                        "componentId":"44444444-4444-4444-8444-444444444444",
+                        "type":"io.github.glynch.jscene3d.spatial3d/directional-light-3d",
+                        "typeVersion":1,
+                        "properties":{
+                          "color":[0.25,0.5,0.75],
+                          "intensity":3.5,
+                          "target":[7,8,9]
+                        }
+                      }],
+                      "children":[]
+                    }]
+                  }]
+                }
+                """);
+    }
+
     /**
      * Writes a project containing each scalar property supported by the first editable Inspector slice.
      *

@@ -4,6 +4,8 @@
  */
 package io.github.glynch.jscene3d.editor.renderer.process;
 
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
+
 /** One Java rendering session owned by one exact Electron native session. */
 interface RendererSession extends AutoCloseable {
     void renderFrame();
@@ -11,6 +13,8 @@ interface RendererSession extends AutoCloseable {
     SurfaceSize receiveReplacementSurface();
 
     void applyValidationDrag(float horizontal, float vertical);
+
+    void replaceSceneViewSnapshot(SceneViewSnapshot snapshot);
 
     @Override
     void close();

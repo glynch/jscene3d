@@ -17,8 +17,10 @@ record RendererConfiguration(
         int initialWidth,
         int initialHeight,
         RendererProtocolVersion protocolVersion,
-        Optional<ProjectLaunch> projectLaunch) {
+        Optional<ProjectLaunch> projectLaunch,
+        Optional<SceneViewLaunch> sceneViewLaunch) {
     private static final String VERSION_OPTION = "--protocol-version=";
+    private static final String SCENE_VIEW_OPTION = "--scene-view";
     private static final String PROJECT_ROOT_OPTION = "--project-root=";
     private static final String PUBLISHED_CONTENT_OPTION = "--published-content-root=";
     private static final String ENGINE_VERSION_OPTION = "--engine-version=";
@@ -32,10 +34,13 @@ record RendererConfiguration(
         int processArgumentCount = arguments.length - 3;
         Map<String, String> options = new LinkedHashMap<>();
         RendererProtocolVersion version = RendererProtocolVersion.CURRENT;
+        boolean sceneView = false;
         for (int index = 0; index < processArgumentCount; index++) {
             String argument = arguments[index];
             if (argument.startsWith(VERSION_OPTION)) {
                 version = parseVersion(argument.substring(VERSION_OPTION.length()));
+            } else if (SCENE_VIEW_OPTION.equals(argument) && !sceneView) {
+                sceneView = true;
             } else if (!putOption(options, argument, PROJECT_ROOT_OPTION)
                     && !putOption(options, argument, PUBLISHED_CONTENT_OPTION)
                     && !putOption(options, argument, ENGINE_VERSION_OPTION)
@@ -55,7 +60,10 @@ record RendererConfiguration(
         if (!version.equals(RendererProtocolVersion.CURRENT)) {
             throw new IllegalArgumentException("Unsupported renderer protocol version: " + version);
         }
-        return new RendererConfiguration(bundleId, width, height, version, projectLaunch(options));
+        Optional<ProjectLaunch> projectLaunch = sceneView ? Optional.empty() : projectLaunch(options);
+        Optional<SceneViewLaunch> sceneViewLaunch =
+                sceneView ? Optional.of(sceneViewLaunch(options)) : Optional.empty();
+        return new RendererConfiguration(bundleId, width, height, version, projectLaunch, sceneViewLaunch);
     }
 
     private static Optional<ProjectLaunch> projectLaunch(Map<String, String> options) {
@@ -68,6 +76,15 @@ record RendererConfiguration(
                 option(options, ENGINE_VERSION_OPTION),
                 option(options, PROJECT_ID_OPTION),
                 AssetId.from(option(options, SCENE_ASSET_ID_OPTION))));
+    }
+
+    private static SceneViewLaunch sceneViewLaunch(Map<String, String> options) {
+        return new SceneViewLaunch(
+                absolutePath(options, PROJECT_ROOT_OPTION),
+                absolutePath(options, PUBLISHED_CONTENT_OPTION),
+                option(options, ENGINE_VERSION_OPTION),
+                option(options, PROJECT_ID_OPTION),
+                AssetId.from(option(options, SCENE_ASSET_ID_OPTION)));
     }
 
     private static boolean putOption(Map<String, String> options, String argument, String prefix) {
@@ -128,6 +145,14 @@ record RendererConfiguration(
 
     /** Java-owned semantic project launch retained independently of Electron surface identity. */
     record ProjectLaunch(
+            Path projectRoot,
+            Path publishedContentRoot,
+            String engineVersion,
+            String projectId,
+            AssetId sceneAssetId) {}
+
+    /** Java-owned safe Scene View launch containing no title runtime artifacts. */
+    record SceneViewLaunch(
             Path projectRoot,
             Path publishedContentRoot,
             String engineVersion,

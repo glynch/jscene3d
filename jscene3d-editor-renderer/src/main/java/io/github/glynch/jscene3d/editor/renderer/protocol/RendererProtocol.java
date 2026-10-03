@@ -51,6 +51,9 @@ public final class RendererProtocol {
     /** Validation-scene drag command retained for Stage 1 compatibility. */
     public static final String COMMAND_DRAG = "DRAG";
 
+    /** Complete safe Scene View snapshot command prefix. */
+    public static final String COMMAND_SCENE_SNAPSHOT = "SCENE_SNAPSHOT";
+
     private RendererProtocol() {
         throw new AssertionError("RendererProtocol cannot be instantiated");
     }

@@ -51,6 +51,7 @@ final class RendererProtocolServer {
             return switch (command) {
                 case RendererCommand.Frame ignored -> executeFrame();
                 case RendererCommand.Drag drag -> executeDrag(drag);
+                case RendererCommand.SceneSnapshot snapshot -> executeSceneSnapshot(snapshot);
                 case RendererCommand.ReceiveSurface ignored -> executeSurfaceReplacement();
                 case RendererCommand.Pause ignored -> executePause();
                 case RendererCommand.Resume ignored -> executeResume();
@@ -77,6 +78,11 @@ final class RendererProtocolServer {
 
     private boolean executeDrag(RendererCommand.Drag drag) {
         session.applyValidationDrag(drag.horizontal(), drag.vertical());
+        return true;
+    }
+
+    private boolean executeSceneSnapshot(RendererCommand.SceneSnapshot snapshot) {
+        session.replaceSceneViewSnapshot(SceneViewSnapshotCodec.decode(snapshot.encodedSnapshot()));
         return true;
     }
 
@@ -115,6 +121,7 @@ final class RendererProtocolServer {
         return switch (command) {
             case RendererCommand.Frame ignored -> "frame";
             case RendererCommand.Drag ignored -> "drag";
+            case RendererCommand.SceneSnapshot ignored -> "scene-snapshot";
             case RendererCommand.ReceiveSurface ignored -> "surface-replacement";
             case RendererCommand.Pause ignored -> "pause";
             case RendererCommand.Resume ignored -> "resume";

@@ -58,7 +58,7 @@ final class SceneViewRendererSessionTest {
     private static final URI SOURCE = URI.create("file:///project/scenes/example.scene.json");
 
     @Test
-    void realizesEmptySnapshotsBesideEditorOwnedCameraAndHelpers() {
+    void realizesEmptySnapshotsBesideEditorOwnedCameraGridAndOverlayGizmo() {
         TrackingResolver resolver = new TrackingResolver();
         try (SceneViewRendererSession session = new SceneViewRendererSession(resolver)) {
             SceneViewRealizationResult result = session.replaceSnapshot(snapshot(0L, List.of()));
@@ -66,11 +66,11 @@ final class SceneViewRendererSessionTest {
             assertThat(result.status()).isEqualTo(Status.APPLIED);
             assertThat(result.currentRevision()).hasValue(0L);
             assertThat(session.scene().children())
-                    .contains(session.camera(), session.grid(), session.axes())
-                    .hasSize(4);
+                    .contains(session.camera(), session.grid())
+                    .hasSize(3);
+            assertThat(session.orientationGizmo()).isNotInstanceOf(Object3D.class);
             assertThat(session.identityFor(session.camera())).isEmpty();
             assertThat(session.identityFor(session.grid())).isEmpty();
-            assertThat(session.identityFor(session.axes())).isEmpty();
             assertThat(resolver.acquisitionCount()).isZero();
         }
     }
@@ -132,21 +132,22 @@ final class SceneViewRendererSessionTest {
     }
 
     @Test
-    void keepsEditorCameraAndHelpersIndependentAcrossReplacement() {
+    void keepsEditorCameraGridAndOrientationGizmoIndependentAcrossReplacement() {
         TrackingResolver resolver = new TrackingResolver();
         try (SceneViewRendererSession session = new SceneViewRendererSession(resolver)) {
             session.replaceSnapshot(snapshot(1L, visualOccurrences()));
             Object3D oldOccurrence = session.objectFor(childOccurrence()).orElseThrow();
             Object3D camera = session.camera();
             Object3D grid = session.grid();
-            Object3D axes = session.axes();
+            SceneOrientationGizmo orientationGizmo = session.orientationGizmo();
 
             SceneViewRealizationResult result = session.replaceSnapshot(snapshot(2L, visualOccurrences()));
 
             assertThat(result.status()).isEqualTo(Status.APPLIED);
             assertThat(session.camera()).isSameAs(camera);
             assertThat(session.grid()).isSameAs(grid);
-            assertThat(session.axes()).isSameAs(axes);
+            assertThat(session.orientationGizmo()).isSameAs(orientationGizmo);
+            assertThat(orientationGizmo).isNotInstanceOf(Object3D.class);
             assertThat(session.objectFor(childOccurrence())).hasValueSatisfying(current -> {
                 assertThat(current).isNotSameAs(oldOccurrence);
                 assertThat(current.parent()).isNotNull();
@@ -155,6 +156,17 @@ final class SceneViewRendererSessionTest {
             Object3D oldContentRoot = Objects.requireNonNull(oldAuthoredRoot.parent());
             assertThat(oldContentRoot.parent()).isNull();
         }
+    }
+
+    @Test
+    void disposesOrientationGizmoWithTheRendererSession() {
+        SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver());
+        SceneOrientationGizmo orientationGizmo = session.orientationGizmo();
+
+        session.close();
+        session.close();
+
+        assertThat(orientationGizmo.isClosed()).isTrue();
     }
 
     @Test

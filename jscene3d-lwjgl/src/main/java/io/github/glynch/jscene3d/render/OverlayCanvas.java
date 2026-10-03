@@ -31,6 +31,7 @@ public final class OverlayCanvas {
     private boolean commandOpen;
     private int activeCommandStart;
     private @Nullable OverlayImage activeImage;
+    private @Nullable OverlayFont font;
 
     /** Restricts construction to the renderer while allowing overlays to use the supplied canvas. */
     OverlayCanvas() {}
@@ -134,6 +135,118 @@ public final class OverlayCanvas {
     }
 
     /**
+     * Appends a solid triangle.
+     *
+     * @param triangle immutable finite triangle coordinates
+     * @param color linear-sRGB color
+     * @param alpha opacity in the inclusive range {@code [0, 1]}
+     */
+    public void triangle(Triangle triangle, Color color, float alpha) {
+        Triangle validTriangle = Objects.requireNonNull(triangle, "triangle");
+        Color validColor = Objects.requireNonNull(color, "color");
+        float validAlpha = Preconditions.requireUnitInterval(alpha, "alpha");
+        beginCommand(null);
+        solidVertex(validTriangle.firstX(), validTriangle.firstY(), validColor, validAlpha);
+        solidVertex(validTriangle.secondX(), validTriangle.secondY(), validColor, validAlpha);
+        solidVertex(validTriangle.thirdX(), validTriangle.thirdY(), validColor, validAlpha);
+    }
+
+    /**
+     * Appends one left-aligned line of antialiased text.
+     *
+     * <p>The {@code x} coordinate is the line's left anchor and {@code y} is the top of its logical
+     * line box. Font size and coordinates are logical pixels, so the renderer scales them to the
+     * native framebuffer without changing layout. This foundation supports selected bundled
+     * Unicode ranges and substitutes a question mark for unavailable glyphs. It deliberately does
+     * not provide shaping, bidirectional layout, kerning, wrapping, or multiple lines.
+     *
+     * @param text non-null single-line Unicode text
+     * @param x finite left coordinate
+     * @param y finite top coordinate
+     * @param fontSize finite positive logical font size
+     * @param color linear-sRGB color
+     * @param alpha opacity in the inclusive range {@code [0, 1]}
+     * @throws NullPointerException if {@code text} or {@code color} is {@code null}
+     * @throws IllegalArgumentException if a numeric argument is invalid or {@code text} contains a
+     *     line break
+     */
+    public void text(String text, float x, float y, float fontSize, Color color, float alpha) {
+        text(text, x, y, fontSize, color, alpha, OverlayTextAlignment.LEFT);
+    }
+
+    /**
+     * Appends one horizontally aligned line of antialiased text.
+     *
+     * <p>The {@code x} coordinate is interpreted according to {@code alignment}; {@code y} is
+     * always the top of the logical line box. Font size and coordinates are logical pixels.
+     *
+     * @param text non-null single-line Unicode text
+     * @param x finite horizontal alignment anchor
+     * @param y finite top coordinate
+     * @param fontSize finite positive logical font size
+     * @param color linear-sRGB color
+     * @param alpha opacity in the inclusive range {@code [0, 1]}
+     * @param alignment horizontal relationship between {@code x} and the rendered line
+     * @throws NullPointerException if a reference argument is {@code null}
+     * @throws IllegalArgumentException if a numeric argument is invalid or {@code text} contains a
+     *     line break
+     */
+    public void text(
+            String text, float x, float y, float fontSize, Color color, float alpha, OverlayTextAlignment alignment) {
+        String validText = validateText(text);
+        float validX = Preconditions.requireFinite(x, "x");
+        float validY = Preconditions.requireFinite(y, "y");
+        float validFontSize = Preconditions.requirePositive(fontSize, "fontSize");
+        Color validColor = Objects.requireNonNull(color, "color");
+        float validAlpha = Preconditions.requireUnitInterval(alpha, "alpha");
+        OverlayTextAlignment validAlignment = Objects.requireNonNull(alignment, "alignment");
+        if (!validText.isEmpty()) {
+            font().text(
+                            this,
+                            new OverlayFont.TextRun(
+                                    validText, validX, validY, validFontSize, validColor, validAlpha, validAlignment));
+        }
+    }
+
+    /**
+     * Returns the logical advance width of one line of overlay text.
+     *
+     * @param text non-null single-line Unicode text
+     * @param fontSize finite positive logical font size
+     * @return logical advance width
+     * @throws NullPointerException if {@code text} is {@code null}
+     * @throws IllegalArgumentException if {@code fontSize} is invalid or {@code text} contains a
+     *     line break
+     */
+    public float textWidth(String text, float fontSize) {
+        String validText = validateText(text);
+        float validFontSize = Preconditions.requirePositive(fontSize, "fontSize");
+        return validText.isEmpty() ? 0.0f : font().width(validText, validFontSize);
+    }
+
+    /**
+     * Immutable finite coordinates for one solid overlay triangle.
+     *
+     * @param firstX first x-coordinate
+     * @param firstY first y-coordinate
+     * @param secondX second x-coordinate
+     * @param secondY second y-coordinate
+     * @param thirdX third x-coordinate
+     * @param thirdY third y-coordinate
+     */
+    public record Triangle(float firstX, float firstY, float secondX, float secondY, float thirdX, float thirdY) {
+        /** Validates all triangle coordinates. */
+        public Triangle {
+            Preconditions.requireFinite(firstX, "firstX");
+            Preconditions.requireFinite(firstY, "firstY");
+            Preconditions.requireFinite(secondX, "secondX");
+            Preconditions.requireFinite(secondY, "secondY");
+            Preconditions.requireFinite(thirdX, "thirdX");
+            Preconditions.requireFinite(thirdY, "thirdY");
+        }
+    }
+
+    /**
      * Appends a tinted rectangular region of an alpha-mask image.
      *
      * @param region immutable normalized source-image region
@@ -187,11 +300,29 @@ public final class OverlayCanvas {
 
     /** Clears all accumulated vertices and commands while retaining storage. */
     void clear() {
+        Arrays.fill(commandImages, 0, commandCount, null);
         size = 0;
         commandCount = 0;
         commandOpen = false;
         activeCommandStart = 0;
         activeImage = null;
+    }
+
+    /** Returns the lazily loaded renderer-owned overlay font. */
+    private OverlayFont font() {
+        if (font == null) {
+            font = OverlayFont.load();
+        }
+        return font;
+    }
+
+    /** Validates the deliberately single-line text foundation. */
+    private static String validateText(String text) {
+        String validText = Objects.requireNonNull(text, "text");
+        if (validText.indexOf('\n') >= 0 || validText.indexOf('\r') >= 0) {
+            throw new IllegalArgumentException("overlay text must be a single line");
+        }
+        return validText;
     }
 
     /** Returns packed position, texture-coordinate, and color data. */

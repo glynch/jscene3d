@@ -15,7 +15,6 @@ import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Tr
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Vector3;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.VisualOccurrence;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
-import io.github.glynch.jscene3d.helpers.AxesHelper;
 import io.github.glynch.jscene3d.helpers.GridHelper;
 import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.materials.Material;
@@ -46,7 +45,7 @@ final class SceneViewRendererSession implements AutoCloseable {
     private final Scene scene = new Scene();
     private final PerspectiveCamera camera = new PerspectiveCamera((float) Math.toRadians(60.0), 1.0f, 0.1f, 1000.0f);
     private final GridHelper grid = new GridHelper(20.0f, 20);
-    private final AxesHelper axes = new AxesHelper(2.0f);
+    private final SceneOrientationGizmo orientationGizmo = new SceneOrientationGizmo(camera);
     private final SceneViewResourceCache resources;
 
     private @Nullable RealizedContent content;
@@ -59,7 +58,6 @@ final class SceneViewRendererSession implements AutoCloseable {
         camera.lookAt(0.0f, 0.0f, 0.0f);
         scene.add(camera);
         scene.add(grid);
-        scene.add(axes);
     }
 
     SceneViewRealizationResult replaceSnapshot(SceneViewSnapshot snapshot) {
@@ -107,7 +105,9 @@ final class SceneViewRendererSession implements AutoCloseable {
     void render(Renderer renderer, int viewportWidth, int viewportHeight) {
         requireOpen();
         updateViewportSize(viewportWidth, viewportHeight);
-        Objects.requireNonNull(renderer, "renderer").render(scene, camera);
+        Renderer validRenderer = Objects.requireNonNull(renderer, "renderer");
+        validRenderer.render(scene, camera);
+        validRenderer.render(orientationGizmo);
     }
 
     void updateViewportSize(int viewportWidth, int viewportHeight) {
@@ -133,9 +133,9 @@ final class SceneViewRendererSession implements AutoCloseable {
         return grid;
     }
 
-    AxesHelper axes() {
+    SceneOrientationGizmo orientationGizmo() {
         requireOpen();
-        return axes;
+        return orientationGizmo;
     }
 
     OptionalLong revision() {
@@ -179,7 +179,7 @@ final class SceneViewRendererSession implements AutoCloseable {
             failure = retainFailure(failure, exception);
         }
         try {
-            axes.close();
+            orientationGizmo.close();
         } catch (RuntimeException exception) {
             failure = retainFailure(failure, exception);
         }

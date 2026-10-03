@@ -87,8 +87,16 @@ public final class Material3dResource implements AutoCloseable {
         }
     }
 
-    /** Returns the internal material while this resource is open. */
-    Material material() {
+    /**
+     * Returns the shared renderer-independent material while this resource is open.
+     *
+     * <p>The resource retains ownership, including any texture dependencies. Callers must not mutate or close the
+     * returned material.
+     *
+     * @return shared open material
+     * @throws IllegalStateException if this resource is closed
+     */
+    public Material material() {
         requireOpen();
         return material;
     }

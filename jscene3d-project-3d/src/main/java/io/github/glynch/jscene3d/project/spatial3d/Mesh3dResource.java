@@ -59,8 +59,15 @@ public final class Mesh3dResource implements AutoCloseable {
         geometry.close();
     }
 
-    /** Returns the internal geometry while this resource is open. */
-    BufferGeometry geometry() {
+    /**
+     * Returns the shared renderer-independent geometry while this resource is open.
+     *
+     * <p>The resource retains ownership. Callers must not mutate or close the returned geometry.
+     *
+     * @return shared open geometry
+     * @throws IllegalStateException if this resource is closed
+     */
+    public BufferGeometry geometry() {
         requireOpen();
         return geometry;
     }

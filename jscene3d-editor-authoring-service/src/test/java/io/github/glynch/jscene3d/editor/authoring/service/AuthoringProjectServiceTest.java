@@ -30,6 +30,7 @@ import io.github.glynch.jscene3d.editor.project.session.AuthoringMutation;
 import io.github.glynch.jscene3d.editor.project.session.EditorProjectSession;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewProjectionResult;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.entity.EntityId;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
@@ -97,6 +98,45 @@ final class AuthoringProjectServiceTest {
                     assertThat(project.catalog().entityDefinitions()).isEmpty();
                 });
         assertThat(service.activeSession()).isPresent();
+    }
+
+    /** Scopes Java-side Scene View requests to project, Scene, and retained definition revision. */
+    @Test
+    void scopesSceneViewProjectionToCurrentAuthoringIdentity() throws IOException {
+        AssetId scene = AssetId.from(AuthoringTestProject.SCENE_ASSET_ID);
+        SceneViewServiceResult unopened = service.projectSceneView(1L, scene, 0L);
+        AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+
+        SceneViewServiceResult wrongGeneration = service.projectSceneView(2L, scene, 0L);
+        SceneViewServiceResult unretained = service.projectSceneView(1L, scene, 0L);
+        service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID));
+        SceneViewServiceResult projected = service.projectSceneView(1L, scene, 0L);
+
+        assertThat(unopened)
+                .returns(false, SceneViewServiceResult::accepted)
+                .returns(AuthoringProjectService.PROJECT_NOT_OPEN, SceneViewServiceResult::failureCode);
+        assertThat(wrongGeneration)
+                .returns(false, SceneViewServiceResult::accepted)
+                .returns(AuthoringProjectService.PROJECT_GENERATION_CONFLICT, SceneViewServiceResult::failureCode);
+        assertThat(unretained)
+                .returns(true, SceneViewServiceResult::accepted)
+                .returns(1L, SceneViewServiceResult::projectGeneration)
+                .extracting(SceneViewServiceResult::projection)
+                .isNotNull()
+                .extracting(SceneViewProjectionResult::outcome)
+                .isEqualTo(SceneViewProjectionResult.Outcome.SCENE_UNAVAILABLE);
+        assertThat(projected)
+                .returns(true, SceneViewServiceResult::accepted)
+                .returns(1L, SceneViewServiceResult::projectGeneration)
+                .extracting(SceneViewServiceResult::projection)
+                .isNotNull()
+                .satisfies(result -> {
+                    assertThat(result.outcome()).isEqualTo(SceneViewProjectionResult.Outcome.PROJECTED);
+                    assertThat(result.scene()).isEqualTo(scene);
+                    assertThat(result.currentRevision()).hasValue(0L);
+                    assertThat(result.snapshot()).get().returns(scene, snapshot -> snapshot.scene());
+                });
     }
 
     /** Groups definitions semantically and retains Main Scene identity after physical relocation. */

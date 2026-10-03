@@ -18,6 +18,7 @@ module io.github.glynch.jscene3d.editor.authoring {
     exports io.github.glynch.jscene3d.editor.project.session;
     exports io.github.glynch.jscene3d.editor.workbench.hierarchy;
     exports io.github.glynch.jscene3d.editor.workbench.inspector;
+    exports io.github.glynch.jscene3d.editor.workbench.sceneview;
 
     opens io.github.glynch.jscene3d.editor.presentation to
             io.github.glynch.jscene3d.i18n;

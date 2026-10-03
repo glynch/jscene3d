@@ -17,6 +17,10 @@ import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProjection;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProperty;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorSection;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewDiagnosticCode;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewProjectionResult;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewProjector;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetKind;
@@ -25,6 +29,8 @@ import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
 import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
+import io.github.glynch.jscene3d.project.composition.CompositionPlanResult;
+import io.github.glynch.jscene3d.project.composition.CompositionPlanner;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
 import io.github.glynch.jscene3d.project.entity.EntityDefinition;
 import io.github.glynch.jscene3d.project.entity.EntityEntry;
@@ -47,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 
 /** Central facade for one loaded JScene3D authoring project and its per-definition working copies. */
@@ -237,6 +244,57 @@ public final class EditorProjectSession implements AutoCloseable {
         ensureOpen();
         AuthoredDefinitionWorkingCopy workingCopy = workingCopies.get(Objects.requireNonNull(id, "id"));
         return workingCopy == null ? Optional.empty() : Optional.of(workingCopy.state());
+    }
+
+    /**
+     * Projects the current in-memory revision of one retained Scene for a future editor Scene View.
+     *
+     * <p>The root Scene comes directly from its authoritative working copy, including accepted unsaved changes. The
+     * established definition resolver remains responsible for referenced authored and generated entity definitions.
+     * The projection uses only safe descriptors and never creates runtime components, project classes, renderer
+     * objects, or resources.
+     *
+     * @param scene retained Scene asset identity
+     * @param expectedRevision Scene revision observed by the caller
+     * @return current projection, stale/unavailable outcome, or structured planning diagnostics
+     */
+    public SceneViewProjectionResult projectSceneView(AssetId scene, long expectedRevision) {
+        ensureOpen();
+        AssetId validScene = Objects.requireNonNull(scene, "scene");
+        if (expectedRevision < 0) {
+            throw new IllegalArgumentException("expectedRevision must be non-negative");
+        }
+        RetainedState state = retainedDefinitions.get(validScene);
+        if (state == null || state.kind() != AssetKind.SCENE_DEFINITION) {
+            return new SceneViewProjectionResult(
+                    SceneViewProjectionResult.Outcome.SCENE_UNAVAILABLE,
+                    validScene,
+                    OptionalLong.empty(),
+                    Optional.empty(),
+                    List.of());
+        }
+        EditorRetainedDefinition retained = snapshot(state);
+        long currentRevision = retained.revision();
+        if (currentRevision != expectedRevision) {
+            return new SceneViewProjectionResult(
+                    SceneViewProjectionResult.Outcome.STALE_REVISION,
+                    validScene,
+                    OptionalLong.of(currentRevision),
+                    Optional.empty(),
+                    List.of());
+        }
+        EditorRetainedDefinition.Content.Scene content = (EditorRetainedDefinition.Content.Scene) retained.content();
+        CompositionPlanResult plan =
+                CompositionPlanner.plan(retained.source(), content.definition(), definitions, types);
+        if (plan.plan().isEmpty()) {
+            return new SceneViewProjectionResult(
+                    SceneViewProjectionResult.Outcome.PLANNING_FAILED,
+                    validScene,
+                    OptionalLong.of(currentRevision),
+                    Optional.empty(),
+                    plan.diagnostics());
+        }
+        return projectSceneView(validScene, retained.source(), currentRevision, plan);
     }
 
     /** Returns whether any authored definition differs from its persisted semantic baseline.
@@ -733,6 +791,35 @@ public final class EditorProjectSession implements AutoCloseable {
                 definitionRevision,
                 content,
                 projection);
+    }
+
+    /** Converts one coherent plan into a snapshot while containing unexpected projection failures. */
+    private static SceneViewProjectionResult projectSceneView(
+            AssetId scene, URI source, long revision, CompositionPlanResult plan) {
+        try {
+            SceneViewSnapshot projected = SceneViewProjector.project(plan.plan().orElseThrow(), revision);
+            return new SceneViewProjectionResult(
+                    SceneViewProjectionResult.Outcome.PROJECTED,
+                    scene,
+                    OptionalLong.of(revision),
+                    Optional.of(projected),
+                    List.of());
+        } catch (RuntimeException exception) {
+            String detail =
+                    exception.getMessage() == null ? "The visual projection was inconsistent" : exception.getMessage();
+            ProjectDiagnostic diagnostic = new ProjectDiagnostic(
+                    ProjectDiagnostic.Severity.ERROR,
+                    SceneViewDiagnosticCode.PROJECTION_FAILED,
+                    source,
+                    "",
+                    Map.of("technicalDetail", detail));
+            return new SceneViewProjectionResult(
+                    SceneViewProjectionResult.Outcome.PROJECTION_FAILED,
+                    scene,
+                    OptionalLong.of(revision),
+                    Optional.empty(),
+                    List.of(diagnostic));
+        }
     }
 
     /** Rejects a stale inspector read against one retained definition revision. */

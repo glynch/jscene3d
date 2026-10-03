@@ -45,6 +45,7 @@ import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProperty;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorSection;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorValue;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewProjectionResult;
 import io.github.glynch.jscene3d.i18n.MessageSource;
 import io.github.glynch.jscene3d.i18n.resourcebundle.ResourceBundleMessageSource;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -535,6 +536,33 @@ public final class AuthoringProjectService implements AutoCloseable {
         } catch (IllegalArgumentException exception) {
             return inspectorFailure(INSPECTOR_TARGET_INVALID);
         }
+    }
+
+    /**
+     * Requests the current editor-safe Scene View projection within an active project generation.
+     *
+     * <p>The returned inner result remains tied to the requested Scene asset and its current working-copy revision.
+     * This Java service seam deliberately adds no protocol method; a future transport maps it through the existing
+     * connection-generation envelope.
+     *
+     * @param expectedProjectGeneration active project generation observed by the caller
+     * @param scene retained Scene asset identity
+     * @param expectedDefinitionRevision Scene revision observed by the caller
+     * @return project-generation-scoped projection or stable ownership rejection
+     */
+    public synchronized SceneViewServiceResult projectSceneView(
+            long expectedProjectGeneration, AssetId scene, long expectedDefinitionRevision) {
+        ensureOpen();
+        AssetId validScene = Objects.requireNonNull(scene, "scene");
+        EditorProjectSession session = activeSession;
+        if (session == null) {
+            return sceneViewFailure(PROJECT_NOT_OPEN);
+        }
+        if (activeProjectGeneration != expectedProjectGeneration) {
+            return sceneViewFailure(PROJECT_GENERATION_CONFLICT);
+        }
+        SceneViewProjectionResult projection = session.projectSceneView(validScene, expectedDefinitionRevision);
+        return new SceneViewServiceResult(true, activeProjectGeneration, projection, null);
     }
 
     /**
@@ -1113,6 +1141,11 @@ public final class AuthoringProjectService implements AutoCloseable {
     /** Creates an operation-level Inspector rejection without leaking a stale generation. */
     private static InspectorReadResult inspectorFailure(String failureCode) {
         return new InspectorReadResult(false, null, null, List.of(), failureCode);
+    }
+
+    /** Creates a project-ownership rejection without leaking a stale generation. */
+    private static SceneViewServiceResult sceneViewFailure(String failureCode) {
+        return new SceneViewServiceResult(false, null, null, failureCode);
     }
 
     /** Creates an operation-level viewport rejection without leaking stale launch inputs. */

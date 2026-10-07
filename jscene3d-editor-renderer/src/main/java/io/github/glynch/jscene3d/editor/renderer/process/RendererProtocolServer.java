@@ -52,6 +52,8 @@ final class RendererProtocolServer {
                 case RendererCommand.Frame ignored -> executeFrame();
                 case RendererCommand.Drag drag -> executeDrag(drag);
                 case RendererCommand.SceneSnapshot snapshot -> executeSceneSnapshot(snapshot);
+                case RendererCommand.ScenePick pick -> executeScenePick(pick);
+                case RendererCommand.SceneSelect select -> executeSceneSelect(select);
                 case RendererCommand.ReceiveSurface ignored -> executeSurfaceReplacement();
                 case RendererCommand.Pause ignored -> executePause();
                 case RendererCommand.Resume ignored -> executeResume();
@@ -83,6 +85,25 @@ final class RendererProtocolServer {
 
     private boolean executeSceneSnapshot(RendererCommand.SceneSnapshot snapshot) {
         session.replaceSceneViewSnapshot(SceneViewSnapshotCodec.decode(snapshot.encodedSnapshot()));
+        return true;
+    }
+
+    private boolean executeScenePick(RendererCommand.ScenePick pick) {
+        SceneViewSelectionResult result = session.pickSceneView(pick.revision(), pick.horizontal(), pick.vertical());
+        String selection =
+                switch (result.status()) {
+                    case SELECTED ->
+                        SceneViewOccurrenceCodec.encode(result.occurrence().orElseThrow());
+                    case CLEARED -> "NONE";
+                    case STALE -> "STALE";
+                };
+        send(RendererProtocol.EVENT_SCENE_SELECTION + " " + pick.requestToken() + " " + result.revision() + " "
+                + selection);
+        return true;
+    }
+
+    private boolean executeSceneSelect(RendererCommand.SceneSelect select) {
+        session.selectSceneView(select.revision(), select.occurrence());
         return true;
     }
 
@@ -122,6 +143,8 @@ final class RendererProtocolServer {
             case RendererCommand.Frame ignored -> "frame";
             case RendererCommand.Drag ignored -> "drag";
             case RendererCommand.SceneSnapshot ignored -> "scene-snapshot";
+            case RendererCommand.ScenePick ignored -> "scene-pick";
+            case RendererCommand.SceneSelect ignored -> "scene-select";
             case RendererCommand.ReceiveSurface ignored -> "surface-replacement";
             case RendererCommand.Pause ignored -> "pause";
             case RendererCommand.Resume ignored -> "resume";

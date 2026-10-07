@@ -16,7 +16,9 @@ import io.github.glynch.jscene3d.iosurface.macos.IOSurfaceDescriptor;
 import io.github.glynch.jscene3d.iosurface.macos.IOSurfaceRenderSurface;
 import io.github.glynch.jscene3d.platform.Window;
 import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.composition.CompositionOccurrenceId;
 import io.github.glynch.jscene3d.render.Renderer;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /** Isolated runtime-free renderer for Java-projected authored Scene state. */
@@ -140,6 +142,18 @@ final class SceneViewProcessSession implements RendererSession {
         if (result.status() == SceneViewRealizationResult.Status.FAILED) {
             throw new IllegalStateException("Scene View snapshot realization failed: " + result.diagnostics());
         }
+    }
+
+    @Override
+    public SceneViewSelectionResult pickSceneView(long revision, float horizontal, float vertical) {
+        requireOpen();
+        return sceneView.pick(revision, horizontal, vertical);
+    }
+
+    @Override
+    public boolean selectSceneView(long revision, Optional<CompositionOccurrenceId> occurrence) {
+        requireOpen();
+        return sceneView.select(revision, occurrence);
     }
 
     @Override

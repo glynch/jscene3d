@@ -107,7 +107,7 @@ final class RendererConfigurationTest {
     @Test
     void acceptsExplicitCurrentProtocolVersion() {
         RendererConfiguration configuration = RendererConfiguration.from(
-                new String[] {"--protocol-version=1.1", "org.example.Editor", "1920", "1080"});
+                new String[] {"--protocol-version=1.2", "org.example.Editor", "1920", "1080"});
 
         assertThat(configuration.protocolVersion()).isEqualTo(RendererProtocolVersion.CURRENT);
     }

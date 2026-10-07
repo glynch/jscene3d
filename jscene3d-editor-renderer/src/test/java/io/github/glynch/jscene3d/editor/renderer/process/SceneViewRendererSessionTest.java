@@ -18,6 +18,7 @@ import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Ve
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.VisualOccurrence;
 import io.github.glynch.jscene3d.geometries.BoxGeometry;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.helpers.BoxHelper;
 import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.materials.BasicMaterial;
 import io.github.glynch.jscene3d.materials.Material;
@@ -170,6 +171,48 @@ final class SceneViewRendererSessionTest {
     }
 
     @Test
+    void highlightsSharedSelectionAndRetainsItAcrossSnapshotReplacement() {
+        TrackingResolver resolver = new TrackingResolver();
+        SceneViewRendererSession session = new SceneViewRendererSession(resolver);
+        session.replaceSnapshot(snapshot(1L, List.of(pickableRoot())));
+
+        assertThat(session.select(0L, Optional.of(rootOccurrence()))).isFalse();
+        assertThat(session.select(1L, Optional.of(rootOccurrence()))).isTrue();
+        BoxHelper firstHelper = selectionHelper(session);
+        assertThat(firstHelper.target())
+                .isSameAs(session.objectFor(rootOccurrence()).orElseThrow());
+        assertThat(session.identityFor(firstHelper)).isEmpty();
+
+        session.replaceSnapshot(snapshot(2L, List.of(pickableRoot())));
+        BoxHelper replacementHelper = selectionHelper(session);
+        assertThat(replacementHelper).isNotSameAs(firstHelper);
+        assertThat(replacementHelper.target())
+                .isSameAs(session.objectFor(rootOccurrence()).orElseThrow());
+        assertThat(firstHelper.parent()).isNull();
+        assertThat(firstHelper.isClosed()).isTrue();
+
+        session.close();
+        assertThat(replacementHelper.parent()).isNull();
+        assertThat(replacementHelper.isClosed()).isTrue();
+    }
+
+    @Test
+    void picksVisibleAuthoredGeometryWithoutAddingEditorIdentity() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(4L, List.of(pickableRoot())));
+
+            SceneViewSelectionResult selected = session.pick(4L, 0.0f, 0.0f);
+            SceneViewSelectionResult stale = session.pick(3L, 0.0f, 0.0f);
+
+            assertThat(selected.status()).isEqualTo(SceneViewSelectionResult.Status.SELECTED);
+            assertThat(selected.occurrence()).contains(rootOccurrence());
+            assertThat(stale.status()).isEqualTo(SceneViewSelectionResult.Status.STALE);
+            assertThat(stale.revision()).isEqualTo(4L);
+            assertThat(session.identityFor(selectionHelper(session))).isEmpty();
+        }
+    }
+
+    @Test
     void reusesResourcesAndRejectsEqualAndStaleSnapshots() {
         TrackingResolver resolver = new TrackingResolver();
         try (SceneViewRendererSession session = new SceneViewRendererSession(resolver)) {
@@ -258,6 +301,27 @@ final class SceneViewRendererSessionTest {
     private static VisualOccurrence root() {
         return occurrence(
                 rootOccurrence(), Optional.empty(), ROOT_ENTITY, true, Optional.empty(), List.of(), Optional.empty());
+    }
+
+    private static VisualOccurrence pickableRoot() {
+        MeshRenderer3d mesh =
+                new MeshRenderer3d(component(rootOccurrence(), MESH), MESH_REFERENCE, MATERIAL_REFERENCE, true);
+        return occurrence(
+                rootOccurrence(),
+                Optional.empty(),
+                ROOT_ENTITY,
+                true,
+                Optional.empty(),
+                List.of(mesh),
+                Optional.empty());
+    }
+
+    private static BoxHelper selectionHelper(SceneViewRendererSession session) {
+        return session.scene().children().stream()
+                .filter(BoxHelper.class::isInstance)
+                .map(BoxHelper.class::cast)
+                .findFirst()
+                .orElseThrow();
     }
 
     private static VisualOccurrence visualChild(

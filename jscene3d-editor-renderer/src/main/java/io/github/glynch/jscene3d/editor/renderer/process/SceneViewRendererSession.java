@@ -15,6 +15,7 @@ import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Tr
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Vector3;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.VisualOccurrence;
 import io.github.glynch.jscene3d.geometries.BufferGeometry;
+import io.github.glynch.jscene3d.helpers.BoxHelper;
 import io.github.glynch.jscene3d.helpers.GridHelper;
 import io.github.glynch.jscene3d.lights.DirectionalLight;
 import io.github.glynch.jscene3d.materials.Material;
@@ -25,6 +26,7 @@ import io.github.glynch.jscene3d.objects.RotationOrder;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.composition.CompositionOccurrenceId;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
+import io.github.glynch.jscene3d.raycasting.Raycaster;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
 import java.math.BigDecimal;
@@ -47,9 +49,12 @@ final class SceneViewRendererSession implements AutoCloseable {
     private final GridHelper grid = new GridHelper(20.0f, 20);
     private final SceneOrientationGizmo orientationGizmo = new SceneOrientationGizmo(camera);
     private final SceneViewResourceCache resources;
+    private final Raycaster raycaster = new Raycaster();
 
     private @Nullable RealizedContent content;
     private @Nullable AssetId sceneId;
+    private @Nullable CompositionOccurrenceId selectedOccurrence;
+    private @Nullable BoxHelper selectionHelper;
     private boolean closed;
 
     SceneViewRendererSession(SceneViewResourceResolver resolver) {
@@ -90,6 +95,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         }
         content = replacement;
         sceneId = validSnapshot.scene();
+        restoreSelection();
         if (previous != null) {
             try {
                 previous.close();
@@ -158,6 +164,39 @@ final class SceneViewRendererSession implements AutoCloseable {
                 : Optional.ofNullable(content.identities().get(Objects.requireNonNull(object, "object")));
     }
 
+    SceneViewSelectionResult pick(long expectedRevision, float horizontal, float vertical) {
+        requireOpen();
+        RealizedContent current = content;
+        if (current == null) {
+            return SceneViewSelectionResult.stale(0L);
+        }
+        if (current.revision() != expectedRevision) {
+            return SceneViewSelectionResult.stale(current.revision());
+        }
+        raycaster.setFromCamera(horizontal, vertical, camera);
+        Optional<CompositionOccurrenceId> picked = raycaster.intersect(current.root()).stream()
+                .map(hit -> current.identities().get(hit.mesh()))
+                .filter(Objects::nonNull)
+                .map(SceneViewObjectIdentity::occurrence)
+                .findFirst();
+        select(expectedRevision, picked);
+        return picked.map(occurrence -> SceneViewSelectionResult.selected(expectedRevision, occurrence))
+                .orElseGet(() -> SceneViewSelectionResult.cleared(expectedRevision));
+    }
+
+    boolean select(long expectedRevision, Optional<CompositionOccurrenceId> occurrence) {
+        requireOpen();
+        Objects.requireNonNull(occurrence, "occurrence");
+        RealizedContent current = content;
+        if (current == null || current.revision() != expectedRevision) {
+            return false;
+        }
+        selectedOccurrence =
+                occurrence.filter(current.occurrenceObjects()::containsKey).orElse(null);
+        restoreSelection();
+        return selectedOccurrence != null || occurrence.isEmpty();
+    }
+
     @Override
     public void close() {
         if (closed) {
@@ -165,6 +204,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         }
         closed = true;
         @Nullable RuntimeException failure = null;
+        clearSelectionHelper();
         if (content != null) {
             try {
                 content.close();
@@ -197,6 +237,36 @@ final class SceneViewRendererSession implements AutoCloseable {
     private SceneViewRealizationResult failure(Code code, String detail, Optional<ResourceReference> resource) {
         OptionalLong currentRevision = content == null ? OptionalLong.empty() : OptionalLong.of(content.revision());
         return SceneViewRealizationResult.failure(currentRevision, new Diagnostic(code, detail, resource));
+    }
+
+    private void restoreSelection() {
+        clearSelectionHelper();
+        RealizedContent current = content;
+        CompositionOccurrenceId occurrence = selectedOccurrence;
+        if (current == null || occurrence == null) {
+            return;
+        }
+        Object3D selected = current.occurrenceObjects().get(occurrence);
+        if (selected == null) {
+            selectedOccurrence = null;
+            return;
+        }
+        try {
+            BoxHelper helper = new BoxHelper(selected);
+            scene.add(helper);
+            selectionHelper = helper;
+        } catch (IllegalArgumentException ignored) {
+            // Non-spatial Entities remain selected without a visual bounds helper.
+        }
+    }
+
+    private void clearSelectionHelper() {
+        BoxHelper helper = selectionHelper;
+        selectionHelper = null;
+        if (helper != null) {
+            helper.detach();
+            helper.close();
+        }
     }
 
     private void requireOpen() {

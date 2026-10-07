@@ -10,6 +10,9 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.glynch.jscene3d.editor.renderer.protocol.RendererProtocolVersion;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
+import io.github.glynch.jscene3d.project.asset.AssetId;
+import io.github.glynch.jscene3d.project.composition.CompositionOccurrenceId;
+import io.github.glynch.jscene3d.project.entity.EntityId;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -18,6 +21,8 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +35,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.1",
+                        "PROTOCOL_VERSION 1.2",
                         "RENDERER_READY",
                         "FRAME_READY",
                         "SURFACE_READY 800 600",
@@ -49,7 +54,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.1",
+                        "PROTOCOL_VERSION 1.2",
                         "RENDERER_READY",
                         "PAUSED",
                         "ERROR INVALID_STATE frame-paused",
@@ -65,7 +70,7 @@ final class RendererProtocolServerTest {
     void preservesStageOneQuitWithoutWritingAProductShutdownAcknowledgement() throws IOException {
         ProtocolResult result = run(new FakeRendererSession(), "QUIT\n");
 
-        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY");
+        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY");
     }
 
     @Test
@@ -74,7 +79,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.1",
+                        "PROTOCOL_VERSION 1.2",
                         "RENDERER_READY",
                         "ERROR MALFORMED_REQUEST command",
                         "ERROR UNKNOWN_COMMAND command",
@@ -92,13 +97,39 @@ final class RendererProtocolServerTest {
 
         ProtocolResult result = run(session, "SCENE_SNAPSHOT " + encoded + "\nSHUTDOWN\n");
 
-        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY", "SHUTDOWN_READY");
+        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY", "SHUTDOWN_READY");
         assertThat(session.snapshot)
                 .isNotNull()
                 .returns(3L, SceneViewSnapshot::revision)
                 .returns(
                         "e890c4c3-fb32-49d8-88b8-4e04e7a29656",
                         value -> value.scene().toString());
+    }
+
+    @Test
+    void reportsPickedSelectionAndAcceptsHierarchySelection() throws IOException {
+        CompositionOccurrenceId occurrence = new CompositionOccurrenceId(
+                AssetId.from("11111111-1111-4111-8111-111111111111"),
+                List.of(EntityId.from("22222222-2222-4222-8222-222222222222")));
+        FakeRendererSession session = new FakeRendererSession();
+        session.pickedOccurrence = occurrence;
+
+        ProtocolResult result = run(
+                session,
+                "SCENE_PICK request-9 3 0.25 -0.5\nSCENE_SELECT 3 "
+                        + SceneViewOccurrenceCodec.encode(occurrence)
+                        + "\nSHUTDOWN\n");
+
+        assertThat(result.events())
+                .containsExactly(
+                        "PROTOCOL_VERSION 1.2",
+                        "RENDERER_READY",
+                        "SCENE_SELECTION request-9 3 " + SceneViewOccurrenceCodec.encode(occurrence),
+                        "SHUTDOWN_READY");
+        assertThat(session.pickRevision).isEqualTo(3L);
+        assertThat(session.pickHorizontal).isEqualTo(0.25f);
+        assertThat(session.pickVertical).isEqualTo(-0.5f);
+        assertThat(session.selectedOccurrence).contains(occurrence);
     }
 
     @Test
@@ -116,7 +147,7 @@ final class RendererProtocolServerTest {
                 .isThrownBy(() -> server.run(new BufferedReader(new StringReader("FRAME 9\n"))))
                 .withMessage("frame failed");
         assertThat(output.toString().lines())
-                .containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
+                .containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
     }
 
     @Test
@@ -134,7 +165,7 @@ final class RendererProtocolServerTest {
                 .isThrownBy(() -> server.run(new BufferedReader(new StringReader("FRAME 9\n"))))
                 .withMessage("native frame failed");
         assertThat(output.toString().lines())
-                .containsExactly("PROTOCOL_VERSION 1.1", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
+                .containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
     }
 
     private static ProtocolResult run(FakeRendererSession session, String input) throws IOException {
@@ -159,6 +190,11 @@ final class RendererProtocolServerTest {
         private boolean failNativeFrames;
         private boolean closed;
         private @Nullable SceneViewSnapshot snapshot;
+        private @Nullable CompositionOccurrenceId pickedOccurrence;
+        private Optional<CompositionOccurrenceId> selectedOccurrence = Optional.empty();
+        private long pickRevision;
+        private float pickHorizontal;
+        private float pickVertical;
 
         @Override
         public void renderFrame() {
@@ -185,6 +221,20 @@ final class RendererProtocolServerTest {
         @Override
         public void replaceSceneViewSnapshot(SceneViewSnapshot snapshot) {
             this.snapshot = snapshot;
+        }
+
+        @Override
+        public SceneViewSelectionResult pickSceneView(long revision, float horizontal, float vertical) {
+            pickRevision = revision;
+            pickHorizontal = horizontal;
+            pickVertical = vertical;
+            return SceneViewSelectionResult.selected(revision, Objects.requireNonNull(pickedOccurrence));
+        }
+
+        @Override
+        public boolean selectSceneView(long revision, Optional<CompositionOccurrenceId> occurrence) {
+            selectedOccurrence = occurrence;
+            return true;
         }
 
         @Override

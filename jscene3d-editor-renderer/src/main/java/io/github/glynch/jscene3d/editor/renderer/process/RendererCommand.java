@@ -5,6 +5,8 @@
 package io.github.glynch.jscene3d.editor.renderer.process;
 
 import io.github.glynch.jscene3d.editor.renderer.protocol.RendererProtocol;
+import io.github.glynch.jscene3d.project.composition.CompositionOccurrenceId;
+import java.util.Optional;
 
 /** Validated command received from one owning native renderer session. */
 sealed interface RendererCommand {
@@ -22,6 +24,8 @@ sealed interface RendererCommand {
             case RendererProtocol.COMMAND_QUIT -> noArguments(parts, new Quit());
             case RendererProtocol.COMMAND_DRAG -> parseDrag(parts);
             case RendererProtocol.COMMAND_SCENE_SNAPSHOT -> parseSceneSnapshot(parts);
+            case RendererProtocol.COMMAND_SCENE_PICK -> parseScenePick(parts);
+            case RendererProtocol.COMMAND_SCENE_SELECT -> parseSceneSelect(parts);
             default -> throw RendererProtocolException.unknown("Unknown renderer command: " + parts[0]);
         };
     }
@@ -56,6 +60,51 @@ sealed interface RendererCommand {
         return new SceneSnapshot(parts[1]);
     }
 
+    private static ScenePick parseScenePick(String[] parts) throws RendererProtocolException {
+        if (parts.length != 5 || parts[1].isEmpty()) {
+            throw RendererProtocolException.malformed("SCENE_PICK requires a token, revision, and two coordinates");
+        }
+        try {
+            long revision = Long.parseLong(parts[2]);
+            float horizontal = Float.parseFloat(parts[3]);
+            float vertical = Float.parseFloat(parts[4]);
+            if (revision < 0
+                    || !Float.isFinite(horizontal)
+                    || !Float.isFinite(vertical)
+                    || horizontal < -1.0f
+                    || horizontal > 1.0f
+                    || vertical < -1.0f
+                    || vertical > 1.0f) {
+                throw RendererProtocolException.malformed("SCENE_PICK arguments are outside their valid range");
+            }
+            return new ScenePick(parts[1], revision, horizontal, vertical);
+        } catch (NumberFormatException exception) {
+            throw RendererProtocolException.malformed(
+                    "SCENE_PICK requires numeric revision and coordinates", exception);
+        }
+    }
+
+    private static SceneSelect parseSceneSelect(String[] parts) throws RendererProtocolException {
+        if (parts.length != 3 || parts[2].isEmpty()) {
+            throw RendererProtocolException.malformed("SCENE_SELECT requires a revision and occurrence");
+        }
+        try {
+            long revision = Long.parseLong(parts[1]);
+            if (revision < 0) {
+                throw RendererProtocolException.malformed("SCENE_SELECT revision must be non-negative");
+            }
+            return new SceneSelect(
+                    revision,
+                    "NONE".equals(parts[2])
+                            ? Optional.empty()
+                            : Optional.of(SceneViewOccurrenceCodec.decode(parts[2])));
+        } catch (NumberFormatException exception) {
+            throw RendererProtocolException.malformed("SCENE_SELECT revision must be numeric", exception);
+        } catch (IllegalArgumentException exception) {
+            throw RendererProtocolException.malformed("SCENE_SELECT occurrence is invalid", exception);
+        }
+    }
+
     private static <T extends RendererCommand> T noArguments(String[] parts, T command)
             throws RendererProtocolException {
         if (parts.length != 1) {
@@ -69,6 +118,10 @@ sealed interface RendererCommand {
     record Drag(float horizontal, float vertical) implements RendererCommand {}
 
     record SceneSnapshot(String encodedSnapshot) implements RendererCommand {}
+
+    record ScenePick(String requestToken, long revision, float horizontal, float vertical) implements RendererCommand {}
+
+    record SceneSelect(long revision, Optional<CompositionOccurrenceId> occurrence) implements RendererCommand {}
 
     record ReceiveSurface() implements RendererCommand {}
 

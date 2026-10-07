@@ -18,6 +18,9 @@ public final class RendererProtocol {
     /** Replacement-surface event prefix. */
     public static final String EVENT_SURFACE_READY = "SURFACE_READY";
 
+    /** Scene View pick-result event prefix. */
+    public static final String EVENT_SCENE_SELECTION = "SCENE_SELECTION";
+
     /** Pause acknowledgement. */
     public static final String EVENT_PAUSED = "PAUSED";
 
@@ -53,6 +56,12 @@ public final class RendererProtocol {
 
     /** Complete safe Scene View snapshot command prefix. */
     public static final String COMMAND_SCENE_SNAPSHOT = "SCENE_SNAPSHOT";
+
+    /** Scene View pointer-pick command prefix. */
+    public static final String COMMAND_SCENE_PICK = "SCENE_PICK";
+
+    /** Scene View shared-selection command prefix. */
+    public static final String COMMAND_SCENE_SELECT = "SCENE_SELECT";
 
     private RendererProtocol() {
         throw new AssertionError("RendererProtocol cannot be instantiated");

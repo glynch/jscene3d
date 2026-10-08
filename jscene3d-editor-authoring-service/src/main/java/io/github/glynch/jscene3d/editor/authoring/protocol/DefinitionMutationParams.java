@@ -79,25 +79,44 @@ public record DefinitionMutationParams(
         }
     }
 
-    /** Exact scalar candidate without binary floating-point conversion.
+    /** Exact candidate without binary floating-point conversion.
      *
-     * @param kind boolean, integer, number, or text
+     * @param kind boolean, integer, number, text, or number-array
      * @param value boolean candidate value
      * @param literal exact integer, decimal, or text literal
+     * @param literals exact decimal components for a numeric array
      */
     public record CandidateValue(
-            String kind, @Nullable Boolean value, @Nullable String literal) {
-        /** Validates one supported scalar candidate shape. */
+            String kind,
+            @Nullable Boolean value,
+            @Nullable String literal,
+            @Nullable List<String> literals) {
+        /** Preserves the scalar construction form used by non-array clients.
+         *
+         * @param kind boolean, integer, number, or text
+         * @param value boolean candidate value
+         * @param literal exact integer, decimal, or text literal
+         */
+        public CandidateValue(String kind, @Nullable Boolean value, @Nullable String literal) {
+            this(kind, value, literal, null);
+        }
+
+        /** Validates one supported candidate shape. */
         public CandidateValue {
             Objects.requireNonNull(kind, "kind");
             if ("boolean".equals(kind)) {
-                if (value == null || literal != null) {
+                if (value == null || literal != null || literals != null) {
                     throw new IllegalArgumentException("boolean candidate requires only value");
                 }
             } else if (List.of("integer", "number", "text").contains(kind)) {
-                if (value != null || literal == null) {
+                if (value != null || literal == null || literals != null) {
                     throw new IllegalArgumentException("literal candidate requires only literal");
                 }
+            } else if ("number-array".equals(kind)) {
+                if (value != null || literal != null || literals == null) {
+                    throw new IllegalArgumentException("number-array candidate requires only literals");
+                }
+                literals = List.copyOf(literals);
             } else {
                 throw new IllegalArgumentException("unsupported candidate kind");
             }

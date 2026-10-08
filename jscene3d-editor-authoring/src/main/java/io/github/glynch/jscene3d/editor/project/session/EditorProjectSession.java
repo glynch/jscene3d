@@ -634,7 +634,7 @@ public final class EditorProjectSession implements AutoCloseable {
     /**
      * Rejects a syntactically invalid mutation candidate after applying the normal identity and revision checks.
      *
-     * <p>Protocol adapters use this when an exact scalar literal cannot be represented as a {@link ProjectValue}.
+     * <p>Protocol adapters use this when an exact numeric literal cannot be represented as a {@link ProjectValue}.
      * The working copy remains authoritative for the unchanged revision, dirty state, and history availability.
      *
      * @param definition authoritative definition identity

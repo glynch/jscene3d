@@ -384,7 +384,7 @@ public final class AuthoringProjectService implements AutoCloseable {
     }
 
     /**
-     * Applies one exact scalar SET or property REMOVE through the authoritative working copy.
+     * Applies one exact typed SET or property REMOVE through the authoritative working copy.
      *
      * @param params mutation identity, target, operation, and candidate value
      * @param locale initialized client display locale
@@ -937,13 +937,19 @@ public final class AuthoringProjectService implements AutoCloseable {
         };
     }
 
-    /** Maps an exact supported scalar transport candidate without binary floating-point conversion. */
+    /** Maps an exact supported transport candidate without binary floating-point conversion. */
     private static ProjectValue projectValue(DefinitionMutationParams.CandidateValue value) {
         return switch (value.kind()) {
             case "boolean" -> new ProjectValue.BooleanValue(Objects.requireNonNull(value.value(), "value"));
             case "integer", "number" ->
                 new ProjectValue.NumberValue(new BigDecimal(Objects.requireNonNull(value.literal(), "literal")));
             case "text" -> new ProjectValue.TextValue(Objects.requireNonNull(value.literal(), "literal"));
+            case "number-array" ->
+                new ProjectValue.ArrayValue(Objects.requireNonNull(value.literals(), "literals").stream()
+                        .map(BigDecimal::new)
+                        .map(ProjectValue.NumberValue::new)
+                        .map(ProjectValue.class::cast)
+                        .toList());
             default -> throw new IllegalArgumentException("Unsupported mutation candidate kind: " + value.kind());
         };
     }

@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionMutationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOperationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOperationResult;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionSnapshot;
 import io.github.glynch.jscene3d.editor.authoring.protocol.InspectorReadParams;
@@ -462,6 +463,89 @@ final class AuthoringProjectServiceTest {
         assertThat(value.values())
                 .extracting(component -> ((InspectorSnapshot.NumberValue) component).decimal())
                 .containsExactly("0", "90.0000000000000000001", "-2.5");
+    }
+
+    /** Mutates a fixed numeric array and immediately projects the unsaved value into Scene View. */
+    @Test
+    @SuppressWarnings("NullAway") // Candidate transport variants deliberately leave alternate fields null.
+    void mutatesNumericArrayAndProjectsUnsavedSceneViewState() throws IOException {
+        AuthoringTestProject.writeSceneViewProject(temporaryDirectory);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        DefinitionSnapshot definition = Objects.requireNonNull(
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID))
+                        .definition());
+        InspectorSnapshot inspector = Objects.requireNonNull(service.readInspector(
+                        new InspectorReadParams(
+                                1L,
+                                definition.revision(),
+                                definition.roots().getFirst().target()),
+                        Locale.ENGLISH)
+                .snapshot());
+
+        DefinitionOperationResult mutation = mutate(
+                inspector,
+                "position",
+                0L,
+                new DefinitionMutationParams.CandidateValue(
+                        "number-array", null, null, List.of("9.25", "-2", "3.0000000000000000001")));
+        SceneViewReadResult projected = service.readSceneView(
+                new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 1L), Locale.ENGLISH);
+        SceneViewSnapshotDto.Transform3d transform = Objects.requireNonNull(Objects.requireNonNull(projected.snapshot())
+                .occurrences()
+                .getFirst()
+                .transform());
+
+        assertThat(mutation)
+                .returns("accepted", DefinitionOperationResult::outcome)
+                .returns(1L, DefinitionOperationResult::revision)
+                .returns(true, DefinitionOperationResult::dirty)
+                .returns(true, DefinitionOperationResult::canUndo);
+        assertThat(transform.position())
+                .extracting(
+                        SceneViewSnapshotDto.Vector3::x,
+                        SceneViewSnapshotDto.Vector3::y,
+                        SceneViewSnapshotDto.Vector3::z)
+                .containsExactly("9.25", "-2", "3.0000000000000000001");
+
+        DefinitionOperationResult undone = service.undoDefinition(
+                new DefinitionOperationParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 1L), Locale.ENGLISH);
+        SceneViewSnapshotDto.Transform3d undoneTransform =
+                Objects.requireNonNull(Objects.requireNonNull(service.readSceneView(
+                                        new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 2L),
+                                        Locale.ENGLISH)
+                                .snapshot())
+                        .occurrences()
+                        .getFirst()
+                        .transform());
+        assertThat(undone)
+                .returns("accepted", DefinitionOperationResult::outcome)
+                .returns(2L, DefinitionOperationResult::revision)
+                .returns(false, DefinitionOperationResult::dirty)
+                .returns(true, DefinitionOperationResult::canRedo);
+        assertThat(undoneTransform.position())
+                .extracting(SceneViewSnapshotDto.Vector3::x)
+                .isEqualTo("1.25");
+
+        DefinitionOperationResult redone = service.redoDefinition(
+                new DefinitionOperationParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 2L), Locale.ENGLISH);
+        SceneViewSnapshotDto.Transform3d redoneTransform =
+                Objects.requireNonNull(Objects.requireNonNull(service.readSceneView(
+                                        new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 3L),
+                                        Locale.ENGLISH)
+                                .snapshot())
+                        .occurrences()
+                        .getFirst()
+                        .transform());
+        assertThat(redone)
+                .returns("accepted", DefinitionOperationResult::outcome)
+                .returns(3L, DefinitionOperationResult::revision)
+                .returns(true, DefinitionOperationResult::dirty)
+                .returns(true, DefinitionOperationResult::canUndo);
+        assertThat(redoneTransform.position())
+                .extracting(SceneViewSnapshotDto.Vector3::x)
+                .isEqualTo("9.25");
+        assertThat(Files.readString(temporaryDirectory.resolve("worlds/main.scene.json")))
+                .contains("\"position\":[1.25,2,3]");
     }
 
     /** Parses every first-slice scalar candidate in Java while preserving exact decimal text. */

@@ -342,7 +342,7 @@ final class ProtocolDtoValidationTest {
         assertThat(minimum.inclusive()).isTrue();
     }
 
-    /** Enforces the closed SET/REMOVE and exact scalar candidate transport vocabulary. */
+    /** Enforces the closed SET/REMOVE and exact candidate transport vocabulary. */
     @Test
     void validatesDefinitionMutationParams() {
         DefinitionMutationParams.MutationTarget target = new DefinitionMutationParams.MutationTarget(
@@ -350,6 +350,10 @@ final class ProtocolDtoValidationTest {
 
         assertThat(new DefinitionMutationParams.CandidateValue("number", null, "0.00000000000000000001").literal())
                 .isEqualTo("0.00000000000000000001");
+        assertThat(new DefinitionMutationParams.CandidateValue(
+                                "number-array", null, null, List.of("1.25", "-2", "3.0000000000000000001"))
+                        .literals())
+                .containsExactly("1.25", "-2", "3.0000000000000000001");
         assertThatThrownBy(() -> new DefinitionMutationParams(1L, "world", 0L, "reset", target, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("set or remove");
@@ -402,6 +406,14 @@ final class ProtocolDtoValidationTest {
         assertThatThrownBy(() -> new DefinitionMutationParams.CandidateValue("integer", true, "1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("only literal");
+        assertThatThrownBy(() -> new DefinitionMutationParams.CandidateValue("number-array", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("literals");
+        var numericLiterals = List.of("1");
+        assertThatThrownBy(
+                        () -> new DefinitionMutationParams.CandidateValue("number-array", null, "1", numericLiterals))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only literals");
         assertThatThrownBy(() -> new DefinitionMutationParams.CandidateValue("unknown", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsupported");

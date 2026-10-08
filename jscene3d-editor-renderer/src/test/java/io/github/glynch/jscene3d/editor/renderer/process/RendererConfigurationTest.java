@@ -10,6 +10,9 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import io.github.glynch.jscene3d.editor.renderer.protocol.RendererProtocolVersion;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -17,8 +20,7 @@ import org.junit.jupiter.api.Test;
 final class RendererConfigurationTest {
     @Test
     void acceptsStageOneArgumentsWithCurrentProtocol() {
-        RendererConfiguration configuration =
-                RendererConfiguration.from(new String[] {"org.example.Editor", "640", "480"});
+        RendererConfiguration configuration = configuration(new String[] {"org.example.Editor", "640", "480"});
 
         assertThat(configuration)
                 .isEqualTo(new RendererConfiguration(
@@ -32,7 +34,7 @@ final class RendererConfigurationTest {
 
     @Test
     void acceptsCompleteProjectLaunchSpecification() {
-        RendererConfiguration configuration = RendererConfiguration.from(new String[] {
+        RendererConfiguration configuration = configuration(new String[] {
             "--project-root=/projects/example",
             "--published-content-root=/projects/example/.jscene3d/published",
             "--engine-version=0.1.0-SNAPSHOT",
@@ -54,7 +56,7 @@ final class RendererConfigurationTest {
 
     @Test
     void distinguishesRuntimeFreeSceneViewLaunch() {
-        RendererConfiguration configuration = RendererConfiguration.from(new String[] {
+        RendererConfiguration configuration = configuration(new String[] {
             "--scene-view",
             "--project-root=/projects/example",
             "--published-content-root=/projects/example/.jscene3d/published",
@@ -79,11 +81,11 @@ final class RendererConfigurationTest {
     @Test
     void rejectsPartialDuplicateOrInvalidProjectLaunchSpecification() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(
+                .isThrownBy(() -> configuration(
                         new String[] {"--project-root=/projects/example", "org.example.Editor", "640", "480"}))
                 .withMessageContaining("required");
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(new String[] {
+                .isThrownBy(() -> configuration(new String[] {
                     "--project-root=/projects/example",
                     "--project-root=/projects/other",
                     "org.example.Editor",
@@ -92,7 +94,7 @@ final class RendererConfigurationTest {
                 }))
                 .withMessageContaining("must occur once");
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(new String[] {
+                .isThrownBy(() -> configuration(new String[] {
                     "--project-root=relative",
                     "--published-content-root=/published",
                     "--engine-version=0.1.0-SNAPSHOT",
@@ -106,8 +108,8 @@ final class RendererConfigurationTest {
 
     @Test
     void acceptsExplicitCurrentProtocolVersion() {
-        RendererConfiguration configuration = RendererConfiguration.from(
-                new String[] {"--protocol-version=1.2", "org.example.Editor", "1920", "1080"});
+        RendererConfiguration configuration =
+                configuration(new String[] {"--protocol-version=1.0", "org.example.Editor", "1920", "1080"});
 
         assertThat(configuration.protocolVersion()).isEqualTo(RendererProtocolVersion.CURRENT);
     }
@@ -115,21 +117,48 @@ final class RendererConfigurationTest {
     @Test
     void rejectsUnsupportedOrMalformedProtocolVersions() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(
-                        new String[] {"--protocol-version=2.0", "org.example.Editor", "640", "480"}));
+                .isThrownBy(() ->
+                        configuration(new String[] {"--protocol-version=2.0", "org.example.Editor", "640", "480"}));
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(
-                        new String[] {"--protocol-version=one", "org.example.Editor", "640", "480"}));
+                .isThrownBy(() ->
+                        configuration(new String[] {"--protocol-version=one", "org.example.Editor", "640", "480"}));
+    }
+
+    @Test
+    void rejectsStaleDevelopmentBuildIdentity() {
+        RendererBuildInfo build = RendererBuildInfo.current();
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> RendererConfiguration.from(new String[] {
+                    "--protocol-version=1.0",
+                    "--contract-identity=" + build.contractIdentity(),
+                    "--build-identity=stale-build",
+                    "org.example.Editor",
+                    "640",
+                    "480"
+                }))
+                .withMessageContaining("Stale renderer build identity");
     }
 
     @Test
     void rejectsInvalidLaunchIdentityAndDimensions() {
+        assertThatIllegalArgumentException().isThrownBy(() -> configuration(new String[] {" ", "640", "480"}));
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(new String[] {" ", "640", "480"}));
+                .isThrownBy(() -> configuration(new String[] {"org.example.Editor", "0", "480"}));
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(new String[] {"org.example.Editor", "0", "480"}));
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> RendererConfiguration.from(new String[] {"org.example.Editor", "640", "height"}));
-        assertThatIllegalArgumentException().isThrownBy(() -> RendererConfiguration.from(new String[0]));
+                .isThrownBy(() -> configuration(new String[] {"org.example.Editor", "640", "height"}));
+        assertThatIllegalArgumentException().isThrownBy(() -> configuration(new String[0]));
+    }
+
+    private static RendererConfiguration configuration(String[] arguments) {
+        RendererBuildInfo build = RendererBuildInfo.current();
+        List<String> complete = new ArrayList<>();
+        if (Arrays.stream(arguments).noneMatch(argument -> argument.startsWith("--protocol-version="))) {
+            complete.add("--protocol-version=1.0");
+        }
+        complete.add("--contract-identity=" + build.contractIdentity());
+        complete.add("--build-identity=" + build.buildIdentity());
+        complete.addAll(Arrays.asList(arguments));
+        return RendererConfiguration.from(complete.toArray(String[]::new));
     }
 }

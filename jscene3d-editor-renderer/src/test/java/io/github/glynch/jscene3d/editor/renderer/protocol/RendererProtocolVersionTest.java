@@ -14,8 +14,8 @@ final class RendererProtocolVersionTest {
     @Test
     void exposesCurrentWireVersion() {
         assertThat(RendererProtocolVersion.CURRENT)
-                .isEqualTo(new RendererProtocolVersion(1, 2))
-                .hasToString("1.2");
+                .isEqualTo(new RendererProtocolVersion(1, 0))
+                .hasToString("1.0");
     }
 
     @Test

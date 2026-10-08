@@ -4,6 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.authoring.process;
 
+import io.github.glynch.jscene3d.editor.authoring.protocol.ProtocolVersion;
 import io.github.glynch.jscene3d.editor.authoring.protocol.internal.AuthoringProtocolServer;
 import io.github.glynch.jscene3d.editor.authoring.service.AuthoringProjectService;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
@@ -27,6 +28,14 @@ public final class AuthoringServiceMain {
      */
     public static void main(String[] arguments) {
         AuthoringServiceBuildInfo build = AuthoringServiceBuildInfo.current();
+        String protocolVersion = ProtocolVersion.CURRENT.major() + "." + ProtocolVersion.CURRENT.minor();
+        if (!protocolVersion.equals(build.protocolVersion())) {
+            throw new IllegalStateException(
+                    "Authoring service protocol identity does not match its implementation: embedded="
+                            + build.protocolVersion()
+                            + " implementation="
+                            + protocolVersion);
+        }
         AuthoringServiceConfiguration configuration = AuthoringServiceConfiguration.from(arguments);
         EditorProjectLoader loader = new EditorProjectLoader(
                 build.engineVersion(),
@@ -38,6 +47,8 @@ public final class AuthoringServiceMain {
                 service,
                 build.serviceVersion(),
                 build.engineVersion(),
+                build.contractIdentity(),
+                build.buildIdentity(),
                 UUID.randomUUID().toString());
         try {
             server.run(new FileInputStream(FileDescriptor.in), new FileOutputStream(FileDescriptor.out));

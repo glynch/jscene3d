@@ -7,12 +7,12 @@ package io.github.glynch.jscene3d.editor.renderer.protocol;
 /**
  * Version of the line-framed editor-renderer protocol.
  *
- * @param major compatibility-breaking version
- * @param minor backward-compatible feature version
+ * @param major fixed pre-release protocol major
+ * @param minor fixed pre-release protocol minor
  */
 public record RendererProtocolVersion(int major, int minor) {
     /** Current product protocol version. */
-    public static final RendererProtocolVersion CURRENT = new RendererProtocolVersion(1, 2);
+    public static final RendererProtocolVersion CURRENT = new RendererProtocolVersion(1, 0);
 
     /** Validates a non-negative protocol version. */
     public RendererProtocolVersion {

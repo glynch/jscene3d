@@ -11,18 +11,31 @@ import java.util.Objects;
 /**
  * Client protocol range offered during initialization.
  *
- * @param protocolVersion newest protocol version supported by the client
+ * @param protocolVersion exact internal protocol version expected by the client
+ * @param contractIdentity stable internal development contract identity
+ * @param buildIdentity source-derived development build identity
  * @param clientLanguage Code OSS UI language as a BCP 47 language tag
  */
-public record InitializeParams(ProtocolVersion protocolVersion, String clientLanguage) {
+public record InitializeParams(
+        ProtocolVersion protocolVersion, String contractIdentity, String buildIdentity, String clientLanguage) {
     /** Validates initialization parameters. */
     public InitializeParams {
         Objects.requireNonNull(protocolVersion, "protocolVersion");
+        contractIdentity = requireIdentity(contractIdentity, "contractIdentity");
+        buildIdentity = requireIdentity(buildIdentity, "buildIdentity");
         Objects.requireNonNull(clientLanguage, "clientLanguage");
         if (clientLanguage.isBlank() || !clientLanguage.equals(clientLanguage.trim())) {
             throw new IllegalArgumentException("clientLanguage must be a non-blank BCP 47 language tag");
         }
         clientLocale(clientLanguage);
+    }
+
+    private static String requireIdentity(String value, String name) {
+        String identity = Objects.requireNonNull(value, name).trim();
+        if (identity.isEmpty() || !identity.equals(value)) {
+            throw new IllegalArgumentException(name + " must be non-blank without surrounding whitespace");
+        }
+        return identity;
     }
 
     /**

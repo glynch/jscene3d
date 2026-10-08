@@ -47,6 +47,12 @@ final class AuthoringServiceProcessTest {
             writer.writeMessage(request(1, "initialize", initializeParams()));
             JsonNode initialize = response(reader);
             assertThat(initialize.at("/result/processKind").asText()).isEqualTo("authoring");
+            assertThat(initialize.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
+            assertThat(initialize.at("/result/protocolVersion/minor").asInt()).isZero();
+            assertThat(initialize.at("/result/contractIdentity").asText())
+                    .isEqualTo(AuthoringServiceBuildInfo.current().contractIdentity());
+            assertThat(initialize.at("/result/buildIdentity").asText())
+                    .isEqualTo(AuthoringServiceBuildInfo.current().buildIdentity());
             assertThat(initialize.at("/result/capabilities"))
                     .extracting(JsonNode::asText)
                     .contains("project/open", "project/replace", "project/close");
@@ -226,6 +232,9 @@ final class AuthoringServiceProcessTest {
 
         assertThat(build.serviceVersion()).isEqualTo("0.1.0-SNAPSHOT");
         assertThat(build.engineVersion()).isEqualTo("0.1.0-SNAPSHOT");
+        assertThat(build.protocolVersion()).isEqualTo("1.0");
+        assertThat(build.contractIdentity()).isEqualTo("jscene3d-editor-development");
+        assertThat(build.buildIdentity()).isNotBlank().doesNotContain("${");
     }
 
     /** Starts the service main class with Surefire's resolved production module path. */
@@ -269,8 +278,12 @@ final class AuthoringServiceProcessTest {
 
     /** Creates initialization parameters for the current protocol major. */
     private static ObjectNode initializeParams() {
-        ObjectNode version = JSON.createObjectNode().put("major", 2).put("minor", 0);
-        ObjectNode params = JSON.createObjectNode().put("clientLanguage", "en-GB");
+        AuthoringServiceBuildInfo build = AuthoringServiceBuildInfo.current();
+        ObjectNode version = JSON.createObjectNode().put("major", 1).put("minor", 0);
+        ObjectNode params = JSON.createObjectNode()
+                .put("contractIdentity", build.contractIdentity())
+                .put("buildIdentity", build.buildIdentity())
+                .put("clientLanguage", "en-GB");
         return params.set("protocolVersion", version);
     }
 

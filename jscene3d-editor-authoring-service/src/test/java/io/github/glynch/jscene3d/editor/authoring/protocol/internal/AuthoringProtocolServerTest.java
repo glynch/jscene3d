@@ -37,8 +37,14 @@ final class AuthoringProtocolServerTest {
     private final AuthoringProjectService service = new AuthoringProjectService(
             new EditorProjectLoader("0.1.0-SNAPSHOT", AuthoringProtocolServerTest.class.getClassLoader()));
     private final RecordingLogger logger = new RecordingLogger();
-    private final AuthoringProtocolServer server =
-            new AuthoringProtocolServer(service, "1.2.0-test", "0.1.0-SNAPSHOT", "connection-test", logger);
+    private final AuthoringProtocolServer server = new AuthoringProtocolServer(
+            service,
+            "1.2.0-test",
+            "0.1.0-SNAPSHOT",
+            "jscene3d-editor-development",
+            "test-build",
+            "connection-test",
+            logger);
 
     @TempDir
     private Path temporaryDirectory;
@@ -49,15 +55,17 @@ final class AuthoringProtocolServerTest {
         service.close();
     }
 
-    /** Negotiates the supported protocol and advertises only implemented authoring capabilities. */
+    /** Validates the exact protocol and advertises only implemented authoring capabilities. */
     @Test
     void initializesAuthoringConnection() throws IOException {
-        JsonNode response = response(initialize(2, 2));
+        JsonNode response = response(initialize(1, 0));
 
         assertThat(response.path("id").asInt()).isEqualTo(1);
         assertThat(response.path("connectionGeneration").asText()).isEqualTo("connection-test");
-        assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(2);
+        assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(1);
+        assertThat(response.at("/result/protocolVersion/minor").asInt()).isZero();
+        assertThat(response.at("/result/contractIdentity").asText()).isEqualTo("jscene3d-editor-development");
+        assertThat(response.at("/result/buildIdentity").asText()).isEqualTo("test-build");
         assertThat(response.at("/result/processKind").asText()).isEqualTo("authoring");
         assertThat(response.at("/result/serviceVersion").asText()).isEqualTo("1.2.0-test");
         assertThat(response.at("/result/engineVersion").asText()).isEqualTo("0.1.0-SNAPSHOT");
@@ -90,26 +98,53 @@ final class AuthoringProtocolServerTest {
 
         assertThat(response.at("/error/code").asInt()).isEqualTo(-32001);
         assertThat(response.at("/error/data/requested/major").asInt()).isEqualTo(3);
-        assertThat(response.at("/error/data/supported/major").asInt()).isEqualTo(2);
+        assertThat(response.at("/error/data/supported/major").asInt()).isEqualTo(1);
         assertThat(server.isInitialized()).isFalse();
     }
 
-    /** Negotiates the implemented minor when the client supports a newer compatible minor. */
+    /** Rejects a different minor because unreleased components move together at protocol 1.0. */
     @Test
-    void negotiatesCompatibleMinorVersion() throws IOException {
-        JsonNode response = response(initialize(2, 7));
+    void rejectsDifferentMinorVersion() throws IOException {
+        JsonNode response = response(initialize(1, 1));
 
-        assertThat(response.at("/result/protocolVersion/major").asInt()).isEqualTo(2);
-        assertThat(response.at("/result/protocolVersion/minor").asInt()).isEqualTo(2);
-        assertThat(server.isInitialized()).isTrue();
+        assertThat(response.at("/error/code").asInt()).isEqualTo(-32001);
+        assertThat(server.isInitialized()).isFalse();
+    }
+
+    /** Rejects a client from another development contract. */
+    @Test
+    void rejectsDifferentContractIdentity() throws IOException {
+        String params = identityParams("en-GB").replace("jscene3d-editor-development", "other-contract");
+
+        JsonNode response = response(request(1, "initialize", params));
+
+        assertThat(response.at("/error/code").asInt()).isEqualTo(-32001);
+        assertThat(response.at("/error/data/requestedContractIdentity").asText())
+                .isEqualTo("other-contract");
+        assertThat(response.at("/error/data/supportedContractIdentity").asText())
+                .isEqualTo("jscene3d-editor-development");
+        assertThat(server.isInitialized()).isFalse();
+    }
+
+    /** Rejects a stale client built from different Java sources. */
+    @Test
+    void rejectsDifferentBuildIdentity() throws IOException {
+        String params = identityParams("en-GB").replace("test-build", "stale-build");
+
+        JsonNode response = response(request(1, "initialize", params));
+
+        assertThat(response.at("/error/code").asInt()).isEqualTo(-32001);
+        assertThat(response.at("/error/data/requestedBuildIdentity").asText()).isEqualTo("stale-build");
+        assertThat(response.at("/error/data/supportedBuildIdentity").asText()).isEqualTo("test-build");
+        assertThat(server.isInitialized()).isFalse();
     }
 
     /** Rejects a second initialization without replacing negotiated connection state. */
     @Test
     void rejectsRepeatedInitialization() throws IOException {
-        response(initialize(2, 0));
+        response(initialize(1, 0));
 
-        JsonNode repeated = response(initialize(2, 0));
+        JsonNode repeated = response(initialize(1, 0));
 
         assertThat(repeated.at("/error/code").asInt()).isEqualTo(-32003);
         assertThat(server.isInitialized()).isTrue();
@@ -122,7 +157,7 @@ final class AuthoringProtocolServerTest {
 
         assertThat(response.at("/error/code").asInt()).isEqualTo(-32002);
 
-        response(initialize(2, 0));
+        response(initialize(1, 0));
         JsonNode closed = response(request(2, "project/close", "{}"));
 
         assertThat(closed.at("/result/closed").asBoolean()).isFalse();
@@ -162,7 +197,7 @@ final class AuthoringProtocolServerTest {
     void reportsInvalidParams() throws IOException {
         JsonNode missingInitialize = response("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}");
         JsonNode scalarInitialize = response(request(2, "initialize", "true"));
-        response(initialize(2, 0));
+        response(initialize(1, 0));
         JsonNode missingOpen = response("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"project/open\"}");
         JsonNode invalidOpen = response(request(4, "project/open", "{\"path\":\"   \"}"));
         JsonNode invalidReplace =
@@ -180,7 +215,7 @@ final class AuthoringProtocolServerTest {
     void serializesSemanticProjectCatalog() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
         AuthoringTestProject.writeEntityDefinition(temporaryDirectory);
-        response(initialize(2, 1));
+        response(initialize(1, 0));
 
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
 
@@ -200,11 +235,9 @@ final class AuthoringProtocolServerTest {
     /** Rejects absent, blank, and malformed client language tags without retaining a locale. */
     @Test
     void rejectsInvalidClientLanguage() throws IOException {
-        JsonNode missing = response(request(1, "initialize", "{\"protocolVersion\":{\"major\":2,\"minor\":0}}"));
-        JsonNode blank = response(
-                request(2, "initialize", "{\"protocolVersion\":{\"major\":2,\"minor\":0},\"clientLanguage\":\" \"}"));
-        JsonNode malformed = response(request(
-                3, "initialize", "{\"protocolVersion\":{\"major\":2,\"minor\":0},\"clientLanguage\":\"en_US\"}"));
+        JsonNode missing = response(request(1, "initialize", "{\"protocolVersion\":{\"major\":1,\"minor\":0}}"));
+        JsonNode blank = response(request(2, "initialize", identityParams(" ")));
+        JsonNode malformed = response(request(3, "initialize", identityParams("en_US")));
 
         assertThat(missing.at("/error/code").asInt()).isEqualTo(-32602);
         assertThat(blank.at("/error/code").asInt()).isEqualTo(-32602);
@@ -218,7 +251,7 @@ final class AuthoringProtocolServerTest {
         Path first = temporaryDirectory.resolve("first");
         Path invalid = temporaryDirectory.resolve("invalid");
         AuthoringTestProject.write(first, "first.j3d");
-        response(initialize(2, 0));
+        response(initialize(1, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + first + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
 
@@ -240,7 +273,7 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesDefinitionOpen() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(2, 1));
+        response(initialize(1, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
 
@@ -267,7 +300,7 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesViewportLaunchPreparation() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(2, 5));
+        response(initialize(1, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
 
@@ -289,7 +322,7 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesSafeSceneViewRead() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(2, 2));
+        response(initialize(1, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
         response(request(
@@ -318,7 +351,7 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesInspectorRead() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(2, 2));
+        response(initialize(1, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
         JsonNode definition = response(request(
@@ -348,7 +381,7 @@ final class AuthoringProtocolServerTest {
     @Test
     void dispatchesAuthoredDefinitionLifecycle() throws IOException {
         AuthoringTestProject.write(temporaryDirectory, AuthoringTestProject.DESCRIPTOR);
-        response(initialize(2, 3));
+        response(initialize(1, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
         JsonNode definition = response(request(
@@ -415,7 +448,7 @@ final class AuthoringProtocolServerTest {
     @Test
     void reportsMalformedNumericMutationWithoutTerminatingConnection() throws IOException {
         AuthoringTestProject.writeScalarPropertyProject(temporaryDirectory);
-        response(initialize(2, 3));
+        response(initialize(1, 0));
         JsonNode opened = response(request(2, "project/open", "{\"path\":\"" + temporaryDirectory + "\"}"));
         long generation = opened.at("/result/projectGeneration").asLong();
         JsonNode definition = response(request(
@@ -448,7 +481,8 @@ final class AuthoringProtocolServerTest {
     /** Ignores unknown optional initialization fields as required for additive evolution. */
     @Test
     void ignoresUnknownInitializationFields() throws IOException {
-        String params = "{\"protocolVersion\":{\"major\":2,\"minor\":0,\"patch\":4},"
+        String params = "{\"protocolVersion\":{\"major\":1,\"minor\":0,\"patch\":4},"
+                + "\"contractIdentity\":\"jscene3d-editor-development\",\"buildIdentity\":\"test-build\","
                 + "\"clientLanguage\":\"en\",\"clientName\":\"test\"}";
 
         JsonNode response = response(request(1, "initialize", params));
@@ -460,7 +494,7 @@ final class AuthoringProtocolServerTest {
     /** Reports unknown methods only after initialization has established the connection. */
     @Test
     void reportsUnknownMethod() throws IOException {
-        response(initialize(2, 0));
+        response(initialize(1, 0));
 
         JsonNode response = response(request(2, "project/unknown", "{}"));
 
@@ -471,7 +505,7 @@ final class AuthoringProtocolServerTest {
     /** Converts an unexpected closed-service failure into the defined internal error response. */
     @Test
     void reportsUnexpectedServiceFailure() throws IOException {
-        response(initialize(2, 0));
+        response(initialize(1, 0));
         service.close();
 
         JsonNode response = response(request(2, "project/close", "{}"));
@@ -521,7 +555,7 @@ final class AuthoringProtocolServerTest {
         assertThat(response).isEmpty();
         assertThat(server.isInitialized()).isFalse();
 
-        response(initialize(2, 0));
+        response(initialize(1, 0));
         JsonNode closed = response(request(2, "project/close", "{}"));
 
         assertThat(closed.at("/result/closed").asBoolean()).isFalse();
@@ -551,7 +585,15 @@ final class AuthoringProtocolServerTest {
         return request(
                 1,
                 "initialize",
-                "{\"protocolVersion\":{\"major\":" + major + ",\"minor\":" + minor + "},\"clientLanguage\":\"en-GB\"}");
+                "{\"protocolVersion\":{\"major\":" + major + ",\"minor\":" + minor
+                        + "},\"contractIdentity\":\"jscene3d-editor-development\","
+                        + "\"buildIdentity\":\"test-build\",\"clientLanguage\":\"en-GB\"}");
+    }
+
+    private static String identityParams(String clientLanguage) {
+        return "{\"protocolVersion\":{\"major\":1,\"minor\":0},"
+                + "\"contractIdentity\":\"jscene3d-editor-development\",\"buildIdentity\":\"test-build\","
+                + "\"clientLanguage\":\"" + clientLanguage + "\"}";
     }
 
     /** Creates one JSON-RPC-style request. */

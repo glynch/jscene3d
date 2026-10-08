@@ -35,7 +35,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.2",
+                        "PROTOCOL_VERSION 1.0",
                         "RENDERER_READY",
                         "FRAME_READY",
                         "SURFACE_READY 800 600",
@@ -54,7 +54,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.2",
+                        "PROTOCOL_VERSION 1.0",
                         "RENDERER_READY",
                         "PAUSED",
                         "ERROR INVALID_STATE frame-paused",
@@ -70,7 +70,7 @@ final class RendererProtocolServerTest {
     void preservesStageOneQuitWithoutWritingAProductShutdownAcknowledgement() throws IOException {
         ProtocolResult result = run(new FakeRendererSession(), "QUIT\n");
 
-        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY");
+        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY");
     }
 
     @Test
@@ -79,7 +79,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.2",
+                        "PROTOCOL_VERSION 1.0",
                         "RENDERER_READY",
                         "ERROR MALFORMED_REQUEST command",
                         "ERROR UNKNOWN_COMMAND command",
@@ -97,7 +97,7 @@ final class RendererProtocolServerTest {
 
         ProtocolResult result = run(session, "SCENE_SNAPSHOT " + encoded + "\nSHUTDOWN\n");
 
-        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY", "SHUTDOWN_READY");
+        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY", "SHUTDOWN_READY");
         assertThat(session.snapshot)
                 .isNotNull()
                 .returns(3L, SceneViewSnapshot::revision)
@@ -122,7 +122,7 @@ final class RendererProtocolServerTest {
 
         assertThat(result.events())
                 .containsExactly(
-                        "PROTOCOL_VERSION 1.2",
+                        "PROTOCOL_VERSION 1.0",
                         "RENDERER_READY",
                         "SCENE_SELECTION request-9 3 " + SceneViewOccurrenceCodec.encode(occurrence),
                         "SHUTDOWN_READY");
@@ -147,7 +147,7 @@ final class RendererProtocolServerTest {
                 .isThrownBy(() -> server.run(new BufferedReader(new StringReader("FRAME 9\n"))))
                 .withMessage("frame failed");
         assertThat(output.toString().lines())
-                .containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
+                .containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
     }
 
     @Test
@@ -165,7 +165,7 @@ final class RendererProtocolServerTest {
                 .isThrownBy(() -> server.run(new BufferedReader(new StringReader("FRAME 9\n"))))
                 .withMessage("native frame failed");
         assertThat(output.toString().lines())
-                .containsExactly("PROTOCOL_VERSION 1.2", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
+                .containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY", "ERROR RUNTIME_FAILURE frame");
     }
 
     private static ProtocolResult run(FakeRendererSession session, String input) throws IOException {

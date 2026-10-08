@@ -77,6 +77,9 @@
 
         <jscene3d.coverage.branch.minimum>0.00</jscene3d.coverage.branch.minimum>
         <jscene3d.coverage.line.minimum>0.00</jscene3d.coverage.line.minimum>
+        <jscene3d.developmentBuildIdentity>unverified-source-build</jscene3d.developmentBuildIdentity>
+        <jscene3d.developmentContractIdentity>jscene3d-editor-development</jscene3d.developmentContractIdentity>
+        <jscene3d.developmentProtocolVersion>1.0</jscene3d.developmentProtocolVersion>
 
         <assertj.version>3.27.7</assertj.version>
         <build.helper.maven.version>3.6.1</build.helper.maven.version>

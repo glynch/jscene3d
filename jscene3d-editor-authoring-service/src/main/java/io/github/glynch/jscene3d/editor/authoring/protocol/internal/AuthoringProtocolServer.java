@@ -55,6 +55,8 @@ public final class AuthoringProtocolServer {
     private final AuthoringProjectService service;
     private final String serviceVersion;
     private final String engineVersion;
+    private final String contractIdentity;
+    private final String buildIdentity;
     private final String connectionGeneration;
     private final System.Logger logger;
 
@@ -68,11 +70,25 @@ public final class AuthoringProtocolServer {
      * @param service retained authoring project owner
      * @param serviceVersion authoring-service implementation version
      * @param engineVersion JScene3D engine compatibility version
+     * @param contractIdentity stable internal development contract identity
+     * @param buildIdentity source-derived development build identity
      * @param connectionGeneration unique owning-connection generation
      */
     public AuthoringProtocolServer(
-            AuthoringProjectService service, String serviceVersion, String engineVersion, String connectionGeneration) {
-        this(service, serviceVersion, engineVersion, connectionGeneration, DEFAULT_LOGGER);
+            AuthoringProjectService service,
+            String serviceVersion,
+            String engineVersion,
+            String contractIdentity,
+            String buildIdentity,
+            String connectionGeneration) {
+        this(
+                service,
+                serviceVersion,
+                engineVersion,
+                contractIdentity,
+                buildIdentity,
+                connectionGeneration,
+                DEFAULT_LOGGER);
     }
 
     /**
@@ -81,6 +97,8 @@ public final class AuthoringProtocolServer {
      * @param service retained authoring project owner
      * @param serviceVersion authoring-service implementation version
      * @param engineVersion JScene3D engine compatibility version
+     * @param contractIdentity stable internal development contract identity
+     * @param buildIdentity source-derived development build identity
      * @param connectionGeneration unique owning-connection generation
      * @param logger sparse unexpected-failure diagnostic sink
      */
@@ -88,11 +106,15 @@ public final class AuthoringProtocolServer {
             AuthoringProjectService service,
             String serviceVersion,
             String engineVersion,
+            String contractIdentity,
+            String buildIdentity,
             String connectionGeneration,
             System.Logger logger) {
         this.service = Objects.requireNonNull(service, "service");
         this.serviceVersion = Objects.requireNonNull(serviceVersion, "serviceVersion");
         this.engineVersion = Objects.requireNonNull(engineVersion, "engineVersion");
+        this.contractIdentity = Objects.requireNonNull(contractIdentity, "contractIdentity");
+        this.buildIdentity = Objects.requireNonNull(buildIdentity, "buildIdentity");
         this.connectionGeneration = Objects.requireNonNull(connectionGeneration, "connectionGeneration");
         this.logger = Objects.requireNonNull(logger, "logger");
     }
@@ -275,17 +297,30 @@ public final class AuthoringProtocolServer {
         }
         InitializeParams offered = mapper.treeToValue(params, InitializeParams.class);
         ProtocolVersion requested = offered.protocolVersion();
-        if (requested.major() != ProtocolVersion.CURRENT.major()) {
+        if (!requested.equals(ProtocolVersion.CURRENT)
+                || !contractIdentity.equals(offered.contractIdentity())
+                || !buildIdentity.equals(offered.buildIdentity())) {
             ObjectNode data = JsonNodeFactory.instance.objectNode();
             data.set("requested", mapper.valueToTree(requested));
             data.set("supported", mapper.valueToTree(ProtocolVersion.CURRENT));
-            return error(id, INCOMPATIBLE_PROTOCOL, "Incompatible protocol major version", data);
+            data.put("requestedContractIdentity", offered.contractIdentity());
+            data.put("supportedContractIdentity", contractIdentity);
+            data.put("requestedBuildIdentity", offered.buildIdentity());
+            data.put("supportedBuildIdentity", buildIdentity);
+            return error(id, INCOMPATIBLE_PROTOCOL, "Incompatible authoring protocol or development build", data);
         }
-        ProtocolVersion negotiated = new ProtocolVersion(
-                ProtocolVersion.CURRENT.major(), Math.min(requested.minor(), ProtocolVersion.CURRENT.minor()));
         clientLocale = offered.clientLocale();
         initialized = true;
-        return success(id, new InitializeResult(negotiated, "authoring", serviceVersion, engineVersion, CAPABILITIES));
+        return success(
+                id,
+                new InitializeResult(
+                        ProtocolVersion.CURRENT,
+                        contractIdentity,
+                        buildIdentity,
+                        "authoring",
+                        serviceVersion,
+                        engineVersion,
+                        CAPABILITIES));
     }
 
     /** Reads required object parameters as one explicit wire DTO. */

@@ -15,11 +15,22 @@ public final class AuthoringServiceBuildInfo {
 
     private final String serviceVersion;
     private final String engineVersion;
+    private final String protocolVersion;
+    private final String contractIdentity;
+    private final String buildIdentity;
 
-    /** Stores validated embedded build versions. */
-    private AuthoringServiceBuildInfo(String serviceVersion, String engineVersion) {
+    /** Stores validated embedded build and contract identity. */
+    private AuthoringServiceBuildInfo(
+            String serviceVersion,
+            String engineVersion,
+            String protocolVersion,
+            String contractIdentity,
+            String buildIdentity) {
         this.serviceVersion = requireValue(serviceVersion, "serviceVersion");
         this.engineVersion = requireValue(engineVersion, "engineVersion");
+        this.protocolVersion = requireValue(protocolVersion, "protocolVersion");
+        this.contractIdentity = requireValue(contractIdentity, "contractIdentity");
+        this.buildIdentity = requireValue(buildIdentity, "buildIdentity");
     }
 
     /**
@@ -38,7 +49,11 @@ public final class AuthoringServiceBuildInfo {
             throw new IllegalStateException("Cannot read authoring service build information", exception);
         }
         return new AuthoringServiceBuildInfo(
-                properties.getProperty("serviceVersion"), properties.getProperty("engineVersion"));
+                properties.getProperty("serviceVersion"),
+                properties.getProperty("engineVersion"),
+                properties.getProperty("protocolVersion"),
+                properties.getProperty("contractIdentity"),
+                properties.getProperty("buildIdentity"));
     }
 
     /**
@@ -57,6 +72,33 @@ public final class AuthoringServiceBuildInfo {
      */
     public String engineVersion() {
         return engineVersion;
+    }
+
+    /**
+     * Returns the fixed development protocol version.
+     *
+     * @return development protocol version
+     */
+    public String protocolVersion() {
+        return protocolVersion;
+    }
+
+    /**
+     * Returns the stable development contract identity.
+     *
+     * @return development contract identity
+     */
+    public String contractIdentity() {
+        return contractIdentity;
+    }
+
+    /**
+     * Returns the source-derived development build identity.
+     *
+     * @return development build identity
+     */
+    public String buildIdentity() {
+        return buildIdentity;
     }
 
     /** Rejects missing or unfiltered build values. */

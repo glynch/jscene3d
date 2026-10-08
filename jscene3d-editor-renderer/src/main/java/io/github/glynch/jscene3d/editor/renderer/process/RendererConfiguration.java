@@ -9,7 +9,9 @@ import io.github.glynch.jscene3d.project.asset.AssetId;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /** Validated process arguments supplied by the Electron structured-launch boundary. */
 record RendererConfiguration(
@@ -20,6 +22,8 @@ record RendererConfiguration(
         Optional<ProjectLaunch> projectLaunch,
         Optional<SceneViewLaunch> sceneViewLaunch) {
     private static final String VERSION_OPTION = "--protocol-version=";
+    private static final String CONTRACT_IDENTITY_OPTION = "--contract-identity=";
+    private static final String BUILD_IDENTITY_OPTION = "--build-identity=";
     private static final String SCENE_VIEW_OPTION = "--scene-view";
     private static final String PROJECT_ROOT_OPTION = "--project-root=";
     private static final String PUBLISHED_CONTENT_OPTION = "--published-content-root=";
@@ -28,27 +32,16 @@ record RendererConfiguration(
     private static final String SCENE_ASSET_ID_OPTION = "--scene-asset-id=";
 
     static RendererConfiguration from(String[] arguments) {
+        return from(arguments, RendererBuildInfo.current());
+    }
+
+    private static RendererConfiguration from(String[] arguments, RendererBuildInfo build) {
+        validateEmbeddedBuild(build);
         if (arguments.length < 3) {
             throw usageFailure();
         }
         int processArgumentCount = arguments.length - 3;
-        Map<String, String> options = new LinkedHashMap<>();
-        RendererProtocolVersion version = RendererProtocolVersion.CURRENT;
-        boolean sceneView = false;
-        for (int index = 0; index < processArgumentCount; index++) {
-            String argument = arguments[index];
-            if (argument.startsWith(VERSION_OPTION)) {
-                version = parseVersion(argument.substring(VERSION_OPTION.length()));
-            } else if (SCENE_VIEW_OPTION.equals(argument) && !sceneView) {
-                sceneView = true;
-            } else if (!putOption(options, argument, PROJECT_ROOT_OPTION)
-                    && !putOption(options, argument, PUBLISHED_CONTENT_OPTION)
-                    && !putOption(options, argument, ENGINE_VERSION_OPTION)
-                    && !putOption(options, argument, PROJECT_ID_OPTION)
-                    && !putOption(options, argument, SCENE_ASSET_ID_OPTION)) {
-                throw usageFailure();
-            }
-        }
+        ProcessArguments processArguments = parseProcessArguments(arguments, processArgumentCount);
 
         int offset = processArgumentCount;
         String bundleId = arguments[offset].strip();
@@ -57,13 +50,50 @@ record RendererConfiguration(
         }
         int width = parseDimension(arguments[offset + 1], "width");
         int height = parseDimension(arguments[offset + 2], "height");
-        if (!version.equals(RendererProtocolVersion.CURRENT)) {
-            throw new IllegalArgumentException("Unsupported renderer protocol version: " + version);
-        }
-        Optional<ProjectLaunch> projectLaunch = sceneView ? Optional.empty() : projectLaunch(options);
+        validateCompatibility(processArguments, build);
+        RendererProtocolVersion selectedVersion = Objects.requireNonNull(processArguments.version, "version");
+        Optional<ProjectLaunch> projectLaunch =
+                processArguments.sceneView ? Optional.empty() : projectLaunch(processArguments.options);
         Optional<SceneViewLaunch> sceneViewLaunch =
-                sceneView ? Optional.of(sceneViewLaunch(options)) : Optional.empty();
-        return new RendererConfiguration(bundleId, width, height, version, projectLaunch, sceneViewLaunch);
+                processArguments.sceneView ? Optional.of(sceneViewLaunch(processArguments.options)) : Optional.empty();
+        return new RendererConfiguration(bundleId, width, height, selectedVersion, projectLaunch, sceneViewLaunch);
+    }
+
+    private static void validateEmbeddedBuild(RendererBuildInfo build) {
+        if (!RendererProtocolVersion.CURRENT.toString().equals(build.protocolVersion())) {
+            throw new IllegalStateException("Renderer protocol identity does not match its implementation: embedded="
+                    + build.protocolVersion()
+                    + " implementation="
+                    + RendererProtocolVersion.CURRENT);
+        }
+    }
+
+    private static ProcessArguments parseProcessArguments(String[] arguments, int processArgumentCount) {
+        ProcessArguments result = new ProcessArguments();
+        for (int index = 0; index < processArgumentCount; index++) {
+            result.accept(arguments[index]);
+        }
+        return result;
+    }
+
+    private static void validateCompatibility(ProcessArguments arguments, RendererBuildInfo build) {
+        if (!RendererProtocolVersion.CURRENT.equals(arguments.version)) {
+            throw new IllegalArgumentException("Unsupported renderer protocol version: " + arguments.version);
+        }
+        if (!build.contractIdentity().equals(arguments.contractIdentity)) {
+            throw new IllegalArgumentException("Unsupported renderer contract identity: " + arguments.contractIdentity);
+        }
+        if (!build.buildIdentity().equals(arguments.buildIdentity)) {
+            throw new IllegalArgumentException("Stale renderer build identity: " + arguments.buildIdentity);
+        }
+    }
+
+    private static String uniqueIdentity(@Nullable String previous, String argument, String prefix) {
+        String value = argument.substring(prefix.length());
+        if (previous != null || value.isBlank()) {
+            throw usageFailure();
+        }
+        return value;
     }
 
     private static Optional<ProjectLaunch> projectLaunch(Map<String, String> options) {
@@ -140,6 +170,35 @@ record RendererConfiguration(
             return dimension;
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Initial surface " + name + " must be an integer", exception);
+        }
+    }
+
+    private static final class ProcessArguments {
+        private final Map<String, String> options = new LinkedHashMap<>();
+        private @Nullable RendererProtocolVersion version;
+        private @Nullable String contractIdentity;
+        private @Nullable String buildIdentity;
+        private boolean sceneView;
+
+        private void accept(String argument) {
+            if (argument.startsWith(VERSION_OPTION)) {
+                if (version != null) {
+                    throw usageFailure();
+                }
+                version = parseVersion(argument.substring(VERSION_OPTION.length()));
+            } else if (argument.startsWith(CONTRACT_IDENTITY_OPTION)) {
+                contractIdentity = uniqueIdentity(contractIdentity, argument, CONTRACT_IDENTITY_OPTION);
+            } else if (argument.startsWith(BUILD_IDENTITY_OPTION)) {
+                buildIdentity = uniqueIdentity(buildIdentity, argument, BUILD_IDENTITY_OPTION);
+            } else if (SCENE_VIEW_OPTION.equals(argument) && !sceneView) {
+                sceneView = true;
+            } else if (!putOption(options, argument, PROJECT_ROOT_OPTION)
+                    && !putOption(options, argument, PUBLISHED_CONTENT_OPTION)
+                    && !putOption(options, argument, ENGINE_VERSION_OPTION)
+                    && !putOption(options, argument, PROJECT_ID_OPTION)
+                    && !putOption(options, argument, SCENE_ASSET_ID_OPTION)) {
+                throw usageFailure();
+            }
         }
     }
 

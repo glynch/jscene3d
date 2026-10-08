@@ -5,14 +5,14 @@
 package io.github.glynch.jscene3d.editor.authoring.protocol;
 
 /**
- * Negotiated authoring-protocol version.
+ * Exact internal authoring-protocol version.
  *
- * @param major compatibility boundary
- * @param minor backward-compatible feature level
+ * @param major fixed pre-release protocol major
+ * @param minor fixed pre-release protocol minor
  */
 public record ProtocolVersion(int major, int minor) {
     /** Current protocol version implemented by this service. */
-    public static final ProtocolVersion CURRENT = new ProtocolVersion(2, 2);
+    public static final ProtocolVersion CURRENT = new ProtocolVersion(1, 0);
 
     /** Validates non-negative version components. */
     public ProtocolVersion {

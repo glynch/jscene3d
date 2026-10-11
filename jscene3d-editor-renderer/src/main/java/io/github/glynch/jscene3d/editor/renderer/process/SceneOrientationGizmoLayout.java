@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.renderer.process;
 
 import io.github.glynch.jscene3d.cameras.Camera;
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneOrientationGizmoState.Axis;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneOrientationGizmoState.AxisVisual;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneOrientationGizmoState.Backdrop;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.joml.Vector3f;
 
 /** Camera-relative projection, geometry, and hit-test layout for the Scene orientation gizmo. */
@@ -27,9 +29,10 @@ final class SceneOrientationGizmoLayout {
     static final float HEIGHT = 202.0f;
     static final float MARGIN = 26.0f;
     static final float LABEL_FONT_SIZE = 20.0f;
+    static final float PROJECTION_LABEL_FONT_SIZE = 15.0f;
 
     private static final float CENTER_X = WIDTH * 0.5f;
-    private static final float CENTER_Y = HEIGHT * 0.5f;
+    private static final float CENTER_Y = 84.0f;
     private static final float AXIS_LENGTH = 68.0f;
     private static final float CUBE_HALF_EXTENT = 15.5f;
     private static final float POSITIVE_STEM_THICKNESS = 5.5f;
@@ -57,11 +60,11 @@ final class SceneOrientationGizmoLayout {
         {4, 6, 7, 5}
     };
 
-    private final Camera camera;
+    private final Supplier<? extends Camera> camera;
     private final Vector3f projected = new Vector3f();
 
     /** Retains the editor camera used to project world directions. */
-    SceneOrientationGizmoLayout(Camera camera) {
+    SceneOrientationGizmoLayout(Supplier<? extends Camera> camera) {
         this.camera = camera;
     }
 
@@ -75,7 +78,11 @@ final class SceneOrientationGizmoLayout {
         Point center = new Point(x + CENTER_X, MARGIN + CENTER_Y);
         List<AxisVisual> axes = createAxes(center);
         axes.sort(Comparator.comparingDouble(AxisVisual::depth));
-        return new SceneOrientationGizmoState(bounds, center, Backdrop.NONE, createCube(center), axes);
+        Camera currentCamera = camera.get();
+        String projectionLabel = currentCamera instanceof PerspectiveCamera ? "Persp" : "Ortho";
+        Point projectionLabelAnchor = new Point(center.x(), bounds.y() + bounds.height() - 18.0f);
+        return new SceneOrientationGizmoState(
+                bounds, center, Backdrop.NONE, createCube(center), axes, projectionLabel, projectionLabelAnchor);
     }
 
     /** Creates projected visuals for all six signed world-axis directions. */
@@ -92,7 +99,7 @@ final class SceneOrientationGizmoLayout {
     /** Creates one camera-relative signed-axis visual with future hit-test geometry. */
     private AxisVisual createAxis(Point center, Axis axis, Direction direction) {
         projected.set(axis.x() * direction.sign(), axis.y() * direction.sign(), axis.z() * direction.sign());
-        camera.viewMatrix().transformDirection(projected);
+        camera.get().viewMatrix().transformDirection(projected);
         float screenLength = (float) Math.hypot(projected.x, projected.y);
         Optional<String> label = direction == Direction.POSITIVE ? Optional.of(axis.label()) : Optional.empty();
         float alpha = direction == Direction.POSITIVE ? POSITIVE_ALPHA : NEGATIVE_ALPHA;
@@ -157,7 +164,7 @@ final class SceneOrientationGizmoLayout {
             Axis axis = Axis.values()[faceIndex / 2];
             Direction direction = faceIndex % 2 == 0 ? Direction.NEGATIVE : Direction.POSITIVE;
             projected.set(axis.x() * direction.sign(), axis.y() * direction.sign(), axis.z() * direction.sign());
-            camera.viewMatrix().transformDirection(projected);
+            camera.get().viewMatrix().transformDirection(projected);
             if (projected.z > 0.001f) {
                 faces.add(createFace(corners, faceIndex, axis, direction, projected.z));
             }
@@ -191,7 +198,7 @@ final class SceneOrientationGizmoLayout {
             for (int ySign : new int[] {-1, 1}) {
                 for (int xSign : new int[] {-1, 1}) {
                     projected.set(xSign, ySign, zSign);
-                    camera.viewMatrix().transformDirection(projected);
+                    camera.get().viewMatrix().transformDirection(projected);
                     corners.add(new ProjectedCorner(
                             new Point(
                                     center.x() + projected.x * CUBE_HALF_EXTENT,

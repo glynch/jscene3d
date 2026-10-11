@@ -63,6 +63,9 @@ public final class RendererProtocol {
     /** Scene View shared-selection command prefix. */
     public static final String COMMAND_SCENE_SELECT = "SCENE_SELECT";
 
+    /** Scene View editor-camera navigation command prefix. */
+    public static final String COMMAND_SCENE_NAVIGATE = "SCENE_NAVIGATE";
+
     private RendererProtocol() {
         throw new AssertionError("RendererProtocol cannot be instantiated");
     }

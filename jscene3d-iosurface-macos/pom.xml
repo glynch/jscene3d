@@ -30,6 +30,8 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <executions>
                     <execution>
+                        <!-- The verified Maven build, not VS Code's Java workspace build, owns native compilation. -->
+                        <?m2e ignore?>
                         <id>build-iosurface-native-bridge</id>
                         <phase>generate-resources</phase>
                         <goals>

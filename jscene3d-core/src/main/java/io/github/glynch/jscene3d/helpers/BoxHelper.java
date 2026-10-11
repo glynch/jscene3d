@@ -12,6 +12,7 @@ import io.github.glynch.jscene3d.math.BoundingBox;
 import io.github.glynch.jscene3d.math.Color;
 import io.github.glynch.jscene3d.objects.Object3D;
 import java.util.Objects;
+import java.util.Optional;
 
 /** World-axis-aligned wireframe bounds for visible renderable geometry in an object subtree. */
 public final class BoxHelper extends GeneratedLineSegmentsHelper {
@@ -60,6 +61,20 @@ public final class BoxHelper extends GeneratedLineSegmentsHelper {
      */
     public Object3D target() {
         return target;
+    }
+
+    /**
+     * Computes world-axis-aligned bounds for visible renderable geometry in a subtree.
+     *
+     * <p>Generated line helpers are excluded, matching the bounds used by this helper. This
+     * operation does not create GPU resources and is suitable for editor framing operations.
+     *
+     * @param target root of the subtree to inspect
+     * @return visible world-space bounds, or an empty result when no renderable geometry exists
+     * @throws NullPointerException if {@code target} is {@code null}
+     */
+    public static Optional<BoundingBox> computeVisibleBounds(Object3D target) {
+        return Optional.ofNullable(VisibleObjectBounds.compute(Objects.requireNonNull(target, "target")));
     }
 
     /**

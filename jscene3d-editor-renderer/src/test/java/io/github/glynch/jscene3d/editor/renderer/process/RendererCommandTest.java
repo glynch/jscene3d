@@ -30,6 +30,14 @@ final class RendererCommandTest {
                 .isEqualTo(new RendererCommand.SceneSelect(3L, Optional.of(occurrence)));
         assertThat(RendererCommand.parse("SCENE_SELECT 3 NONE"))
                 .isEqualTo(new RendererCommand.SceneSelect(3L, Optional.empty()));
+        assertThat(RendererCommand.parse("SCENE_NAVIGATE ORBIT 12 -4 800 600"))
+                .isEqualTo(new RendererCommand.SceneNavigate(new SceneViewNavigation.Orbit(12.0f, -4.0f, 800, 600)));
+        assertThat(RendererCommand.parse("SCENE_NAVIGATE PAN 2 3 800 600"))
+                .isEqualTo(new RendererCommand.SceneNavigate(new SceneViewNavigation.Pan(2.0f, 3.0f, 800, 600)));
+        assertThat(RendererCommand.parse("SCENE_NAVIGATE ZOOM -120"))
+                .isEqualTo(new RendererCommand.SceneNavigate(new SceneViewNavigation.Zoom(-120.0f)));
+        assertThat(RendererCommand.parse("SCENE_NAVIGATE FOCUS_SELECTED"))
+                .isEqualTo(new RendererCommand.SceneNavigate(new SceneViewNavigation.FocusSelected()));
         assertThat(RendererCommand.parse("RECEIVE_SURFACE")).isInstanceOf(RendererCommand.ReceiveSurface.class);
         assertThat(RendererCommand.parse("PAUSE")).isInstanceOf(RendererCommand.Pause.class);
         assertThat(RendererCommand.parse("RESUME")).isInstanceOf(RendererCommand.Resume.class);
@@ -50,6 +58,12 @@ final class RendererCommandTest {
                 .satisfies(exception -> assertThat(exception.category()).isEqualTo("MALFORMED_REQUEST"));
         assertThatExceptionOfType(RendererProtocolException.class)
                 .isThrownBy(() -> RendererCommand.parse("SCENE_SELECT 2 not-base64"))
+                .satisfies(exception -> assertThat(exception.category()).isEqualTo("MALFORMED_REQUEST"));
+        assertThatExceptionOfType(RendererProtocolException.class)
+                .isThrownBy(() -> RendererCommand.parse("SCENE_NAVIGATE ORBIT NaN 1 800 600"))
+                .satisfies(exception -> assertThat(exception.category()).isEqualTo("MALFORMED_REQUEST"));
+        assertThatExceptionOfType(RendererProtocolException.class)
+                .isThrownBy(() -> RendererCommand.parse("SCENE_NAVIGATE TOGGLE_PROJECTION extra"))
                 .satisfies(exception -> assertThat(exception.category()).isEqualTo("MALFORMED_REQUEST"));
         assertThatExceptionOfType(RendererProtocolException.class)
                 .isThrownBy(() -> RendererCommand.parse("PROJECT_OPEN anything"))

@@ -157,6 +157,12 @@ final class SceneViewProcessSession implements RendererSession {
     }
 
     @Override
+    public void navigateSceneView(SceneViewNavigation navigation) {
+        requireOpen();
+        sceneView.navigate(navigation);
+    }
+
+    @Override
     public void close() {
         if (closed) {
             return;

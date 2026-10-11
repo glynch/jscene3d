@@ -26,6 +26,10 @@ interface RendererSession extends AutoCloseable {
         throw new IllegalStateException("Renderer session does not support Scene View selection");
     }
 
+    default void navigateSceneView(SceneViewNavigation navigation) {
+        throw new IllegalStateException("Renderer session does not support Scene View navigation");
+    }
+
     @Override
     void close();
 

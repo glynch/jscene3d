@@ -27,6 +27,7 @@ final class SceneOrientationGizmoRenderer {
         paintCube(canvas, state.cube());
         state.axes().stream().filter(axis -> axis.depth() > 0.0f).forEach(axis -> paintAxis(canvas, axis));
         state.axes().stream().filter(axis -> axis.label().isPresent()).forEach(axis -> paintLabel(canvas, axis));
+        paintProjectionLabel(canvas, state);
     }
 
     /** Draws one directed axis using its retained stem and tip geometry. */
@@ -80,6 +81,27 @@ final class SceneOrientationGizmoRenderer {
                 SceneOrientationGizmoLayout.LABEL_FONT_SIZE,
                 LABEL_COLOR,
                 1.0f,
+                OverlayTextAlignment.CENTER);
+    }
+
+    /** Draws the active projection label below the orientation axes. */
+    private static void paintProjectionLabel(OverlayCanvas canvas, SceneOrientationGizmoState state) {
+        Point anchor = state.projectionLabelAnchor();
+        canvas.text(
+                state.projectionLabel(),
+                anchor.x() + 1.0f,
+                anchor.y() + 1.0f,
+                SceneOrientationGizmoLayout.PROJECTION_LABEL_FONT_SIZE,
+                LABEL_SHADOW,
+                0.82f,
+                OverlayTextAlignment.CENTER);
+        canvas.text(
+                state.projectionLabel(),
+                anchor.x(),
+                anchor.y(),
+                SceneOrientationGizmoLayout.PROJECTION_LABEL_FONT_SIZE,
+                LABEL_COLOR,
+                0.9f,
                 OverlayTextAlignment.CENTER);
     }
 

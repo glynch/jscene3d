@@ -26,6 +26,7 @@ sealed interface RendererCommand {
             case RendererProtocol.COMMAND_SCENE_SNAPSHOT -> parseSceneSnapshot(parts);
             case RendererProtocol.COMMAND_SCENE_PICK -> parseScenePick(parts);
             case RendererProtocol.COMMAND_SCENE_SELECT -> parseSceneSelect(parts);
+            case RendererProtocol.COMMAND_SCENE_NAVIGATE -> parseSceneNavigate(parts);
             default -> throw RendererProtocolException.unknown("Unknown renderer command: " + parts[0]);
         };
     }
@@ -105,6 +106,66 @@ sealed interface RendererCommand {
         }
     }
 
+    private static SceneNavigate parseSceneNavigate(String[] parts) throws RendererProtocolException {
+        if (parts.length < 2) {
+            throw RendererProtocolException.malformed("SCENE_NAVIGATE requires an action");
+        }
+        try {
+            return new SceneNavigate(
+                    switch (parts[1]) {
+                        case "ORBIT" ->
+                            new SceneViewNavigation.Orbit(
+                                    finite(parts, 2, 6, "ORBIT"), finite(parts, 3, 6, "ORBIT"),
+                                    positiveInteger(parts, 4, "ORBIT"), positiveInteger(parts, 5, "ORBIT"));
+                        case "PAN" ->
+                            new SceneViewNavigation.Pan(
+                                    finite(parts, 2, 6, "PAN"), finite(parts, 3, 6, "PAN"),
+                                    positiveInteger(parts, 4, "PAN"), positiveInteger(parts, 5, "PAN"));
+                        case "ZOOM" -> new SceneViewNavigation.Zoom(finite(parts, 2, 3, "ZOOM"));
+                        case "GIZMO_CLICK" ->
+                            new SceneViewNavigation.GizmoClick(
+                                    finite(parts, 2, 6, "GIZMO_CLICK"), finite(parts, 3, 6, "GIZMO_CLICK"),
+                                    positiveInteger(parts, 4, "GIZMO_CLICK"), positiveInteger(parts, 5, "GIZMO_CLICK"));
+                        case "FOCUS_SELECTED" -> noNavigationArguments(parts, new SceneViewNavigation.FocusSelected());
+                        case "FRAME_ALL" -> noNavigationArguments(parts, new SceneViewNavigation.FrameAll());
+                        case "TOGGLE_PROJECTION" ->
+                            noNavigationArguments(parts, new SceneViewNavigation.ToggleProjection());
+                        default ->
+                            throw RendererProtocolException.malformed("Unknown SCENE_NAVIGATE action: " + parts[1]);
+                    });
+        } catch (NumberFormatException | IndexOutOfBoundsException exception) {
+            throw RendererProtocolException.malformed("SCENE_NAVIGATE arguments are invalid", exception);
+        }
+    }
+
+    private static float finite(String[] parts, int index, int expectedLength, String action)
+            throws RendererProtocolException {
+        if (parts.length != expectedLength) {
+            throw RendererProtocolException.malformed(action + " arguments are invalid");
+        }
+        float value = Float.parseFloat(parts[index]);
+        if (!Float.isFinite(value)) {
+            throw RendererProtocolException.malformed(action + " requires finite numbers");
+        }
+        return value;
+    }
+
+    private static int positiveInteger(String[] parts, int index, String action) throws RendererProtocolException {
+        int value = Integer.parseInt(parts[index]);
+        if (value <= 0) {
+            throw RendererProtocolException.malformed(action + " requires positive viewport dimensions");
+        }
+        return value;
+    }
+
+    private static <T extends SceneViewNavigation> T noNavigationArguments(String[] parts, T navigation)
+            throws RendererProtocolException {
+        if (parts.length != 2) {
+            throw RendererProtocolException.malformed(parts[1] + " does not accept arguments");
+        }
+        return navigation;
+    }
+
     private static <T extends RendererCommand> T noArguments(String[] parts, T command)
             throws RendererProtocolException {
         if (parts.length != 1) {
@@ -122,6 +183,8 @@ sealed interface RendererCommand {
     record ScenePick(String requestToken, long revision, float horizontal, float vertical) implements RendererCommand {}
 
     record SceneSelect(long revision, Optional<CompositionOccurrenceId> occurrence) implements RendererCommand {}
+
+    record SceneNavigate(SceneViewNavigation navigation) implements RendererCommand {}
 
     record ReceiveSurface() implements RendererCommand {}
 

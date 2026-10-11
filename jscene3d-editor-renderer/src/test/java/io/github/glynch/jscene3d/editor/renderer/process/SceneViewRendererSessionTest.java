@@ -7,6 +7,8 @@ package io.github.glynch.jscene3d.editor.renderer.process;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
 
+import io.github.glynch.jscene3d.cameras.OrthographicCamera;
+import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneViewRealizationResult.Code;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneViewRealizationResult.Status;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
@@ -67,8 +69,9 @@ final class SceneViewRendererSessionTest {
             assertThat(result.status()).isEqualTo(Status.APPLIED);
             assertThat(result.currentRevision()).hasValue(0L);
             assertThat(session.scene().children())
-                    .contains(session.camera(), session.grid())
-                    .hasSize(3);
+                    .contains(session.grid())
+                    .doesNotContain(session.camera())
+                    .hasSize(2);
             assertThat(session.orientationGizmo()).isNotInstanceOf(Object3D.class);
             assertThat(session.identityFor(session.camera())).isEmpty();
             assertThat(session.identityFor(session.grid())).isEmpty();
@@ -80,10 +83,83 @@ final class SceneViewRendererSessionTest {
     void updatesEditorCameraAspectFromTheCurrentPhysicalViewport() {
         try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
             session.updateViewportSize(1_920, 1_080);
-            assertThat(session.camera().aspectRatio()).isCloseTo(16.0f / 9.0f, offset(0.000_001f));
+            assertThat(((PerspectiveCamera) session.camera()).aspectRatio())
+                    .isCloseTo(16.0f / 9.0f, offset(0.000_001f));
 
             session.updateViewportSize(900, 1_600);
-            assertThat(session.camera().aspectRatio()).isCloseTo(9.0f / 16.0f, offset(0.000_001f));
+            assertThat(((PerspectiveCamera) session.camera()).aspectRatio())
+                    .isCloseTo(9.0f / 16.0f, offset(0.000_001f));
+        }
+    }
+
+    @Test
+    void navigatesOneSessionLocalEditorCameraWithoutChangingSceneContent() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(pickableRoot())));
+            Object3D authored = session.objectFor(rootOccurrence()).orElseThrow();
+            SceneViewEditorCamera.State initial = session.cameraState();
+
+            session.navigate(new SceneViewNavigation.Orbit(80.0f, -30.0f, 1_200, 800));
+            SceneViewEditorCamera.State orbited = session.cameraState();
+            session.navigate(new SceneViewNavigation.Pan(24.0f, -18.0f, 1_200, 800));
+            SceneViewEditorCamera.State panned = session.cameraState();
+            session.navigate(new SceneViewNavigation.Zoom(-120.0f));
+            SceneViewEditorCamera.State zoomed = session.cameraState();
+
+            assertThat(orbited.position()).isNotEqualTo(initial.position());
+            assertThat(orbited.pivot()).isEqualTo(initial.pivot());
+            assertThat(panned.pivot()).isNotEqualTo(orbited.pivot());
+            assertThat(zoomed.distance()).isLessThan(panned.distance());
+            assertThat(session.objectFor(rootOccurrence())).containsSame(authored);
+            assertThat(session.revision()).hasValue(1L);
+        }
+    }
+
+    @Test
+    void framesSelectionAndSceneAndTogglesProjectionThroughGizmoCentre() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(pickableRoot())));
+            session.select(1L, Optional.of(rootOccurrence()));
+
+            session.navigate(new SceneViewNavigation.FocusSelected());
+            SceneViewEditorCamera.State focused = session.cameraState();
+            assertThat(focused.pivot()).isEqualTo(new Vector3f());
+            assertThat(focused.distance()).isLessThan(3.0f);
+
+            session.navigate(new SceneViewNavigation.Pan(50.0f, 0.0f, 1_000, 700));
+            session.navigate(new SceneViewNavigation.FrameAll());
+            assertThat(session.cameraState().pivot()).isEqualTo(new Vector3f());
+
+            SceneOrientationGizmoState gizmo = session.orientationGizmo().renderState(1_000, 700);
+            session.navigate(new SceneViewNavigation.GizmoClick(
+                    gizmo.center().x(), gizmo.center().y(), 1_000, 700));
+            assertThat(session.camera()).isInstanceOf(OrthographicCamera.class);
+            assertThat(session.cameraState().perspective()).isFalse();
+            assertThat(session.orientationGizmo().renderState(1_000, 700).projectionLabel())
+                    .isEqualTo("Ortho");
+        }
+    }
+
+    @Test
+    void clickingGizmoAxisAlignsCameraAndSnapshotReplacementRetainsItsState() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(pickableRoot())));
+            SceneOrientationGizmoState state = session.orientationGizmo().renderState(1_000, 700);
+            SceneOrientationGizmoState.AxisVisual positiveX = state.axes().stream()
+                    .filter(axis -> axis.axis() == SceneOrientationGizmoState.Axis.X
+                            && axis.direction() == SceneOrientationGizmoState.Direction.POSITIVE)
+                    .findFirst()
+                    .orElseThrow();
+
+            session.navigate(new SceneViewNavigation.GizmoClick(
+                    positiveX.endpoint().x(), positiveX.endpoint().y(), 1_000, 700));
+            SceneViewEditorCamera.State aligned = session.cameraState();
+            session.replaceSnapshot(snapshot(2L, List.of(pickableRoot())));
+
+            assertThat(aligned.position().x()).isGreaterThan(aligned.pivot().x());
+            assertThat(aligned.position().y()).isCloseTo(aligned.pivot().y(), offset(0.000_1f));
+            assertThat(aligned.position().z()).isCloseTo(aligned.pivot().z(), offset(0.000_1f));
+            assertThat(session.cameraState()).isEqualTo(aligned);
         }
     }
 

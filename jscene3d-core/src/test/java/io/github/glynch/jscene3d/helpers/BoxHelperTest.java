@@ -23,9 +23,25 @@ import io.github.glynch.jscene3d.objects.LineSegments;
 import io.github.glynch.jscene3d.objects.Mesh;
 import io.github.glynch.jscene3d.objects.Object3D;
 import java.util.Objects;
+import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 final class BoxHelperTest {
+    @Test
+    void computesReusableVisibleBoundsWithoutCreatingAHelper() {
+        try (BufferGeometry geometry = BoxGeometry.create(2.0f, 4.0f, 6.0f);
+                BasicMaterial material = new BasicMaterial()) {
+            Mesh target = positionedMesh(geometry, material, 1.0f, 2.0f, 3.0f);
+
+            assertThat(BoxHelper.computeVisibleBounds(target)).hasValueSatisfying(bounds -> {
+                assertThat(bounds.minimum()).isEqualTo(new Vector3f(0.0f, 0.0f, 0.0f));
+                assertThat(bounds.maximum()).isEqualTo(new Vector3f(2.0f, 4.0f, 6.0f));
+            });
+            target.setVisible(false);
+            assertThat(BoxHelper.computeVisibleBounds(target)).isEmpty();
+        }
+    }
+
     @Test
     void createsOwnedDynamicWorldBoundsWithTwelveEdges() {
         try (BufferGeometry geometry = BoxGeometry.create(2.0f, 4.0f, 6.0f);

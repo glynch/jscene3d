@@ -26,7 +26,7 @@ final class SceneOrientationGizmoTest {
     @Test
     void describesCubeSignedAxesConventionalColorsAndLabelsWithoutAStatusCard() {
         PerspectiveCamera camera = camera();
-        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(camera)) {
+        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(() -> camera)) {
             SceneOrientationGizmoState state = gizmo.renderState(1_200, 800);
 
             assertThat(positive(state, Axis.X)).satisfies(axis -> {
@@ -56,12 +56,19 @@ final class SceneOrientationGizmoTest {
             assertThat(state.cube().hitBounds().width()).isPositive();
             assertThat(state.cube().hitBounds().height()).isPositive();
             assertThat(state.backdrop()).isEqualTo(Backdrop.NONE);
+            assertThat(state.projectionLabel()).isEqualTo("Persp");
+            assertThat(state.bounds()
+                            .contains(
+                                    state.projectionLabelAnchor().x(),
+                                    state.projectionLabelAnchor().y()))
+                    .isTrue();
         }
     }
 
     @Test
     void retainsArrowAndHitTestGeometryForFutureInteraction() {
-        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(camera())) {
+        PerspectiveCamera camera = camera();
+        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(() -> camera)) {
             SceneOrientationGizmoState state = gizmo.renderState(1_200, 800);
 
             assertThat(state.axes()).allSatisfy(axis -> {
@@ -80,7 +87,8 @@ final class SceneOrientationGizmoTest {
 
     @Test
     void remainsTopRightAndConstantSizeAcrossViewportResize() {
-        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(camera())) {
+        PerspectiveCamera camera = camera();
+        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(() -> camera)) {
             SceneOrientationGizmoState first = gizmo.renderState(800, 600);
             SceneOrientationGizmoState resized = gizmo.renderState(1_600, 1_000);
 
@@ -99,7 +107,7 @@ final class SceneOrientationGizmoTest {
     @Test
     void projectsAxesAndCentralCubeThroughCurrentEditorCameraOrientation() {
         PerspectiveCamera camera = camera();
-        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(camera)) {
+        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(() -> camera)) {
             SceneOrientationGizmoState initial = gizmo.renderState(1_200, 800);
             AxisVisual initialX = positive(initial, Axis.X);
             List<Axis> initialFaces = initial.cube().faces().stream()
@@ -125,7 +133,7 @@ final class SceneOrientationGizmoTest {
     void retainsBackToFrontDepthOrdering() {
         PerspectiveCamera camera = camera();
         camera.setQuaternion(new Quaternionf().rotationXYZ(0.4f, -0.65f, 0.2f));
-        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(camera)) {
+        try (SceneOrientationGizmo gizmo = new SceneOrientationGizmo(() -> camera)) {
             SceneOrientationGizmoState state = gizmo.renderState(1_200, 800);
 
             assertThat(state.axes())
@@ -137,7 +145,8 @@ final class SceneOrientationGizmoTest {
 
     @Test
     void closesIdempotentlyWithItsOwningSessionLifecycle() {
-        SceneOrientationGizmo gizmo = new SceneOrientationGizmo(camera());
+        PerspectiveCamera camera = camera();
+        SceneOrientationGizmo gizmo = new SceneOrientationGizmo(() -> camera);
 
         gizmo.close();
         gizmo.close();

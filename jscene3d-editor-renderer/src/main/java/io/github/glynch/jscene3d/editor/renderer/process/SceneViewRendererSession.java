@@ -4,7 +4,7 @@
  */
 package io.github.glynch.jscene3d.editor.renderer.process;
 
-import io.github.glynch.jscene3d.cameras.PerspectiveCamera;
+import io.github.glynch.jscene3d.cameras.Camera;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneViewRealizationResult.Code;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneViewRealizationResult.Diagnostic;
 import io.github.glynch.jscene3d.editor.renderer.process.SceneViewRealizationResult.Status;
@@ -45,9 +45,9 @@ final class SceneViewRendererSession implements AutoCloseable {
     private static final float DEGREES_TO_RADIANS = (float) (Math.PI / 180.0);
 
     private final Scene scene = new Scene();
-    private final PerspectiveCamera camera = new PerspectiveCamera((float) Math.toRadians(60.0), 1.0f, 0.1f, 1000.0f);
+    private final SceneViewEditorCamera editorCamera = new SceneViewEditorCamera();
     private final GridHelper grid = new GridHelper(20.0f, 20);
-    private final SceneOrientationGizmo orientationGizmo = new SceneOrientationGizmo(camera);
+    private final SceneOrientationGizmo orientationGizmo = new SceneOrientationGizmo(editorCamera::active);
     private final SceneViewResourceCache resources;
     private final Raycaster raycaster = new Raycaster();
 
@@ -59,9 +59,6 @@ final class SceneViewRendererSession implements AutoCloseable {
 
     SceneViewRendererSession(SceneViewResourceResolver resolver) {
         resources = new SceneViewResourceCache(Objects.requireNonNull(resolver, "resolver"));
-        camera.setPosition(6.0f, 4.0f, 6.0f);
-        camera.lookAt(0.0f, 0.0f, 0.0f);
-        scene.add(camera);
         scene.add(grid);
     }
 
@@ -112,7 +109,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         requireOpen();
         updateViewportSize(viewportWidth, viewportHeight);
         Renderer validRenderer = Objects.requireNonNull(renderer, "renderer");
-        validRenderer.render(scene, camera);
+        validRenderer.render(scene, editorCamera.active());
         validRenderer.render(orientationGizmo);
     }
 
@@ -121,7 +118,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         if (viewportWidth <= 0 || viewportHeight <= 0) {
             throw new IllegalArgumentException("viewport dimensions must be positive");
         }
-        camera.setAspectRatio((float) viewportWidth / viewportHeight);
+        editorCamera.resize(viewportWidth, viewportHeight);
     }
 
     Scene scene() {
@@ -129,9 +126,9 @@ final class SceneViewRendererSession implements AutoCloseable {
         return scene;
     }
 
-    PerspectiveCamera camera() {
+    Camera camera() {
         requireOpen();
-        return camera;
+        return editorCamera.active();
     }
 
     GridHelper grid() {
@@ -173,7 +170,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         if (current.revision() != expectedRevision) {
             return SceneViewSelectionResult.stale(current.revision());
         }
-        raycaster.setFromCamera(horizontal, vertical, camera);
+        raycaster.setFromCamera(horizontal, vertical, editorCamera.active());
         Optional<CompositionOccurrenceId> picked = raycaster.intersect(current.root()).stream()
                 .map(hit -> current.identities().get(hit.mesh()))
                 .filter(Objects::nonNull)
@@ -195,6 +192,29 @@ final class SceneViewRendererSession implements AutoCloseable {
                 occurrence.filter(current.occurrenceObjects()::containsKey).orElse(null);
         restoreSelection();
         return selectedOccurrence != null || occurrence.isEmpty();
+    }
+
+    void navigate(SceneViewNavigation navigation) {
+        requireOpen();
+        switch (Objects.requireNonNull(navigation, "navigation")) {
+            case SceneViewNavigation.Orbit orbit ->
+                editorCamera.orbit(orbit.horizontal(), orbit.vertical(), orbit.viewportWidth(), orbit.viewportHeight());
+            case SceneViewNavigation.Pan pan ->
+                editorCamera.pan(pan.horizontal(), pan.vertical(), pan.viewportWidth(), pan.viewportHeight());
+            case SceneViewNavigation.Zoom zoom -> editorCamera.zoom(zoom.amount());
+            case SceneViewNavigation.FocusSelected ignored -> focusSelected();
+            case SceneViewNavigation.FrameAll ignored -> frameAll();
+            case SceneViewNavigation.ToggleProjection ignored -> editorCamera.toggleProjection();
+            case SceneViewNavigation.GizmoClick click ->
+                orientationGizmo
+                        .hitTest(click.horizontal(), click.vertical(), click.viewportWidth(), click.viewportHeight())
+                        .ifPresent(this::applyGizmoHit);
+        }
+    }
+
+    SceneViewEditorCamera.State cameraState() {
+        requireOpen();
+        return editorCamera.state();
     }
 
     @Override
@@ -257,6 +277,32 @@ final class SceneViewRendererSession implements AutoCloseable {
             selectionHelper = helper;
         } catch (IllegalArgumentException ignored) {
             // Non-spatial Entities remain selected without a visual bounds helper.
+        }
+    }
+
+    private void focusSelected() {
+        RealizedContent current = content;
+        CompositionOccurrenceId occurrence = selectedOccurrence;
+        if (current == null || occurrence == null) {
+            return;
+        }
+        Object3D selected = current.occurrenceObjects().get(occurrence);
+        if (selected != null) {
+            BoxHelper.computeVisibleBounds(selected).ifPresent(editorCamera::frame);
+        }
+    }
+
+    private void frameAll() {
+        RealizedContent current = content;
+        if (current != null) {
+            BoxHelper.computeVisibleBounds(current.root()).ifPresent(editorCamera::frame);
+        }
+    }
+
+    private void applyGizmoHit(SceneOrientationGizmo.Hit hit) {
+        switch (hit) {
+            case SceneOrientationGizmo.Hit.Center ignored -> editorCamera.toggleProjection();
+            case SceneOrientationGizmo.Hit.Axis axis -> editorCamera.align(axis.axis(), axis.direction());
         }
     }
 

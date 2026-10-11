@@ -54,6 +54,7 @@ final class RendererProtocolServer {
                 case RendererCommand.SceneSnapshot snapshot -> executeSceneSnapshot(snapshot);
                 case RendererCommand.ScenePick pick -> executeScenePick(pick);
                 case RendererCommand.SceneSelect select -> executeSceneSelect(select);
+                case RendererCommand.SceneNavigate navigate -> executeSceneNavigate(navigate);
                 case RendererCommand.ReceiveSurface ignored -> executeSurfaceReplacement();
                 case RendererCommand.Pause ignored -> executePause();
                 case RendererCommand.Resume ignored -> executeResume();
@@ -107,6 +108,11 @@ final class RendererProtocolServer {
         return true;
     }
 
+    private boolean executeSceneNavigate(RendererCommand.SceneNavigate navigate) {
+        session.navigateSceneView(navigate.navigation());
+        return true;
+    }
+
     private boolean executeSurfaceReplacement() {
         RendererSession.SurfaceSize size = session.receiveReplacementSurface();
         send(RendererProtocol.EVENT_SURFACE_READY + " " + size.width() + " " + size.height());
@@ -145,6 +151,7 @@ final class RendererProtocolServer {
             case RendererCommand.SceneSnapshot ignored -> "scene-snapshot";
             case RendererCommand.ScenePick ignored -> "scene-pick";
             case RendererCommand.SceneSelect ignored -> "scene-select";
+            case RendererCommand.SceneNavigate ignored -> "scene-navigate";
             case RendererCommand.ReceiveSurface ignored -> "surface-replacement";
             case RendererCommand.Pause ignored -> "pause";
             case RendererCommand.Resume ignored -> "resume";

@@ -11,7 +11,13 @@ import java.util.Optional;
 
 /** Immutable render and future hit-test model for one Scene orientation gizmo frame. */
 record SceneOrientationGizmoState(
-        Bounds bounds, Point center, Backdrop backdrop, CubeVisual cube, List<AxisVisual> axes) {
+        Bounds bounds,
+        Point center,
+        Backdrop backdrop,
+        CubeVisual cube,
+        List<AxisVisual> axes,
+        String projectionLabel,
+        Point projectionLabelAnchor) {
 
     /** Copies collection state and validates required values. */
     SceneOrientationGizmoState {
@@ -20,6 +26,8 @@ record SceneOrientationGizmoState(
         Objects.requireNonNull(backdrop, "backdrop");
         Objects.requireNonNull(cube, "cube");
         axes = List.copyOf(Objects.requireNonNull(axes, "axes"));
+        Objects.requireNonNull(projectionLabel, "projectionLabel");
+        Objects.requireNonNull(projectionLabelAnchor, "projectionLabelAnchor");
     }
 
     /** World axis represented by one conventional editor color and positive label. */
@@ -94,6 +102,11 @@ record SceneOrientationGizmoState(
 
     /** Immutable widget bounds in logical Scene View coordinates. */
     record Bounds(float x, float y, float width, float height) {
+        /** Returns whether the supplied logical point lies within these bounds. */
+        boolean contains(float horizontal, float vertical) {
+            return horizontal >= x && horizontal <= x + width && vertical >= y && vertical <= y + height;
+        }
+
         /** Creates square bounds centered around one screen point. */
         static Bounds centered(Point center, float size) {
             float halfSize = size * 0.5f;

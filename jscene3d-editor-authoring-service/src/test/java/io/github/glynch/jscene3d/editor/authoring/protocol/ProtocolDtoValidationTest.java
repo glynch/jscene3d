@@ -354,6 +354,15 @@ final class ProtocolDtoValidationTest {
                                 "number-array", null, null, List.of("1.25", "-2", "3.0000000000000000001"))
                         .literals())
                 .containsExactly("1.25", "-2", "3.0000000000000000001");
+        DefinitionMutationParams.MutationTarget propertyTarget = new DefinitionMutationParams.MutationTarget(
+                "component-property",
+                new DefinitionSnapshot.Occurrence("world", List.of("entity")),
+                "entity",
+                "component",
+                "position");
+        assertThat(new DefinitionInteractiveEditParams(1L, "world", 0L, propertyTarget, "begin", "drag-1", null)
+                        .phase())
+                .isEqualTo("begin");
         assertThatThrownBy(() -> new DefinitionMutationParams(1L, "world", 0L, "reset", target, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("set or remove");
@@ -371,6 +380,8 @@ final class ProtocolDtoValidationTest {
         DefinitionSnapshot.Occurrence occurrence = new DefinitionSnapshot.Occurrence("world", List.of("entity"));
         DefinitionMutationParams.MutationTarget target =
                 new DefinitionMutationParams.MutationTarget("entity-enabled", occurrence, "entity", null, null);
+        DefinitionMutationParams.MutationTarget propertyTarget = new DefinitionMutationParams.MutationTarget(
+                "component-property", occurrence, "entity", "component", "position");
         DefinitionMutationParams.CandidateValue text =
                 new DefinitionMutationParams.CandidateValue("text", null, "value");
 
@@ -386,6 +397,17 @@ final class ProtocolDtoValidationTest {
         assertThatThrownBy(() -> new DefinitionMutationParams(1L, "world", 0L, "remove", target, text))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("value");
+        assertThatThrownBy(() -> new DefinitionInteractiveEditParams(1L, "world", 0L, target, "begin", "drag-1", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("component-property");
+        assertThatThrownBy(() ->
+                        new DefinitionInteractiveEditParams(1L, "world", 0L, propertyTarget, "unknown", "drag-1", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("interactive");
+        assertThatThrownBy(
+                        () -> new DefinitionInteractiveEditParams(1L, "world", 0L, propertyTarget, "begin", " ", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("interactive");
 
         assertThatThrownBy(() -> new DefinitionMutationParams.MutationTarget(
                         "entity-enabled", occurrence, "entity", "component", null))

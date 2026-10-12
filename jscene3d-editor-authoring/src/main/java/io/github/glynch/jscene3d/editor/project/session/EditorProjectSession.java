@@ -632,6 +632,61 @@ public final class EditorProjectSession implements AutoCloseable {
     }
 
     /**
+     * Applies one phase of a Java-authoritative interactive component-property edit.
+     *
+     * @param definition authoritative definition identity
+     * @param target stable component-property target
+     * @param phase interactive lifecycle phase
+     * @param editId client-generated identity retained for the complete drag
+     * @param value preview value, required only for {@link AuthoringInteractivePhase#UPDATE}
+     * @param expectedRevision definition revision observed by the caller
+     * @return authoritative edit state
+     */
+    public AuthoringMutationResult interact(
+            AssetId definition,
+            InspectorMutationTarget.ComponentProperty target,
+            AuthoringInteractivePhase phase,
+            String editId,
+            Optional<ProjectValue> value,
+            long expectedRevision) {
+        ensureOpen();
+        AssetId validDefinition = Objects.requireNonNull(definition, "definition");
+        InspectorMutationTarget.ComponentProperty validTarget = Objects.requireNonNull(target, "target");
+        AuthoringInteractivePhase validPhase = Objects.requireNonNull(phase, "phase");
+        Optional<ProjectValue> validValue = Objects.requireNonNull(value, "value");
+        Optional<AuthoredDefinitionWorkingCopy> authored = authoredWorkingCopy(validDefinition);
+        if (authored.isEmpty()) {
+            return retainedFailure(validDefinition, expectedRevision);
+        }
+        AuthoredDefinitionWorkingCopy workingCopy = authored.orElseThrow();
+        if (workingCopy.state().revision() != expectedRevision) {
+            return result(workingCopy, AuthoringMutationResult.Outcome.STALE_REVISION, List.of());
+        }
+        if (!validTarget.occurrence().definition().equals(validDefinition)) {
+            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
+        }
+        Optional<EditorHierarchyNode> node = editableNode(validDefinition, validTarget.occurrence());
+        if (node.isEmpty() || !matchesEntity(node.orElseThrow(), validTarget)) {
+            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
+        }
+        if ((validPhase == AuthoringInteractivePhase.UPDATE) != validValue.isPresent()) {
+            throw new IllegalArgumentException("interactive update requires exactly one value");
+        }
+        return switch (validPhase) {
+            case BEGIN ->
+                workingCopy.beginInteractiveSet(
+                        editId,
+                        validTarget.entity(),
+                        validTarget.component(),
+                        validTarget.property(),
+                        expectedRevision);
+            case UPDATE -> workingCopy.previewInteractiveSet(editId, validValue.orElseThrow(), expectedRevision);
+            case COMMIT -> workingCopy.commitInteractiveSet(editId, expectedRevision);
+            case CANCEL -> workingCopy.cancelInteractiveSet(editId, expectedRevision);
+        };
+    }
+
+    /**
      * Rejects a syntactically invalid mutation candidate after applying the normal identity and revision checks.
      *
      * <p>Protocol adapters use this when an exact numeric literal cannot be represented as a {@link ProjectValue}.

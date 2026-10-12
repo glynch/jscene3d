@@ -151,15 +151,34 @@ final class SceneViewProcessSession implements RendererSession {
     }
 
     @Override
-    public boolean selectSceneView(long revision, Optional<CompositionOccurrenceId> occurrence) {
+    public Optional<SceneTransformEvent> selectSceneView(long revision, Optional<CompositionOccurrenceId> occurrence) {
         requireOpen();
-        return sceneView.select(revision, occurrence);
+        return sceneView.synchronizeSelection(revision, occurrence);
     }
 
     @Override
     public void navigateSceneView(SceneViewNavigation navigation) {
         requireOpen();
         sceneView.navigate(navigation);
+    }
+
+    @Override
+    public Optional<SceneTransformEvent> configureSceneTransform(SceneTransformSettings settings) {
+        requireOpen();
+        return sceneView.configureTransform(settings);
+    }
+
+    @Override
+    public SceneTransformPointerOutcome transformSceneView(
+            SceneTransformGizmo.PointerPhase phase, float horizontal, float vertical, int width, int height) {
+        requireOpen();
+        return sceneView.transform(phase, horizontal, vertical, width, height);
+    }
+
+    @Override
+    public Optional<SceneTransformEvent> cancelSceneTransform() {
+        requireOpen();
+        return sceneView.cancelTransform();
     }
 
     @Override

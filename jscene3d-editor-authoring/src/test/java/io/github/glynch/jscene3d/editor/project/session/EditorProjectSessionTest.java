@@ -46,6 +46,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -194,6 +195,57 @@ final class EditorProjectSessionTest {
                             AuthoringDefinitionChange.Kind.UNDO,
                             AuthoringDefinitionChange.Kind.UNDO,
                             AuthoringDefinitionChange.Kind.REDO);
+        }
+    }
+
+    /** Commits many transform previews as one undoable operation and restores cancellation exactly. */
+    @Test
+    void treatsInteractivePropertyEditingAsOneTransaction() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            InspectorMutationTarget.ComponentProperty target = worldProperty(session, SPEED);
+
+            assertThat(session.interact(
+                                    WORLD_ID, target, AuthoringInteractivePhase.BEGIN, "drag-a", Optional.empty(), 0L)
+                            .outcome())
+                    .isEqualTo(AuthoringMutationResult.Outcome.NO_OP);
+            assertOutcome(
+                    session.interact(
+                            WORLD_ID, target, AuthoringInteractivePhase.UPDATE, "drag-a", Optional.of(number("2")), 0L),
+                    AuthoringMutationResult.Outcome.ACCEPTED,
+                    1L,
+                    true,
+                    false,
+                    false);
+            assertOutcome(
+                    session.interact(
+                            WORLD_ID, target, AuthoringInteractivePhase.UPDATE, "drag-a", Optional.of(number("3")), 1L),
+                    AuthoringMutationResult.Outcome.ACCEPTED,
+                    2L,
+                    true,
+                    false,
+                    false);
+            assertOutcome(
+                    session.interact(
+                            WORLD_ID, target, AuthoringInteractivePhase.COMMIT, "drag-a", Optional.empty(), 2L),
+                    AuthoringMutationResult.Outcome.ACCEPTED,
+                    2L,
+                    true,
+                    true,
+                    false);
+            assertOutcome(session.undo(WORLD_ID, 2L), AuthoringMutationResult.Outcome.ACCEPTED, 3L, false, false, true);
+
+            session.interact(WORLD_ID, target, AuthoringInteractivePhase.BEGIN, "drag-b", Optional.empty(), 3L);
+            session.interact(
+                    WORLD_ID, target, AuthoringInteractivePhase.UPDATE, "drag-b", Optional.of(number("4")), 3L);
+            assertOutcome(
+                    session.interact(
+                            WORLD_ID, target, AuthoringInteractivePhase.CANCEL, "drag-b", Optional.empty(), 4L),
+                    AuthoringMutationResult.Outcome.ACCEPTED,
+                    5L,
+                    false,
+                    false,
+                    true);
         }
     }
 
@@ -645,6 +697,38 @@ final class EditorProjectSessionTest {
                     .contains(new InspectorValue.NumberValue(new BigDecimal("3")));
             assertThat(Files.readString(worldSource(), StandardCharsets.UTF_8)).isEqualTo(external);
             assertThat(changes).isEmpty();
+        }
+    }
+
+    /** Refuses to serialize a transient interactive preview into recovery state. */
+    @Test
+    void backupRejectsAnActiveInteractivePreview() throws Exception {
+        try (EditorProjectSession session = session()) {
+            retain(session, WORLD_ID);
+            InspectorMutationTarget.ComponentProperty target = worldProperty(session, SPEED);
+
+            assertThat(session.interact(
+                                    WORLD_ID, target, AuthoringInteractivePhase.BEGIN, "drag-a", Optional.empty(), 0L)
+                            .outcome())
+                    .isEqualTo(AuthoringMutationResult.Outcome.NO_OP);
+            assertThat(session.interact(
+                                    WORLD_ID,
+                                    target,
+                                    AuthoringInteractivePhase.UPDATE,
+                                    "drag-a",
+                                    Optional.of(number("2")),
+                                    0L)
+                            .outcome())
+                    .isEqualTo(AuthoringMutationResult.Outcome.ACCEPTED);
+
+            AuthoringBackupResult backup = session.backupDefinition(WORLD_ID, 1L);
+
+            assertThat(backup.outcome()).isEqualTo(AuthoringBackupResult.Outcome.EDIT_IN_PROGRESS);
+            assertThat(backup.backup()).isEmpty();
+            assertThat(session.interact(
+                                    WORLD_ID, target, AuthoringInteractivePhase.CANCEL, "drag-a", Optional.empty(), 1L)
+                            .outcome())
+                    .isEqualTo(AuthoringMutationResult.Outcome.ACCEPTED);
         }
     }
 

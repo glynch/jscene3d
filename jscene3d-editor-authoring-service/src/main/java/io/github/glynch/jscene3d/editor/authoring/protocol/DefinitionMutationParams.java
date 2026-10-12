@@ -42,7 +42,7 @@ public record DefinitionMutationParams(
             throw new IllegalArgumentException("operation must be set or remove");
         }
         if (("set".equals(operation)) != (value != null)) {
-            throw new IllegalArgumentException("value must be present exactly for set");
+            throw new IllegalArgumentException("mutation value shape is invalid");
         }
     }
 

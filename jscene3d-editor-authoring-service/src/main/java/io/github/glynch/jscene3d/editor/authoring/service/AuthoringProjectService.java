@@ -5,6 +5,7 @@
 package io.github.glynch.jscene3d.editor.authoring.service;
 
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionBackupResult;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionInteractiveEditParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionMutationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
@@ -33,6 +34,7 @@ import io.github.glynch.jscene3d.editor.project.asset.ProjectAsset;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoadResult;
 import io.github.glynch.jscene3d.editor.project.loading.EditorProjectLoader;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringBackupResult;
+import io.github.glynch.jscene3d.editor.project.session.AuthoringInteractivePhase;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringMutation;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringMutationResult;
 import io.github.glynch.jscene3d.editor.project.session.AuthoringPersistenceResult;
@@ -406,10 +408,59 @@ public final class AuthoringProjectService implements AutoCloseable {
                     ? new AuthoringMutation.Remove()
                     : new AuthoringMutation.Set(projectValue(Objects.requireNonNull(validParams.value(), "value")));
         } catch (NumberFormatException exception) {
-            return invalidNumericLiteral(session, definition, target, validParams, validLocale);
+            return invalidNumericLiteral(
+                    session,
+                    definition,
+                    target,
+                    Objects.requireNonNull(validParams.value(), "value"),
+                    validParams.expectedDefinitionRevision(),
+                    validLocale);
         }
         AuthoringMutationResult result =
                 session.mutate(definition, target, mutation, validParams.expectedDefinitionRevision());
+        return operationResult(result, validLocale);
+    }
+
+    /**
+     * Applies one ordered phase of an interactive component-property edit.
+     *
+     * @param params transaction identity, target, phase, and optional preview candidate
+     * @param locale initialized client display locale
+     * @return authoritative operation state and localized validation diagnostics
+     */
+    public synchronized DefinitionOperationResult interactDefinition(
+            DefinitionInteractiveEditParams params, Locale locale) {
+        ensureOpen();
+        DefinitionInteractiveEditParams validParams = Objects.requireNonNull(params, "params");
+        Locale validLocale = Objects.requireNonNull(locale, "locale");
+        EditorProjectSession session = operationSession(validParams.expectedProjectGeneration());
+        if (session == null) {
+            return operationFailure(validParams.assetId(), validParams.expectedDefinitionRevision());
+        }
+        AssetId definition = AssetId.from(validParams.assetId());
+        InspectorMutationTarget target = mutationTarget(validParams.target());
+        if (!(target instanceof InspectorMutationTarget.ComponentProperty property)) {
+            throw new IllegalArgumentException("interactive edit requires a component property target");
+        }
+        Optional<ProjectValue> value;
+        try {
+            value = validParams.value() == null ? Optional.empty() : Optional.of(projectValue(validParams.value()));
+        } catch (NumberFormatException exception) {
+            return invalidNumericLiteral(
+                    session,
+                    definition,
+                    target,
+                    Objects.requireNonNull(validParams.value(), "value"),
+                    validParams.expectedDefinitionRevision(),
+                    validLocale);
+        }
+        AuthoringMutationResult result = session.interact(
+                definition,
+                property,
+                AuthoringInteractivePhase.valueOf(validParams.phase().toUpperCase(Locale.ROOT)),
+                validParams.editId(),
+                value,
+                validParams.expectedDefinitionRevision());
         return operationResult(result, validLocale);
     }
 
@@ -959,9 +1010,9 @@ public final class AuthoringProjectService implements AutoCloseable {
             EditorProjectSession session,
             AssetId definition,
             InspectorMutationTarget target,
-            DefinitionMutationParams params,
+            DefinitionMutationParams.CandidateValue candidate,
+            long expectedRevision,
             Locale locale) {
-        DefinitionMutationParams.CandidateValue candidate = Objects.requireNonNull(params.value(), "value");
         URI source = session.retainDefinition(definition)
                 .definition()
                 .map(EditorRetainedDefinition::source)
@@ -983,7 +1034,7 @@ public final class AuthoringProjectService implements AutoCloseable {
                 List.of(property, candidate.kind().toUpperCase(Locale.ROOT), "invalid numeric literal"),
                 Map.of("candidateKind", candidate.kind(), "technicalDetail", "numeric literal could not be parsed"));
         AuthoringMutationResult result =
-                session.rejectMutation(definition, target, params.expectedDefinitionRevision(), List.of(diagnostic));
+                session.rejectMutation(definition, target, expectedRevision, List.of(diagnostic));
         return operationResult(result, locale);
     }
 

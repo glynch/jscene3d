@@ -9,6 +9,7 @@ import io.github.glynch.jscene3d.editor.renderer.protocol.RendererProtocolVersio
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Optional;
 
 /** Drives a renderer session from the versioned line protocol on standard I/O. */
 final class RendererProtocolServer {
@@ -55,6 +56,8 @@ final class RendererProtocolServer {
                 case RendererCommand.ScenePick pick -> executeScenePick(pick);
                 case RendererCommand.SceneSelect select -> executeSceneSelect(select);
                 case RendererCommand.SceneNavigate navigate -> executeSceneNavigate(navigate);
+                case RendererCommand.SceneTransformConfig config -> executeSceneTransformConfig(config);
+                case RendererCommand.SceneTransformPointer pointer -> executeSceneTransformPointer(pointer);
                 case RendererCommand.ReceiveSurface ignored -> executeSurfaceReplacement();
                 case RendererCommand.Pause ignored -> executePause();
                 case RendererCommand.Resume ignored -> executeResume();
@@ -91,6 +94,42 @@ final class RendererProtocolServer {
 
     private boolean executeScenePick(RendererCommand.ScenePick pick) {
         SceneViewSelectionResult result = session.pickSceneView(pick.revision(), pick.horizontal(), pick.vertical());
+        sendSelection(pick.requestToken(), result);
+        return true;
+    }
+
+    private boolean executeSceneSelect(RendererCommand.SceneSelect select) {
+        sendTransformEvent(session.selectSceneView(select.revision(), select.occurrence()));
+        return true;
+    }
+
+    private boolean executeSceneNavigate(RendererCommand.SceneNavigate navigate) {
+        session.navigateSceneView(navigate.navigation());
+        return true;
+    }
+
+    private boolean executeSceneTransformConfig(RendererCommand.SceneTransformConfig config) {
+        sendTransformEvent(session.configureSceneTransform(config.settings()));
+        return true;
+    }
+
+    private boolean executeSceneTransformPointer(RendererCommand.SceneTransformPointer pointer) {
+        SceneTransformPointerOutcome outcome = session.transformSceneView(
+                pointer.phase(), pointer.horizontal(), pointer.vertical(), pointer.width(), pointer.height());
+        sendTransformEvent(outcome.event());
+        if (pointer.phase() == SceneTransformGizmo.PointerPhase.BEGIN
+                && !outcome.claimed()
+                && !"NONE".equals(pointer.selectionRequestToken())) {
+            float horizontal = pointer.horizontal() / pointer.width() * 2.0f - 1.0f;
+            float vertical = 1.0f - pointer.vertical() / pointer.height() * 2.0f;
+            sendSelection(
+                    pointer.selectionRequestToken(),
+                    session.pickSceneView(pointer.selectionRevision(), horizontal, vertical));
+        }
+        return true;
+    }
+
+    private void sendSelection(String requestToken, SceneViewSelectionResult result) {
         String selection =
                 switch (result.status()) {
                     case SELECTED ->
@@ -98,19 +137,7 @@ final class RendererProtocolServer {
                     case CLEARED -> "NONE";
                     case STALE -> "STALE";
                 };
-        send(RendererProtocol.EVENT_SCENE_SELECTION + " " + pick.requestToken() + " " + result.revision() + " "
-                + selection);
-        return true;
-    }
-
-    private boolean executeSceneSelect(RendererCommand.SceneSelect select) {
-        session.selectSceneView(select.revision(), select.occurrence());
-        return true;
-    }
-
-    private boolean executeSceneNavigate(RendererCommand.SceneNavigate navigate) {
-        session.navigateSceneView(navigate.navigation());
-        return true;
+        send(RendererProtocol.EVENT_SCENE_SELECTION + " " + requestToken + " " + result.revision() + " " + selection);
     }
 
     private boolean executeSurfaceReplacement() {
@@ -152,12 +179,19 @@ final class RendererProtocolServer {
             case RendererCommand.ScenePick ignored -> "scene-pick";
             case RendererCommand.SceneSelect ignored -> "scene-select";
             case RendererCommand.SceneNavigate ignored -> "scene-navigate";
+            case RendererCommand.SceneTransformConfig ignored -> "scene-transform-config";
+            case RendererCommand.SceneTransformPointer ignored -> "scene-transform-pointer";
             case RendererCommand.ReceiveSurface ignored -> "surface-replacement";
             case RendererCommand.Pause ignored -> "pause";
             case RendererCommand.Resume ignored -> "resume";
             case RendererCommand.Shutdown ignored -> "shutdown";
             case RendererCommand.Quit ignored -> "shutdown";
         };
+    }
+
+    private void sendTransformEvent(Optional<SceneTransformEvent> event) {
+        event.ifPresent(
+                value -> send(RendererProtocol.EVENT_SCENE_TRANSFORM + " " + SceneTransformEventCodec.encode(value)));
     }
 
     private void send(String event) {

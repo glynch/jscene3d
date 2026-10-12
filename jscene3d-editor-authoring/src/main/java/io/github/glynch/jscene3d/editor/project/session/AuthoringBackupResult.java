@@ -60,6 +60,8 @@ public record AuthoringBackupResult(
         BACKED_UP,
         /** The expected content revision was not current. */
         STALE_REVISION,
+        /** An uncommitted interactive preview must be cancelled before recovery capture. */
+        EDIT_IN_PROGRESS,
         /** The retained definition is generated or otherwise non-editable. */
         NON_EDITABLE,
         /** The identity does not name an open authored definition. */

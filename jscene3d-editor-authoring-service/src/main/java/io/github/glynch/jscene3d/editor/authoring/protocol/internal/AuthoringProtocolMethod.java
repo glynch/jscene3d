@@ -27,6 +27,8 @@ enum AuthoringProtocolMethod {
     DEFINITION_OPEN("definition/open"),
     /** Applies one exact SET or REMOVE mutation. */
     DEFINITION_MUTATE("definition/mutate"),
+    /** Applies one phase of an interactive component-property edit. */
+    DEFINITION_INTERACT("definition/interact"),
     /** Restores the preceding accepted authored state. */
     DEFINITION_UNDO("definition/undo"),
     /** Reapplies the next previously undone authored state. */

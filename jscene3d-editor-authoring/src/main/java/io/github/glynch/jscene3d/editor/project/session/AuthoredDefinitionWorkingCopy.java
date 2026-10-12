@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Internal authoritative working copy shared by authored Scene and entity definitions.
@@ -35,6 +36,7 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
 
     private AuthoredDefinitionDocument current;
     private AuthoredDefinitionDocument persisted;
+    private @Nullable InteractiveEdit interactiveEdit;
     private long revision;
     private boolean closed;
 
@@ -126,12 +128,102 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
                 document -> document.setEntityEnabled(entity, enabled));
     }
 
+    /** Begins one component-property edit whose previews are committed as a single history transaction. */
+    AuthoringMutationResult beginInteractiveSet(
+            String editId, EntityId entity, ComponentId component, PropertyId property, long expectedRevision) {
+        ensureOpen();
+        Optional<AuthoringMutationResult> stale = stale(expectedRevision);
+        if (stale.isPresent()) {
+            return stale.orElseThrow();
+        }
+        if (interactiveEdit != null) {
+            return result(AuthoringMutationResult.Outcome.EDIT_IN_PROGRESS, List.of());
+        }
+        String validEditId = requireEditId(editId);
+        AuthoredDefinitionDocument.ComponentPropertyTarget target =
+                new AuthoredDefinitionDocument.ComponentPropertyTarget(entity, component, property);
+        interactiveEdit = new InteractiveEdit(
+                validEditId,
+                new AuthoringOperation(
+                        AuthoringText.message("editor.operation.transform-entity", "Transform entity"),
+                        current.source()),
+                target,
+                current);
+        return result(AuthoringMutationResult.Outcome.NO_OP, List.of());
+    }
+
+    /** Applies one validated preview without adding an undo-history entry. */
+    AuthoringMutationResult previewInteractiveSet(String editId, ProjectValue value, long expectedRevision) {
+        ensureOpen();
+        Optional<AuthoringMutationResult> stale = stale(expectedRevision);
+        if (stale.isPresent()) {
+            return stale.orElseThrow();
+        }
+        InteractiveEdit edit = interactiveEdit;
+        if (edit == null || !edit.id().equals(requireEditId(editId))) {
+            return result(AuthoringMutationResult.Outcome.EDIT_NOT_ACTIVE, List.of());
+        }
+        return switch (current.set(edit.target(), Objects.requireNonNull(value, "value"))) {
+            case AuthoredDefinitionDocument.CandidateResult.Accepted accepted -> acceptPreview(accepted);
+            case AuthoredDefinitionDocument.CandidateResult.Rejected rejected ->
+                result(AuthoringMutationResult.Outcome.VALIDATION_REJECTED, rejected.diagnostics());
+            case AuthoredDefinitionDocument.CandidateResult.InvalidTarget ignored ->
+                result(AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
+            case AuthoredDefinitionDocument.CandidateResult.InvalidEntityTarget ignored ->
+                result(AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
+        };
+    }
+
+    /** Commits all accepted previews as one undoable transform operation. */
+    AuthoringMutationResult commitInteractiveSet(String editId, long expectedRevision) {
+        ensureOpen();
+        Optional<AuthoringMutationResult> stale = stale(expectedRevision);
+        if (stale.isPresent()) {
+            return stale.orElseThrow();
+        }
+        InteractiveEdit edit = interactiveEdit;
+        if (edit == null || !edit.id().equals(requireEditId(editId))) {
+            return result(AuthoringMutationResult.Outcome.EDIT_NOT_ACTIVE, List.of());
+        }
+        interactiveEdit = null;
+        if (current.hasSameAuthoredState(edit.before())) {
+            return result(AuthoringMutationResult.Outcome.NO_OP, List.of());
+        }
+        undoHistory.push(new Transaction(edit.operation(), edit.before(), current));
+        redoHistory.clear();
+        return result(AuthoringMutationResult.Outcome.ACCEPTED, List.of());
+    }
+
+    /** Cancels an active transform edit and restores its exact pre-drag authored state. */
+    AuthoringMutationResult cancelInteractiveSet(String editId, long expectedRevision) {
+        ensureOpen();
+        Optional<AuthoringMutationResult> stale = stale(expectedRevision);
+        if (stale.isPresent()) {
+            return stale.orElseThrow();
+        }
+        InteractiveEdit edit = interactiveEdit;
+        if (edit == null || !edit.id().equals(requireEditId(editId))) {
+            return result(AuthoringMutationResult.Outcome.EDIT_NOT_ACTIVE, List.of());
+        }
+        interactiveEdit = null;
+        if (current.hasSameAuthoredState(edit.before())) {
+            return result(AuthoringMutationResult.Outcome.NO_OP, List.of());
+        }
+        current = edit.before().withPersistedSourceBaseline(persisted);
+        revision++;
+        emit(AuthoringDefinitionChange.Kind.INTERACTIVE_CANCELLED);
+        return result(AuthoringMutationResult.Outcome.ACCEPTED, List.of());
+    }
+
     /** Restores the previous accepted document state under optimistic revision checking. */
     AuthoringMutationResult undo(long expectedRevision) {
         ensureOpen();
         Optional<AuthoringMutationResult> stale = stale(expectedRevision);
         if (stale.isPresent()) {
             return stale.orElseThrow();
+        }
+        if (interactiveEdit != null) {
+            return result(AuthoringMutationResult.Outcome.EDIT_IN_PROGRESS, List.of());
         }
         Transaction transaction = undoHistory.poll();
         if (transaction == null) {
@@ -150,6 +242,9 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         Optional<AuthoringMutationResult> stale = stale(expectedRevision);
         if (stale.isPresent()) {
             return stale.orElseThrow();
+        }
+        if (interactiveEdit != null) {
+            return result(AuthoringMutationResult.Outcome.EDIT_IN_PROGRESS, List.of());
         }
         Transaction transaction = redoHistory.poll();
         if (transaction == null) {
@@ -174,6 +269,9 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         if (stale.isPresent()) {
             return stale.orElseThrow();
         }
+        if (interactiveEdit != null) {
+            return result(AuthoringMutationResult.Outcome.EDIT_IN_PROGRESS, List.of());
+        }
         AuthoredDefinitionDocument baseline = Objects.requireNonNull(baselinedDocument, "baselinedDocument");
         if (!current.hasSameAuthoredState(baseline)) {
             throw new IllegalArgumentException("persisted document must match current authored state");
@@ -191,6 +289,7 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
     /** Persists current authored state without changing content revision or edit history. */
     AuthoringPersistenceResult save(long expectedRevision) {
         ensureOpen();
+        requireNoInteractiveEdit();
         Optional<AuthoringPersistenceResult> stale = stalePersistence(expectedRevision);
         if (stale.isPresent()) {
             return stale.orElseThrow();
@@ -214,6 +313,7 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
     /** Reloads and validates physical authored source, accepting legitimate external changes. */
     AuthoringPersistenceResult revert(long expectedRevision) {
         ensureOpen();
+        requireNoInteractiveEdit();
         Optional<AuthoringPersistenceResult> stale = stalePersistence(expectedRevision);
         if (stale.isPresent()) {
             return stale.orElseThrow();
@@ -232,6 +332,9 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         ensureOpen();
         if (expectedRevision != revision) {
             return backupResult(AuthoringBackupResult.Outcome.STALE_REVISION, Optional.empty());
+        }
+        if (interactiveEdit != null) {
+            return backupResult(AuthoringBackupResult.Outcome.EDIT_IN_PROGRESS, Optional.empty());
         }
         AuthoredDefinitionBackup backup = AuthoredDefinitionBackup.create(projectId, current);
         return backupResult(AuthoringBackupResult.Outcome.BACKED_UP, Optional.of(backup));
@@ -273,6 +376,7 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
             changes.close();
             undoHistory.clear();
             redoHistory.clear();
+            interactiveEdit = null;
         }
     }
 
@@ -286,6 +390,9 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         Optional<AuthoringMutationResult> stale = stale(expectedRevision);
         if (stale.isPresent()) {
             return stale.orElseThrow();
+        }
+        if (interactiveEdit != null) {
+            return result(AuthoringMutationResult.Outcome.EDIT_IN_PROGRESS, List.of());
         }
         return switch (candidates.create(current)) {
             case AuthoredDefinitionDocument.CandidateResult.Accepted accepted -> accept(operation, kind, accepted);
@@ -313,6 +420,33 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
         revision++;
         emit(kind);
         return result(AuthoringMutationResult.Outcome.ACCEPTED, List.of());
+    }
+
+    /** Accepts changed preview content without altering undo or redo history. */
+    private AuthoringMutationResult acceptPreview(AuthoredDefinitionDocument.CandidateResult.Accepted accepted) {
+        if (!accepted.changed()) {
+            return result(AuthoringMutationResult.Outcome.NO_OP, List.of());
+        }
+        current = accepted.document();
+        revision++;
+        emit(AuthoringDefinitionChange.Kind.INTERACTIVE_PREVIEW);
+        return result(AuthoringMutationResult.Outcome.ACCEPTED, List.of());
+    }
+
+    /** Validates one client-generated interaction identity. */
+    private static String requireEditId(String editId) {
+        String validEditId = Objects.requireNonNull(editId, "editId");
+        if (validEditId.isBlank() || validEditId.length() > 128) {
+            throw new IllegalArgumentException("editId must contain between 1 and 128 characters");
+        }
+        return validEditId;
+    }
+
+    /** Rejects lifecycle operations while a preview edit still owns the working copy. */
+    private void requireNoInteractiveEdit() {
+        if (interactiveEdit != null) {
+            throw new IllegalStateException("An interactive authored-definition edit is still active");
+        }
     }
 
     /** Returns a stale outcome before any candidate or history work occurs. */
@@ -478,6 +612,20 @@ final class AuthoredDefinitionWorkingCopy implements AutoCloseable {
             Objects.requireNonNull(operation, "operation");
             Objects.requireNonNull(before, "before");
             Objects.requireNonNull(after, "after");
+        }
+    }
+
+    /** One active preview sequence retaining its exact pre-drag document. */
+    private record InteractiveEdit(
+            String id,
+            AuthoringOperation operation,
+            AuthoredDefinitionDocument.ComponentPropertyTarget target,
+            AuthoredDefinitionDocument before) {
+        private InteractiveEdit {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(operation, "operation");
+            Objects.requireNonNull(target, "target");
+            Objects.requireNonNull(before, "before");
         }
     }
 }

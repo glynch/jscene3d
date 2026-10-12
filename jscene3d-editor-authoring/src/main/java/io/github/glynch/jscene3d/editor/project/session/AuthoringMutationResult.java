@@ -70,6 +70,10 @@ public record AuthoringMutationResult(
         INVALID_TARGET,
         /** The retained definition is generated or otherwise non-editable. */
         NON_EDITABLE,
+        /** Another interactive edit already owns this working copy. */
+        EDIT_IN_PROGRESS,
+        /** The requested interactive edit identity is not active. */
+        EDIT_NOT_ACTIVE,
         /** No earlier accepted transaction is available. */
         UNDO_UNAVAILABLE,
         /** No previously undone transaction is available. */

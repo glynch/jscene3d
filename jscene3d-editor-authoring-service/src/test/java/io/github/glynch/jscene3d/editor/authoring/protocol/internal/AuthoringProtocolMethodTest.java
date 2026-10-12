@@ -36,6 +36,7 @@ final class AuthoringProtocolMethodTest {
                         "sceneView/read",
                         "definition/open",
                         "definition/mutate",
+                        "definition/interact",
                         "definition/undo",
                         "definition/redo",
                         "definition/save",

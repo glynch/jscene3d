@@ -27,6 +27,8 @@ sealed interface RendererCommand {
             case RendererProtocol.COMMAND_SCENE_PICK -> parseScenePick(parts);
             case RendererProtocol.COMMAND_SCENE_SELECT -> parseSceneSelect(parts);
             case RendererProtocol.COMMAND_SCENE_NAVIGATE -> parseSceneNavigate(parts);
+            case RendererProtocol.COMMAND_SCENE_TRANSFORM_CONFIG -> parseSceneTransformConfig(parts);
+            case RendererProtocol.COMMAND_SCENE_TRANSFORM_POINTER -> parseSceneTransformPointer(parts);
             default -> throw RendererProtocolException.unknown("Unknown renderer command: " + parts[0]);
         };
     }
@@ -138,6 +140,53 @@ sealed interface RendererCommand {
         }
     }
 
+    private static SceneTransformConfig parseSceneTransformConfig(String[] parts) throws RendererProtocolException {
+        if (parts.length != 7) {
+            throw RendererProtocolException.malformed("SCENE_TRANSFORM_CONFIG requires six arguments");
+        }
+        try {
+            return new SceneTransformConfig(new SceneTransformSettings(
+                    SceneTransformTool.valueOf(parts[1]),
+                    SceneTransformSpace.valueOf(parts[2]),
+                    switch (parts[3]) {
+                        case "ON" -> true;
+                        case "OFF" -> false;
+                        default -> throw RendererProtocolException.malformed("snapping must be ON or OFF");
+                    },
+                    positiveFloat(parts[4], "translation snap"),
+                    positiveFloat(parts[5], "rotation snap"),
+                    positiveFloat(parts[6], "scale snap")));
+        } catch (IllegalArgumentException exception) {
+            throw RendererProtocolException.malformed("SCENE_TRANSFORM_CONFIG arguments are invalid", exception);
+        }
+    }
+
+    private static SceneTransformPointer parseSceneTransformPointer(String[] parts) throws RendererProtocolException {
+        if (parts.length != 8) {
+            throw RendererProtocolException.malformed("SCENE_TRANSFORM_POINTER requires seven arguments");
+        }
+        try {
+            return new SceneTransformPointer(
+                    SceneTransformGizmo.PointerPhase.valueOf(parts[1]),
+                    finite(parts, 2, 8, "SCENE_TRANSFORM_POINTER"),
+                    finite(parts, 3, 8, "SCENE_TRANSFORM_POINTER"),
+                    positiveInteger(parts, 4, "SCENE_TRANSFORM_POINTER"),
+                    positiveInteger(parts, 5, "SCENE_TRANSFORM_POINTER"),
+                    nonEmpty(parts[6], "selection request token"),
+                    nonNegativeLong(parts[7], "selection revision"));
+        } catch (IllegalArgumentException exception) {
+            throw RendererProtocolException.malformed("SCENE_TRANSFORM_POINTER arguments are invalid", exception);
+        }
+    }
+
+    private static float positiveFloat(String literal, String name) throws RendererProtocolException {
+        float value = Float.parseFloat(literal);
+        if (!Float.isFinite(value) || value <= 0.0f) {
+            throw RendererProtocolException.malformed(name + " must be finite and positive");
+        }
+        return value;
+    }
+
     private static float finite(String[] parts, int index, int expectedLength, String action)
             throws RendererProtocolException {
         if (parts.length != expectedLength) {
@@ -156,6 +205,21 @@ sealed interface RendererCommand {
             throw RendererProtocolException.malformed(action + " requires positive viewport dimensions");
         }
         return value;
+    }
+
+    private static String nonEmpty(String value, String name) throws RendererProtocolException {
+        if (value.isBlank()) {
+            throw RendererProtocolException.malformed(name + " must not be blank");
+        }
+        return value;
+    }
+
+    private static long nonNegativeLong(String value, String name) throws RendererProtocolException {
+        long parsed = Long.parseLong(value);
+        if (parsed < 0L) {
+            throw RendererProtocolException.malformed(name + " must be non-negative");
+        }
+        return parsed;
     }
 
     private static <T extends SceneViewNavigation> T noNavigationArguments(String[] parts, T navigation)
@@ -185,6 +249,18 @@ sealed interface RendererCommand {
     record SceneSelect(long revision, Optional<CompositionOccurrenceId> occurrence) implements RendererCommand {}
 
     record SceneNavigate(SceneViewNavigation navigation) implements RendererCommand {}
+
+    record SceneTransformConfig(SceneTransformSettings settings) implements RendererCommand {}
+
+    record SceneTransformPointer(
+            SceneTransformGizmo.PointerPhase phase,
+            float horizontal,
+            float vertical,
+            int width,
+            int height,
+            String selectionRequestToken,
+            long selectionRevision)
+            implements RendererCommand {}
 
     record ReceiveSurface() implements RendererCommand {}
 

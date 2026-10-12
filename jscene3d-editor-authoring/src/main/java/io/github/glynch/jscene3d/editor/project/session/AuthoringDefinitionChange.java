@@ -34,6 +34,10 @@ public record AuthoringDefinitionChange(
         SET,
         /** One REMOVE transaction changed authored state. */
         REMOVE,
+        /** One interactive transform preview changed authored state without adding history. */
+        INTERACTIVE_PREVIEW,
+        /** An interactive transform edit restored its pre-drag authored state. */
+        INTERACTIVE_CANCELLED,
         /** One prior transaction was undone. */
         UNDO,
         /** One prior transaction was redone. */

@@ -7,6 +7,7 @@ package io.github.glynch.jscene3d.editor.authoring.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionInteractiveEditParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionMutationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenResult;
@@ -44,6 +45,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -548,6 +550,68 @@ final class AuthoringProjectServiceTest {
                 .contains("\"position\":[1.25,2,3]");
     }
 
+    /** Routes transform previews through one interactive service transaction and supports cancellation. */
+    @Test
+    @SuppressWarnings("NullAway") // Candidate transport variants deliberately leave alternate fields null.
+    void editsTransformInteractivelyAsOneUndoableOperation() throws IOException {
+        AuthoringTestProject.writeSceneViewProject(temporaryDirectory);
+        service.openProject(new ProjectOpenParams(temporaryDirectory.toString()));
+        DefinitionSnapshot definition = Objects.requireNonNull(
+                service.openDefinition(new DefinitionOpenParams(1L, AuthoringTestProject.SCENE_ASSET_ID))
+                        .definition());
+        InspectorSnapshot inspector = Objects.requireNonNull(service.readInspector(
+                        new InspectorReadParams(
+                                1L,
+                                definition.revision(),
+                                definition.roots().getFirst().target()),
+                        Locale.ENGLISH)
+                .snapshot());
+        DefinitionMutationParams.CandidateValue preview =
+                new DefinitionMutationParams.CandidateValue("number-array", null, null, List.of("4.5", "2", "3"));
+
+        DefinitionOperationResult begun = interact(inspector, "position", 0L, "begin", "drag-1", null);
+        DefinitionOperationResult updated = interact(inspector, "position", 0L, "update", "drag-1", preview);
+        DefinitionOperationResult committed = interact(inspector, "position", 1L, "commit", "drag-1", null);
+
+        assertThat(begun)
+                .returns("no-op", DefinitionOperationResult::outcome)
+                .returns(0L, DefinitionOperationResult::revision);
+        assertThat(updated)
+                .returns("accepted", DefinitionOperationResult::outcome)
+                .returns(1L, DefinitionOperationResult::revision);
+        assertThat(committed)
+                .returns("accepted", DefinitionOperationResult::outcome)
+                .returns(1L, DefinitionOperationResult::revision)
+                .returns(true, DefinitionOperationResult::canUndo);
+
+        DefinitionOperationResult begunCancellation = interact(inspector, "position", 1L, "begin", "drag-2", null);
+        DefinitionOperationResult cancellationPreview = interact(
+                inspector,
+                "position",
+                1L,
+                "update",
+                "drag-2",
+                new DefinitionMutationParams.CandidateValue("number-array", null, null, List.of("8", "2", "3")));
+        DefinitionOperationResult cancelled = interact(inspector, "position", 2L, "cancel", "drag-2", null);
+
+        assertThat(begunCancellation).returns("no-op", DefinitionOperationResult::outcome);
+        assertThat(cancellationPreview).returns("accepted", DefinitionOperationResult::outcome);
+        assertThat(cancelled)
+                .returns("accepted", DefinitionOperationResult::outcome)
+                .returns(3L, DefinitionOperationResult::revision)
+                .returns(true, DefinitionOperationResult::canUndo);
+        assertThat(Objects.requireNonNull(service.readSceneView(
+                                        new SceneViewReadParams(1L, AuthoringTestProject.SCENE_ASSET_ID, 3L),
+                                        Locale.ENGLISH)
+                                .snapshot())
+                        .occurrences()
+                        .getFirst()
+                        .transform()
+                        .position()
+                        .x())
+                .isEqualTo("4.5");
+    }
+
     /** Parses every first-slice scalar candidate in Java while preserving exact decimal text. */
     @Test
     @SuppressWarnings("NullAway") // Candidate transport variants deliberately leave the alternate field null.
@@ -933,6 +997,34 @@ final class AuthoringProjectServiceTest {
                                 target.entityId(),
                                 target.componentId(),
                                 target.propertyId()),
+                        value),
+                Locale.ENGLISH);
+    }
+
+    /** Applies one interactive component-property phase using the Java-issued Inspector target. */
+    @SuppressWarnings("NullAway") // The assertion fixture guarantees the projected mutation target is present.
+    private DefinitionOperationResult interact(
+            InspectorSnapshot inspector,
+            String propertyId,
+            long revision,
+            String phase,
+            String editId,
+            DefinitionMutationParams.@Nullable CandidateValue value) {
+        InspectorSnapshot.ComponentPropertyMutation target = (InspectorSnapshot.ComponentPropertyMutation)
+                property(inspector, propertyId).mutationTarget();
+        return service.interactDefinition(
+                new DefinitionInteractiveEditParams(
+                        1L,
+                        AuthoringTestProject.SCENE_ASSET_ID,
+                        revision,
+                        new DefinitionMutationParams.MutationTarget(
+                                target.kind(),
+                                target.occurrence(),
+                                target.entityId(),
+                                target.componentId(),
+                                target.propertyId()),
+                        phase,
+                        editId,
                         value),
                 Locale.ENGLISH);
     }

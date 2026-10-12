@@ -133,6 +133,106 @@ final class RendererProtocolServerTest {
     }
 
     @Test
+    void fallsBackToScenePickingWhenTransformBeginMissesEveryHandle() throws IOException {
+        CompositionOccurrenceId occurrence = new CompositionOccurrenceId(
+                AssetId.from("11111111-1111-4111-8111-111111111111"),
+                List.of(EntityId.from("22222222-2222-4222-8222-222222222222")));
+        FakeRendererSession session = new FakeRendererSession();
+        session.pickedOccurrence = occurrence;
+        session.transformBeginClaimed = false;
+
+        ProtocolResult result =
+                run(session, "SCENE_TRANSFORM_POINTER BEGIN 400 300 800 600 request-transform-1 7\nSHUTDOWN\n");
+
+        assertThat(result.events())
+                .containsExactly(
+                        "PROTOCOL_VERSION 1.0",
+                        "RENDERER_READY",
+                        "SCENE_SELECTION request-transform-1 7 " + SceneViewOccurrenceCodec.encode(occurrence),
+                        "SHUTDOWN_READY");
+        assertThat(session.pickRevision).isEqualTo(7L);
+        assertThat(session.pickHorizontal).isZero();
+        assertThat(session.pickVertical).isZero();
+    }
+
+    @Test
+    void preservesTransformPriorityWhenAHandleHitCannotBeginAPlaneDrag() throws IOException {
+        FakeRendererSession session = new FakeRendererSession();
+        session.transformBeginClaimed = true;
+
+        ProtocolResult result =
+                run(session, "SCENE_TRANSFORM_POINTER BEGIN 400 300 800 600 request-transform-1 7\nSHUTDOWN\n");
+
+        assertThat(result.events()).containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY", "SHUTDOWN_READY");
+        assertThat(session.pickRevision).isZero();
+    }
+
+    @Test
+    void clearsSelectionWhenTransformModeClickMissesHandlesAndSceneGeometry() throws IOException {
+        FakeRendererSession session = new FakeRendererSession();
+        session.transformBeginClaimed = false;
+
+        ProtocolResult result =
+                run(session, "SCENE_TRANSFORM_POINTER BEGIN 400 300 800 600 request-transform-1 7\nSHUTDOWN\n");
+
+        assertThat(result.events())
+                .containsExactly(
+                        "PROTOCOL_VERSION 1.0",
+                        "RENDERER_READY",
+                        "SCENE_SELECTION request-transform-1 7 NONE",
+                        "SHUTDOWN_READY");
+    }
+
+    @Test
+    void keepsTransformActiveAcrossSnapshotAndUnchangedSelectionSynchronization() throws IOException {
+        CompositionOccurrenceId occurrence = new CompositionOccurrenceId(
+                AssetId.from("11111111-1111-4111-8111-111111111111"),
+                List.of(EntityId.from("22222222-2222-4222-8222-222222222222")));
+        FakeRendererSession session = new FakeRendererSession();
+        session.selectedOccurrence = Optional.of(occurrence);
+        String json =
+                "{\"sceneAssetId\":\"e890c4c3-fb32-49d8-88b8-4e04e7a29656\"," + "\"revision\":4,\"occurrences\":[]}";
+        String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+
+        run(
+                session,
+                "SCENE_TRANSFORM_POINTER BEGIN 100 100 800 600 NONE 4\n"
+                        + "SCENE_TRANSFORM_POINTER UPDATE 110 100 800 600 NONE 4\n"
+                        + "SCENE_SNAPSHOT "
+                        + encoded
+                        + "\nSCENE_SELECT 4 "
+                        + SceneViewOccurrenceCodec.encode(occurrence)
+                        + "\nSCENE_TRANSFORM_POINTER UPDATE 120 100 800 600 NONE 4\nSHUTDOWN\n");
+
+        assertThat(session.transformUpdates).isEqualTo(2);
+        assertThat(session.transformCancels).isZero();
+    }
+
+    @Test
+    void cancelsTransformWhenSelectionActuallyChanges() throws IOException {
+        CompositionOccurrenceId originalOccurrence = new CompositionOccurrenceId(
+                AssetId.from("11111111-1111-4111-8111-111111111111"),
+                List.of(EntityId.from("22222222-2222-4222-8222-222222222222")));
+        CompositionOccurrenceId replacementOccurrence = new CompositionOccurrenceId(
+                AssetId.from("11111111-1111-4111-8111-111111111111"),
+                List.of(EntityId.from("33333333-3333-4333-8333-333333333333")));
+        FakeRendererSession session = new FakeRendererSession();
+        session.selectedOccurrence = Optional.of(originalOccurrence);
+
+        run(
+                session,
+                "SCENE_TRANSFORM_POINTER BEGIN 100 100 800 600 NONE 4\n"
+                        + "SCENE_TRANSFORM_POINTER UPDATE 110 100 800 600 NONE 4\n"
+                        + "SCENE_SELECT 4 "
+                        + SceneViewOccurrenceCodec.encode(replacementOccurrence)
+                        + "\nSCENE_TRANSFORM_POINTER UPDATE 120 100 800 600 NONE 4\nSHUTDOWN\n");
+
+        assertThat(session.transformUpdates).isEqualTo(1);
+        assertThat(session.transformCancels).isEqualTo(1);
+        assertThat(session.selectedOccurrence).contains(replacementOccurrence);
+    }
+
+    @Test
     void reportsUnexpectedRuntimeFailureBeforePropagatingIt() {
         FakeRendererSession session = new FakeRendererSession();
         session.failFrames = true;
@@ -195,6 +295,10 @@ final class RendererProtocolServerTest {
         private long pickRevision;
         private float pickHorizontal;
         private float pickVertical;
+        private boolean transformActive;
+        private boolean transformBeginClaimed = true;
+        private int transformUpdates;
+        private int transformCancels;
 
         @Override
         public void renderFrame() {
@@ -228,13 +332,47 @@ final class RendererProtocolServerTest {
             pickRevision = revision;
             pickHorizontal = horizontal;
             pickVertical = vertical;
-            return SceneViewSelectionResult.selected(revision, Objects.requireNonNull(pickedOccurrence));
+            return pickedOccurrence == null
+                    ? SceneViewSelectionResult.cleared(revision)
+                    : SceneViewSelectionResult.selected(revision, pickedOccurrence);
         }
 
         @Override
-        public boolean selectSceneView(long revision, Optional<CompositionOccurrenceId> occurrence) {
+        public Optional<SceneTransformEvent> selectSceneView(
+                long revision, Optional<CompositionOccurrenceId> occurrence) {
+            Optional<SceneTransformEvent> cancelled =
+                    Objects.equals(selectedOccurrence, occurrence) ? Optional.empty() : cancelSceneTransform();
             selectedOccurrence = occurrence;
-            return true;
+            return cancelled;
+        }
+
+        @Override
+        public SceneTransformPointerOutcome transformSceneView(
+                SceneTransformGizmo.PointerPhase phase, float horizontal, float vertical, int width, int height) {
+            switch (phase) {
+                case BEGIN -> transformActive = transformBeginClaimed;
+                case UPDATE -> {
+                    if (transformActive) {
+                        transformUpdates++;
+                    }
+                }
+                case COMMIT, CANCEL -> transformActive = false;
+                case HOVER -> {
+                    // No transaction state changes for hover.
+                }
+            }
+            return transformActive || (phase == SceneTransformGizmo.PointerPhase.BEGIN && transformBeginClaimed)
+                    ? SceneTransformPointerOutcome.claimed(Optional.empty())
+                    : SceneTransformPointerOutcome.unclaimed();
+        }
+
+        @Override
+        public Optional<SceneTransformEvent> cancelSceneTransform() {
+            if (transformActive) {
+                transformCancels++;
+                transformActive = false;
+            }
+            return Optional.empty();
         }
 
         @Override

@@ -21,6 +21,9 @@ public final class RendererProtocol {
     /** Scene View pick-result event prefix. */
     public static final String EVENT_SCENE_SELECTION = "SCENE_SELECTION";
 
+    /** Scene View transform authoring-intent event prefix. */
+    public static final String EVENT_SCENE_TRANSFORM = "SCENE_TRANSFORM";
+
     /** Pause acknowledgement. */
     public static final String EVENT_PAUSED = "PAUSED";
 
@@ -65,6 +68,12 @@ public final class RendererProtocol {
 
     /** Scene View editor-camera navigation command prefix. */
     public static final String COMMAND_SCENE_NAVIGATE = "SCENE_NAVIGATE";
+
+    /** Scene View transform-tool configuration command prefix. */
+    public static final String COMMAND_SCENE_TRANSFORM_CONFIG = "SCENE_TRANSFORM_CONFIG";
+
+    /** Scene View transform-pointer lifecycle command prefix. */
+    public static final String COMMAND_SCENE_TRANSFORM_POINTER = "SCENE_TRANSFORM_POINTER";
 
     private RendererProtocol() {
         throw new AssertionError("RendererProtocol cannot be instantiated");

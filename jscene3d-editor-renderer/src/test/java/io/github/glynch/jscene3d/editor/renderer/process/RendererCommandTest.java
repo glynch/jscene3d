@@ -32,6 +32,12 @@ final class RendererCommandTest {
                 .isEqualTo(new RendererCommand.SceneSelect(3L, Optional.empty()));
         assertThat(RendererCommand.parse("SCENE_NAVIGATE ORBIT 12 -4 800 600"))
                 .isEqualTo(new RendererCommand.SceneNavigate(new SceneViewNavigation.Orbit(12.0f, -4.0f, 800, 600)));
+        assertThat(RendererCommand.parse("SCENE_TRANSFORM_CONFIG MOVE LOCAL ON 0.5 15 0.1"))
+                .isEqualTo(new RendererCommand.SceneTransformConfig(new SceneTransformSettings(
+                        SceneTransformTool.MOVE, SceneTransformSpace.LOCAL, true, 0.5f, 15.0f, 0.1f)));
+        assertThat(RendererCommand.parse("SCENE_TRANSFORM_POINTER BEGIN 320 240 800 600 request-8 3"))
+                .isEqualTo(new RendererCommand.SceneTransformPointer(
+                        SceneTransformGizmo.PointerPhase.BEGIN, 320.0f, 240.0f, 800, 600, "request-8", 3L));
         assertThat(RendererCommand.parse("SCENE_NAVIGATE PAN 2 3 800 600"))
                 .isEqualTo(new RendererCommand.SceneNavigate(new SceneViewNavigation.Pan(2.0f, 3.0f, 800, 600)));
         assertThat(RendererCommand.parse("SCENE_NAVIGATE ZOOM -120"))

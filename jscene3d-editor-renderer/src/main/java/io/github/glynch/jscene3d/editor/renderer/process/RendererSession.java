@@ -22,12 +22,25 @@ interface RendererSession extends AutoCloseable {
         throw new IllegalStateException("Renderer session does not support Scene View picking");
     }
 
-    default boolean selectSceneView(long revision, Optional<CompositionOccurrenceId> occurrence) {
+    default Optional<SceneTransformEvent> selectSceneView(long revision, Optional<CompositionOccurrenceId> occurrence) {
         throw new IllegalStateException("Renderer session does not support Scene View selection");
     }
 
     default void navigateSceneView(SceneViewNavigation navigation) {
         throw new IllegalStateException("Renderer session does not support Scene View navigation");
+    }
+
+    default Optional<SceneTransformEvent> configureSceneTransform(SceneTransformSettings settings) {
+        throw new IllegalStateException("Renderer session does not support Scene transform tools");
+    }
+
+    default SceneTransformPointerOutcome transformSceneView(
+            SceneTransformGizmo.PointerPhase phase, float horizontal, float vertical, int width, int height) {
+        throw new IllegalStateException("Renderer session does not support Scene transform tools");
+    }
+
+    default Optional<SceneTransformEvent> cancelSceneTransform() {
+        return Optional.empty();
     }
 
     @Override

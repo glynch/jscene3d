@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionInteractiveEditParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionMutationParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOpenParams;
 import io.github.glynch.jscene3d.editor.authoring.protocol.DefinitionOperationParams;
@@ -247,6 +248,11 @@ public final class AuthoringProtocolServer {
                         id,
                         service.mutateDefinition(
                                 readParams(request, DefinitionMutationParams.class), initializedLocale()));
+            case DEFINITION_INTERACT ->
+                success(
+                        id,
+                        service.interactDefinition(
+                                readParams(request, DefinitionInteractiveEditParams.class), initializedLocale()));
             case DEFINITION_UNDO ->
                 success(
                         id,

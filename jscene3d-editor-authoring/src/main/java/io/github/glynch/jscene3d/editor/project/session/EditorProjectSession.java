@@ -7,15 +7,10 @@ package io.github.glynch.jscene3d.editor.project.session;
 import io.github.glynch.jscene3d.configuration.definition.SettingKey;
 import io.github.glynch.jscene3d.editor.project.asset.ProjectAsset;
 import io.github.glynch.jscene3d.editor.project.session.internal.AuthoringChangeSource;
-import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyNode;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjection;
 import io.github.glynch.jscene3d.editor.workbench.hierarchy.EditorHierarchyProjector;
-import io.github.glynch.jscene3d.editor.workbench.hierarchy.HierarchyOccurrenceId;
-import io.github.glynch.jscene3d.editor.workbench.inspector.EditorInspectorProjector;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorMutationTarget;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProjection;
-import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorProperty;
-import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorSection;
 import io.github.glynch.jscene3d.editor.workbench.inspector.InspectorTarget;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewDiagnosticCode;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewProjectionResult;
@@ -24,37 +19,24 @@ import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.asset.AssetKind;
-import io.github.glynch.jscene3d.project.asset.AssetMetadata;
-import io.github.glynch.jscene3d.project.asset.AssetRef;
 import io.github.glynch.jscene3d.project.asset.AuthoredDefinitionDocument;
-import io.github.glynch.jscene3d.project.asset.DefinitionLoadResult;
 import io.github.glynch.jscene3d.project.asset.DefinitionResolver;
 import io.github.glynch.jscene3d.project.composition.CompositionPlanResult;
 import io.github.glynch.jscene3d.project.composition.CompositionPlanner;
 import io.github.glynch.jscene3d.project.diagnostic.ProjectDiagnostic;
-import io.github.glynch.jscene3d.project.entity.EntityDefinition;
-import io.github.glynch.jscene3d.project.entity.EntityEntry;
-import io.github.glynch.jscene3d.project.entity.EntityId;
-import io.github.glynch.jscene3d.project.entity.EntityPlacement;
-import io.github.glynch.jscene3d.project.entity.LocalEntity;
-import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
 import io.github.glynch.jscene3d.project.settings.ProjectSettings;
-import io.github.glynch.jscene3d.project.validation.PropertyValidationDiagnosticCode;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 
 /** Central facade for one loaded JScene3D authoring project and its per-definition working copies. */
 public final class EditorProjectSession implements AutoCloseable {
@@ -65,16 +47,14 @@ public final class EditorProjectSession implements AutoCloseable {
     private final DefinitionResolver definitions;
     private final List<ProjectAsset> assets;
     private final Collection<ProjectDiagnostic> diagnostics;
-    private final EditorHierarchyProjector hierarchyProjector;
+    private final RetainedDefinitionRegistry retainedDefinitions;
+    private final DefinitionAuthoringOperations authoringOperations;
+    private final InspectorProjectionService inspectorProjection;
     private final AuthoringChangeSource<AuthoringSessionChange> changes = new AuthoringChangeSource<>();
     private final AuthoringChangeSource<EditorHierarchyProjection> hierarchyChanges = new AuthoringChangeSource<>();
     private final AuthoringChangeSource<AuthoringDefinitionChange> definitionChanges = new AuthoringChangeSource<>();
     private final AuthoringChangeSource<AuthoringConfigurationChange> configurationChanges =
             new AuthoringChangeSource<>();
-    private final Map<AssetId, AuthoredDefinitionWorkingCopy> workingCopies = new LinkedHashMap<>();
-    private final List<AuthoringSubscription> workingCopySubscriptions = new ArrayList<>();
-    private final Map<AssetId, RetainedState> retainedDefinitions = new LinkedHashMap<>();
-
     private Optional<EditorHierarchyProjection> activeHierarchy = Optional.empty();
     private long configurationRevision;
     private boolean closed;
@@ -99,8 +79,13 @@ public final class EditorProjectSession implements AutoCloseable {
         types = validSource.types();
         definitions = validSource.definitions();
         this.assets = List.copyOf(assets);
-        this.hierarchyProjector = Objects.requireNonNull(hierarchyProjector, "hierarchyProjector");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
+        retainedDefinitions = new RetainedDefinitionRegistry(
+                authoredAssets, definitions, types, hierarchyProjector, this::workingCopyChanged);
+        MutationTargetResolver mutationTargets = new MutationTargetResolver(retainedDefinitions);
+        authoringOperations =
+                new DefinitionAuthoringOperations(project.identity().id(), retainedDefinitions, mutationTargets);
+        inspectorProjection = new InspectorProjectionService(retainedDefinitions, definitions, types, this.assets);
     }
 
     /** Returns the validated project descriptor.
@@ -187,18 +172,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public DefinitionRetentionResult retainDefinition(AssetId id) {
         ensureOpen();
-        AssetId validId = Objects.requireNonNull(id, "id");
-        RetainedState existing = retainedDefinitions.get(validId);
-        if (existing != null) {
-            EditorRetainedDefinition retained = snapshot(existing);
-            activeHierarchy = Optional.of(retained.hierarchy());
-            hierarchyChanges.emit(retained.hierarchy());
-            return new DefinitionRetentionResult(Optional.of(retained), List.of());
-        }
-
-        Optional<AssetMetadata> authored = authoredAssets.find(validId);
-        DefinitionRetentionResult result =
-                authored.isPresent() ? retainAuthored(authored.orElseThrow()) : retainGeneratedEntity(validId);
+        DefinitionRetentionResult result = retainedDefinitions.retain(id);
         diagnostics.addAll(result.diagnostics());
         result.definition().ifPresent(definition -> {
             activeHierarchy = Optional.of(definition.hierarchy());
@@ -214,25 +188,19 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public List<AssetId> retainedDefinitionIds() {
         ensureOpen();
-        return List.copyOf(retainedDefinitions.keySet());
+        return retainedDefinitions.retainedIds();
     }
 
     /** Returns the session-owned source-preserving state after an authored definition has been retained. */
     Optional<AuthoredDefinitionDocument> retainedAuthoredDocument(AssetId id) {
         ensureOpen();
-        RetainedState retained = retainedDefinitions.get(Objects.requireNonNull(id, "id"));
-        return retained instanceof AuthoredRetainedState(AuthoredDefinitionWorkingCopy workingCopy)
-                ? Optional.of(workingCopy.current())
-                : Optional.empty();
+        return retainedDefinitions.authoredDocument(id);
     }
 
     /** Returns the retained authoritative working-copy instance for focused session tests. */
     Optional<AuthoredDefinitionWorkingCopy> retainedAuthoredWorkingCopy(AssetId id) {
         ensureOpen();
-        RetainedState retained = retainedDefinitions.get(Objects.requireNonNull(id, "id"));
-        return retained instanceof AuthoredRetainedState(AuthoredDefinitionWorkingCopy workingCopy)
-                ? Optional.of(workingCopy)
-                : Optional.empty();
+        return retainedDefinitions.workingCopy(id);
     }
 
     /** Returns current lifecycle state for one open authored definition.
@@ -242,8 +210,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public Optional<AuthoringDefinitionState> definitionState(AssetId id) {
         ensureOpen();
-        AuthoredDefinitionWorkingCopy workingCopy = workingCopies.get(Objects.requireNonNull(id, "id"));
-        return workingCopy == null ? Optional.empty() : Optional.of(workingCopy.state());
+        return retainedDefinitions.definitionState(id);
     }
 
     /**
@@ -264,8 +231,8 @@ public final class EditorProjectSession implements AutoCloseable {
         if (expectedRevision < 0) {
             throw new IllegalArgumentException("expectedRevision must be non-negative");
         }
-        RetainedState state = retainedDefinitions.get(validScene);
-        if (state == null || state.kind() != AssetKind.SCENE_DEFINITION) {
+        Optional<EditorRetainedDefinition> retainedDefinition = retainedDefinitions.snapshot(validScene);
+        if (retainedDefinition.isEmpty() || retainedDefinition.orElseThrow().kind() != AssetKind.SCENE_DEFINITION) {
             return new SceneViewProjectionResult(
                     SceneViewProjectionResult.Outcome.SCENE_UNAVAILABLE,
                     validScene,
@@ -273,7 +240,7 @@ public final class EditorProjectSession implements AutoCloseable {
                     Optional.empty(),
                     List.of());
         }
-        EditorRetainedDefinition retained = snapshot(state);
+        EditorRetainedDefinition retained = retainedDefinition.orElseThrow();
         long currentRevision = retained.revision();
         if (currentRevision != expectedRevision) {
             return new SceneViewProjectionResult(
@@ -303,7 +270,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public boolean isDirty() {
         ensureOpen();
-        return workingCopies.values().stream().anyMatch(AuthoredDefinitionWorkingCopy::isDirty);
+        return retainedDefinitions.isDirty();
     }
 
     /** Returns metadata for the next undo operation of one retained authored definition.
@@ -313,7 +280,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public Optional<AuthoringOperation> undoOperation(AssetId id) {
         ensureOpen();
-        return authoredWorkingCopy(id).flatMap(AuthoredDefinitionWorkingCopy::undoOperation);
+        return authoringOperations.undoOperation(id);
     }
 
     /** Restores the previous accepted state of one authored definition.
@@ -324,7 +291,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public AuthoringMutationResult undo(AssetId id, long expectedRevision) {
         ensureOpen();
-        return editableWorkingCopyResult(id, expectedRevision, HistoryOperation.UNDO);
+        return authoringOperations.undo(id, expectedRevision);
     }
 
     /** Reapplies the next previously undone state of one authored definition.
@@ -335,7 +302,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public AuthoringMutationResult redo(AssetId id, long expectedRevision) {
         ensureOpen();
-        return editableWorkingCopyResult(id, expectedRevision, HistoryOperation.REDO);
+        return authoringOperations.redo(id, expectedRevision);
     }
 
     /**
@@ -347,10 +314,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public AuthoringPersistenceResult saveDefinition(AssetId id, long expectedRevision) {
         ensureOpen();
-        AssetId validId = Objects.requireNonNull(id, "id");
-        return authoredWorkingCopy(validId)
-                .map(workingCopy -> workingCopy.save(expectedRevision))
-                .orElseGet(() -> persistenceFailure(validId, expectedRevision));
+        return authoringOperations.save(id, expectedRevision);
     }
 
     /**
@@ -362,10 +326,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public AuthoringPersistenceResult revertDefinition(AssetId id, long expectedRevision) {
         ensureOpen();
-        AssetId validId = Objects.requireNonNull(id, "id");
-        return authoredWorkingCopy(validId)
-                .map(workingCopy -> workingCopy.revert(expectedRevision))
-                .orElseGet(() -> persistenceFailure(validId, expectedRevision));
+        return authoringOperations.revert(id, expectedRevision);
     }
 
     /**
@@ -377,10 +338,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public AuthoringBackupResult backupDefinition(AssetId id, long expectedRevision) {
         ensureOpen();
-        AssetId validId = Objects.requireNonNull(id, "id");
-        return authoredWorkingCopy(validId)
-                .map(workingCopy -> workingCopy.backup(project.identity().id(), expectedRevision))
-                .orElseGet(() -> backupFailure(validId, expectedRevision));
+        return authoringOperations.backup(id, expectedRevision);
     }
 
     /**
@@ -393,20 +351,14 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public AuthoringRestoreResult restoreDefinition(AssetId id, long expectedRevision, byte[] encodedBackup) {
         ensureOpen();
-        AssetId validId = Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(encodedBackup, "encodedBackup");
-        return authoredWorkingCopy(validId)
-                .map(workingCopy -> workingCopy.restore(project.identity().id(), encodedBackup, expectedRevision))
-                .orElseGet(() -> restoreFailure(validId, expectedRevision));
+        return authoringOperations.restore(id, expectedRevision, encodedBackup);
     }
 
     /** Establishes a future successfully persisted authored document as the in-memory baseline. */
     AuthoringMutationResult markPersisted(
             AssetId id, AuthoredDefinitionDocument baselinedDocument, long expectedRevision) {
         ensureOpen();
-        return authoredWorkingCopy(id)
-                .map(workingCopy -> workingCopy.markPersisted(baselinedDocument, expectedRevision))
-                .orElseGet(() -> retainedFailure(id, expectedRevision));
+        return authoringOperations.markPersisted(id, baselinedDocument, expectedRevision);
     }
 
     /** Returns the hierarchy projection for the explicitly opened active definition.
@@ -429,100 +381,7 @@ public final class EditorProjectSession implements AutoCloseable {
      */
     public InspectorProjection inspect(InspectorTarget target, long expectedRevision) {
         ensureOpen();
-        InspectorTarget validTarget = Objects.requireNonNull(target, "target");
-        HierarchyOccurrenceId occurrence = validTarget
-                .occurrence()
-                .orElseThrow(() -> new IllegalArgumentException("Inspector target must have a hierarchy occurrence"));
-        RetainedState retained = Optional.ofNullable(retainedDefinitions.get(occurrence.definition()))
-                .orElseThrow(() ->
-                        new IllegalStateException("Inspector definition is not retained: " + occurrence.definition()));
-        EditorRetainedDefinition current = snapshot(retained);
-        requireRevision(current.revision(), expectedRevision);
-        EditorHierarchyNode node = current.hierarchy().roots().stream()
-                .map(root -> findNode(root, occurrence))
-                .flatMap(Optional::stream)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("hierarchy occurrence is not current: " + occurrence));
-        if (!node.inspectorTarget().equals(validTarget)) {
-            throw new IllegalArgumentException("Inspector target does not match current hierarchy state");
-        }
-        List<EntityEntry> roots = scopeRoots(current.content());
-        ResolvedInspectorEntry resolved = resolveEntry(
-                roots,
-                occurrence.entityPath(),
-                false,
-                roots,
-                new HierarchyOccurrenceId(occurrence.definition(), List.of()));
-        InspectorProjection.Provenance provenance =
-                resolved.generated() ? InspectorProjection.Provenance.GENERATED : InspectorProjection.Provenance.LOCAL;
-        InspectorProjection.DefinitionOrigin definitionOrigin =
-                current.origin() == EditorRetainedDefinition.Origin.AUTHORED
-                        ? InspectorProjection.DefinitionOrigin.AUTHORED
-                        : InspectorProjection.DefinitionOrigin.GENERATED;
-        EditorInspectorProjector.Context context = new EditorInspectorProjector.Context(
-                validTarget,
-                definitionOrigin,
-                provenance,
-                node.isEditable(),
-                types,
-                resolved.scopeRoots(),
-                resolved.scopeOccurrence(),
-                assets);
-        InspectorProjection projection =
-                switch (resolved.entry()) {
-                    case LocalEntity entity -> EditorInspectorProjector.entity(entity, context);
-                    case EntityPlacement placement ->
-                        EditorInspectorProjector.placement(placement, resolvePlacementDefinition(placement), context);
-                };
-        return retained instanceof AuthoredRetainedState(AuthoredDefinitionWorkingCopy workingCopy)
-                ? withModificationState(projection, workingCopy)
-                : projection;
-    }
-
-    /** Decorates editable Inspector properties from the working copy's authoritative persisted baseline. */
-    private static InspectorProjection withModificationState(
-            InspectorProjection projection, AuthoredDefinitionWorkingCopy workingCopy) {
-        List<InspectorSection> sections = projection.sections().stream()
-                .map(section -> new InspectorSection(
-                        section.identity(),
-                        section.kind(),
-                        section.label(),
-                        section.description(),
-                        section.componentId(),
-                        section.componentType(),
-                        section.metadataAvailable(),
-                        section.editable(),
-                        section.properties().stream()
-                                .map(property -> withModificationState(property, workingCopy))
-                                .toList()))
-                .toList();
-        return new InspectorProjection(
-                projection.target(),
-                projection.title(),
-                projection.definitionOrigin(),
-                projection.provenance(),
-                projection.editable(),
-                sections);
-    }
-
-    /** Decorates one property only when it exposes an authoritative mutation target. */
-    private static InspectorProperty withModificationState(
-            InspectorProperty property, AuthoredDefinitionWorkingCopy workingCopy) {
-        boolean modified =
-                property.mutationTarget().map(workingCopy::isModified).orElse(false);
-        InspectorProperty.State state = property.state();
-        return new InspectorProperty(
-                property.identity(),
-                property.presentation(),
-                new InspectorProperty.State(
-                        state.authoredValue(),
-                        state.defaultValue(),
-                        state.effectiveValue(),
-                        state.origin(),
-                        state.validity(),
-                        state.editable(),
-                        modified),
-                property.mutationTarget());
+        return inspectorProjection.inspect(target, expectedRevision);
     }
 
     /** Returns all authoritative session state changes.
@@ -605,30 +464,7 @@ public final class EditorProjectSession implements AutoCloseable {
     public AuthoringMutationResult mutate(
             AssetId definition, InspectorMutationTarget target, AuthoringMutation mutation, long expectedRevision) {
         ensureOpen();
-        AssetId validDefinition = Objects.requireNonNull(definition, "definition");
-        InspectorMutationTarget validTarget = Objects.requireNonNull(target, "target");
-        AuthoringMutation validMutation = Objects.requireNonNull(mutation, "mutation");
-        Optional<AuthoredDefinitionWorkingCopy> authored = authoredWorkingCopy(validDefinition);
-        if (authored.isEmpty()) {
-            return retainedFailure(validDefinition, expectedRevision);
-        }
-        AuthoredDefinitionWorkingCopy workingCopy = authored.orElseThrow();
-        if (workingCopy.state().revision() != expectedRevision) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.STALE_REVISION, List.of());
-        }
-        if (!validTarget.occurrence().definition().equals(validDefinition)) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
-        }
-        Optional<EditorHierarchyNode> node = editableNode(validDefinition, validTarget.occurrence());
-        if (node.isEmpty() || !matchesEntity(node.orElseThrow(), validTarget)) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
-        }
-        return switch (validTarget) {
-            case InspectorMutationTarget.EntityEnabled enabled ->
-                mutateEnabled(workingCopy, enabled, validMutation, expectedRevision);
-            case InspectorMutationTarget.ComponentProperty property ->
-                mutateProperty(workingCopy, property, validMutation, expectedRevision);
-        };
+        return authoringOperations.mutate(definition, target, mutation, expectedRevision);
     }
 
     /**
@@ -650,40 +486,7 @@ public final class EditorProjectSession implements AutoCloseable {
             Optional<ProjectValue> value,
             long expectedRevision) {
         ensureOpen();
-        AssetId validDefinition = Objects.requireNonNull(definition, "definition");
-        InspectorMutationTarget.ComponentProperty validTarget = Objects.requireNonNull(target, "target");
-        AuthoringInteractivePhase validPhase = Objects.requireNonNull(phase, "phase");
-        Optional<ProjectValue> validValue = Objects.requireNonNull(value, "value");
-        Optional<AuthoredDefinitionWorkingCopy> authored = authoredWorkingCopy(validDefinition);
-        if (authored.isEmpty()) {
-            return retainedFailure(validDefinition, expectedRevision);
-        }
-        AuthoredDefinitionWorkingCopy workingCopy = authored.orElseThrow();
-        if (workingCopy.state().revision() != expectedRevision) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.STALE_REVISION, List.of());
-        }
-        if (!validTarget.occurrence().definition().equals(validDefinition)) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
-        }
-        Optional<EditorHierarchyNode> node = editableNode(validDefinition, validTarget.occurrence());
-        if (node.isEmpty() || !matchesEntity(node.orElseThrow(), validTarget)) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
-        }
-        if ((validPhase == AuthoringInteractivePhase.UPDATE) != validValue.isPresent()) {
-            throw new IllegalArgumentException("interactive update requires exactly one value");
-        }
-        return switch (validPhase) {
-            case BEGIN ->
-                workingCopy.beginInteractiveSet(
-                        editId,
-                        validTarget.entity(),
-                        validTarget.component(),
-                        validTarget.property(),
-                        expectedRevision);
-            case UPDATE -> workingCopy.previewInteractiveSet(editId, validValue.orElseThrow(), expectedRevision);
-            case COMMIT -> workingCopy.commitInteractiveSet(editId, expectedRevision);
-            case CANCEL -> workingCopy.cancelInteractiveSet(editId, expectedRevision);
-        };
+        return authoringOperations.interact(definition, target, phase, editId, value, expectedRevision);
     }
 
     /**
@@ -704,28 +507,7 @@ public final class EditorProjectSession implements AutoCloseable {
             long expectedRevision,
             List<ProjectDiagnostic> diagnostics) {
         ensureOpen();
-        AssetId validDefinition = Objects.requireNonNull(definition, "definition");
-        InspectorMutationTarget validTarget = Objects.requireNonNull(target, "target");
-        List<ProjectDiagnostic> validDiagnostics = List.copyOf(diagnostics);
-        if (validDiagnostics.isEmpty()) {
-            throw new IllegalArgumentException("mutation rejection requires diagnostics");
-        }
-        Optional<AuthoredDefinitionWorkingCopy> authored = authoredWorkingCopy(validDefinition);
-        if (authored.isEmpty()) {
-            return retainedFailure(validDefinition, expectedRevision);
-        }
-        AuthoredDefinitionWorkingCopy workingCopy = authored.orElseThrow();
-        if (workingCopy.state().revision() != expectedRevision) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.STALE_REVISION, List.of());
-        }
-        if (!validTarget.occurrence().definition().equals(validDefinition)) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
-        }
-        Optional<EditorHierarchyNode> node = editableNode(validDefinition, validTarget.occurrence());
-        if (node.isEmpty() || !matchesEntity(node.orElseThrow(), validTarget)) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
-        }
-        return result(workingCopy, AuthoringMutationResult.Outcome.VALIDATION_REJECTED, validDiagnostics);
+        return authoringOperations.reject(definition, target, expectedRevision, diagnostics);
     }
 
     /** Returns whether this session has released its subscriptions and working copy.
@@ -743,11 +525,7 @@ public final class EditorProjectSession implements AutoCloseable {
             return;
         }
         closed = true;
-        workingCopySubscriptions.forEach(AuthoringSubscription::close);
-        workingCopies.values().forEach(AuthoredDefinitionWorkingCopy::close);
-        workingCopySubscriptions.clear();
-        workingCopies.clear();
-        retainedDefinitions.clear();
+        retainedDefinitions.close();
         changes.close();
         hierarchyChanges.close();
         definitionChanges.close();
@@ -756,96 +534,18 @@ public final class EditorProjectSession implements AutoCloseable {
 
     /** Refreshes current projections and forwards one coherent working-copy notification. */
     private void workingCopyChanged(AuthoringDefinitionChange change) {
-        RetainedState retained = retainedDefinitions.get(change.definition());
-        if (retained != null
+        Optional<EditorRetainedDefinition> retained = retainedDefinitions.snapshot(change.definition());
+        if (retained.isPresent()
                 && activeHierarchy
                         .map(EditorHierarchyProjection::context)
                         .map(EditorHierarchyProjection.Context::definitionId)
                         .filter(change.definition()::equals)
                         .isPresent()) {
-            EditorHierarchyProjection refreshed = snapshot(retained).hierarchy();
+            EditorHierarchyProjection refreshed = retained.orElseThrow().hierarchy();
             activeHierarchy = Optional.of(refreshed);
             hierarchyChanges.emit(refreshed);
         }
         definitionChanges.emit(change);
-    }
-
-    /** Loads one definition whose kind and filesystem source were established by the authored catalog. */
-    private DefinitionRetentionResult retainAuthored(AssetMetadata metadata) {
-        AuthoredDefinitionWorkingCopy workingCopy = workingCopies.get(metadata.id());
-        List<ProjectDiagnostic> loadingDiagnostics = List.of();
-        if (workingCopy == null) {
-            AuthoredDefinitionDocument.LoadResult result =
-                    AuthoredDefinitionDocument.load(authoredAssets, definitions, types, metadata.id());
-            if (result.document().isEmpty()) {
-                return new DefinitionRetentionResult(Optional.empty(), result.diagnostics());
-            }
-            workingCopy = openWorkingCopy(result.document().orElseThrow());
-            loadingDiagnostics = result.diagnostics();
-        }
-        RetainedState state = new AuthoredRetainedState(workingCopy);
-        retainedDefinitions.put(metadata.id(), state);
-        return new DefinitionRetentionResult(Optional.of(snapshot(state)), loadingDiagnostics);
-    }
-
-    /** Resolves the only currently publishable generated structural kind. */
-    private DefinitionRetentionResult retainGeneratedEntity(AssetId id) {
-        DefinitionLoadResult<EntityDefinition> result = definitions.loadEntity(AssetRef.to(id), types);
-        return retainLoaded(
-                result,
-                AssetKind.ENTITY_DEFINITION,
-                result.definition().map(EditorRetainedDefinition.Content.Entity::new));
-    }
-
-    /** Retains successfully loaded content while preserving resolver diagnostics on failure. */
-    private DefinitionRetentionResult retainLoaded(
-            DefinitionLoadResult<?> result, AssetKind kind, Optional<EditorRetainedDefinition.Content> content) {
-        if (content.isEmpty()) {
-            return new DefinitionRetentionResult(Optional.empty(), result.diagnostics());
-        }
-        EditorRetainedDefinition.Content loaded = content.orElseThrow();
-        RetainedState state = new GeneratedRetainedState(loaded.id(), kind, result.source(), loaded);
-        retainedDefinitions.put(loaded.id(), state);
-        return new DefinitionRetentionResult(Optional.of(snapshot(state)), result.diagnostics());
-    }
-
-    /** Creates a current immutable snapshot from authored working-copy or generated retained state. */
-    private EditorRetainedDefinition snapshot(RetainedState state) {
-        EditorRetainedDefinition.Content content;
-        long definitionRevision;
-        boolean editable;
-        Set<EntityId> modifiedEntities;
-        if (state instanceof AuthoredRetainedState(AuthoredDefinitionWorkingCopy workingCopy)) {
-            AuthoringDefinitionState authoredState = workingCopy.state();
-            content = authoredState.content();
-            definitionRevision = authoredState.revision();
-            editable = true;
-            modifiedEntities = workingCopy.modifiedEntityIds();
-        } else {
-            GeneratedRetainedState generated = (GeneratedRetainedState) state;
-            content = generated.content();
-            definitionRevision = 0L;
-            editable = false;
-            modifiedEntities = Set.of();
-        }
-        EditorHierarchyProjection projection =
-                switch (content) {
-                    case EditorRetainedDefinition.Content.Scene world ->
-                        hierarchyProjector.project(
-                                world.definition(), state.source(), editable, editable, modifiedEntities);
-                    case EditorRetainedDefinition.Content.Entity entity ->
-                        hierarchyProjector.project(
-                                entity.definition(), state.source(), editable, editable, modifiedEntities);
-                };
-        return new EditorRetainedDefinition(
-                state.id(),
-                state.kind(),
-                state.origin(),
-                editable,
-                state.source(),
-                definitionRevision,
-                content,
-                projection);
     }
 
     /** Converts one coherent plan into a snapshot while containing unexpected projection failures. */
@@ -877,235 +577,6 @@ public final class EditorProjectSession implements AutoCloseable {
         }
     }
 
-    /** Rejects a stale inspector read against one retained definition revision. */
-    private static void requireRevision(long currentRevision, long expectedRevision) {
-        if (expectedRevision != currentRevision) {
-            throw new IllegalStateException("stale authoring revision: expected " + expectedRevision
-                    + " but current revision is " + currentRevision);
-        }
-    }
-
-    /** Returns an editable occurrence from the current retained-definition projection. */
-    private Optional<EditorHierarchyNode> editableNode(AssetId definition, HierarchyOccurrenceId occurrence) {
-        RetainedState retained = retainedDefinitions.get(definition);
-        EditorHierarchyProjection currentHierarchy;
-        if (retained != null) {
-            currentHierarchy = snapshot(retained).hierarchy();
-        } else {
-            return Optional.empty();
-        }
-        return currentHierarchy.roots().stream()
-                .map(root -> findNode(root, occurrence))
-                .flatMap(Optional::stream)
-                .findFirst()
-                .filter(EditorHierarchyNode::isEditable);
-    }
-
-    private static Optional<EditorHierarchyNode> findNode(EditorHierarchyNode node, HierarchyOccurrenceId occurrence) {
-        if (node.occurrence().equals(occurrence)) {
-            return Optional.of(node);
-        }
-        return node.children().stream()
-                .map(child -> findNode(child, occurrence))
-                .flatMap(Optional::stream)
-                .findFirst();
-    }
-
-    /** Returns the directly authored roots of one retained structural definition. */
-    private static List<EntityEntry> scopeRoots(EditorRetainedDefinition.Content content) {
-        return switch (content) {
-            case EditorRetainedDefinition.Content.Scene world ->
-                world.definition().roots();
-            case EditorRetainedDefinition.Content.Entity entity ->
-                List.of(entity.definition().root());
-        };
-    }
-
-    /** Resolves one occurrence path, traversing placed definitions without adding a wrapper entity. */
-    private ResolvedInspectorEntry resolveEntry(
-            List<EntityEntry> roots,
-            List<EntityId> path,
-            boolean generated,
-            List<EntityEntry> scopeRoots,
-            HierarchyOccurrenceId scopeOccurrence) {
-        if (path.isEmpty()) {
-            throw new IllegalArgumentException("Inspector occurrence must identify an entity or placement");
-        }
-        EntityEntry entry = roots.stream()
-                .filter(candidate -> candidate.id().equals(path.getFirst()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Inspector occurrence path is not current"));
-        if (path.size() == 1) {
-            return new ResolvedInspectorEntry(entry, generated, scopeRoots, scopeOccurrence);
-        }
-        List<EntityId> remainder = path.subList(1, path.size());
-        return switch (entry) {
-            case LocalEntity entity ->
-                resolveEntry(entity.children(), remainder, generated, scopeRoots, scopeOccurrence);
-            case EntityPlacement placement -> {
-                EntityDefinition definition = resolvePlacementDefinition(placement)
-                        .orElseThrow(() -> new IllegalStateException("placed definition is unavailable"));
-                yield resolveEntry(
-                        definition.root().children(),
-                        remainder,
-                        true,
-                        definition.root().children(),
-                        scopeOccurrence.child(placement.id()));
-            }
-        };
-    }
-
-    /** Resolves a placement through the session's authoritative definition graph. */
-    private Optional<EntityDefinition> resolvePlacementDefinition(EntityPlacement placement) {
-        return definitions.loadEntity(placement.definition(), types).definition();
-    }
-
-    /** Checks that one Java-issued mutation target still names the projected entity occurrence. */
-    private static boolean matchesEntity(EditorHierarchyNode node, InspectorMutationTarget target) {
-        EntityId targetEntity =
-                switch (target) {
-                    case InspectorMutationTarget.EntityEnabled enabled -> enabled.entity();
-                    case InspectorMutationTarget.ComponentProperty property -> property.entity();
-                };
-        return node.entityId().filter(targetEntity::equals).isPresent();
-    }
-
-    /** Applies the built-in entity-enabled SET operation or returns a structured rejection. */
-    private AuthoringMutationResult mutateEnabled(
-            AuthoredDefinitionWorkingCopy workingCopy,
-            InspectorMutationTarget.EntityEnabled target,
-            AuthoringMutation mutation,
-            long expectedRevision) {
-        if (mutation instanceof AuthoringMutation.Remove) {
-            return result(workingCopy, AuthoringMutationResult.Outcome.INVALID_TARGET, List.of());
-        }
-        ProjectValue value = ((AuthoringMutation.Set) mutation).value();
-        if (!(value instanceof ProjectValue.BooleanValue booleanValue)) {
-            return rejectedEnabled(workingCopy, value);
-        }
-        return workingCopy.setEntityEnabled(target.entity(), booleanValue.value(), expectedRevision);
-    }
-
-    /** Applies one source-preserving component-property SET or REMOVE operation. */
-    private static AuthoringMutationResult mutateProperty(
-            AuthoredDefinitionWorkingCopy workingCopy,
-            InspectorMutationTarget.ComponentProperty target,
-            AuthoringMutation mutation,
-            long expectedRevision) {
-        return switch (mutation) {
-            case AuthoringMutation.Set set ->
-                workingCopy.set(target.entity(), target.component(), target.property(), set.value(), expectedRevision);
-            case AuthoringMutation.Remove ignored ->
-                workingCopy.remove(target.entity(), target.component(), target.property(), expectedRevision);
-        };
-    }
-
-    /** Creates a structured rejection for a non-boolean built-in entity-enabled value. */
-    private static AuthoringMutationResult rejectedEnabled(
-            AuthoredDefinitionWorkingCopy workingCopy, ProjectValue value) {
-        ProjectDiagnostic diagnostic = new ProjectDiagnostic(
-                ProjectDiagnostic.Severity.ERROR,
-                PropertyValidationDiagnosticCode.KIND,
-                workingCopy.current().source().toUri(),
-                "/enabled",
-                List.of("enabled", "BOOLEAN", ProjectValueKind.of(value)),
-                Map.of("technicalDetail", "enabled replacement must be a boolean value"));
-        return result(workingCopy, AuthoringMutationResult.Outcome.VALIDATION_REJECTED, List.of(diagnostic));
-    }
-
-    /** Opens or reuses exactly one authoritative working copy per authored definition identity. */
-    private AuthoredDefinitionWorkingCopy openWorkingCopy(AuthoredDefinitionDocument document) {
-        AuthoredDefinitionWorkingCopy existing = workingCopies.get(document.id());
-        if (existing != null) {
-            return existing;
-        }
-        AuthoredDefinitionWorkingCopy workingCopy = new AuthoredDefinitionWorkingCopy(document);
-        workingCopies.put(document.id(), workingCopy);
-        workingCopySubscriptions.add(workingCopy.onDidChange().subscribe(this::workingCopyChanged));
-        return workingCopy;
-    }
-
-    /** Returns an explicitly opened authored working copy. */
-    private Optional<AuthoredDefinitionWorkingCopy> authoredWorkingCopy(AssetId id) {
-        return Optional.ofNullable(workingCopies.get(Objects.requireNonNull(id, "id")));
-    }
-
-    /** Performs one history operation against a retained authored definition. */
-    private AuthoringMutationResult editableWorkingCopyResult(
-            AssetId id, long expectedRevision, HistoryOperation operation) {
-        AssetId validId = Objects.requireNonNull(id, "id");
-        return authoredWorkingCopy(validId)
-                .map(workingCopy -> switch (operation) {
-                    case UNDO -> workingCopy.undo(expectedRevision);
-                    case REDO -> workingCopy.redo(expectedRevision);
-                })
-                .orElseGet(() -> retainedFailure(validId, expectedRevision));
-    }
-
-    /** Returns a generated-definition or unknown-definition structured failure. */
-    private AuthoringMutationResult retainedFailure(AssetId id, long expectedRevision) {
-        RetainedState retained = retainedDefinitions.get(id);
-        AuthoringMutationResult.Outcome outcome = retained instanceof GeneratedRetainedState
-                ? AuthoringMutationResult.Outcome.NON_EDITABLE
-                : AuthoringMutationResult.Outcome.INVALID_TARGET;
-        long currentRevision = retained == null
-                ? Math.max(0L, expectedRevision)
-                : snapshot(retained).revision();
-        return new AuthoringMutationResult(id, outcome, currentRevision, false, false, false, List.of());
-    }
-
-    /** Returns a generated-definition or unknown-definition persistence failure. */
-    private AuthoringPersistenceResult persistenceFailure(AssetId id, long expectedRevision) {
-        RetainedState retained = retainedDefinitions.get(id);
-        AuthoringPersistenceResult.Outcome outcome = retained instanceof GeneratedRetainedState
-                ? AuthoringPersistenceResult.Outcome.NON_EDITABLE
-                : AuthoringPersistenceResult.Outcome.INVALID_TARGET;
-        long currentRevision = retained == null
-                ? Math.max(0L, expectedRevision)
-                : snapshot(retained).revision();
-        return new AuthoringPersistenceResult(id, outcome, currentRevision, false, false, false, List.of());
-    }
-
-    /** Returns a generated-definition or unknown-definition backup failure. */
-    private AuthoringBackupResult backupFailure(AssetId id, long expectedRevision) {
-        RetainedState retained = retainedDefinitions.get(id);
-        AuthoringBackupResult.Outcome outcome = retained instanceof GeneratedRetainedState
-                ? AuthoringBackupResult.Outcome.NON_EDITABLE
-                : AuthoringBackupResult.Outcome.INVALID_TARGET;
-        long currentRevision = retained == null
-                ? Math.max(0L, expectedRevision)
-                : snapshot(retained).revision();
-        return new AuthoringBackupResult(id, outcome, currentRevision, false, false, false, Optional.empty());
-    }
-
-    /** Returns a generated-definition or unknown-definition restore failure. */
-    private AuthoringRestoreResult restoreFailure(AssetId id, long expectedRevision) {
-        RetainedState retained = retainedDefinitions.get(id);
-        AuthoringRestoreResult.Outcome outcome = retained instanceof GeneratedRetainedState
-                ? AuthoringRestoreResult.Outcome.NON_EDITABLE
-                : AuthoringRestoreResult.Outcome.INVALID_TARGET;
-        long currentRevision = retained == null
-                ? Math.max(0L, expectedRevision)
-                : snapshot(retained).revision();
-        return new AuthoringRestoreResult(id, outcome, currentRevision, false, false, false, List.of());
-    }
-
-    /** Creates one operation result from the current working-copy state. */
-    private static AuthoringMutationResult result(
-            AuthoredDefinitionWorkingCopy workingCopy,
-            AuthoringMutationResult.Outcome outcome,
-            List<ProjectDiagnostic> diagnostics) {
-        AuthoringDefinitionState state = workingCopy.state();
-        return new AuthoringMutationResult(
-                state.definition(),
-                outcome,
-                state.revision(),
-                state.dirty(),
-                state.canUndo(),
-                state.canRedo(),
-                diagnostics);
-    }
-
     private void ensureOpen() {
         if (closed) {
             throw new IllegalStateException("Editor project session is closed");
@@ -1134,87 +605,6 @@ public final class EditorProjectSession implements AutoCloseable {
             Objects.requireNonNull(authoredAssets, "authoredAssets");
             Objects.requireNonNull(types, "types");
             Objects.requireNonNull(definitions, "definitions");
-        }
-    }
-
-    /** Selects one per-definition history transition. */
-    private enum HistoryOperation {
-        /** Restore the previous accepted state. */
-        UNDO,
-        /** Restore the next previously undone state. */
-        REDO
-    }
-
-    /** Session-owned retained definition state independent of transient protocol snapshots. */
-    private sealed interface RetainedState permits AuthoredRetainedState, GeneratedRetainedState {
-        /** Returns the retained asset identity. */
-        AssetId id();
-
-        /** Returns the retained structural kind. */
-        AssetKind kind();
-
-        /** Returns the definition-level origin. */
-        EditorRetainedDefinition.Origin origin();
-
-        /** Returns the absolute logical source. */
-        URI source();
-    }
-
-    /** Retained authored state backed by exactly one authoritative working copy. */
-    private record AuthoredRetainedState(AuthoredDefinitionWorkingCopy workingCopy) implements RetainedState {
-        /** Validates the retained authored state. */
-        private AuthoredRetainedState {
-            Objects.requireNonNull(workingCopy, "workingCopy");
-        }
-
-        @Override
-        public AssetId id() {
-            return workingCopy.state().definition();
-        }
-
-        @Override
-        public AssetKind kind() {
-            return workingCopy.state().kind();
-        }
-
-        @Override
-        public EditorRetainedDefinition.Origin origin() {
-            return EditorRetainedDefinition.Origin.AUTHORED;
-        }
-
-        @Override
-        public URI source() {
-            return workingCopy.current().source().toUri();
-        }
-    }
-
-    /** Retained immutable generated structural state. */
-    private record GeneratedRetainedState(
-            AssetId id, AssetKind kind, URI source, EditorRetainedDefinition.Content content) implements RetainedState {
-        /** Validates the retained generated state. */
-        private GeneratedRetainedState {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(kind, "kind");
-            Objects.requireNonNull(source, "source");
-            Objects.requireNonNull(content, "content");
-            if (!id.equals(content.id()) || kind != content.kind()) {
-                throw new IllegalArgumentException("generated definition identity and content must agree");
-            }
-        }
-
-        @Override
-        public EditorRetainedDefinition.Origin origin() {
-            return EditorRetainedDefinition.Origin.GENERATED;
-        }
-    }
-
-    /** One resolved occurrence and whether traversal crossed a placement boundary. */
-    private record ResolvedInspectorEntry(
-            EntityEntry entry, boolean generated, List<EntityEntry> scopeRoots, HierarchyOccurrenceId scopeOccurrence) {
-        private ResolvedInspectorEntry {
-            Objects.requireNonNull(entry, "entry");
-            scopeRoots = List.copyOf(scopeRoots);
-            Objects.requireNonNull(scopeOccurrence, "scopeOccurrence");
         }
     }
 }

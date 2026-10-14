@@ -265,6 +265,30 @@ public final class AuthoringTestProject {
                         "material":{"$ref":"asset:test-material"},
                         "visible":true
                       }
+                    },{
+                      "componentId":"66666666-6666-4666-8666-666666666666",
+                      "type":"io.github.glynch.jscene3d.spatial3d/perspective-camera-3d",
+                      "typeVersion":1,
+                      "properties":{
+                        "field-of-view-degrees":55,
+                        "near":0.1,
+                        "far":500,
+                        "primary":false
+                      }
+                    },{
+                      "componentId":"77777777-7777-4777-8777-777777777777",
+                      "type":"io.github.glynch.jscene3d.spatial3d/orthographic-camera-3d",
+                      "typeVersion":1,
+                      "properties":{
+                        "left":-8,
+                        "right":8,
+                        "top":5,
+                        "bottom":-5,
+                        "near":0,
+                        "far":500,
+                        "zoom":1.5,
+                        "primary":true
+                      }
                     }],
                     "children":[{
                       "entryType":"local",

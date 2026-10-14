@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.project.value.ResourceReference;
 import io.github.glynch.jscene3d.raycasting.Raycaster;
 import io.github.glynch.jscene3d.render.Renderer;
 import io.github.glynch.jscene3d.scenes.Scene;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -149,6 +150,17 @@ final class SceneViewRendererSession implements AutoCloseable {
         return content == null
                 ? Optional.empty()
                 : Optional.ofNullable(content.identities().get(Objects.requireNonNull(object, "object")));
+    }
+
+    /** Returns retained authored camera semantics for one currently realized occurrence. */
+    List<SceneViewSnapshot.Camera3d> camerasFor(CompositionOccurrenceId occurrence) {
+        requireOpen();
+        SceneViewRealizedContent current = content;
+        if (current == null) {
+            return List.of();
+        }
+        VisualOccurrence description = current.occurrenceDescriptions().get(Objects.requireNonNull(occurrence));
+        return description == null ? List.of() : description.cameras();
     }
 
     SceneViewSelectionResult pick(long expectedRevision, float horizontal, float vertical) {

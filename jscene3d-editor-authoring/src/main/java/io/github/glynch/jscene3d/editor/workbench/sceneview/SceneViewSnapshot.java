@@ -53,6 +53,7 @@ public record SceneViewSnapshot(AssetId scene, long revision, List<VisualOccurre
      * @param transform optional built-in Transform 3D projection
      * @param meshes built-in Mesh Renderer 3D projections in declaration order
      * @param directionalLight optional built-in Directional Light 3D projection
+     * @param cameras built-in authored camera projections in declaration order
      */
     public record VisualOccurrence(
             CompositionOccurrenceId occurrence,
@@ -64,7 +65,8 @@ public record SceneViewSnapshot(AssetId scene, long revision, List<VisualOccurre
             boolean enabled,
             Optional<Transform3d> transform,
             List<MeshRenderer3d> meshes,
-            Optional<DirectionalLight3d> directionalLight) {
+            Optional<DirectionalLight3d> directionalLight,
+            List<Camera3d> cameras) {
         /** Copies and validates one visual occurrence. */
         public VisualOccurrence {
             Objects.requireNonNull(occurrence, "occurrence");
@@ -77,6 +79,7 @@ public record SceneViewSnapshot(AssetId scene, long revision, List<VisualOccurre
             Objects.requireNonNull(transform, "transform");
             meshes = List.copyOf(meshes);
             Objects.requireNonNull(directionalLight, "directionalLight");
+            cameras = List.copyOf(cameras);
             if (!authoredSource.isAbsolute()) {
                 throw new IllegalArgumentException("authoredSource must be absolute");
             }
@@ -88,6 +91,140 @@ public record SceneViewSnapshot(AssetId scene, long revision, List<VisualOccurre
             transform.ifPresent(component -> requireOwner(component.identity(), occurrence));
             meshes.forEach(component -> requireOwner(component.identity(), occurrence));
             directionalLight.ifPresent(component -> requireOwner(component.identity(), occurrence));
+            cameras.forEach(component -> requireOwner(component.identity(), occurrence));
+        }
+    }
+
+    /** Authored camera projection semantics retained for editor visualization. */
+    public sealed interface Camera3d permits PerspectiveCamera3d, OrthographicCamera3d {
+        /**
+         * Returns the stable authored component identity.
+         *
+         * @return stable authored component identity
+         */
+        ComponentIdentity identity();
+
+        /**
+         * Returns the near clipping distance.
+         *
+         * @return near clipping distance
+         */
+        BigDecimal near();
+
+        /**
+         * Returns the far clipping distance.
+         *
+         * @return far clipping distance
+         */
+        BigDecimal far();
+
+        /**
+         * Reports whether this is an authored primary camera.
+         *
+         * @return whether this is an authored primary camera
+         */
+        boolean primary();
+    }
+
+    /**
+     * Built-in Perspective Camera 3D projection state.
+     *
+     * @param identity stable authored component identity
+     * @param fieldOfViewDegrees vertical field of view in degrees
+     * @param near near clipping distance
+     * @param far far clipping distance
+     * @param primary whether this is an authored primary camera
+     */
+    public record PerspectiveCamera3d(
+            ComponentIdentity identity, BigDecimal fieldOfViewDegrees, BigDecimal near, BigDecimal far, boolean primary)
+            implements Camera3d {
+        /** Validates one perspective camera projection. */
+        public PerspectiveCamera3d {
+            Objects.requireNonNull(identity, "identity");
+            requireFinite(fieldOfViewDegrees, "fieldOfViewDegrees");
+            requireFinite(near, "near");
+            requireFinite(far, "far");
+            if (fieldOfViewDegrees.signum() <= 0 || fieldOfViewDegrees.compareTo(BigDecimal.valueOf(180)) >= 0) {
+                throw new IllegalArgumentException("fieldOfViewDegrees must be greater than 0 and less than 180");
+            }
+            if (near.signum() <= 0) {
+                throw new IllegalArgumentException("near must be greater than 0");
+            }
+            if (far.compareTo(near) <= 0) {
+                throw new IllegalArgumentException("far must be greater than near");
+            }
+        }
+    }
+
+    /**
+     * Exact orthographic projection bounds and magnification.
+     *
+     * @param left left projection boundary
+     * @param right right projection boundary
+     * @param top top projection boundary
+     * @param bottom bottom projection boundary
+     * @param near near clipping distance
+     * @param far far clipping distance
+     * @param zoom projection magnification
+     */
+    public record OrthographicProjection(
+            BigDecimal left,
+            BigDecimal right,
+            BigDecimal top,
+            BigDecimal bottom,
+            BigDecimal near,
+            BigDecimal far,
+            BigDecimal zoom) {
+        /** Validates one orthographic projection. */
+        public OrthographicProjection {
+            requireFinite(left, "left");
+            requireFinite(right, "right");
+            requireFinite(top, "top");
+            requireFinite(bottom, "bottom");
+            requireFinite(near, "near");
+            requireFinite(far, "far");
+            requireFinite(zoom, "zoom");
+            if (left.compareTo(right) >= 0) {
+                throw new IllegalArgumentException("left must be less than right");
+            }
+            if (bottom.compareTo(top) >= 0) {
+                throw new IllegalArgumentException("bottom must be less than top");
+            }
+            if (near.signum() < 0) {
+                throw new IllegalArgumentException("near must be non-negative");
+            }
+            if (far.compareTo(near) <= 0) {
+                throw new IllegalArgumentException("far must be greater than near");
+            }
+            if (zoom.signum() <= 0) {
+                throw new IllegalArgumentException("zoom must be greater than 0");
+            }
+        }
+    }
+
+    /**
+     * Built-in Orthographic Camera 3D projection state.
+     *
+     * @param identity stable authored component identity
+     * @param projection orthographic bounds and magnification
+     * @param primary whether this is an authored primary camera
+     */
+    public record OrthographicCamera3d(ComponentIdentity identity, OrthographicProjection projection, boolean primary)
+            implements Camera3d {
+        /** Validates one orthographic camera projection. */
+        public OrthographicCamera3d {
+            Objects.requireNonNull(identity, "identity");
+            Objects.requireNonNull(projection, "projection");
+        }
+
+        @Override
+        public BigDecimal near() {
+            return projection.near();
+        }
+
+        @Override
+        public BigDecimal far() {
+            return projection.far();
         }
     }
 
@@ -187,6 +324,14 @@ public record SceneViewSnapshot(AssetId scene, long revision, List<VisualOccurre
     private static void requireOwner(ComponentIdentity identity, CompositionOccurrenceId occurrence) {
         if (!identity.occurrence().equals(occurrence)) {
             throw new IllegalArgumentException("projected component must belong to its visual occurrence");
+        }
+    }
+
+    /** Rejects a decimal that cannot be represented by the renderer's finite float domain. */
+    private static void requireFinite(BigDecimal value, String name) {
+        Objects.requireNonNull(value, name);
+        if (!Float.isFinite(value.floatValue())) {
+            throw new IllegalArgumentException(name + " must be finite");
         }
     }
 }

@@ -4,9 +4,13 @@
  */
 package io.github.glynch.jscene3d.editor.workbench.sceneview;
 
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Camera3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.ComponentIdentity;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.DirectionalLight3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.MeshRenderer3d;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.OrthographicCamera3d;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.OrthographicProjection;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.PerspectiveCamera3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Transform3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Vector3;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.VisualOccurrence;
@@ -62,6 +66,7 @@ public final class SceneViewProjector {
         Optional<Transform3d> transform = Optional.empty();
         List<MeshRenderer3d> meshes = new ArrayList<>();
         Optional<DirectionalLight3d> directionalLight = Optional.empty();
+        List<Camera3d> cameras = new ArrayList<>();
         for (CompositionComponent component : entity.components()) {
             if (component.descriptor().type().equals(StandardSpatial3dDescriptors.transformType())) {
                 if (transform.isPresent()) {
@@ -76,6 +81,10 @@ public final class SceneViewProjector {
                             component, "multiple Directional Light 3D components were planned for one occurrence");
                 }
                 directionalLight = Optional.of(directionalLight(component));
+            } else if (component.descriptor().type().equals(StandardSpatial3dDescriptors.perspectiveCameraType())) {
+                cameras.add(perspectiveCamera(component));
+            } else if (component.descriptor().type().equals(StandardSpatial3dDescriptors.orthographicCameraType())) {
+                cameras.add(orthographicCamera(component));
             }
         }
         return new VisualOccurrence(
@@ -88,7 +97,8 @@ public final class SceneViewProjector {
                 entity.effectivelyEnabled(),
                 transform,
                 meshes,
-                directionalLight);
+                directionalLight,
+                cameras);
     }
 
     /** Projects Transform 3D values using stable standard property identities. */
@@ -116,6 +126,31 @@ public final class SceneViewProjector {
                 vector(component, StandardSpatial3dDescriptors.colorProperty()),
                 number(component, StandardSpatial3dDescriptors.intensityProperty()),
                 vector(component, StandardSpatial3dDescriptors.targetProperty()));
+    }
+
+    /** Projects Perspective Camera 3D values using stable standard property identities. */
+    private static PerspectiveCamera3d perspectiveCamera(CompositionComponent component) {
+        return new PerspectiveCamera3d(
+                identity(component),
+                number(component, StandardSpatial3dDescriptors.fieldOfViewDegreesProperty()),
+                number(component, StandardSpatial3dDescriptors.nearProperty()),
+                number(component, StandardSpatial3dDescriptors.farProperty()),
+                booleanValue(component, StandardSpatial3dDescriptors.primaryProperty()));
+    }
+
+    /** Projects Orthographic Camera 3D values using stable standard property identities. */
+    private static OrthographicCamera3d orthographicCamera(CompositionComponent component) {
+        return new OrthographicCamera3d(
+                identity(component),
+                new OrthographicProjection(
+                        number(component, StandardSpatial3dDescriptors.leftProperty()),
+                        number(component, StandardSpatial3dDescriptors.rightProperty()),
+                        number(component, StandardSpatial3dDescriptors.topProperty()),
+                        number(component, StandardSpatial3dDescriptors.bottomProperty()),
+                        number(component, StandardSpatial3dDescriptors.nearProperty()),
+                        number(component, StandardSpatial3dDescriptors.farProperty()),
+                        number(component, StandardSpatial3dDescriptors.zoomProperty())),
+                booleanValue(component, StandardSpatial3dDescriptors.primaryProperty()));
     }
 
     /** Preserves expanded and authored component identities for later selection mapping. */

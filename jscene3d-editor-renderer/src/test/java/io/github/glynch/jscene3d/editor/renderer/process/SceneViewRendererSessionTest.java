@@ -20,6 +20,7 @@ import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.ComponentIdentity;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.DirectionalLight3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.MeshRenderer3d;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.PerspectiveCamera3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Transform3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.Vector3;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.VisualOccurrence;
@@ -63,6 +64,7 @@ final class SceneViewRendererSessionTest {
     private static final ComponentId SECOND_MESH = ComponentId.from("99999999-9999-4999-8999-999999999991");
     private static final ComponentId THIRD_MESH = ComponentId.from("99999999-9999-4999-8999-999999999992");
     private static final ComponentId LIGHT = ComponentId.from("88888888-8888-4888-8888-888888888888");
+    private static final ComponentId AUTHORED_CAMERA = ComponentId.from("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     private static final ResourceReference MESH_REFERENCE = ResourceReference.asset("box-mesh");
     private static final ResourceReference MATERIAL_REFERENCE = ResourceReference.asset("textured-material");
     private static final ResourceReference UNSUPPORTED_MATERIAL_REFERENCE = ResourceReference.asset("unsupported");
@@ -84,6 +86,24 @@ final class SceneViewRendererSessionTest {
             assertThat(session.identityFor(session.camera())).isEmpty();
             assertThat(session.identityFor(session.grid())).isEmpty();
             assertThat(resolver.acquisitionCount()).isZero();
+        }
+    }
+
+    @Test
+    void retainsAuthoredCameraSemanticsAcrossSnapshotReplacementAndRemoval() {
+        PerspectiveCamera3d first = new PerspectiveCamera3d(
+                component(rootOccurrence(), AUTHORED_CAMERA), decimal("55"), decimal("0.1"), decimal("500"), true);
+        PerspectiveCamera3d replacement = new PerspectiveCamera3d(
+                component(rootOccurrence(), AUTHORED_CAMERA), decimal("65"), decimal("0.2"), decimal("750"), false);
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(authoredCameraRoot(first))));
+            assertThat(session.camerasFor(rootOccurrence()).getFirst()).isSameAs(first);
+
+            session.replaceSnapshot(snapshot(2L, List.of(authoredCameraRoot(replacement))));
+            assertThat(session.camerasFor(rootOccurrence()).getFirst()).isSameAs(replacement);
+
+            session.replaceSnapshot(snapshot(3L, List.of()));
+            assertThat(session.camerasFor(rootOccurrence())).isEmpty();
         }
     }
 
@@ -995,7 +1015,23 @@ final class SceneViewRendererSessionTest {
                 enabled,
                 transform,
                 meshes,
-                light);
+                light,
+                List.of());
+    }
+
+    private static VisualOccurrence authoredCameraRoot(PerspectiveCamera3d camera) {
+        return new VisualOccurrence(
+                rootOccurrence(),
+                Optional.empty(),
+                SCENE,
+                SOURCE,
+                ROOT_ENTITY,
+                Optional.of("Camera"),
+                true,
+                Optional.empty(),
+                List.of(),
+                Optional.empty(),
+                List.of(camera));
     }
 
     private static SceneViewSnapshot snapshot(long revision, List<VisualOccurrence> occurrences) {

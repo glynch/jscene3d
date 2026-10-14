@@ -57,7 +57,8 @@ final class SceneViewSnapshotCodec {
                 booleanValue(node, "enabled"),
                 optionalObject(node, "transform").map(SceneViewSnapshotCodec::transform),
                 meshes(node),
-                optionalObject(node, "directionalLight").map(SceneViewSnapshotCodec::directionalLight));
+                optionalObject(node, "directionalLight").map(SceneViewSnapshotCodec::directionalLight),
+                cameras(node));
     }
 
     private static List<SceneViewSnapshot.MeshRenderer3d> meshes(JsonNode node) {
@@ -87,6 +88,37 @@ final class SceneViewSnapshotCodec {
                 vector(object(node, "color")),
                 decimal(node, "intensity"),
                 vector(object(node, "target")));
+    }
+
+    private static List<SceneViewSnapshot.Camera3d> cameras(JsonNode node) {
+        List<SceneViewSnapshot.Camera3d> cameras = new ArrayList<>();
+        for (JsonNode camera : array(node, "cameras")) {
+            JsonNode value = requireObject(camera, "camera");
+            cameras.add(
+                    switch (text(value, "kind")) {
+                        case "perspective" ->
+                            new SceneViewSnapshot.PerspectiveCamera3d(
+                                    componentIdentity(object(value, "identity")),
+                                    decimal(value, "fieldOfViewDegrees"),
+                                    decimal(value, "near"),
+                                    decimal(value, "far"),
+                                    booleanValue(value, "primary"));
+                        case "orthographic" ->
+                            new SceneViewSnapshot.OrthographicCamera3d(
+                                    componentIdentity(object(value, "identity")),
+                                    new SceneViewSnapshot.OrthographicProjection(
+                                            decimal(value, "left"),
+                                            decimal(value, "right"),
+                                            decimal(value, "top"),
+                                            decimal(value, "bottom"),
+                                            decimal(value, "near"),
+                                            decimal(value, "far"),
+                                            decimal(value, "zoom")),
+                                    booleanValue(value, "primary"));
+                        default -> throw new IllegalArgumentException("Unsupported Scene View camera kind");
+                    });
+        }
+        return cameras;
     }
 
     private static SceneViewSnapshot.ComponentIdentity componentIdentity(JsonNode node) {

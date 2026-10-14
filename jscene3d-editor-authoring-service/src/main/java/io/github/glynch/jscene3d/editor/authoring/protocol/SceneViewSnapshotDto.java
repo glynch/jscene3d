@@ -164,6 +164,81 @@ public record SceneViewSnapshotDto(String sceneAssetId, long revision, List<Visu
         }
     }
 
+    /** Authored camera projection payload carried by one visual occurrence. */
+    public sealed interface Camera3d permits PerspectiveCamera3d, OrthographicCamera3d {}
+
+    /**
+     * Built-in Perspective Camera 3D wire projection.
+     *
+     * @param kind stable camera discriminator
+     * @param identity stable authored component identity
+     * @param fieldOfViewDegrees exact vertical field of view in degrees
+     * @param near exact near clipping distance
+     * @param far exact far clipping distance
+     * @param primary whether this is an authored primary camera
+     */
+    public record PerspectiveCamera3d(
+            String kind,
+            ComponentIdentity identity,
+            String fieldOfViewDegrees,
+            String near,
+            String far,
+            boolean primary)
+            implements Camera3d {
+        /** Validates one perspective camera wire projection. */
+        public PerspectiveCamera3d {
+            if (!"perspective".equals(kind)) {
+                throw new IllegalArgumentException("perspective camera kind must be perspective");
+            }
+            Objects.requireNonNull(identity, "identity");
+            requireText(fieldOfViewDegrees, "fieldOfViewDegrees");
+            requireText(near, "near");
+            requireText(far, "far");
+        }
+    }
+
+    /**
+     * Built-in Orthographic Camera 3D wire projection.
+     *
+     * @param kind stable camera discriminator
+     * @param identity stable authored component identity
+     * @param left exact left projection boundary
+     * @param right exact right projection boundary
+     * @param top exact top projection boundary
+     * @param bottom exact bottom projection boundary
+     * @param near exact near clipping distance
+     * @param far exact far clipping distance
+     * @param zoom exact projection magnification
+     * @param primary whether this is an authored primary camera
+     */
+    public record OrthographicCamera3d(
+            String kind,
+            ComponentIdentity identity,
+            String left,
+            String right,
+            String top,
+            String bottom,
+            String near,
+            String far,
+            String zoom,
+            boolean primary)
+            implements Camera3d {
+        /** Validates one orthographic camera wire projection. */
+        public OrthographicCamera3d {
+            if (!"orthographic".equals(kind)) {
+                throw new IllegalArgumentException("orthographic camera kind must be orthographic");
+            }
+            Objects.requireNonNull(identity, "identity");
+            requireText(left, "left");
+            requireText(right, "right");
+            requireText(top, "top");
+            requireText(bottom, "bottom");
+            requireText(near, "near");
+            requireText(far, "far");
+            requireText(zoom, "zoom");
+        }
+    }
+
     /**
      * One expanded visual occurrence.
      *
@@ -177,6 +252,7 @@ public record SceneViewSnapshotDto(String sceneAssetId, long revision, List<Visu
      * @param transform effective Transform 3D projection, when present
      * @param meshes effective mesh projections
      * @param directionalLight effective directional-light projection, when present
+     * @param cameras authored camera projections in declaration order
      */
     public record VisualOccurrence(
             Occurrence occurrence,
@@ -188,7 +264,8 @@ public record SceneViewSnapshotDto(String sceneAssetId, long revision, List<Visu
             boolean enabled,
             @Nullable Transform3d transform,
             List<MeshRenderer3d> meshes,
-            @Nullable DirectionalLight3d directionalLight) {
+            @Nullable DirectionalLight3d directionalLight,
+            List<Camera3d> cameras) {
         /** Copies and validates one visual occurrence. */
         public VisualOccurrence {
             Objects.requireNonNull(occurrence, "occurrence");
@@ -196,6 +273,7 @@ public record SceneViewSnapshotDto(String sceneAssetId, long revision, List<Visu
             requireText(authoredSource, "authoredSource");
             requireText(authoredEntityId, "authoredEntityId");
             meshes = List.copyOf(meshes);
+            cameras = List.copyOf(cameras);
         }
     }
 

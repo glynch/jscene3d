@@ -212,6 +212,7 @@ final class AuthoringProjectServiceTest {
                 .returns(0L, SceneViewReadResult::currentRevision);
         assertThat(snapshot.occurrences()).hasSize(2);
         assertRootSceneViewProjection(snapshot.occurrences().getFirst());
+        assertRootCameraProjection(snapshot.occurrences().getFirst());
         assertChildSceneViewProjection(snapshot.occurrences().get(1));
         assertThat(result.launch())
                 .isNotNull()
@@ -243,6 +244,33 @@ final class AuthoringProjectServiceTest {
         assertThat(root.directionalLight()).isNull();
     }
 
+    /** Verifies typed camera discriminators, exact values, and stable component identities. */
+    private static void assertRootCameraProjection(SceneViewSnapshotDto.VisualOccurrence root) {
+        assertThat(root.cameras()).hasSize(2);
+        assertThat(root.cameras().get(0))
+                .isInstanceOfSatisfying(SceneViewSnapshotDto.PerspectiveCamera3d.class, camera -> {
+                    assertThat(camera.kind()).isEqualTo("perspective");
+                    assertThat(camera.identity().componentId()).isEqualTo("66666666-6666-4666-8666-666666666666");
+                    assertThat(camera.fieldOfViewDegrees()).isEqualTo("55");
+                    assertThat(camera.near()).isEqualTo("0.1");
+                    assertThat(camera.far()).isEqualTo("500");
+                    assertThat(camera.primary()).isFalse();
+                });
+        assertThat(root.cameras().get(1))
+                .isInstanceOfSatisfying(SceneViewSnapshotDto.OrthographicCamera3d.class, camera -> {
+                    assertThat(camera.kind()).isEqualTo("orthographic");
+                    assertThat(camera.identity().componentId()).isEqualTo("77777777-7777-4777-8777-777777777777");
+                    assertThat(camera.left()).isEqualTo("-8");
+                    assertThat(camera.right()).isEqualTo("8");
+                    assertThat(camera.top()).isEqualTo("5");
+                    assertThat(camera.bottom()).isEqualTo("-5");
+                    assertThat(camera.near()).isEqualTo("0");
+                    assertThat(camera.far()).isEqualTo("500");
+                    assertThat(camera.zoom()).isEqualTo("1.5");
+                    assertThat(camera.primary()).isTrue();
+                });
+    }
+
     /** Verifies parent identity, disabled state, and exact directional-light values. */
     private static void assertChildSceneViewProjection(SceneViewSnapshotDto.VisualOccurrence child) {
         assertThat(child.parent()).isNotNull();
@@ -255,6 +283,7 @@ final class AuthoringProjectServiceTest {
             assertThat(light.intensity()).isEqualTo("3.5");
             assertThat(light.target().z()).isEqualTo("9");
         });
+        assertThat(child.cameras()).isEmpty();
     }
 
     /** Groups definitions semantically and retains Main Scene identity after physical relocation. */

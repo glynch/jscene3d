@@ -49,7 +49,26 @@ final class SceneViewSnapshotCodecTest {
                       "color": {"x": "1", "y": "0.5", "z": "0.25"},
                       "intensity": "2",
                       "target": {"x": "0", "y": "0", "z": "0"}
-                    }
+                    },
+                    "cameras": [{
+                      "kind": "perspective",
+                      "identity": %s,
+                      "fieldOfViewDegrees": "55",
+                      "near": "0.1",
+                      "far": "500",
+                      "primary": false
+                    }, {
+                      "kind": "orthographic",
+                      "identity": %s,
+                      "left": "-8",
+                      "right": "8",
+                      "top": "5",
+                      "bottom": "-5",
+                      "near": "0",
+                      "far": "500",
+                      "zoom": "1.5",
+                      "primary": true
+                    }]
                   }]
                 }
                 """,
@@ -57,7 +76,9 @@ final class SceneViewSnapshotCodecTest {
                 SCENE,
                 identity("66666666-6666-4666-8666-666666666666"),
                 identity("77777777-7777-4777-8777-777777777777"),
-                identity("88888888-8888-4888-8888-888888888888"))));
+                identity("88888888-8888-4888-8888-888888888888"),
+                identity("99999999-9999-4999-8999-999999999999"),
+                identity("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))));
 
         assertThat(snapshot.scene().toString()).isEqualTo(SCENE);
         assertThat(snapshot.revision()).isEqualTo(5L);
@@ -69,7 +90,58 @@ final class SceneViewSnapshotCodecTest {
                 assertThat(mesh.material().kind().name()).isEqualTo("ASSET");
             });
             assertThat(occurrence.directionalLight()).isPresent();
+            assertThat(occurrence.cameras())
+                    .extracting(camera -> camera.getClass().getSimpleName())
+                    .containsExactly("PerspectiveCamera3d", "OrthographicCamera3d");
         });
+    }
+
+    @Test
+    void rejectsMalformedCameraProjectionPayloads() {
+        String occurrence = String.format(Locale.ROOT, """
+                {"sceneAssetId":"%s","revision":0,"occurrences":[{
+                  "occurrence":{"rootDefinitionAssetId":"%s","entityPath":["33333333-3333-4333-8333-333333333333"]},
+                  "parent":null,
+                  "authoredAssetId":"22222222-2222-4222-8222-222222222222",
+                  "authoredSource":"file:///project/example.scene.json",
+                  "authoredEntityId":"33333333-3333-4333-8333-333333333333",
+                  "name":null,"enabled":true,"transform":null,"meshes":[],"directionalLight":null,
+                  "cameras":[%s]
+                }]}
+                """, SCENE, SCENE, "%s");
+        String identity = identity("99999999-9999-4999-8999-999999999999");
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> SceneViewSnapshotCodec.decode(encoded(String.format(
+                        Locale.ROOT, occurrence, "{\"kind\":\"panoramic\",\"identity\":" + identity + "}"))));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> SceneViewSnapshotCodec.decode(encoded(String.format(
+                        Locale.ROOT,
+                        occurrence,
+                        "{\"kind\":\"perspective\",\"identity\":" + identity
+                                + ",\"fieldOfViewDegrees\":\"55\",\"near\":\"1\",\"far\":\"1\",\"primary\":false}"))));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> SceneViewSnapshotCodec.decode(encoded(String.format(
+                        Locale.ROOT,
+                        occurrence,
+                        "{\"kind\":\"perspective\",\"identity\":" + identity
+                                + ",\"fieldOfViewDegrees\":\"55\",\"near\":\"0.1\",\"far\":\"500\"}"))));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> SceneViewSnapshotCodec.decode(encoded(String.format(
+                        Locale.ROOT,
+                        occurrence,
+                        "{\"kind\":\"perspective\",\"identity\":" + identity
+                                + ",\"fieldOfViewDegrees\":\"55\",\"near\":\"0.1\",\"far\":\""
+                                + "9".repeat(400) + "\",\"primary\":false}"))));
+        assertThatIllegalArgumentException()
+                .isThrownBy(
+                        () -> SceneViewSnapshotCodec.decode(
+                                encoded(
+                                        String.format(
+                                                Locale.ROOT,
+                                                occurrence,
+                                                "{\"kind\":\"orthographic\",\"identity\":" + identity
+                                                        + ",\"left\":\"1\",\"right\":\"-1\",\"top\":\"1\",\"bottom\":\"-1\",\"near\":\"0\",\"far\":\"10\",\"zoom\":\"1\",\"primary\":false}"))));
     }
 
     @Test
@@ -85,7 +157,8 @@ final class SceneViewSnapshotCodecTest {
                   "enabled":true,
                   "transform":null,
                   "meshes":[],
-                  "directionalLight":{"identity":%s,"color":{"x":"NaN","y":"0","z":"0"},"intensity":"1","target":{"x":"0","y":"0","z":"0"}}
+                  "directionalLight":{"identity":%s,"color":{"x":"NaN","y":"0","z":"0"},"intensity":"1","target":{"x":"0","y":"0","z":"0"}},
+                  "cameras":[]
                 }]}
                 """, SCENE, SCENE, identity("88888888-8888-4888-8888-888888888888"));
 

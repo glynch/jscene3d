@@ -61,7 +61,8 @@ final class SceneViewProtocolMapper {
                 occurrence.enabled(),
                 occurrence.transform().map(this::transform).orElse(null),
                 occurrence.meshes().stream().map(this::mesh).toList(),
-                occurrence.directionalLight().map(this::directionalLight).orElse(null));
+                occurrence.directionalLight().map(this::directionalLight).orElse(null),
+                occurrence.cameras().stream().map(this::camera).toList());
     }
 
     private SceneViewSnapshotDto.Occurrence occurrenceId(CompositionOccurrenceId occurrence) {
@@ -113,5 +114,32 @@ final class SceneViewProtocolMapper {
                 vector(light.color()),
                 light.intensity().toPlainString(),
                 vector(light.target()));
+    }
+
+    private SceneViewSnapshotDto.Camera3d camera(SceneViewSnapshot.Camera3d camera) {
+        return switch (camera) {
+            case SceneViewSnapshot.PerspectiveCamera3d perspective ->
+                new SceneViewSnapshotDto.PerspectiveCamera3d(
+                        "perspective",
+                        componentIdentity(perspective.identity()),
+                        perspective.fieldOfViewDegrees().toPlainString(),
+                        perspective.near().toPlainString(),
+                        perspective.far().toPlainString(),
+                        perspective.primary());
+            case SceneViewSnapshot.OrthographicCamera3d orthographic -> {
+                SceneViewSnapshot.OrthographicProjection projection = orthographic.projection();
+                yield new SceneViewSnapshotDto.OrthographicCamera3d(
+                        "orthographic",
+                        componentIdentity(orthographic.identity()),
+                        projection.left().toPlainString(),
+                        projection.right().toPlainString(),
+                        projection.top().toPlainString(),
+                        projection.bottom().toPlainString(),
+                        projection.near().toPlainString(),
+                        projection.far().toPlainString(),
+                        projection.zoom().toPlainString(),
+                        orthographic.primary());
+            }
+        };
     }
 }

@@ -6,6 +6,8 @@ package io.github.glynch.jscene3d.editor.workbench.sceneview;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.OrthographicCamera3d;
+import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.PerspectiveCamera3d;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.VisualOccurrence;
 import io.github.glynch.jscene3d.project.asset.AssetCatalog;
 import io.github.glynch.jscene3d.project.asset.AssetId;
@@ -61,6 +63,8 @@ final class SceneViewProjectorTest {
     private static final ComponentId TRANSFORM = ComponentId.from("88888888-8888-4888-8888-888888888888");
     private static final ComponentId MESH = ComponentId.from("99999999-9999-4999-8999-999999999999");
     private static final ComponentId LIGHT = ComponentId.from("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    private static final ComponentId PERSPECTIVE_CAMERA = ComponentId.from("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+    private static final ComponentId ORTHOGRAPHIC_CAMERA = ComponentId.from("dddddddd-dddd-4ddd-8ddd-dddddddddddd");
     private static final ComponentId CUSTOM = ComponentId.from("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     private static final PropertyId POSITION_ARGUMENT = new PropertyId("position-argument");
     private static final PropertyId INTENSITY_ARGUMENT = new PropertyId("intensity-argument");
@@ -130,6 +134,34 @@ final class SceneViewProjectorTest {
                 .isNotEqualTo(second.transform().orElseThrow().identity().occurrence());
     }
 
+    /** Projects every valid authored camera variant in deterministic declaration order. */
+    @Test
+    void projectsAuthoredCameraSemantics() throws IOException {
+        VisualOccurrence occurrence = occurrence(projection().snapshot(), SECOND_PLACEMENT);
+
+        assertThat(occurrence.cameras()).hasSize(2);
+        assertThat(occurrence.cameras().get(0)).isInstanceOfSatisfying(PerspectiveCamera3d.class, camera -> {
+            assertThat(camera.identity().component()).isEqualTo(PERSPECTIVE_CAMERA);
+            assertThat(camera.fieldOfViewDegrees()).isEqualByComparingTo("55");
+            assertThat(camera.near()).isEqualByComparingTo("0.1");
+            assertThat(camera.far()).isEqualByComparingTo("500");
+            assertThat(camera.primary()).isFalse();
+        });
+        assertThat(occurrence.cameras().get(1)).isInstanceOfSatisfying(OrthographicCamera3d.class, camera -> {
+            assertThat(camera.identity().component()).isEqualTo(ORTHOGRAPHIC_CAMERA);
+            assertThat(camera.projection().left()).isEqualByComparingTo("-8");
+            assertThat(camera.projection().right()).isEqualByComparingTo("8");
+            assertThat(camera.projection().top()).isEqualByComparingTo("5");
+            assertThat(camera.projection().bottom()).isEqualByComparingTo("-5");
+            assertThat(camera.near()).isEqualByComparingTo("0");
+            assertThat(camera.far()).isEqualByComparingTo("500");
+            assertThat(camera.projection().zoom()).isEqualByComparingTo("1.5");
+            assertThat(camera.primary()).isTrue();
+            assertThat(camera.identity().occurrence()).isEqualTo(occurrence.occurrence());
+            assertThat(camera.identity().scope().definition()).isEqualTo(VISUAL_DEFINITION);
+        });
+    }
+
     /** Resolves generated definitions while safely ignoring project-defined components. */
     @Test
     void projectsGeneratedDefinitionsAndIgnoresCustomComponents() throws IOException {
@@ -137,7 +169,7 @@ final class SceneViewProjectorTest {
 
         assertThat(fixture.plan().definitionSources()).containsEntry(VISUAL_DEFINITION, fixture.generatedSource());
         assertThat(projectedComponentIds(fixture.snapshot()))
-                .containsOnly(TRANSFORM, MESH, LIGHT)
+                .containsOnly(TRANSFORM, MESH, LIGHT, PERSPECTIVE_CAMERA, ORTHOGRAPHIC_CAMERA)
                 .doesNotContain(CUSTOM);
     }
 
@@ -198,6 +230,9 @@ final class SceneViewProjectorTest {
             occurrence
                     .directionalLight()
                     .ifPresent(light -> components.add(light.identity().component()));
+            occurrence
+                    .cameras()
+                    .forEach(camera -> components.add(camera.identity().component()));
         });
         return List.copyOf(components);
     }
@@ -269,10 +304,34 @@ final class SceneViewProjectorTest {
                         StandardSpatial3dDescriptors.colorProperty(), vectorValue("0.25", "0.5", "0.75"),
                         StandardSpatial3dDescriptors.intensityProperty(), number("1"),
                         StandardSpatial3dDescriptors.targetProperty(), vectorValue("7", "8", "9")));
+        ComponentDefinition perspectiveCamera = component(
+                PERSPECTIVE_CAMERA,
+                StandardSpatial3dDescriptors.perspectiveCameraType(),
+                Map.of(
+                        StandardSpatial3dDescriptors.fieldOfViewDegreesProperty(), number("55"),
+                        StandardSpatial3dDescriptors.nearProperty(), number("0.1"),
+                        StandardSpatial3dDescriptors.farProperty(), number("500"),
+                        StandardSpatial3dDescriptors.primaryProperty(), new ProjectValue.BooleanValue(false)));
+        ComponentDefinition orthographicCamera = component(
+                ORTHOGRAPHIC_CAMERA,
+                StandardSpatial3dDescriptors.orthographicCameraType(),
+                Map.of(
+                        StandardSpatial3dDescriptors.leftProperty(), number("-8"),
+                        StandardSpatial3dDescriptors.rightProperty(), number("8"),
+                        StandardSpatial3dDescriptors.topProperty(), number("5"),
+                        StandardSpatial3dDescriptors.bottomProperty(), number("-5"),
+                        StandardSpatial3dDescriptors.nearProperty(), number("0"),
+                        StandardSpatial3dDescriptors.farProperty(), number("500"),
+                        StandardSpatial3dDescriptors.zoomProperty(), number("1.5"),
+                        StandardSpatial3dDescriptors.primaryProperty(), new ProjectValue.BooleanValue(true)));
         ComponentDefinition custom = component(CUSTOM, CUSTOM_TYPE, Map.of());
         LocalEntity child = new LocalEntity(DEFINITION_CHILD, "Child", true, List.of(), List.of());
         LocalEntity root = new LocalEntity(
-                DEFINITION_ROOT, "Visual Root", true, List.of(transform, mesh, light, custom), List.of(child));
+                DEFINITION_ROOT,
+                "Visual Root",
+                true,
+                List.of(transform, mesh, light, perspectiveCamera, orthographicCamera, custom),
+                List.of(child));
         EntityContract contract = new EntityContract(
                 List.of(
                         new EntityContract.Parameter(

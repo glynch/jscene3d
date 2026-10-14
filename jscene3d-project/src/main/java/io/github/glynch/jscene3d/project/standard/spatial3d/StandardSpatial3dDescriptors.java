@@ -33,6 +33,7 @@ public class StandardSpatial3dDescriptors {
 
     private static final ComponentType TRANSFORM_TYPE = type("transform-3d");
     private static final ComponentType PERSPECTIVE_CAMERA_TYPE = type("perspective-camera-3d");
+    private static final ComponentType ORTHOGRAPHIC_CAMERA_TYPE = type("orthographic-camera-3d");
     private static final ComponentType DIRECTIONAL_LIGHT_TYPE = type("directional-light-3d");
     private static final ComponentType MESH_RENDERER_TYPE = type("mesh-renderer-3d");
     private static final ComponentType BILLBOARD_RENDERER_TYPE = type("billboard-renderer-3d");
@@ -47,8 +48,13 @@ public class StandardSpatial3dDescriptors {
     private static final PropertyId ORIENTATION = new PropertyId("orientation");
     private static final PropertyId SCALE = new PropertyId("scale");
     private static final PropertyId FIELD_OF_VIEW_DEGREES = new PropertyId("field-of-view-degrees");
+    private static final PropertyId LEFT = new PropertyId("left");
+    private static final PropertyId RIGHT = new PropertyId("right");
+    private static final PropertyId TOP = new PropertyId("top");
+    private static final PropertyId BOTTOM = new PropertyId("bottom");
     private static final PropertyId NEAR = new PropertyId("near");
     private static final PropertyId FAR = new PropertyId("far");
+    private static final PropertyId ZOOM = new PropertyId("zoom");
     private static final PropertyId PRIMARY = new PropertyId("primary");
     private static final PropertyId COLOR = new PropertyId("color");
     private static final PropertyId INTENSITY = new PropertyId("intensity");
@@ -95,6 +101,15 @@ public class StandardSpatial3dDescriptors {
      */
     public static ComponentType perspectiveCameraType() {
         return PERSPECTIVE_CAMERA_TYPE;
+    }
+
+    /**
+     * Returns the exact version-one orthographic-camera component type.
+     *
+     * @return orthographic-camera component type
+     */
+    public static ComponentType orthographicCameraType() {
+        return ORTHOGRAPHIC_CAMERA_TYPE;
     }
 
     /**
@@ -206,6 +221,42 @@ public class StandardSpatial3dDescriptors {
     }
 
     /**
+     * Returns the orthographic left-boundary property identity.
+     *
+     * @return left-boundary property identity
+     */
+    public static PropertyId leftProperty() {
+        return LEFT;
+    }
+
+    /**
+     * Returns the orthographic right-boundary property identity.
+     *
+     * @return right-boundary property identity
+     */
+    public static PropertyId rightProperty() {
+        return RIGHT;
+    }
+
+    /**
+     * Returns the orthographic top-boundary property identity.
+     *
+     * @return top-boundary property identity
+     */
+    public static PropertyId topProperty() {
+        return TOP;
+    }
+
+    /**
+     * Returns the orthographic bottom-boundary property identity.
+     *
+     * @return bottom-boundary property identity
+     */
+    public static PropertyId bottomProperty() {
+        return BOTTOM;
+    }
+
+    /**
      * Returns the near clipping-plane property identity.
      *
      * @return near-plane property identity
@@ -221,6 +272,15 @@ public class StandardSpatial3dDescriptors {
      */
     public static PropertyId farProperty() {
         return FAR;
+    }
+
+    /**
+     * Returns the orthographic zoom property identity.
+     *
+     * @return zoom property identity
+     */
+    public static PropertyId zoomProperty() {
+        return ZOOM;
     }
 
     /**
@@ -337,6 +397,7 @@ public class StandardSpatial3dDescriptors {
                 List.of(
                         transformDescriptor(),
                         cameraDescriptor(),
+                        orthographicCameraDescriptor(),
                         lightDescriptor(),
                         meshRendererDescriptor(),
                         billboardRendererDescriptor()));
@@ -498,6 +559,21 @@ public class StandardSpatial3dDescriptors {
                 .build();
     }
 
+    /** Describes an explicitly selectable orthographic camera. */
+    private static ComponentTypeDescriptor orthographicCameraDescriptor() {
+        return presentation(ORTHOGRAPHIC_CAMERA_TYPE, "Orthographic Camera 3D", "Orthographic projection")
+                .properties(List.of(
+                        numberProperty(LEFT, "Left", "Left projection boundary", -1.0F),
+                        numberProperty(RIGHT, "Right", "Right projection boundary", 1.0F),
+                        numberProperty(TOP, "Top", "Top projection boundary", 1.0F),
+                        numberProperty(BOTTOM, "Bottom", "Bottom projection boundary", -1.0F),
+                        nonNegativeNumberProperty(NEAR, "Near", "Near clipping distance", 0.0F),
+                        positiveNumberProperty(FAR, "Far", "Far clipping distance", 1000.0F),
+                        positiveNumberProperty(ZOOM, "Zoom", "Orthographic projection magnification", 1.0F),
+                        booleanProperty(PRIMARY, "Primary", "Selects the authored primary camera", false)))
+                .build();
+    }
+
     /** Describes one transform-attached directional light. */
     private static ComponentTypeDescriptor lightDescriptor() {
         PropertyDescriptor color = vectorProperty(
@@ -591,6 +667,18 @@ public class StandardSpatial3dDescriptors {
                 number(value),
                 DescriptorPresentation.described(name, description),
                 Map.of("minimum-exclusive", number(0.0F)),
+                Set.of());
+    }
+
+    /** Creates one optional non-negative numeric component property. */
+    private static PropertyDescriptor nonNegativeNumberProperty(
+            PropertyId id, String name, String description, float value) {
+        return PropertyDescriptor.optionalWithDefault(
+                id.value(),
+                ProjectValueKind.NUMBER,
+                number(value),
+                DescriptorPresentation.described(name, description),
+                Map.of("minimum", number(0.0F)),
                 Set.of());
     }
 

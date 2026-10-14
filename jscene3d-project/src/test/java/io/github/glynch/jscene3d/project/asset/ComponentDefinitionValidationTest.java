@@ -162,6 +162,32 @@ final class ComponentDefinitionValidationTest {
                 .contains("property.domain");
     }
 
+    /** Rejects invalid persisted orthographic projection relationships during ordinary definition loading. */
+    @Test
+    void rejectsInvalidOrthographicProjectionDuringLoad() throws IOException {
+        ComponentDefinition camera = component(
+                MOVER,
+                StandardSpatial3dDescriptors.orthographicCameraType().id(),
+                Map.of(
+                        StandardSpatial3dDescriptors.leftProperty(), number("1"),
+                        StandardSpatial3dDescriptors.rightProperty(), number("-1")));
+        ComponentDefinition transform = component(
+                TRANSFORM, StandardSpatial3dDescriptors.transformType().id(), Map.of());
+        EntityDefinition definition = new EntityDefinition(
+                ASSET_ID,
+                "Invalid orthographic camera",
+                new LocalEntity(ROOT, true, List.of(transform, camera), List.of()));
+        RegisteredTypeCatalog types =
+                RegisteredTypeCatalog.of(List.of(StandardSpatial3dDescriptors.extensionDescriptor()));
+
+        DefinitionLoadResult<EntityDefinition> result = load(definition, types);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.diagnostics())
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("property.domain");
+    }
+
     /** Rejects multiple components claiming primary spatial authority even across different domains. */
     @Test
     void rejectsMultiplePrimarySpatialComponents() throws IOException {

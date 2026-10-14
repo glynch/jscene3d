@@ -10,6 +10,7 @@ import io.github.glynch.jscene3d.project.component.ComponentLifecycle;
 import io.github.glynch.jscene3d.project.component.ComponentMultiplicity;
 import io.github.glynch.jscene3d.project.component.ComponentSpatialDomain;
 import io.github.glynch.jscene3d.project.component.ComponentTypeDescriptor;
+import io.github.glynch.jscene3d.project.component.PropertyId;
 import io.github.glynch.jscene3d.project.extension.ProjectValueKind;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptor;
 import io.github.glynch.jscene3d.project.extension.PropertyDescriptorKeys;
@@ -82,16 +83,17 @@ final class Spatial3dDescriptorsTest {
                 .containsExactly(
                         Spatial3dDescriptors.transformType(),
                         Spatial3dDescriptors.perspectiveCameraType(),
+                        Spatial3dDescriptors.orthographicCameraType(),
                         Spatial3dDescriptors.directionalLightType(),
                         Spatial3dDescriptors.meshRendererType(),
                         Spatial3dDescriptors.billboardRendererType());
-        assertThat(components.subList(1, 5)).allSatisfy(component -> {
+        assertThat(components.subList(1, 6)).allSatisfy(component -> {
             assertThat(component.requiredCapabilities()).containsExactly(Spatial3dDescriptors.spatialCapability());
             assertThat(component.lifecycle())
                     .containsExactlyInAnyOrder(ComponentLifecycle.ACTIVATED, ComponentLifecycle.DEACTIVATED);
         });
-        assertThat(components.get(3).multiplicity()).isEqualTo(ComponentMultiplicity.MULTIPLE);
         assertThat(components.get(4).multiplicity()).isEqualTo(ComponentMultiplicity.MULTIPLE);
+        assertThat(components.get(5).multiplicity()).isEqualTo(ComponentMultiplicity.MULTIPLE);
     }
 
     /** Publishes required resource references and portable camera, light, and visibility defaults. */
@@ -100,9 +102,10 @@ final class Spatial3dDescriptorsTest {
         List<ComponentTypeDescriptor> components =
                 Spatial3dDescriptors.extensionDescriptor().components();
         ComponentTypeDescriptor camera = components.get(1);
-        ComponentTypeDescriptor light = components.get(2);
-        ComponentTypeDescriptor mesh = components.get(3);
-        ComponentTypeDescriptor billboard = components.get(4);
+        ComponentTypeDescriptor orthographic = components.get(2);
+        ComponentTypeDescriptor light = components.get(3);
+        ComponentTypeDescriptor mesh = components.get(4);
+        ComponentTypeDescriptor billboard = components.get(5);
 
         assertThat(camera.properties().keySet())
                 .containsExactly(
@@ -110,6 +113,25 @@ final class Spatial3dDescriptorsTest {
                         Spatial3dDescriptors.nearProperty(),
                         Spatial3dDescriptors.farProperty(),
                         Spatial3dDescriptors.primaryProperty());
+        assertThat(orthographic.properties().keySet())
+                .containsExactly(
+                        Spatial3dDescriptors.leftProperty(),
+                        Spatial3dDescriptors.rightProperty(),
+                        Spatial3dDescriptors.topProperty(),
+                        Spatial3dDescriptors.bottomProperty(),
+                        Spatial3dDescriptors.nearProperty(),
+                        Spatial3dDescriptors.farProperty(),
+                        Spatial3dDescriptors.zoomProperty(),
+                        Spatial3dDescriptors.primaryProperty());
+        assertThat(List.of(
+                        number(orthographic, Spatial3dDescriptors.leftProperty()),
+                        number(orthographic, Spatial3dDescriptors.rightProperty()),
+                        number(orthographic, Spatial3dDescriptors.topProperty()),
+                        number(orthographic, Spatial3dDescriptors.bottomProperty()),
+                        number(orthographic, Spatial3dDescriptors.nearProperty()),
+                        number(orthographic, Spatial3dDescriptors.farProperty()),
+                        number(orthographic, Spatial3dDescriptors.zoomProperty())))
+                .containsExactly(-1.0F, 1.0F, 1.0F, -1.0F, 0.0F, 1000.0F, 1.0F);
         assertThat(light.properties().keySet())
                 .containsExactly(
                         Spatial3dDescriptors.colorProperty(),
@@ -145,5 +167,13 @@ final class Spatial3dDescriptorsTest {
                         .map(ProjectValue.NumberValue.class::cast)
                         .map(number -> number.value().floatValue())
                         .toList();
+    }
+
+    /** Extracts one float value from a numeric descriptor default. */
+    private static float number(ComponentTypeDescriptor component, PropertyId property) {
+        ProjectValue value = Objects.requireNonNull(component.properties().get(property))
+                .defaultValue()
+                .orElseThrow();
+        return ((ProjectValue.NumberValue) value).value().floatValue();
     }
 }

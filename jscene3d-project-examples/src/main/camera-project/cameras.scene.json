@@ -1,0 +1,61 @@
+{
+  "$schema" : "https://jscene3d.org/schemas/scene-definition-1.json",
+  "assetId" : "53bb0d96-eb30-4481-a3ef-351951dcfbc5",
+  "assetType" : "scene-definition",
+  "formatVersion" : 1,
+  "name" : "Authored camera fixture",
+  "connections" : [ ],
+  "roots" : [ {
+    "entryType" : "local",
+    "entityId" : "73d7d834-93a8-4be9-9b26-2f3f63c01e04",
+    "name" : "Perspective Camera",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "dbbd7674-0fcc-435d-8b7e-c0abb9ce438e",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "position" : [ 0, 2, 8 ]
+      }
+    }, {
+      "componentId" : "af77fa88-7394-4854-9c46-e1927028a493",
+      "type" : "io.github.glynch.jscene3d.spatial3d/perspective-camera-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "field-of-view-degrees" : 55,
+        "near" : 0.1,
+        "far" : 500,
+        "primary" : false
+      }
+    } ],
+    "children" : [ ]
+  }, {
+    "entryType" : "local",
+    "entityId" : "273004f0-125c-46d5-87e5-05dfc4982f52",
+    "name" : "Orthographic Camera",
+    "enabled" : true,
+    "components" : [ {
+      "componentId" : "f0cd2db9-9709-4727-aa73-a61419f2a65a",
+      "type" : "io.github.glynch.jscene3d.spatial3d/transform-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "position" : [ 4, 6, 10 ]
+      }
+    }, {
+      "componentId" : "7aa2898d-5955-4bbf-b1e3-55fd85e0c37e",
+      "type" : "io.github.glynch.jscene3d.spatial3d/orthographic-camera-3d",
+      "typeVersion" : 1,
+      "properties" : {
+        "left" : -8,
+        "right" : 8,
+        "top" : 5,
+        "bottom" : -5,
+        "near" : 0,
+        "far" : 500,
+        "zoom" : 1.5,
+        "primary" : true
+      }
+    } ],
+    "children" : [ ]
+  } ]
+}

@@ -75,6 +75,19 @@ public interface Spatial3dWorldModule extends WorldModule {
             Entity owner, float fieldOfViewDegrees, float near, float far, boolean primary);
 
     /**
+     * Creates an orthographic camera attached to an entity's primary transform.
+     *
+     * @param owner live component owner
+     * @param projection complete validated orthographic projection state
+     * @param primary whether this is the world's explicitly selected authored camera
+     * @return registered world-owned camera component
+     * @throws IllegalArgumentException if a value is invalid, the owner is incompatible, or another primary camera is
+     *     already registered
+     * @throws IllegalStateException if this module is closed
+     */
+    OrthographicCamera3d createOrthographicCamera(Entity owner, OrthographicProjection3d projection, boolean primary);
+
+    /**
      * Creates a directional light attached to an entity's primary transform.
      *
      * @param owner live component owner
@@ -124,8 +137,9 @@ public interface Spatial3dWorldModule extends WorldModule {
     /**
      * Renders the current presentation through the effectively active primary camera.
      *
-     * <p>The caller retains ownership of the renderer. This method updates the camera projection from the supplied
-     * viewport aspect ratio before submitting the hidden scene graph.
+     * <p>The caller retains ownership of the renderer. This method applies viewport-dependent projection state, such
+     * as perspective aspect ratio, before submitting the hidden scene graph. Authored orthographic boundaries remain
+     * independent of viewport dimensions.
      *
      * @param renderer open host renderer
      * @param viewportAspectRatio positive width-to-height ratio

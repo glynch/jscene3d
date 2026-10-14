@@ -31,6 +31,7 @@ import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantic;
 import io.github.glynch.jscene3d.project.extension.PropertyEditorSemantics;
 import io.github.glynch.jscene3d.project.extension.PropertyNumericBound;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
+import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import io.github.glynch.jscene3d.project.value.ResourceReference;
 import java.math.BigDecimal;
@@ -302,6 +303,44 @@ final class EditorInspectorProjectorTest {
         assertThat(inspection.sections().get(1).properties())
                 .extracting(InspectorProperty::mutationTarget)
                 .containsOnly(Optional.empty());
+    }
+
+    /** Projects authored orthographic properties through the ordinary editable component Inspector path. */
+    @Test
+    void projectsOrthographicCameraPropertiesAsEditable() {
+        ComponentId cameraId = ComponentId.from("04f56075-f906-4194-aa16-45489c88870e");
+        ComponentDefinition camera = new ComponentDefinition(
+                cameraId,
+                StandardSpatial3dDescriptors.orthographicCameraType().id(),
+                StandardSpatial3dDescriptors.orthographicCameraType().version(),
+                Map.of(StandardSpatial3dDescriptors.zoomProperty(), new ProjectValue.NumberValue(BigDecimal.TWO)));
+        LocalEntity entity = new LocalEntity(ENTITY_ID, "Camera", true, List.of(camera), List.of());
+        HierarchyOccurrenceId occurrence = new HierarchyOccurrenceId(WORLD_ID, List.of(ENTITY_ID));
+        RegisteredTypeCatalog types =
+                RegisteredTypeCatalog.of(List.of(StandardSpatial3dDescriptors.extensionDescriptor()));
+
+        InspectorSection section = EditorInspectorProjector.entity(
+                        entity, context(entity, types, occurrence, true, false))
+                .sections()
+                .get(1);
+
+        assertThat(section.label()).isEqualTo(AuthoringText.literal("Orthographic Camera 3D"));
+        assertThat(section.properties())
+                .extracting(property -> property.presentation().label())
+                .containsExactly(
+                        AuthoringText.literal("Left"),
+                        AuthoringText.literal("Right"),
+                        AuthoringText.literal("Top"),
+                        AuthoringText.literal("Bottom"),
+                        AuthoringText.literal("Near"),
+                        AuthoringText.literal("Far"),
+                        AuthoringText.literal("Zoom"),
+                        AuthoringText.literal("Primary"));
+        assertThat(section.properties())
+                .allSatisfy(property -> assertThat(property.mutationTarget()).isPresent());
+        assertThat(section.properties().get(6).state().effectiveValue())
+                .contains(new InspectorValue.NumberValue(BigDecimal.TWO));
+        assertThat(section.properties().get(7).presentation().valueKind()).isEqualTo(ProjectValueKind.BOOLEAN);
     }
 
     /** Copies section collections so callers cannot mutate projected state. */

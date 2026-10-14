@@ -23,11 +23,25 @@ final class AuthoredPresentation3d {
     }
 
     /** Decodes complete perspective-camera configuration. */
-    static Camera camera(Map<PropertyId, ProjectValue> properties) {
-        return new Camera(
+    static PerspectiveCamera perspectiveCamera(Map<PropertyId, ProjectValue> properties) {
+        return new PerspectiveCamera(
                 number(properties, Spatial3dDescriptors.fieldOfViewDegreesProperty()),
                 number(properties, Spatial3dDescriptors.nearProperty()),
                 number(properties, Spatial3dDescriptors.farProperty()),
+                bool(properties, Spatial3dDescriptors.primaryProperty()));
+    }
+
+    /** Decodes complete orthographic-camera configuration. */
+    static OrthographicCamera orthographicCamera(Map<PropertyId, ProjectValue> properties) {
+        return new OrthographicCamera(
+                new OrthographicProjection3d(
+                        number(properties, Spatial3dDescriptors.leftProperty()),
+                        number(properties, Spatial3dDescriptors.rightProperty()),
+                        number(properties, Spatial3dDescriptors.topProperty()),
+                        number(properties, Spatial3dDescriptors.bottomProperty()),
+                        number(properties, Spatial3dDescriptors.nearProperty()),
+                        number(properties, Spatial3dDescriptors.farProperty()),
+                        number(properties, Spatial3dDescriptors.zoomProperty())),
                 bool(properties, Spatial3dDescriptors.primaryProperty()));
     }
 
@@ -139,7 +153,10 @@ final class AuthoredPresentation3d {
     }
 
     /** Complete camera configuration. */
-    record Camera(float fieldOfViewDegrees, float near, float far, boolean primary) {}
+    record PerspectiveCamera(float fieldOfViewDegrees, float near, float far, boolean primary) {}
+
+    /** Complete orthographic-camera configuration. */
+    record OrthographicCamera(OrthographicProjection3d projection, boolean primary) {}
 
     /** Complete light configuration. */
     record Light(Color color, float intensity, Vector3f target) {}

@@ -37,8 +37,8 @@ public final class Spatial3dRuntimeExtension implements ComponentRuntimeExtensio
                     context.owner(), authored.position(), authored.orientation(), authored.scale());
         });
         validRegistry.register(Spatial3dDescriptors.perspectiveCameraType(), context -> {
-            AuthoredPresentation3d.Camera authored =
-                    AuthoredPresentation3d.camera(context.properties().values());
+            AuthoredPresentation3d.PerspectiveCamera authored = AuthoredPresentation3d.perspectiveCamera(
+                    context.properties().values());
             Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
             return spatial.createPerspectiveCamera(
                     context.owner(),
@@ -46,6 +46,12 @@ public final class Spatial3dRuntimeExtension implements ComponentRuntimeExtensio
                     authored.near(),
                     authored.far(),
                     authored.primary());
+        });
+        validRegistry.register(Spatial3dDescriptors.orthographicCameraType(), context -> {
+            AuthoredPresentation3d.OrthographicCamera authored = AuthoredPresentation3d.orthographicCamera(
+                    context.properties().values());
+            Spatial3dWorldModule spatial = context.world().requireModule(Spatial3dWorldModule.class);
+            return spatial.createOrthographicCamera(context.owner(), authored.projection(), authored.primary());
         });
         validRegistry.register(Spatial3dDescriptors.directionalLightType(), context -> {
             AuthoredPresentation3d.Light authored =

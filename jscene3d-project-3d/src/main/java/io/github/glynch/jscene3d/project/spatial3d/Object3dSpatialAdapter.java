@@ -41,7 +41,7 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     private @Nullable World world;
 
     /** The unique authored primary camera, whether or not its entity is active. */
-    private @Nullable Object3dPerspectiveCamera primaryCamera;
+    private @Nullable Object3dCameraComponent<?> primaryCamera;
 
     /** Terminal adapter state. */
     private boolean closed;
@@ -71,16 +71,21 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     public PerspectiveCamera3d createPerspectiveCamera(
             Entity owner, float fieldOfViewDegrees, float near, float far, boolean primary) {
         Entity validOwner = requireOwner(owner);
-        if (primary && primaryCamera != null) {
-            throw new IllegalArgumentException("world already has a primary PerspectiveCamera3d");
-        }
+        requirePrimaryAvailable(primary);
         Object3dPerspectiveCamera camera =
                 new Object3dPerspectiveCamera(this, validOwner, fieldOfViewDegrees, near, far, primary);
-        node(validOwner).add(camera.camera());
-        registrations.add(camera);
-        if (primary) {
-            primaryCamera = camera;
-        }
+        registerCamera(validOwner, camera);
+        return camera;
+    }
+
+    @Override
+    public OrthographicCamera3d createOrthographicCamera(
+            Entity owner, OrthographicProjection3d projection, boolean primary) {
+        Entity validOwner = requireOwner(owner);
+        requirePrimaryAvailable(primary);
+        Object3dOrthographicCamera camera = new Object3dOrthographicCamera(
+                this, validOwner, Objects.requireNonNull(projection, "projection"), primary);
+        registerCamera(validOwner, camera);
         return camera;
     }
 
@@ -129,8 +134,8 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     public void render(Renderer renderer, float viewportAspectRatio) {
         requireOpen();
         Renderer validRenderer = Objects.requireNonNull(renderer, "renderer");
-        Object3dPerspectiveCamera camera = requireActivePrimaryCamera();
-        camera.setAspectRatio(viewportAspectRatio);
+        Object3dCameraComponent<?> camera = requireActivePrimaryCamera();
+        camera.prepareForRender(viewportAspectRatio);
         validRenderer.render(root, camera.camera());
     }
 
@@ -142,7 +147,7 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
 
     @Override
     public Transform3d activePrimaryCameraTransform() {
-        Object3dPerspectiveCamera camera = requireActivePrimaryCamera();
+        Object3dCameraComponent<?> camera = requireActivePrimaryCamera();
         Object3dTransform transform = transforms.get(camera.owner());
         if (transform == null) {
             throw new IllegalStateException("active primary camera entity has no Transform3d");
@@ -186,14 +191,30 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     }
 
     /** Removes one terminal camera registration and its hidden scene object. */
-    void release(Object3dPerspectiveCamera camera) {
-        Object3dPerspectiveCamera validCamera = Objects.requireNonNull(camera, "camera");
+    void release(Object3dCameraComponent<?> camera) {
+        Object3dCameraComponent<?> validCamera = Objects.requireNonNull(camera, "camera");
         requireRegistration(validCamera);
         if (primaryCamera == validCamera) {
             primaryCamera = null;
         }
         validCamera.camera().detach();
         prune(validCamera.owner());
+    }
+
+    /** Registers one validated hidden camera through the shared primary-camera registry. */
+    private void registerCamera(Entity owner, Object3dCameraComponent<?> camera) {
+        node(owner).add(camera.camera());
+        registrations.add(camera);
+        if (camera.isPrimary()) {
+            primaryCamera = camera;
+        }
+    }
+
+    /** Rejects a second primary declaration regardless of projection type. */
+    private void requirePrimaryAvailable(boolean primary) {
+        if (primary && primaryCamera != null) {
+            throw new IllegalArgumentException("world already has a primary authored camera");
+        }
     }
 
     /** Removes one terminal directional-light registration and its hidden scene object. */
@@ -247,7 +268,7 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     /** Returns whether one presentation registration belongs to an entity. */
     private static boolean owns(AutoCloseable registration, Entity owner) {
         return switch (registration) {
-            case Object3dPerspectiveCamera camera -> camera.owner() == owner;
+            case Object3dCameraComponent<?> camera -> camera.owner() == owner;
             case Object3dDirectionalLight light -> light.owner() == owner;
             case Object3dMeshRenderer renderer -> renderer.owner() == owner;
             case Object3dBillboardRenderer renderer -> renderer.owner() == owner;
@@ -276,9 +297,9 @@ final class Object3dSpatialAdapter implements Spatial3dWorldModule {
     }
 
     /** Returns the effectively active primary camera or reports why presentation cannot proceed. */
-    private Object3dPerspectiveCamera requireActivePrimaryCamera() {
+    private Object3dCameraComponent<?> requireActivePrimaryCamera() {
         if (primaryCamera == null || !primaryCamera.isActive()) {
-            throw new IllegalStateException("world has no effectively active primary PerspectiveCamera3d");
+            throw new IllegalStateException("world has no effectively active primary authored camera");
         }
         return primaryCamera;
     }

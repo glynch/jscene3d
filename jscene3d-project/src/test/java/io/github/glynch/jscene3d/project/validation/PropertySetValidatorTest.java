@@ -159,6 +159,33 @@ final class PropertySetValidatorTest {
                 .containsExactly("property.domain");
     }
 
+    /** Validates orthographic bounds, clipping planes, zoom, and finite runtime representation together. */
+    @Test
+    void validatesOrthographicCameraProjectionRules() {
+        ComponentTypeDescriptor camera = StandardSpatial3dDescriptors.extensionDescriptor().components().stream()
+                .filter(descriptor -> descriptor.type().equals(StandardSpatial3dDescriptors.orthographicCameraType()))
+                .findFirst()
+                .orElseThrow();
+        Map<PropertyId, ProjectValue> invalidCamera = Map.of(
+                StandardSpatial3dDescriptors.leftProperty(), number("2"),
+                StandardSpatial3dDescriptors.rightProperty(), number("1"),
+                StandardSpatial3dDescriptors.bottomProperty(), number("3"),
+                StandardSpatial3dDescriptors.topProperty(), number("3"),
+                StandardSpatial3dDescriptors.nearProperty(), number("5"),
+                StandardSpatial3dDescriptors.farProperty(), number("4"),
+                StandardSpatial3dDescriptors.zoomProperty(), number("0"));
+
+        assertThat(PropertySetValidator.validateComponent(invalidCamera, camera, SOURCE, "/properties", ALL_TARGETS))
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsExactly("property.minimum", "property.domain", "property.domain", "property.domain");
+
+        Map<PropertyId, ProjectValue> nonFinite = Map.of(StandardSpatial3dDescriptors.leftProperty(), number("1E1000"));
+        assertThat(PropertySetValidator.validateComponent(nonFinite, camera, SOURCE, "/properties", ALL_TARGETS))
+                .extracting(diagnostic -> diagnostic.code().code())
+                .containsOnly("property.domain")
+                .hasSize(2);
+    }
+
     /** Creates a mutable complete controller property map from descriptor-valid values. */
     private static Map<PropertyId, ProjectValue> validControllerProperties() {
         Map<PropertyId, ProjectValue> values = new LinkedHashMap<>();

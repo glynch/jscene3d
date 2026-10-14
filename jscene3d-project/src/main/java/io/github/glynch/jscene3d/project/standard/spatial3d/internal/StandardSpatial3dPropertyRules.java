@@ -36,31 +36,86 @@ public final class StandardSpatial3dPropertyRules {
      */
     public static List<ProjectDiagnostic> validate(
             ComponentType type, Map<String, ProjectValue> values, URI source, String location) {
-        if (!type.equals(StandardSpatial3dDescriptors.perspectiveCameraType())) {
-            return List.of();
+        if (type.equals(StandardSpatial3dDescriptors.perspectiveCameraType())) {
+            return validatePerspectiveCamera(values, source, location);
         }
+        if (type.equals(StandardSpatial3dDescriptors.orthographicCameraType())) {
+            return validateOrthographicCamera(values, source, location);
+        }
+        return List.of();
+    }
+
+    /** Validates relationships and runtime representation for a perspective projection. */
+    private static List<ProjectDiagnostic> validatePerspectiveCamera(
+            Map<String, ProjectValue> values, URI source, String location) {
         List<ProjectDiagnostic> diagnostics = new ArrayList<>();
         String nearId = StandardSpatial3dDescriptors.nearProperty().value();
         String farId = StandardSpatial3dDescriptors.farProperty().value();
-        BigDecimal near = number(values, nearId);
-        BigDecimal far = number(values, farId);
-        finiteFloat(
-                        values,
-                        StandardSpatial3dDescriptors.fieldOfViewDegreesProperty()
-                                .value(),
-                        source,
-                        location)
-                .ifPresent(diagnostics::add);
-        finiteFloat(values, nearId, source, location).ifPresent(diagnostics::add);
-        finiteFloat(values, farId, source, location).ifPresent(diagnostics::add);
-        if (near != null && far != null && near.compareTo(far) >= 0) {
+        addFiniteFloat(
+                diagnostics,
+                values,
+                StandardSpatial3dDescriptors.fieldOfViewDegreesProperty().value(),
+                source,
+                location);
+        addFiniteFloat(diagnostics, values, nearId, source, location);
+        addFiniteFloat(diagnostics, values, farId, source, location);
+        validateOrdered(diagnostics, values, nearId, farId, source, location, "clipping distance");
+        return List.copyOf(diagnostics);
+    }
+
+    /** Validates relationships and runtime representation for an orthographic projection. */
+    private static List<ProjectDiagnostic> validateOrthographicCamera(
+            Map<String, ProjectValue> values, URI source, String location) {
+        List<ProjectDiagnostic> diagnostics = new ArrayList<>();
+        String leftId = StandardSpatial3dDescriptors.leftProperty().value();
+        String rightId = StandardSpatial3dDescriptors.rightProperty().value();
+        String bottomId = StandardSpatial3dDescriptors.bottomProperty().value();
+        String topId = StandardSpatial3dDescriptors.topProperty().value();
+        String nearId = StandardSpatial3dDescriptors.nearProperty().value();
+        String farId = StandardSpatial3dDescriptors.farProperty().value();
+        List.of(
+                        leftId,
+                        rightId,
+                        topId,
+                        bottomId,
+                        nearId,
+                        farId,
+                        StandardSpatial3dDescriptors.zoomProperty().value())
+                .forEach(property -> addFiniteFloat(diagnostics, values, property, source, location));
+        validateOrdered(diagnostics, values, leftId, rightId, source, location, "projection boundary");
+        validateOrdered(diagnostics, values, bottomId, topId, source, location, "projection boundary");
+        validateOrdered(diagnostics, values, nearId, farId, source, location, "clipping distance");
+        return List.copyOf(diagnostics);
+    }
+
+    /** Adds one finite-float diagnostic when required. */
+    private static void addFiniteFloat(
+            List<ProjectDiagnostic> diagnostics,
+            Map<String, ProjectValue> values,
+            String propertyId,
+            URI source,
+            String location) {
+        finiteFloat(values, propertyId, source, location).ifPresent(diagnostics::add);
+    }
+
+    /** Validates one strictly ordered numeric-property pair. */
+    private static void validateOrdered(
+            List<ProjectDiagnostic> diagnostics,
+            Map<String, ProjectValue> values,
+            String lowerId,
+            String upperId,
+            URI source,
+            String location,
+            String description) {
+        BigDecimal lower = number(values, lowerId);
+        BigDecimal upper = number(values, upperId);
+        if (lower != null && upper != null && lower.compareTo(upper) >= 0) {
             diagnostics.add(error(
                     source,
-                    location + "/" + farId,
-                    farId,
-                    "far clipping distance must be greater than near clipping distance"));
+                    location + "/" + upperId,
+                    upperId,
+                    upperId + " " + description + " must be greater than " + lowerId + " " + description));
         }
-        return List.copyOf(diagnostics);
     }
 
     /** Returns a number when the already core-validated property is available. */

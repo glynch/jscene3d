@@ -34,6 +34,7 @@ import io.github.glynch.jscene3d.project.entity.LocalEntity;
 import io.github.glynch.jscene3d.project.extension.RegisteredTypeCatalog;
 import io.github.glynch.jscene3d.project.manifest.GameProject;
 import io.github.glynch.jscene3d.project.settings.ProjectConfiguration;
+import io.github.glynch.jscene3d.project.standard.spatial3d.StandardSpatial3dDescriptors;
 import io.github.glynch.jscene3d.project.value.ProjectValue;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -54,11 +55,14 @@ import org.junit.jupiter.api.io.TempDir;
 final class EditorProjectSessionTest {
     private static final AssetId WORLD_ID = AssetId.from("3b406aba-26fb-4681-9abe-7a952c321f9a");
     private static final AssetId ENTITY_DEFINITION_ID = AssetId.from("4ccdb339-9c5b-47d3-9b18-9169be5e4936");
+    private static final AssetId ORTHOGRAPHIC_SCENE_ID = AssetId.from("10aa3004-dcef-4ac9-a1b1-55de3e49b56a");
     private static final AssetId GENERATED_DEFINITION_ID = AssetId.from("11111111-1111-4111-8111-111111111111");
     private static final EntityId WORLD_ENTITY_ID = EntityId.from("0b295328-b5a3-4f41-9f34-e9b4abc430a7");
     private static final EntityId DEFINITION_ENTITY_ID = EntityId.from("7be5cdf0-1bc7-481c-8880-3d627e14d52d");
     private static final ComponentId WORLD_COMPONENT_ID = ComponentId.from("3e940be7-e58d-4f3a-8b5e-e61c99c00904");
     private static final ComponentId DEFINITION_COMPONENT_ID = ComponentId.from("8f9c514c-eb42-4800-a9a6-012347ff7104");
+    private static final EntityId ORTHOGRAPHIC_ENTITY_ID = EntityId.from("a9ec5454-f605-4bf0-82c5-9520419977c8");
+    private static final ComponentId ORTHOGRAPHIC_CAMERA_ID = ComponentId.from("8ae734ec-b860-4ea5-b9a2-f1eef98f0a03");
     private static final PropertyId SPEED = new PropertyId("speed");
     private static final PropertyId BOOST = new PropertyId("boost");
 
@@ -319,6 +323,44 @@ final class EditorProjectSessionTest {
             assertThat(property(restoredInspection, SPEED).state().authoredValue())
                     .contains(new InspectorValue.NumberValue(BigDecimal.ONE));
             assertThat(property(restoredInspection, SPEED).state().modified()).isFalse();
+        }
+    }
+
+    /** Applies generic mutation, history, persistence, and atomic validation to an orthographic camera. */
+    @Test
+    void authorsOrthographicCameraThroughGenericWorkingCopyLifecycle() throws Exception {
+        try (EditorProjectSession session = session()) {
+            EditorRetainedDefinition retained = retain(session, ORTHOGRAPHIC_SCENE_ID);
+            InspectorMutationTarget.ComponentProperty zoom =
+                    orthographicProperty(retained, StandardSpatial3dDescriptors.zoomProperty());
+            InspectorMutationTarget.ComponentProperty left =
+                    orthographicProperty(retained, StandardSpatial3dDescriptors.leftProperty());
+
+            AuthoringMutationResult changed = set(session, ORTHOGRAPHIC_SCENE_ID, zoom, number("3"), 0L);
+            AuthoringMutationResult invalidZoom = set(session, ORTHOGRAPHIC_SCENE_ID, zoom, number("0"), 1L);
+            AuthoringMutationResult invalidBounds = set(session, ORTHOGRAPHIC_SCENE_ID, left, number("2"), 1L);
+            AuthoringMutationResult undone = session.undo(ORTHOGRAPHIC_SCENE_ID, 1L);
+            AuthoringMutationResult redone = session.redo(ORTHOGRAPHIC_SCENE_ID, 2L);
+            AuthoringPersistenceResult saved = session.saveDefinition(ORTHOGRAPHIC_SCENE_ID, 3L);
+            set(session, ORTHOGRAPHIC_SCENE_ID, zoom, number("4"), 3L);
+            AuthoringPersistenceResult reverted = session.revertDefinition(ORTHOGRAPHIC_SCENE_ID, 4L);
+
+            assertOutcome(changed, AuthoringMutationResult.Outcome.ACCEPTED, 1L, true, true, false);
+            assertOutcome(invalidZoom, AuthoringMutationResult.Outcome.VALIDATION_REJECTED, 1L, true, true, false);
+            assertOutcome(invalidBounds, AuthoringMutationResult.Outcome.VALIDATION_REJECTED, 1L, true, true, false);
+            assertOutcome(undone, AuthoringMutationResult.Outcome.ACCEPTED, 2L, false, false, true);
+            assertOutcome(redone, AuthoringMutationResult.Outcome.ACCEPTED, 3L, true, true, false);
+            assertPersistenceOutcome(saved, AuthoringPersistenceResult.Outcome.SAVED, 3L, false, true, false);
+            assertPersistenceOutcome(reverted, AuthoringPersistenceResult.Outcome.REVERTED, 5L, false, false, false);
+            assertThat(Files.readString(orthographicSource(), StandardCharsets.UTF_8))
+                    .contains("\"zoom\" : 3");
+            EditorRetainedDefinition current = retain(session, ORTHOGRAPHIC_SCENE_ID);
+            InspectorProjection inspection =
+                    session.inspect(current.hierarchy().roots().getFirst().inspectorTarget(), current.revision());
+            assertThat(property(inspection, StandardSpatial3dDescriptors.zoomProperty())
+                            .state()
+                            .authoredValue())
+                    .contains(new InspectorValue.NumberValue(new BigDecimal("3")));
         }
     }
 
@@ -969,6 +1011,16 @@ final class EditorProjectSessionTest {
                 property);
     }
 
+    /** Creates one orthographic-camera property target in the focused authored Scene fixture. */
+    private static InspectorMutationTarget.ComponentProperty orthographicProperty(
+            EditorRetainedDefinition retained, PropertyId property) {
+        return new InspectorMutationTarget.ComponentProperty(
+                retained.hierarchy().roots().getFirst().occurrence(),
+                ORTHOGRAPHIC_ENTITY_ID,
+                ORTHOGRAPHIC_CAMERA_ID,
+                property);
+    }
+
     /** Applies one SET through the public session entry point. */
     private static AuthoringMutationResult set(
             EditorProjectSession session,
@@ -1128,6 +1180,7 @@ final class EditorProjectSessionTest {
         writeDescriptor();
         writeExtension();
         writeWorld();
+        writeOrthographicWorld();
         writeEntity();
     }
 
@@ -1233,6 +1286,37 @@ final class EditorProjectSessionTest {
                 """);
     }
 
+    private void writeOrthographicWorld() throws IOException {
+        write("worlds/orthographic.scene.json", """
+                {
+                  "$schema":"https://jscene3d.org/schemas/scene-definition-1.json",
+                  "assetId":"10aa3004-dcef-4ac9-a1b1-55de3e49b56a",
+                  "assetType":"scene-definition",
+                  "formatVersion":1,
+                  "name":"Orthographic Authoring",
+                  "connections":[],
+                  "roots":[{
+                    "entryType":"local",
+                    "entityId":"a9ec5454-f605-4bf0-82c5-9520419977c8",
+                    "name":"Camera",
+                    "enabled":true,
+                    "components":[{
+                      "componentId":"811425a1-5086-4ece-ad91-926f94a31806",
+                      "type":"io.github.glynch.jscene3d.spatial3d/transform-3d",
+                      "typeVersion":1,
+                      "properties":{}
+                    },{
+                      "componentId":"8ae734ec-b860-4ea5-b9a2-f1eef98f0a03",
+                      "type":"io.github.glynch.jscene3d.spatial3d/orthographic-camera-3d",
+                      "typeVersion":1,
+                      "properties":{"left":-1,"right":1,"top":1,"bottom":-1,"near":0,"far":100,"zoom":1,"primary":true}
+                    }],
+                    "children":[]
+                  }]
+                }
+                """);
+    }
+
     private void write(String relativePath, String content) throws IOException {
         Path target = projectRoot.resolve(relativePath);
         Files.createDirectories(target.getParent());
@@ -1245,6 +1329,10 @@ final class EditorProjectSessionTest {
 
     private Path entitySource() {
         return projectRoot.resolve("entities/reusable.entity.json");
+    }
+
+    private Path orthographicSource() {
+        return projectRoot.resolve("worlds/orthographic.scene.json");
     }
 
     /** Creates one exact decimal project number. */

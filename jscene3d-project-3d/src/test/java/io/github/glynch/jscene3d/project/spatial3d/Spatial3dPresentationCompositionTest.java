@@ -216,6 +216,20 @@ final class Spatial3dPresentationCompositionTest {
         world.close();
     }
 
+    /** Preserves valid composition and non-ready presentation for a scene with no authored cameras. */
+    @Test
+    void supportsSceneWithoutAuthoredCameras() throws IOException {
+        Spatial3dWorldModule spatial = Spatial3dAdapters.standard();
+        World world = compose(new SceneDefinition(WORLD_ID, "No cameras", List.of()), spatial, noResources())
+                .world()
+                .orElseThrow();
+
+        world.activate();
+        assertThat(spatial.isReadyToRender()).isFalse();
+
+        world.close();
+    }
+
     /** Writes and composes a definition using the real catalog and runtime extension seams. */
     private WorldCompositionResult compose(
             SceneDefinition definition, Spatial3dWorldModule spatial, RuntimeResourceProvider resources)

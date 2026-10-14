@@ -108,6 +108,43 @@ final class SceneViewRendererSessionTest {
     }
 
     @Test
+    void selectsCameraOnlyOccurrenceThroughItsOverlayIconAndShowsAllFrustums() {
+        PerspectiveCamera3d perspective = new PerspectiveCamera3d(
+                component(rootOccurrence(), AUTHORED_CAMERA), decimal("55"), decimal("0.1"), decimal("500"), true);
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.updateViewportSize(1_000, 700);
+            session.replaceSnapshot(snapshot(1L, List.of(authoredCameraRoot(perspective))));
+
+            SceneViewSelectionResult selected = session.pick(1L, 0.0f, 0.0f);
+
+            assertThat(selected).isEqualTo(SceneViewSelectionResult.selected(1L, rootOccurrence()));
+            assertThat(session.cameraVisualizations()
+                            .renderState(1_000, 700)
+                            .getFirst()
+                            .selected())
+                    .isTrue();
+            assertThat(session.cameraVisualizations().frustumsFor(rootOccurrence()))
+                    .hasSize(1)
+                    .allSatisfy(
+                            frustum -> assertThat(frustum.line().isVisible()).isTrue());
+        }
+    }
+
+    @Test
+    void focusSelectedFramesCameraOnlyOccurrenceWithoutUsingItsFrustumExtent() {
+        PerspectiveCamera3d perspective = new PerspectiveCamera3d(
+                component(rootOccurrence(), AUTHORED_CAMERA), decimal("55"), decimal("0.1"), decimal("500"), true);
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(authoredCameraRoot(perspective))));
+            session.select(1L, Optional.of(rootOccurrence()));
+
+            session.navigate(new SceneViewNavigation.FocusSelected());
+
+            assertThat(cameraDistance(session.cameraState())).isLessThan(5.0f);
+        }
+    }
+
+    @Test
     void updatesEditorCameraAspectFromTheCurrentPhysicalViewport() {
         try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
             session.updateViewportSize(1_920, 1_080);

@@ -13,6 +13,7 @@ import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot;
 import io.github.glynch.jscene3d.editor.workbench.sceneview.SceneViewSnapshot.VisualOccurrence;
 import io.github.glynch.jscene3d.helpers.BoxHelper;
 import io.github.glynch.jscene3d.helpers.GridHelper;
+import io.github.glynch.jscene3d.math.BoundingBox;
 import io.github.glynch.jscene3d.objects.Object3D;
 import io.github.glynch.jscene3d.project.asset.AssetId;
 import io.github.glynch.jscene3d.project.composition.CompositionOccurrenceId;
@@ -28,11 +29,15 @@ import org.jspecify.annotations.Nullable;
 
 /** Renderer-side owner of one safe Scene View graph, editor camera, helpers, and resource cache. */
 final class SceneViewRendererSession implements AutoCloseable {
+    private static final float EDITOR_GRID_SIZE = 20.0f;
+
     private final Scene scene = new Scene();
     private final SceneViewEditorCamera editorCamera = new SceneViewEditorCamera();
-    private final GridHelper grid = new GridHelper(20.0f, 20);
+    private final GridHelper grid = new GridHelper(EDITOR_GRID_SIZE, 20);
     private final SceneOrientationGizmo orientationGizmo = new SceneOrientationGizmo(editorCamera::active);
     private final SceneTransformGizmo transformGizmo = new SceneTransformGizmo(editorCamera::active);
+    private final SceneCameraVisualizations cameraVisualizations =
+            new SceneCameraVisualizations(editorCamera::active, EDITOR_GRID_SIZE);
     private final SceneViewResourceCache resources;
     private final Raycaster raycaster = new Raycaster();
 
@@ -40,6 +45,8 @@ final class SceneViewRendererSession implements AutoCloseable {
     private @Nullable AssetId sceneId;
     private @Nullable CompositionOccurrenceId selectedOccurrence;
     private @Nullable BoxHelper selectionHelper;
+    private int viewportWidth = 1;
+    private int viewportHeight = 1;
     private boolean closed;
 
     SceneViewRendererSession(SceneViewResourceResolver resolver) {
@@ -72,6 +79,7 @@ final class SceneViewRendererSession implements AutoCloseable {
 
         SceneViewRealizedContent previous = content;
         scene.add(replacement.root());
+        cameraVisualizations.replace(replacement, (float) viewportWidth / viewportHeight);
         if (previous != null) {
             previous.root().detach();
         }
@@ -95,6 +103,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         updateViewportSize(viewportWidth, viewportHeight);
         Renderer validRenderer = Objects.requireNonNull(renderer, "renderer");
         validRenderer.render(scene, editorCamera.active());
+        validRenderer.render(cameraVisualizations);
         validRenderer.render(transformGizmo);
         validRenderer.render(orientationGizmo);
     }
@@ -104,7 +113,10 @@ final class SceneViewRendererSession implements AutoCloseable {
         if (viewportWidth <= 0 || viewportHeight <= 0) {
             throw new IllegalArgumentException("viewport dimensions must be positive");
         }
+        this.viewportWidth = viewportWidth;
+        this.viewportHeight = viewportHeight;
         editorCamera.resize(viewportWidth, viewportHeight);
+        cameraVisualizations.resize((float) viewportWidth / viewportHeight);
     }
 
     Scene scene() {
@@ -130,6 +142,11 @@ final class SceneViewRendererSession implements AutoCloseable {
     SceneTransformGizmo transformGizmo() {
         requireOpen();
         return transformGizmo;
+    }
+
+    SceneCameraVisualizations cameraVisualizations() {
+        requireOpen();
+        return cameraVisualizations;
     }
 
     OptionalLong revision() {
@@ -172,12 +189,18 @@ final class SceneViewRendererSession implements AutoCloseable {
         if (current.revision() != expectedRevision) {
             return SceneViewSelectionResult.stale(current.revision());
         }
-        raycaster.setFromCamera(horizontal, vertical, editorCamera.active());
-        Optional<CompositionOccurrenceId> picked = raycaster.intersect(current.root()).stream()
-                .map(hit -> current.identities().get(hit.mesh()))
-                .filter(Objects::nonNull)
-                .map(SceneViewObjectIdentity::occurrence)
-                .findFirst();
+        float logicalX = (horizontal + 1.0f) * 0.5f * viewportWidth;
+        float logicalY = (1.0f - vertical) * 0.5f * viewportHeight;
+        Optional<CompositionOccurrenceId> picked =
+                cameraVisualizations.pick(logicalX, logicalY, viewportWidth, viewportHeight);
+        if (picked.isEmpty()) {
+            raycaster.setFromCamera(horizontal, vertical, editorCamera.active());
+            picked = raycaster.intersect(current.root()).stream()
+                    .map(hit -> current.identities().get(hit.mesh()))
+                    .filter(Objects::nonNull)
+                    .map(SceneViewObjectIdentity::occurrence)
+                    .findFirst();
+        }
         select(expectedRevision, picked);
         return picked.map(occurrence -> SceneViewSelectionResult.selected(expectedRevision, occurrence))
                 .orElseGet(() -> SceneViewSelectionResult.cleared(expectedRevision));
@@ -267,6 +290,11 @@ final class SceneViewRendererSession implements AutoCloseable {
         closed = true;
         @Nullable RuntimeException failure = null;
         clearSelectionHelper();
+        try {
+            cameraVisualizations.close();
+        } catch (RuntimeException exception) {
+            failure = exception;
+        }
         if (content != null) {
             try {
                 content.close();
@@ -312,6 +340,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         CompositionOccurrenceId occurrence = selectedOccurrence;
         if (current == null || occurrence == null) {
             transformGizmo.select(null, null, 0L, false);
+            cameraVisualizations.select(null);
             return;
         }
         Object3D selected = current.occurrenceObjects().get(occurrence);
@@ -319,8 +348,10 @@ final class SceneViewRendererSession implements AutoCloseable {
         if (selected == null) {
             selectedOccurrence = null;
             transformGizmo.select(null, null, 0L, false);
+            cameraVisualizations.select(null);
             return;
         }
+        cameraVisualizations.select(occurrence);
         boolean editable = description != null
                 && description
                         .transform()
@@ -331,7 +362,7 @@ final class SceneViewRendererSession implements AutoCloseable {
         transformGizmo.refreshSelection(
                 presentGizmo ? description : null, presentGizmo ? selected : null, current.revision(), editable);
         try {
-            BoxHelper helper = new BoxHelper(selected);
+            BoxHelper helper = cameraVisualizations.excludingFrustums(() -> new BoxHelper(selected));
             scene.add(helper);
             selectionHelper = helper;
         } catch (IllegalArgumentException ignored) {
@@ -347,14 +378,20 @@ final class SceneViewRendererSession implements AutoCloseable {
         }
         Object3D selected = current.occurrenceObjects().get(occurrence);
         if (selected != null) {
-            BoxHelper.computeVisibleBounds(selected).ifPresent(editorCamera::frame);
+            Optional<BoundingBox> authoredBounds =
+                    cameraVisualizations.excludingFrustums(() -> BoxHelper.computeVisibleBounds(selected));
+            authoredBounds
+                    .or(() -> cameraVisualizations.focusBounds(occurrence))
+                    .ifPresent(editorCamera::frame);
         }
     }
 
     private void frameAll() {
         SceneViewRealizedContent current = content;
         if (current != null) {
-            BoxHelper.computeVisibleBounds(current.root()).ifPresent(editorCamera::frame);
+            cameraVisualizations
+                    .excludingFrustums(() -> BoxHelper.computeVisibleBounds(current.root()))
+                    .ifPresent(editorCamera::frame);
         }
     }
 

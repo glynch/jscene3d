@@ -24,6 +24,9 @@ public final class RendererProtocol {
     /** Scene View transform authoring-intent event prefix. */
     public static final String EVENT_SCENE_TRANSFORM = "SCENE_TRANSFORM";
 
+    /** Scene View editor-camera state event prefix. */
+    public static final String EVENT_SCENE_CAMERA_STATE = "SCENE_CAMERA_STATE";
+
     /** Pause acknowledgement. */
     public static final String EVENT_PAUSED = "PAUSED";
 

@@ -23,6 +23,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -104,6 +105,24 @@ final class RendererProtocolServerTest {
                 .returns(
                         "e890c4c3-fb32-49d8-88b8-4e04e7a29656",
                         value -> value.scene().toString());
+    }
+
+    @Test
+    void publishesInitialAndNavigationCameraStateWithoutChangingProtocolVersion() throws IOException {
+        FakeRendererSession session = new FakeRendererSession();
+        session.cameraState = Optional.of(new SceneViewCameraState(
+                new Vector3f(6.0f, 4.0f, 6.0f),
+                new Vector3f(-20.0f, 45.0f, 0.0f),
+                new Vector3f(),
+                SceneViewCameraState.Projection.PERSPECTIVE));
+
+        ProtocolResult result = run(session, "SCENE_NAVIGATE ZOOM -120\nSHUTDOWN\n");
+
+        String cameraEvent =
+                "SCENE_CAMERA_STATE " + SceneViewCameraStateCodec.encode(session.cameraState.orElseThrow());
+        assertThat(result.events())
+                .containsExactly("PROTOCOL_VERSION 1.0", "RENDERER_READY", cameraEvent, cameraEvent, "SHUTDOWN_READY");
+        assertThat(session.navigationRequests).isEqualTo(1);
     }
 
     @Test
@@ -299,6 +318,8 @@ final class RendererProtocolServerTest {
         private boolean transformBeginClaimed = true;
         private int transformUpdates;
         private int transformCancels;
+        private int navigationRequests;
+        private Optional<SceneViewCameraState> cameraState = Optional.empty();
 
         @Override
         public void renderFrame() {
@@ -344,6 +365,16 @@ final class RendererProtocolServerTest {
                     Objects.equals(selectedOccurrence, occurrence) ? Optional.empty() : cancelSceneTransform();
             selectedOccurrence = occurrence;
             return cancelled;
+        }
+
+        @Override
+        public void navigateSceneView(SceneViewNavigation navigation) {
+            navigationRequests++;
+        }
+
+        @Override
+        public Optional<SceneViewCameraState> sceneViewCameraState() {
+            return cameraState;
         }
 
         @Override

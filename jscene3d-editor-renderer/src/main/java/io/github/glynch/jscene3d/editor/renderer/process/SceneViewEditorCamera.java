@@ -33,6 +33,7 @@ final class SceneViewEditorCamera {
     private final Vector3f viewDirection = new Vector3f();
     private final Vector3f right = new Vector3f();
     private final Vector3f up = new Vector3f();
+    private final Vector3f orientationDegrees = new Vector3f();
 
     private Camera active = perspective;
     private float distance;
@@ -156,9 +157,16 @@ final class SceneViewEditorCamera {
         applyPose();
     }
 
-    /** Returns immutable state for focused renderer tests. */
-    State state() {
-        return new State(new Vector3f(active.position()), new Vector3f(pivot), distance, active == perspective);
+    /** Returns immutable renderer-authoritative state for transport and focused tests. */
+    SceneViewCameraState state() {
+        active.quaternion().getEulerAnglesXYZ(orientationDegrees).mul((float) (180.0 / Math.PI));
+        return new SceneViewCameraState(
+                active.position(),
+                orientationDegrees,
+                pivot,
+                active == perspective
+                        ? SceneViewCameraState.Projection.PERSPECTIVE
+                        : SceneViewCameraState.Projection.ORTHOGRAPHIC);
     }
 
     /** Recomputes spherical state from a position relative to the current pivot. */
@@ -195,7 +203,4 @@ final class SceneViewEditorCamera {
             throw new IllegalArgumentException(name + " must be finite");
         }
     }
-
-    /** Immutable observable editor-camera state. */
-    record State(Vector3fc position, Vector3fc pivot, float distance, boolean perspective) {}
 }

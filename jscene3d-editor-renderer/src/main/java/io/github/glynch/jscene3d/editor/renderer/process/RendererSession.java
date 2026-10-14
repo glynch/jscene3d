@@ -30,6 +30,10 @@ interface RendererSession extends AutoCloseable {
         throw new IllegalStateException("Renderer session does not support Scene View navigation");
     }
 
+    default Optional<SceneViewCameraState> sceneViewCameraState() {
+        return Optional.empty();
+    }
+
     default Optional<SceneTransformEvent> configureSceneTransform(SceneTransformSettings settings) {
         throw new IllegalStateException("Renderer session does not support Scene transform tools");
     }

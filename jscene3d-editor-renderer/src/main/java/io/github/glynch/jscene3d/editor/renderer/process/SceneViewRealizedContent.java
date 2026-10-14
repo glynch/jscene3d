@@ -66,6 +66,15 @@ record SceneViewRealizedContent(
         }
     }
 
+    /** Returns whether an occurrence's current realized content permits a transform gizmo. */
+    boolean permitsTransformGizmo(CompositionOccurrenceId occurrence) {
+        VisualOccurrence description = occurrenceDescriptions.get(Objects.requireNonNull(occurrence, "occurrence"));
+        if (description == null || !description.enabled()) {
+            return false;
+        }
+        return description.meshes().isEmpty() || description.meshes().stream().anyMatch(MeshRenderer3d::visible);
+    }
+
     private static Object3D realizeOccurrence(VisualOccurrence occurrence) {
         Object3D node = new Object3D();
         node.setVisible(occurrence.enabled());

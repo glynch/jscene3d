@@ -242,7 +242,7 @@ final class SceneViewRendererSession implements AutoCloseable {
                 .event();
     }
 
-    SceneViewEditorCamera.State cameraState() {
+    SceneViewCameraState cameraState() {
         requireOpen();
         return editorCamera.state();
     }
@@ -315,7 +315,9 @@ final class SceneViewRendererSession implements AutoCloseable {
                         .map(transform -> transform.identity().scope().definition())
                         .filter(occurrence.rootDefinition()::equals)
                         .isPresent();
-        transformGizmo.refreshSelection(description, selected, current.revision(), editable);
+        boolean presentGizmo = current.permitsTransformGizmo(occurrence);
+        transformGizmo.refreshSelection(
+                presentGizmo ? description : null, presentGizmo ? selected : null, current.revision(), editable);
         try {
             BoxHelper helper = new BoxHelper(selected);
             scene.add(helper);

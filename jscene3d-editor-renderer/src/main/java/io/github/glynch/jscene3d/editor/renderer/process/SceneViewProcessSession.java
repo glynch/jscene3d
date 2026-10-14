@@ -163,6 +163,12 @@ final class SceneViewProcessSession implements RendererSession {
     }
 
     @Override
+    public Optional<SceneViewCameraState> sceneViewCameraState() {
+        requireOpen();
+        return Optional.of(sceneView.cameraState());
+    }
+
+    @Override
     public Optional<SceneTransformEvent> configureSceneTransform(SceneTransformSettings settings) {
         requireOpen();
         return sceneView.configureTransform(settings);

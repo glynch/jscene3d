@@ -30,6 +30,7 @@ final class RendererProtocolServer {
     void run(BufferedReader input) throws IOException {
         send(RendererProtocol.EVENT_PROTOCOL_VERSION + " " + version);
         send(RendererProtocol.EVENT_RENDERER_READY);
+        sendCameraState();
         String line;
         while ((line = input.readLine()) != null) {
             RendererCommand command;
@@ -105,6 +106,7 @@ final class RendererProtocolServer {
 
     private boolean executeSceneNavigate(RendererCommand.SceneNavigate navigate) {
         session.navigateSceneView(navigate.navigation());
+        sendCameraState();
         return true;
     }
 
@@ -192,6 +194,12 @@ final class RendererProtocolServer {
     private void sendTransformEvent(Optional<SceneTransformEvent> event) {
         event.ifPresent(
                 value -> send(RendererProtocol.EVENT_SCENE_TRANSFORM + " " + SceneTransformEventCodec.encode(value)));
+    }
+
+    private void sendCameraState() {
+        session.sceneViewCameraState()
+                .ifPresent(state -> send(
+                        RendererProtocol.EVENT_SCENE_CAMERA_STATE + " " + SceneViewCameraStateCodec.encode(state)));
     }
 
     private void send(String event) {

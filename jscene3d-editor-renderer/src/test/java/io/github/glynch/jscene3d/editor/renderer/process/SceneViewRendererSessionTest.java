@@ -60,6 +60,8 @@ final class SceneViewRendererSessionTest {
     private static final EntityId SECOND_CHILD_ENTITY = EntityId.from("55555555-5555-4555-8555-555555555555");
     private static final ComponentId TRANSFORM = ComponentId.from("66666666-6666-4666-8666-666666666666");
     private static final ComponentId MESH = ComponentId.from("77777777-7777-4777-8777-777777777777");
+    private static final ComponentId SECOND_MESH = ComponentId.from("99999999-9999-4999-8999-999999999991");
+    private static final ComponentId THIRD_MESH = ComponentId.from("99999999-9999-4999-8999-999999999992");
     private static final ComponentId LIGHT = ComponentId.from("88888888-8888-4888-8888-888888888888");
     private static final ResourceReference MESH_REFERENCE = ResourceReference.asset("box-mesh");
     private static final ResourceReference MATERIAL_REFERENCE = ResourceReference.asset("textured-material");
@@ -103,19 +105,20 @@ final class SceneViewRendererSessionTest {
         try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
             session.replaceSnapshot(snapshot(1L, List.of(pickableRoot())));
             Object3D authored = session.objectFor(rootOccurrence()).orElseThrow();
-            SceneViewEditorCamera.State initial = session.cameraState();
+            SceneViewCameraState initial = session.cameraState();
 
             session.navigate(new SceneViewNavigation.Orbit(80.0f, -30.0f, 1_200, 800));
-            SceneViewEditorCamera.State orbited = session.cameraState();
+            SceneViewCameraState orbited = session.cameraState();
             session.navigate(new SceneViewNavigation.Pan(24.0f, -18.0f, 1_200, 800));
-            SceneViewEditorCamera.State panned = session.cameraState();
+            SceneViewCameraState panned = session.cameraState();
             session.navigate(new SceneViewNavigation.Zoom(-120.0f));
-            SceneViewEditorCamera.State zoomed = session.cameraState();
+            SceneViewCameraState zoomed = session.cameraState();
 
             assertThat(orbited.position()).isNotEqualTo(initial.position());
             assertThat(orbited.pivot()).isEqualTo(initial.pivot());
             assertThat(panned.pivot()).isNotEqualTo(orbited.pivot());
-            assertThat(zoomed.distance()).isLessThan(panned.distance());
+            assertThat(cameraDistance(zoomed)).isLessThan(cameraDistance(panned));
+            assertThat(orbited.orientationDegrees()).isNotEqualTo(initial.orientationDegrees());
             assertThat(session.objectFor(rootOccurrence())).containsSame(authored);
             assertThat(session.revision()).hasValue(1L);
         }
@@ -128,9 +131,9 @@ final class SceneViewRendererSessionTest {
             session.select(1L, Optional.of(rootOccurrence()));
 
             session.navigate(new SceneViewNavigation.FocusSelected());
-            SceneViewEditorCamera.State focused = session.cameraState();
+            SceneViewCameraState focused = session.cameraState();
             assertThat(focused.pivot()).isEqualTo(new Vector3f());
-            assertThat(focused.distance()).isLessThan(3.0f);
+            assertThat(cameraDistance(focused)).isLessThan(3.0f);
 
             session.navigate(new SceneViewNavigation.Pan(50.0f, 0.0f, 1_000, 700));
             session.navigate(new SceneViewNavigation.FrameAll());
@@ -140,7 +143,7 @@ final class SceneViewRendererSessionTest {
             session.navigate(new SceneViewNavigation.GizmoClick(
                     gizmo.center().x(), gizmo.center().y(), 1_000, 700));
             assertThat(session.camera()).isInstanceOf(OrthographicCamera.class);
-            assertThat(session.cameraState().perspective()).isFalse();
+            assertThat(session.cameraState().projection()).isEqualTo(SceneViewCameraState.Projection.ORTHOGRAPHIC);
             assertThat(session.orientationGizmo().renderState(1_000, 700).projectionLabel())
                     .isEqualTo("Ortho");
         }
@@ -159,7 +162,7 @@ final class SceneViewRendererSessionTest {
 
             session.navigate(new SceneViewNavigation.GizmoClick(
                     positiveX.endpoint().x(), positiveX.endpoint().y(), 1_000, 700));
-            SceneViewEditorCamera.State aligned = session.cameraState();
+            SceneViewCameraState aligned = session.cameraState();
             session.replaceSnapshot(snapshot(2L, List.of(pickableRoot())));
 
             assertThat(aligned.position().x()).isGreaterThan(aligned.pivot().x());
@@ -606,6 +609,114 @@ final class SceneViewRendererSessionTest {
     }
 
     @Test
+    void hidesAndRestoresSelectedMeshGizmoWithoutChangingSelectionOrTool() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(meshTransformRoot(true, true))));
+            session.select(1L, Optional.of(rootOccurrence()));
+            session.configureTransform(settings(SceneTransformTool.MOVE, SceneTransformSpace.GLOBAL, false));
+            SceneTransformGizmoState visible =
+                    session.transformGizmo().renderState(1_000, 700).orElseThrow();
+            Point previousHandle = visible.endpoint(Axis.X);
+
+            session.replaceSnapshot(snapshot(2L, List.of(meshTransformRoot(true, false))));
+
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isEmpty();
+            assertThat(session.transform(PointerPhase.BEGIN, previousHandle.x(), previousHandle.y(), 1_000, 700)
+                            .claimed())
+                    .isFalse();
+            assertThat(session.synchronizeSelection(2L, Optional.of(rootOccurrence())))
+                    .isEmpty();
+
+            session.replaceSnapshot(snapshot(3L, List.of(meshTransformRoot(true, true))));
+
+            assertThat(session.transformGizmo().renderState(1_000, 700))
+                    .hasValueSatisfying(state -> assertThat(state.tool()).isEqualTo(SceneTransformTool.MOVE));
+        }
+    }
+
+    @Test
+    void evaluatesEveryMeshRendererBeforePresentingTheTransformGizmo() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(meshTransformRoot(true, true, true, true))));
+            session.select(1L, Optional.of(rootOccurrence()));
+            session.configureTransform(settings(SceneTransformTool.ROTATE, SceneTransformSpace.GLOBAL, false));
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isPresent();
+
+            session.replaceSnapshot(snapshot(2L, List.of(meshTransformRoot(true, false, true, false))));
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isPresent();
+
+            session.replaceSnapshot(snapshot(3L, List.of(meshTransformRoot(true, false, false, false))));
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isEmpty();
+        }
+    }
+
+    @Test
+    void suppressesDisabledEntitiesButKeepsTransformOnlyAndLightEntitiesEligible() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(meshTransformRoot(false, true))));
+            session.select(1L, Optional.of(rootOccurrence()));
+            session.configureTransform(settings(SceneTransformTool.MOVE, SceneTransformSpace.GLOBAL, false));
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isEmpty();
+
+            session.replaceSnapshot(snapshot(2L, effectivelyDisabledChildOccurrences()));
+            session.select(2L, Optional.of(childOccurrence()));
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isEmpty();
+
+            session.replaceSnapshot(snapshot(3L, List.of(transformableRoot())));
+            session.select(3L, Optional.of(rootOccurrence()));
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isPresent();
+
+            session.replaceSnapshot(snapshot(4L, List.of(lightTransformRoot())));
+            assertThat(session.transformGizmo().renderState(1_000, 700)).isPresent();
+        }
+    }
+
+    @Test
+    void keepsHiddenSelectionNonInteractiveAcrossToolChangesAndRestoresTheCurrentTool() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(meshTransformRoot(true, false))));
+            session.select(1L, Optional.of(rootOccurrence()));
+
+            for (SceneTransformTool tool : SceneTransformTool.values()) {
+                session.configureTransform(settings(tool, SceneTransformSpace.GLOBAL, false));
+                assertThat(session.transformGizmo().renderState(1_000, 700)).isEmpty();
+            }
+            assertThat(session.transform(PointerPhase.BEGIN, 500.0f, 350.0f, 1_000, 700)
+                            .claimed())
+                    .isFalse();
+            assertThat(session.synchronizeSelection(1L, Optional.of(rootOccurrence())))
+                    .isEmpty();
+
+            session.replaceSnapshot(snapshot(2L, List.of(meshTransformRoot(true, true))));
+            assertThat(session.transformGizmo().renderState(1_000, 700))
+                    .hasValueSatisfying(state -> assertThat(state.tool()).isEqualTo(SceneTransformTool.SCALE));
+        }
+    }
+
+    @Test
+    void clearsAnActiveTransformWhenTheSelectedMeshBecomesHidden() {
+        try (SceneViewRendererSession session = new SceneViewRendererSession(new TrackingResolver())) {
+            session.replaceSnapshot(snapshot(1L, List.of(meshTransformRoot(true, true))));
+            session.select(1L, Optional.of(rootOccurrence()));
+            session.configureTransform(settings(SceneTransformTool.MOVE, SceneTransformSpace.GLOBAL, false));
+            Point handle = session.transformGizmo()
+                    .renderState(1_000, 700)
+                    .orElseThrow()
+                    .endpoint(Axis.X);
+            assertThat(session.transform(PointerPhase.BEGIN, handle.x(), handle.y(), 1_000, 700)
+                            .claimed())
+                    .isTrue();
+
+            session.replaceSnapshot(snapshot(2L, List.of(meshTransformRoot(true, false))));
+
+            assertThat(session.transformGizmo().dragging()).isFalse();
+            assertThat(session.transform(PointerPhase.UPDATE, handle.x() + 20.0f, handle.y(), 1_000, 700)
+                            .claimed())
+                    .isFalse();
+        }
+    }
+
+    @Test
     void highlightsSharedSelectionAndRetainsItAcrossSnapshotReplacement() {
         TrackingResolver resolver = new TrackingResolver();
         SceneViewRendererSession session = new SceneViewRendererSession(resolver);
@@ -753,6 +864,70 @@ final class SceneViewRendererSessionTest {
 
     private static VisualOccurrence transformableRoot() {
         return transformRoot(vector("0", "0", "0"), authoredComponent(rootOccurrence(), TRANSFORM));
+    }
+
+    private static VisualOccurrence meshTransformRoot(boolean enabled, boolean... meshVisibility) {
+        Transform3d transform = new Transform3d(
+                authoredComponent(rootOccurrence(), TRANSFORM),
+                vector("0", "0", "0"),
+                vector("0", "0", "0"),
+                vector("1", "1", "1"));
+        List<ComponentId> meshIds = List.of(MESH, SECOND_MESH, THIRD_MESH);
+        List<MeshRenderer3d> meshes = new ArrayList<>();
+        for (int index = 0; index < meshVisibility.length; index++) {
+            meshes.add(new MeshRenderer3d(
+                    authoredComponent(rootOccurrence(), meshIds.get(index)),
+                    MESH_REFERENCE,
+                    MATERIAL_REFERENCE,
+                    meshVisibility[index]));
+        }
+        return occurrence(
+                rootOccurrence(),
+                Optional.empty(),
+                ROOT_ENTITY,
+                enabled,
+                Optional.of(transform),
+                meshes,
+                Optional.empty());
+    }
+
+    private static VisualOccurrence lightTransformRoot() {
+        Transform3d transform = new Transform3d(
+                authoredComponent(rootOccurrence(), TRANSFORM),
+                vector("0", "0", "0"),
+                vector("0", "0", "0"),
+                vector("1", "1", "1"));
+        DirectionalLight3d light = new DirectionalLight3d(
+                authoredComponent(rootOccurrence(), LIGHT), vector("1", "1", "1"), decimal("1"), vector("0", "0", "0"));
+        return occurrence(
+                rootOccurrence(),
+                Optional.empty(),
+                ROOT_ENTITY,
+                true,
+                Optional.of(transform),
+                List.of(),
+                Optional.of(light));
+    }
+
+    private static List<VisualOccurrence> effectivelyDisabledChildOccurrences() {
+        VisualOccurrence parent = occurrence(
+                rootOccurrence(), Optional.empty(), ROOT_ENTITY, false, Optional.empty(), List.of(), Optional.empty());
+        Transform3d transform = new Transform3d(
+                authoredComponent(childOccurrence(), TRANSFORM),
+                vector("0", "0", "0"),
+                vector("0", "0", "0"),
+                vector("1", "1", "1"));
+        MeshRenderer3d mesh = new MeshRenderer3d(
+                authoredComponent(childOccurrence(), MESH), MESH_REFERENCE, MATERIAL_REFERENCE, true);
+        VisualOccurrence child = occurrence(
+                childOccurrence(),
+                Optional.of(rootOccurrence()),
+                CHILD_ENTITY,
+                false,
+                Optional.of(transform),
+                List.of(mesh),
+                Optional.empty());
+        return List.of(parent, child);
     }
 
     private static VisualOccurrence rotatedTransformableRoot() {
@@ -912,6 +1087,10 @@ final class SceneViewRendererSessionTest {
         float y = value.y().floatValue();
         float z = value.z().floatValue();
         return (float) Math.sqrt(x * x + y * y + z * z);
+    }
+
+    private static float cameraDistance(SceneViewCameraState state) {
+        return new Vector3f(state.position()).sub(state.pivot()).length();
     }
 
     private static CompositionOccurrenceId rootOccurrence() {

@@ -20,7 +20,7 @@ import org.joml.Vector4f;
 
 /** Builds exact camera-local wireframe corners by inverting engine projection matrices. */
 final class SceneCameraFrustumGeometry {
-    private static final float FAR_EXTENT_GRID_MULTIPLIER = 50.0f;
+    private static final float FAR_EXTENT_GRID_FRACTION = 0.5f;
     private static final float MINIMUM_FAR_TO_NEAR_RATIO = 2.0f;
     private static final int[] EDGE_INDICES = {
         0, 1, 1, 3, 3, 2, 2, 0,
@@ -35,9 +35,10 @@ final class SceneCameraFrustumGeometry {
     /**
      * Creates camera-local frustum corners using the engine projection implementation.
      *
-     * <p>The displayed far extent is limited to fifty times the editor grid size, or twice the
-     * authored near plane when that is larger. This keeps extreme authored clipping distances
-     * useful in Scene View without changing the retained authored values or runtime projection.
+     * <p>The displayed far extent is limited to half the editor grid span, or twice the authored
+     * near plane when that is larger. The grid-relative limit keeps an ordinary frustum readable
+     * within the editor's principal spatial reference without changing retained authored values
+     * or runtime projection. Shorter authored frustums retain their exact far distance.
      */
     static Optional<Shape> create(Camera3d description, float aspectRatio, float sceneScale) {
         if (!Float.isFinite(aspectRatio) || aspectRatio <= 0.0f) {
@@ -49,7 +50,7 @@ final class SceneCameraFrustumGeometry {
         try {
             float near = finite(description.near().floatValue());
             float authoredFar = finite(description.far().floatValue());
-            float limit = Math.max(sceneScale * FAR_EXTENT_GRID_MULTIPLIER, near * MINIMUM_FAR_TO_NEAR_RATIO);
+            float limit = Math.max(sceneScale * FAR_EXTENT_GRID_FRACTION, near * MINIMUM_FAR_TO_NEAR_RATIO);
             float visualizedFar = Math.min(authoredFar, limit);
             Camera camera = createCamera(description, aspectRatio, near, visualizedFar);
             return Optional.of(new Shape(

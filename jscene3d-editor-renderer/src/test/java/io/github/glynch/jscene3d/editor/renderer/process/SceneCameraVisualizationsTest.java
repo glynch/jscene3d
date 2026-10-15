@@ -59,10 +59,14 @@ final class SceneCameraVisualizationsTest {
             assertThat(first.cameraCount()).isEqualTo(2);
             assertThat(first.hasPerspective()).isTrue();
             assertThat(first.hasOrthographic()).isTrue();
+            assertThat(first.bounds().width()).isEqualTo(24.0f);
+            assertThat(first.bounds().height()).isEqualTo(20.0f);
             assertThat(first.bounds().width()).isEqualTo(resized.bounds().width());
             assertThat(first.bounds().height()).isEqualTo(resized.bounds().height());
             assertThat(resized.center().x()).isEqualTo(first.center().x() * 2.0f);
             assertThat(resized.center().y()).isEqualTo(first.center().y() * 2.0f);
+            assertThat(visualizations.pick(411.9f, 300.0f, 800, 600)).contains(occurrence());
+            assertThat(visualizations.pick(412.1f, 300.0f, 800, 600)).isEmpty();
         }
     }
 
@@ -166,7 +170,7 @@ final class SceneCameraVisualizationsTest {
         float aspect = 16.0f / 9.0f;
 
         SceneCameraFrustumGeometry.Shape shape =
-                SceneCameraFrustumGeometry.create(camera, aspect, 20.0f).orElseThrow();
+                SceneCameraFrustumGeometry.create(camera, aspect, 400.0f).orElseThrow();
         PerspectiveCamera engineCamera = new PerspectiveCamera(
                 (float) Math.toRadians(camera.fieldOfViewDegrees().floatValue()),
                 aspect,
@@ -191,9 +195,9 @@ final class SceneCameraVisualizationsTest {
         OrthographicCamera3d camera = orthographic();
 
         SceneCameraFrustumGeometry.Shape wide =
-                SceneCameraFrustumGeometry.create(camera, 2.0f, 20.0f).orElseThrow();
+                SceneCameraFrustumGeometry.create(camera, 2.0f, 400.0f).orElseThrow();
         SceneCameraFrustumGeometry.Shape tall =
-                SceneCameraFrustumGeometry.create(camera, 0.5f, 20.0f).orElseThrow();
+                SceneCameraFrustumGeometry.create(camera, 0.5f, 400.0f).orElseThrow();
 
         assertThat(wide).isEqualTo(tall);
         assertCorner(wide.corners().get(0), -2.0f, -1.5f, -0.1f);
@@ -209,8 +213,26 @@ final class SceneCameraVisualizationsTest {
                 SceneCameraFrustumGeometry.create(camera, 1.0f, 20.0f).orElseThrow();
 
         assertThat(shape.truncated()).isTrue();
-        assertThat(shape.visualizedFar()).isEqualTo(1_000.0f);
+        assertThat(shape.visualizedFar()).isEqualTo(10.0f);
         assertThat(camera.far()).isEqualByComparingTo("5000");
+    }
+
+    @Test
+    void preservesSmallAuthoredFarDistancesAndTheNearPlaneRelationship() {
+        PerspectiveCamera3d shortRange =
+                new PerspectiveCamera3d(identity(PERSPECTIVE), decimal("60"), decimal("0.1"), decimal("5"), true);
+        PerspectiveCamera3d distantNear =
+                new PerspectiveCamera3d(identity(PERSPECTIVE), decimal("60"), decimal("8"), decimal("500"), true);
+
+        SceneCameraFrustumGeometry.Shape shortShape =
+                SceneCameraFrustumGeometry.create(shortRange, 1.0f, 20.0f).orElseThrow();
+        SceneCameraFrustumGeometry.Shape distantNearShape =
+                SceneCameraFrustumGeometry.create(distantNear, 1.0f, 20.0f).orElseThrow();
+
+        assertThat(shortShape.visualizedFar()).isEqualTo(5.0f);
+        assertThat(shortShape.truncated()).isFalse();
+        assertThat(distantNearShape.visualizedFar()).isEqualTo(16.0f);
+        assertThat(distantNearShape.truncated()).isTrue();
     }
 
     @Test
@@ -224,10 +246,12 @@ final class SceneCameraVisualizationsTest {
             visualizations.replace(firstContent, 1.0f);
             List<SceneCameraFrustum> first = visualizations.frustumsFor(occurrence());
 
-            assertThat(first)
-                    .hasSize(2)
-                    .allSatisfy(
-                            frustum -> assertThat(frustum.line().isVisible()).isFalse());
+            assertThat(first).hasSize(2).allSatisfy(frustum -> {
+                assertThat(frustum.line().isVisible()).isFalse();
+                assertThat(frustum.line().material().transparent()).isTrue();
+                assertThat(frustum.line().material().opacity()).isEqualTo(0.62f);
+                assertThat(frustum.line().material().depthTestEnabled()).isTrue();
+            });
             visualizations.select(occurrence());
             assertThat(first)
                     .allSatisfy(

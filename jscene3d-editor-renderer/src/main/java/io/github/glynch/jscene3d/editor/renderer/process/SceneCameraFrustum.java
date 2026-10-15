@@ -16,9 +16,10 @@ import java.util.Objects;
 /** Owns one camera-local authored frustum line and its renderer resources. */
 final class SceneCameraFrustum implements AutoCloseable {
     private static final Color[] COLORS = {
-        Color.srgb(0x9f8cff), Color.srgb(0x60c7ff), Color.srgb(0xffa95f), Color.srgb(0x70d7a2)
+        Color.srgb(0x9f8cff), Color.srgb(0x79b8d1), Color.srgb(0xd5a36e), Color.srgb(0x7fbd9b)
     };
-    private static final Color TRUNCATED_COLOR = Color.srgb(0xe6b85c);
+    private static final Color TRUNCATED_COLOR = Color.srgb(0xc9a45d);
+    private static final float OPACITY = 0.62f;
 
     private final Camera3d description;
     private final float aspectRatio;
@@ -35,6 +36,8 @@ final class SceneCameraFrustum implements AutoCloseable {
         geometry = SceneCameraFrustumGeometry.geometry(shape);
         material = new LineBasicMaterial(
                 shape.truncated() ? TRUNCATED_COLOR : COLORS[Math.floorMod(styleIndex, COLORS.length)]);
+        material.setTransparent(true);
+        material.setOpacity(OPACITY);
         line = new LineSegments(geometry, material);
         line.setVisible(false);
         line.setRenderOrder(1);

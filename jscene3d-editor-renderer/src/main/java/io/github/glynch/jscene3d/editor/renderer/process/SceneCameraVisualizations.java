@@ -29,8 +29,8 @@ import org.jspecify.annotations.Nullable;
 
 /** Owns authored-camera icon presentation, picking, frustums, and renderer resource lifetime. */
 final class SceneCameraVisualizations implements Overlay, AutoCloseable {
-    static final float ICON_WIDTH = 36.0f;
-    static final float ICON_HEIGHT = 26.0f;
+    static final float ICON_WIDTH = 24.0f;
+    static final float ICON_HEIGHT = 20.0f;
 
     private final Supplier<? extends Camera> editorCamera;
     private final float sceneScale;
